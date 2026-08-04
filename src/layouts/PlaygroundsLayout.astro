@@ -1,0 +1,40 @@
+---
+import "@styles/global.css";
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const {
+  title = "遊樂場",
+  description = "瀏覽器遊樂場（Playgrounds）：開發與實驗單頁小程式（SAM）；沙盒存於 OPFS。",
+} = Astro.props;
+---
+
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, follow" />
+    <meta name="description" content={description} />
+    <title>{title}</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  </head>
+  <body>
+    <div class="playgrounds-page">
+      <header class="border-skin-line text-skin-base/70 flex shrink-0 items-center justify-between gap-3 border-b px-3 py-1.5 text-xs">
+        <span>遊樂場 · Playgrounds</span>
+        <a
+          class="text-skin-accent underline decoration-dashed underline-offset-2"
+          href="https://samkuo.me/"
+          rel="noopener noreferrer">我是山姆鍋</a
+        >
+      </header>
+      <main id="main-content" class="app-shell playgrounds-main">
+        <slot />
+      </main>
+    </div>
+  </body>
+</html>

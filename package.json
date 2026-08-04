@@ -1,0 +1,46 @@
+{
+  "name": "playgrounds",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Browser Playgrounds host: SAM sandboxes, OPFS, agents, WASI shell",
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "check": "astro check",
+    "build": "npm run check && astro build",
+    "preview": "astro preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "sam-host": "node --experimental-strip-types --experimental-transform-types src/sam-host/node/cli.ts"
+  },
+  "dependencies": {
+    "@astrojs/check": "^0.9.9",
+    "@bjorn3/browser_wasi_shim": "^0.4.2",
+    "@codemirror/lang-css": "^6.3.1",
+    "@codemirror/lang-html": "^6.4.11",
+    "@codemirror/lang-javascript": "^6.2.5",
+    "@codemirror/lang-json": "^6.0.2",
+    "@codemirror/theme-one-dark": "^6.1.3",
+    "@tailwindcss/vite": "^4.3.3",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
+    "3d-force-graph": "^1.80.0",
+    "astro": "^7.1.3",
+    "codemirror": "^6.0.2",
+    "fflate": "^0.8.3",
+    "sql.js": "^1.14.1",
+    "tailwindcss": "^4.3.3",
+    "three": "^0.185.1",
+    "typescript": "^6.0.3"
+  },
+  "devDependencies": {
+    "@astrojs/svelte": "^9.0.1",
+    "@types/sql.js": "^1.4.11",
+    "svelte": "^5.56.8",
+    "vitest": "^4.1.10"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

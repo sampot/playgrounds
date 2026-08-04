@@ -1,0 +1,13 @@
+---
+import PlaygroundsLayout from "@layouts/PlaygroundsLayout.astro";
+import PlaygroundsApp from "@components/playgrounds/PlaygroundsApp.svelte";
+---
+
+<PlaygroundsLayout>
+  <PlaygroundsApp client:only="svelte" />
+  <noscript>
+    <p class="text-skin-base p-6 text-sm">
+      遊樂場需要啟用 JavaScript，並在支援 OPFS 的瀏覽器中使用。
+    </p>
+  </noscript>
+</PlaygroundsLayout>
