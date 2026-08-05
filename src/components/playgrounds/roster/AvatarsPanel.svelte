@@ -48,6 +48,10 @@
     applySessionActResultFromRelay,
     bindingFromSeatBound,
     materializeRosterInviteSeat,
+    buildRosterInviteUrl,
+    extractRosterWireFromText,
+    parseRosterInviteFromLocation,
+    clearRosterInviteHashFromLocation,
     type RosterAvatarRelayMsg,
     type RosterAvatarStub,
     type RosterPeerHandlers,
@@ -87,6 +91,8 @@
   let outboundSessionId = $state<string | null>(null);
   let canInvite = $state(false);
   let inviteBusy = $state(false);
+  /** Offer wire arrived via `#roster=` — confirm before joining. */
+  let pendingLinkOffer = $state<string | null>(null);
   /** inviteId → homePeer participant sandbox (accept path). */
   const homeSandboxByInvite = new Map<string, string>();
   /** sessionId → BroadcastChannel name for relayed events. */
@@ -144,7 +150,31 @@
       /* ignore */
     }
     window.addEventListener("message", onWindowMessage);
+    consumeRosterInviteHash();
   });
+
+  function consumeRosterInviteHash(): void {
+    const parsed = parseRosterInviteFromLocation({
+      hash: window.location.hash,
+      search: window.location.search,
+    });
+    if (!parsed) return;
+    clearRosterInviteHashFromLocation();
+    if (parsed.role === "offer") {
+      pendingLinkOffer = parsed.wire;
+      pasteInvite = parsed.wire;
+      lan = parsed.lan;
+      joinOpen = true;
+      startOpen = false;
+      status = "收到邀請連結 — 確認後即可加入";
+    } else {
+      // Answer links are for pasting back to the initiator, not auto-navigate.
+      pasteReply = parsed.wire;
+      startOpen = true;
+      joinOpen = false;
+      status = "已從連結讀取回覆 — 請在「發起連線」確認回覆";
+    }
+  }
 
   onDestroy(() => {
     unsub?.();
@@ -598,7 +628,7 @@
       });
       session = result.session;
       inviteWire = result.wire;
-      status = "已建立邀請 — 請交給對方，並等待對方的回覆";
+      status = "已建立邀請 — 複製邀請連結交給對方，並等待對方的回覆";
       busy = false;
       refreshCanInvite();
       try {
@@ -620,11 +650,12 @@
       error = "請先建立邀請";
       return;
     }
-    const wire = pasteReply.trim();
+    const wire = extractRosterWireFromText(pasteReply) || pasteReply.trim();
     if (!wire) {
       error = "請貼上對方的回覆";
       return;
     }
+    pasteReply = wire;
     error = null;
     busy = true;
     try {
@@ -641,11 +672,13 @@
   async function handleJoinWithInvite(): Promise<void> {
     error = null;
     status = null;
-    const wire = pasteInvite.trim();
+    const wire = extractRosterWireFromText(pasteInvite) || pasteInvite.trim();
     if (!wire) {
       error = "請貼上對方的邀請";
       return;
     }
+    pasteInvite = wire;
+    pendingLinkOffer = null;
     busy = true;
     replyWire = "";
     replyQrUrl = null;
@@ -657,6 +690,15 @@
     await teardownAllProjections();
     persistName();
     try {
+      // Align LAN mode with the invite payload when possible.
+      try {
+        const fromLink = parseRosterInviteFromLocation({
+          hash: `#roster=${wire}`,
+        });
+        if (fromLink) lan = fromLink.lan;
+      } catch {
+        /* ignore */
+      }
       const result = await acceptRosterOffer({
         offerWire: wire,
         lan,
@@ -671,7 +713,7 @@
       });
       session = result.session;
       replyWire = result.wire;
-      status = "已建立回覆 — 請回傳給發起連線的一方";
+      status = "已建立回覆 — 請回傳給發起連線的一方（可複製回覆或回覆連結）";
       busy = false;
       refreshCanInvite();
       try {
@@ -685,6 +727,48 @@
     } catch (e) {
       error = friendlyError(e instanceof Error ? e.message : String(e));
       busy = false;
+    }
+  }
+
+  async function confirmPendingLinkOffer(): Promise<void> {
+    if (!pendingLinkOffer) return;
+    pasteInvite = pendingLinkOffer;
+    joinOpen = true;
+    await handleJoinWithInvite();
+  }
+
+  function dismissPendingLinkOffer(): void {
+    pendingLinkOffer = null;
+    status = "已忽略邀請連結";
+  }
+
+  async function copyInviteLink(): Promise<void> {
+    if (!inviteWire) return;
+    try {
+      const url = buildRosterInviteUrl({
+        origin: location.origin,
+        pathname: location.pathname,
+        wire: inviteWire,
+      });
+      await navigator.clipboard.writeText(url);
+      status = "已複製邀請連結";
+    } catch {
+      error = "無法複製邀請連結";
+    }
+  }
+
+  async function copyReplyLink(): Promise<void> {
+    if (!replyWire) return;
+    try {
+      const url = buildRosterInviteUrl({
+        origin: location.origin,
+        pathname: location.pathname,
+        wire: replyWire,
+      });
+      await navigator.clipboard.writeText(url);
+      status = "已複製回覆連結（請傳回發起方貼上）";
+    } catch {
+      error = "無法複製回覆連結";
     }
   }
 
@@ -739,6 +823,26 @@
       </h3>
       {#if avatars.length === 0}
         <p class="text-skin-base/45 m-0 text-[11px]">還沒有連上任何人</p>
+        <div class="flex flex-wrap gap-1">
+          <button
+            type="button"
+            class={btn}
+            disabled={busy}
+            onclick={() => {
+              startOpen = true;
+              joinOpen = false;
+            }}>發起連線</button
+          >
+          <button
+            type="button"
+            class={btn}
+            disabled={busy}
+            onclick={() => {
+              joinOpen = true;
+              startOpen = false;
+            }}>加入連線</button
+          >
+        </div>
       {:else}
         <ul class="m-0 list-none space-y-2 p-0">
           {#each avatars as a (a.agentId)}
@@ -778,6 +882,33 @@
         </ul>
       {/if}
     </section>
+
+    {#if pendingLinkOffer}
+      <section
+        class="border-skin-line bg-skin-card space-y-2 rounded border px-2 py-2"
+      >
+        <h3 class="text-skin-base m-0 text-[11px] font-semibold">
+          連線邀請連結
+        </h3>
+        <p class="text-skin-base/70 m-0 text-[11px]">
+          有人用連結邀請你加入這場連線。確認後會建立回覆，再把回覆傳回去。
+        </p>
+        <div class="flex flex-wrap gap-1">
+          <button
+            type="button"
+            class={btn}
+            disabled={busy}
+            onclick={() => void confirmPendingLinkOffer()}>加入連線</button
+          >
+          <button
+            type="button"
+            class={btn}
+            disabled={busy}
+            onclick={dismissPendingLinkOffer}>忽略</button
+          >
+        </div>
+      </section>
+    {/if}
 
     {#if pendingIncoming}
       <section
@@ -873,6 +1004,12 @@
           <button
             type="button"
             class={btn}
+            disabled={!inviteWire}
+            onclick={() => void copyInviteLink()}>複製邀請連結</button
+          >
+          <button
+            type="button"
+            class={btn}
             disabled={!session || busy}
             onclick={() => void handleConfirmReply()}>確認回覆</button
           >
@@ -900,7 +1037,7 @@
             class="{inputCls} mt-0.5 min-h-[3.5rem] resize-y"
             bind:value={pasteReply}
             disabled={busy}
-            placeholder="對方給你的回覆…"
+            placeholder="對方給你的回覆或回覆連結…"
           ></textarea>
         </label>
         <label class={btn}>
@@ -929,7 +1066,7 @@
       </summary>
       <div class="border-skin-line space-y-2 border-t p-2">
         <p class="text-skin-base/50 m-0 text-[11px]">
-          貼上對方的邀請，建立回覆後再傳回去。
+          貼上對方的邀請（或邀請連結），建立回覆後再傳回去。
         </p>
         <label class="text-skin-base/70 flex items-center gap-2 text-[11px]">
           <input type="checkbox" bind:checked={lan} disabled={busy} />
@@ -941,7 +1078,7 @@
             class="{inputCls} mt-0.5 min-h-[3.5rem] resize-y"
             bind:value={pasteInvite}
             disabled={busy}
-            placeholder="對方給你的邀請…"
+            placeholder="對方給你的邀請或邀請連結…"
           ></textarea>
         </label>
         <div class="flex flex-wrap gap-1">
@@ -966,6 +1103,12 @@
             class={btn}
             disabled={!replyWire}
             onclick={() => void copyText(replyWire)}>複製回覆</button
+          >
+          <button
+            type="button"
+            class={btn}
+            disabled={!replyWire}
+            onclick={() => void copyReplyLink()}>複製回覆連結</button
           >
         </div>
         {#if replyQrUrl}

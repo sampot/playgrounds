@@ -19,6 +19,7 @@
     SESSION_EVENT_KIND,
     SESSION_SEAT_BOUND_KIND,
     buildSessionActResultPayload,
+    hasRosterInviteInLocation,
     type SessionActPayload,
   } from "./roster";
   import {
@@ -5379,6 +5380,15 @@
       pathname: window.location.pathname,
       hostname: window.location.hostname,
     });
+    if (
+      hasRosterInviteInLocation({
+        hash: window.location.hash,
+        search: window.location.search,
+      })
+    ) {
+      filesSidebarOpen = true;
+      selectSidebarTab("avatars");
+    }
     const unregRosterInvite = registerRosterInviteAcceptedHandler(ev =>
       onRosterInviteAccepted(ev)
     );

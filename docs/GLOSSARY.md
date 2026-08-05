@@ -88,7 +88,8 @@
 | Avatar Agent（遊樂場 Roster） | Avatar／化身／投影 User agent | 每位連線使用者在**本場**自動建立的薄 SAM／proxy（User agent 投影）；可 agent 模式執行；化身 tab 卡片＝其 UI。權威與執行在對方 **`homePeer`**；經 Roster DataChannel 轉。**非**本機 clone。Session 入座**不特規**——走 DEC-023 邀請（附完整 protocol 規格）＋型錄 lazy install。頭像預設 **identicon**。Phase 2.5：本機 ephemeral `roster_avatar` 投影＋`avatar_relay`。見 DEC-045、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)。 |
 | Avatars tab（遊樂場） | 化身 tab | 左側側欄第三 tab（Files／總管／化身）；UI label＝`化身`；layout 鍵＝`avatars`；列出／呈現 Roster 上的 Avatar（投影）。見 DEC-045。 |
 | identicon（遊樂場 Avatar） | identicon | 依穩定 id 本機衍生的預設頭像；不預設外站圖。見 DEC-045。 |
-| 薄 signaling（遊樂場 Roster） | signaling | **只**完成一次 WebRTC offer／answer（非 trickle；每房 1× offer＋1× answer；用完銷房）。載荷經**剪裁＋固定樣板**編碼；以 **QR 或文字**交換（同等）；須仍能單張 QR 舒適掃描。不中繼資料／心跳／重談。見 DEC-045。 |
+| Roster 邀請連結（遊樂場） | 邀請連結／`#roster=` | 把 Roster **壓縮交換字串**（與 QR／文字同一 wire）放進 URL hash，方便分享開場並進入「加入連線」。**不是** session 入座邀請、**不是** `?open=` 開 SAM、**不是** Worker 房間。回覆亦可做成連結供貼回發起方。見 DEC-045 Phase 4.1、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)。 |
+| 薄 signaling（遊樂場 Roster） | signaling | **只**完成一次 WebRTC offer／answer（非 trickle；每房 1× offer＋1× answer；用完銷房）。載荷經**剪裁＋固定樣板**編碼；以 **QR 或文字或邀請連結**交換（同等）；須仍能單張 QR 舒適掃描。不中繼資料／心跳／重談。見 DEC-045。 |
 | Roster 樣板 SDP（遊樂場） | 樣板壓縮／交換 payload | 自完整 SDP 抽取必要欄位，依固定樣板編解碼還原；**QR 與文字**（及可選 rendezvous）共用同一字串。可選**同區網**旗標以進一步剪裁 candidates。見 DEC-045、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)。 |
 | 同區網 Roster（遊樂場） | LAN／同區網模式 | 使用者宣告 peers 同一區網時，offer／answer 可更小；誤選須新邀請改模式，不經同房補 candidates。見 DEC-045。 |
 | Host 本地面／殼面（遊樂場後端） | HOST local｜shell | 本地面＝Runtime 內儲存／純資料；殼面＝終端 UI 指令（執行期不得再打 Runtime 權威儲存完成該指令）。見 DEC-038、SPEC §6。 |

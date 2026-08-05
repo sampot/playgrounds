@@ -169,3 +169,13 @@ export type {
   RosterSeatMaterializeVia,
   RosterSeatMaterializeDeps,
 } from "./rosterInviteSeatMaterialize";
+
+export {
+  ROSTER_INVITE_HASH_KEY,
+  buildRosterInviteUrl,
+  extractRosterWireFromText,
+  parseRosterInviteFromLocation,
+  hasRosterInviteInLocation,
+  clearRosterInviteHashFromLocation,
+} from "./rosterInviteUrl";
+export type { RosterInviteFromLocation } from "./rosterInviteUrl";
