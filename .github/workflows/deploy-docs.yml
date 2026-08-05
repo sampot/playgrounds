@@ -1,9 +1,7 @@
+name: Deploy docs
+
 on:
-  push:
-    branches: [main]
-    paths:
-      - "docs-site/**"
-      - ".github/workflows/deploy-docs.yml"
+  workflow_dispatch:
 
 jobs:
   publish-docs:
