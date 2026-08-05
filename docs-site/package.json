@@ -1,0 +1,27 @@
+{
+  "name": "playgrounds-docs",
+  "type": "module",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Playgrounds documentation (Starlight @ docs.samkuo.me)",
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro",
+    "deploy": "npm run build && wrangler deploy",
+    "deploy:dry": "npm run build && wrangler deploy --dry-run"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "^0.41.6",
+    "astro": "^7.0.2",
+    "sharp": "^0.34.5"
+  },
+  "devDependencies": {
+    "wrangler": "^4.118.0"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

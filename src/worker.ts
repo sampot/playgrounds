@@ -27,8 +27,12 @@ function reservedSubdomain(hostname: string): string | null {
 export default {
   async fetch(request: Request, env: WorkerEnv): Promise<Response> {
     const url = new URL(request.url);
-    if (reservedSubdomain(url.hostname)) {
-      // Prefer apex over serving a field shell on site infra names.
+    const reserved = reservedSubdomain(url.hostname);
+    if (reserved) {
+      // docs = Starlight site (DEC-043); other reserved → apex.
+      if (reserved === "docs") {
+        return Response.redirect("https://docs.samkuo.me/", 302);
+      }
       return Response.redirect("https://samkuo.me/", 302);
     }
     return env.ASSETS.fetch(request);

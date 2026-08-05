@@ -2,7 +2,7 @@
 
 > **狀態：** Phase 0–3／6／**7a（舊場凍結）** 完成；Phase 4＝`play` 已上線（wildcard Route 待 token）；Phase 5 部分；Phase 7b 下線另令  
 > **權威決策：** [DECISIONS.md](./DECISIONS.md) DEC-041（抽取／舊場）、**DEC-042**（Workers／wildcard／`play`）  
-> **相關：** DEC-004（對外敘事）、DEC-009／016（SW／路徑）、DEC-025（`?open=`）、DEC-024（`sam-runtime`）、DEC-040（整場重置／origin 資料）
+> **相關：** DEC-004（對外敘事）、DEC-009／016（SW／路徑）、DEC-025（`?open=`）、DEC-024（`sam-runtime`）、DEC-040（整場重置／origin 資料）、DEC-043／[PG-DOCS-PLAN.md](./PG-DOCS-PLAN.md)（文件站 `docs.samkuo.me`）
 
 一句話：**預設場＝`https://play.samkuo.me/`；任意 `https://<name>.samkuo.me/`＝同程式、異 origin；部署＝Cloudflare Workers；開源 [`sampot/playgrounds`](https://github.com/sampot/playgrounds)；舊 `samkuo.me/playgrounds/` 暫留並提醒匯出。**
 

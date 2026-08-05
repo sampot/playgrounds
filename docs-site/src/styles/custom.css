@@ -1,0 +1,10 @@
+/* Personal mark + title in the nav (DEC-004). */
+.site-title img {
+  height: 1.65rem;
+  width: auto;
+}
+
+/* Soften splash so it reads as notes, not a product landing. */
+.hero > .sl-flex {
+  max-width: 40rem;
+}

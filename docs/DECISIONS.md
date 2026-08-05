@@ -1,6 +1,6 @@
 # 我是山姆鍋 — 架構與工程決策
 
-> **最後更新：** 2026-08-05（DEC-040：Playgrounds 防護邊界與整場重置）  
+> **最後更新：** 2026-08-05（DEC-043：Playgrounds 文件站 Starlight＠`docs.samkuo.me`）  
 > **對象：** 作者、AI agents；必要時給之後的自己讀
 
 本文件以輕量 **ADR**（Architecture Decision Record）記錄本站**顯著且耐久**的架構／工程選擇：選了什麼、為何不選其他、後續工作不可踩破的後果。細節規格仍以 [AGENTS.md](./AGENTS.md)、[TOOLS-PLAN.md](./TOOLS-PLAN.md) 等為準；此檔是可掃讀的決策索引，避免只活在 PR 與聊天裡。
@@ -82,6 +82,7 @@
 | [DEC-040](#dec-040-playgrounds-防護邊界與場內沙盒語意整場重置) | Playgrounds 防護邊界與場內沙盒語意；整場重置 | Accepted |
 | [DEC-041](#dec-041-playgrounds-獨立子網域與開源抽取) | Playgrounds 獨立子網域與開源抽取 | Accepted |
 | [DEC-042](#dec-042-playgrounds-workers與-wildcard-場網) | Playgrounds：Workers 部署與 `*.samkuo.me` 場網 | Accepted |
+| [DEC-043](#dec-043-playgrounds-文件站-starlight與-docssamkuome) | Playgrounds 文件站：Starlight＠`docs.samkuo.me` | Accepted |
 
 ---
 
@@ -789,6 +790,25 @@
   - **勿**在邊緣為每個 name 做 OPFS／狀態代管；**勿**把 wildcard 做成需註冊帳號的多租戶產品。
   - 二級以上子域（`a.b.samkuo.me`）非本決策範圍。
 
+### DEC-043: Playgrounds 文件站 Starlight 與 `docs.samkuo.me`
+
+- **Status:** Accepted（2026-08-05）
+- **Context:** 宿主已開源並部署場網（DEC-041／042）；`docs` 為保留子域，場網 Worker 不當場殼。repo 內 `docs/` 有 Host API／DEC 快照，但缺少獨立、可搜尋的讀者／Agent 文件面。部落格繼續過程分享（DEC-004），不宜兼 Host 契約權威站。
+- **Decision:**
+  1. **權威文件 URL：** `https://docs.samkuo.me/`。
+  2. **技術：** **Astro Starlight**（靜態 SSG＋Pagefind）；部署＝**獨立** Cloudflare Worker（Static Assets）＋Custom Domain `docs.samkuo.me`。**不**併進場網同一 `dist`／同一 Worker 主路徑。
+  3. **套件位置：** 開源宿主 repo 內 **`docs-site/`**（獨立 Astro／wrangler 設定）。
+  4. **保留名：** `docs` 維持 DEC-042 保留——永不跑遊樂場殼；文件站正式佔用該子域。
+  5. **內容範圍：** 用法指南、概念、已落地 Host API、Accepted DEC／GLOSSARY 的可讀呈現。長篇未落地計劃以 repo 為主，不強制進公開主 sidebar。
+  6. **範例場：** 文件內絕對 URL 範例＝`https://play.samkuo.me/…`（DEC-042）；場內分享仍 `location.origin`。
+  7. **敘事：** 讀者向文案依 DEC-004（非產品／品牌／行銷腔）。
+  8. **階段**以 [PG-DOCS-PLAN.md](./PG-DOCS-PLAN.md) 為準。
+- **Consequences:**
+  - 場網 Worker 繼續拒絕 `docs` 當場；文件上線後，誤進場網之 `docs` host 宜 302→文件站（見計劃）。
+  - ADR／計劃原文可續留 `docs/`；Starlight 為呈現層，須約定單一更新路徑，避免雙份漂移。
+  - CI 可將文件部署與場殼部署分開。
+  - 同步 [GLOSSARY.md](./GLOSSARY.md)、[AGENTS.md](../AGENTS.md)、[PG-DOCS-PLAN.md](./PG-DOCS-PLAN.md)。
+
 ---
 
 ## 4. 相關文件
@@ -827,5 +847,6 @@
 | [PG-BACKEND-RUNTIME-PLAN.md](./PG-BACKEND-RUNTIME-PLAN.md) | Backend Runtime 實作階段（DEC-038） |
 | [PG-MAIN-CONTENT-PLAN.md](./PG-MAIN-CONTENT-PLAN.md) | Main content Editor↔SAM tabs／plain 掛載（DEC-030） |
 | [PG-STANDALONE-PLAN.md](./PG-STANDALONE-PLAN.md) | 場網／Workers／開源／舊場暫留（DEC-041／042） |
+| [PG-DOCS-PLAN.md](./PG-DOCS-PLAN.md) | 文件站 Starlight＠`docs.samkuo.me`（DEC-043） |
 | [playgrounds-host-api.md](./playgrounds-host-api.md) | Host API v1 快速參考 |
 | `astro.config.ts`／`src/config.ts` | 建置與站台設定實作 |

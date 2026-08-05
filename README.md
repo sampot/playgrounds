@@ -3,12 +3,13 @@
 Browser host for **SAM** (Single-page Application Module) sandboxes: OPFS workspace, canvas via Service Worker, optional agents, WASI shell, SecretStore.
 
 - **Default field:** [https://play.samkuo.me/](https://play.samkuo.me/)
+- **Docs:** [https://docs.samkuo.me/](https://docs.samkuo.me/) — Starlight in `docs-site/` (DEC-043 / `docs/PG-DOCS-PLAN.md`); `npm run docs:dev` / `docs:deploy`
 - **Field net:** any `https://<name>.samkuo.me/` — same build, separate browser origin (OPFS / secrets / SW)
 - **Deploy target:** Cloudflare Workers (static assets + wildcard `*.samkuo.me`)
 - **Author notes:** [samkuo.me](https://samkuo.me/) (personal blog; not a product site)
 - **Legacy (frozen):** `https://samkuo.me/playgrounds/` still opens with a migrate tip but is **not** updated with this repo; export `.sam` then import on the field you want (data is origin-bound)
 
-Decisions: DEC-041 (extract / legacy mount), DEC-042 (Workers / wildcard / `play`) — see `docs/` (snapshot from the blog docs set).
+Decisions: DEC-041 (extract / legacy mount), DEC-042 (Workers / wildcard / `play`), DEC-043 (docs / Starlight) — see `docs/`.
 
 ## Develop
 
@@ -41,6 +42,7 @@ On another field, the same query works with that host (in-app “copy open link�
 | `src/sam-host/` | Headless Node host |
 | `public/sw.js` | Canvas virtual origin + offline shell cache |
 | `docs/` | Host API / decisions snapshot |
+| `docs-site/` | Starlight site for `docs.samkuo.me` |
 
 ## License
 

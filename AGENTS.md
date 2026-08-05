@@ -4,6 +4,7 @@ This repo is the **Playgrounds** browser host ([sampot/playgrounds](https://gith
 
 - **DEC-041:** extract from blog; legacy `samkuo.me/playgrounds/` is a **frozen** snapshot (migrate tip; no further feature sync from this repo)
 - **DEC-042:** deploy on **Cloudflare Workers**; field net **`*.samkuo.me`** (same code, per-origin storage); default field **`play.samkuo.me`**
+- **DEC-043:** docs site **Starlight** at **`docs.samkuo.me`** (separate Worker; not a field) — see `docs/PG-DOCS-PLAN.md`
 
 This repo is the **authoritative** host codebase. Do not push feature parity back into the blog mount.
 
@@ -15,6 +16,7 @@ Reader-facing narrative stays personal／non-product (blog DEC-004).
 - `npm test` — Vitest
 - `npm run build` — `astro check` + static build
 - `npm run deploy` — build + `wrangler deploy` (`play.samkuo.me`)
+- `npm run docs:dev` / `docs:build` / `docs:deploy` — Starlight docs (`docs.samkuo.me`)
 
 ## Layout
 
@@ -22,11 +24,13 @@ Reader-facing narrative stays personal／non-product (blog DEC-004).
 - `src/sam-runtime/` — portable SAM runtime
 - `src/sam-host/` — Node headless host
 - `public/sw.js` — canvas SW + offline shell
+- `docs-site/` — Starlight docs (DEC-043; separate Worker)
 
 ## Paths / hosts
 
 - Standalone field: `PUBLIC_PLAYGROUNDS_BASE_PATH=` → home `/`, canvas `/canvas/`
-- Default document host: `https://play.samkuo.me`
+- Default field host: `https://play.samkuo.me`
+- Docs (Starlight): `https://docs.samkuo.me` (reserved; separate Worker — DEC-043)
 - Any field: `https://<name>.samkuo.me` (reserved names e.g. `www`, `blog`, `api`, `docs`, `old-blog`; `play` = official default)
 - In-app share links: prefer `location.origin`; docs examples use `play`
 

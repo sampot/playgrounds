@@ -1,0 +1,19 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "playgrounds-docs",
+  "compatibility_date": "2026-08-05",
+  "workers_dev": true,
+  "preview_urls": true,
+  // Static Starlight output — not the field shell (DEC-043).
+  "assets": {
+    "directory": "./dist",
+    // Prefer a real 404 over SPA fallback onto the docs home page.
+    "not_found_handling": "404-page"
+  },
+  "routes": [
+    {
+      "pattern": "docs.samkuo.me",
+      "custom_domain": true
+    }
+  ]
+}
