@@ -6,6 +6,7 @@
   import PlaygroundsPythonRepl from "./PlaygroundsPythonRepl.svelte";
   import PlaygroundsJsRepl from "./PlaygroundsJsRepl.svelte";
   import PlaygroundsShell from "./PlaygroundsShell.svelte";
+  import AvatarsPanel from "./visit/AvatarsPanel.svelte";
   import {
     assertCanvasEntryServed,
     buildCanvasEntryUrl,
@@ -522,8 +523,8 @@
   let addBottomPanelDialogOpen = $state(false);
   let addBottomPanelDialogEl = $state<HTMLDialogElement | null>(null);
   let addBottomSamPickId = $state("");
-  /** Left sidebar: file tree vs agent chat. Default Files; restore from layout. */
-  let sidebarTab = $state<"files" | "agent">("files");
+  /** Left sidebar: file tree vs agent chat vs Avatars. Default Files; restore from layout. */
+  let sidebarTab = $state<"files" | "agent" | "avatars">("files");
   let previewOpen = $state(true);
   let previewMaximized = $state(false);
   /** Main content (Editor 槽) fills the viewport; mutually exclusive with previewMaximized. */
@@ -764,7 +765,7 @@
           | "javascript"
           | "shell";
         enabledBottomBuiltins?: string[];
-        sidebarTab?: "files" | "agent";
+        sidebarTab?: "files" | "agent" | "avatars";
         previewOpen?: boolean;
         previewMaximized?: boolean;
         editorMaximized?: boolean;
@@ -797,7 +798,11 @@
         bottomPanelMaximized = parsed.bottomPanelMaximized;
         if (bottomPanelMaximized) bottomPanelOpen = true;
       }
-      if (parsed.sidebarTab === "files" || parsed.sidebarTab === "agent") {
+      if (
+        parsed.sidebarTab === "files" ||
+        parsed.sidebarTab === "agent" ||
+        parsed.sidebarTab === "avatars"
+      ) {
         sidebarTab = parsed.sidebarTab;
       }
       if (parsed.bottomTab === "agent") {
@@ -1160,7 +1165,7 @@
   }
 
   function selectSidebarTab(
-    tab: "files" | "agent",
+    tab: "files" | "agent" | "avatars",
     opts?: { ensureAgent?: boolean }
   ) {
     sidebarTab = tab;
@@ -6165,7 +6170,7 @@
         <div
           class="border-skin-line flex h-8 shrink-0 items-center gap-0.5 border-b px-1 text-[10px] font-semibold tracking-wider uppercase"
           role="tablist"
-          aria-label="檔案與總管"
+          aria-label="沙盒、總管與化身"
         >
           <button
             type="button"
@@ -6180,7 +6185,7 @@
             onclick={() => selectSidebarTab("files")}
           >
             <PgIcon name="files" size={12} />
-            Files{#if sidebarTab === "files"}
+            沙盒{#if sidebarTab === "files"}
               <span class="normal-case tracking-normal opacity-70"
                 >{fileList.length}</span
               >
@@ -6200,6 +6205,21 @@
           >
             <PgIcon name="bot" size={12} />
             總管
+          </button>
+          <button
+            type="button"
+            role="tab"
+            id="playgrounds-sidebar-tab-avatars"
+            aria-selected={sidebarTab === "avatars"}
+            aria-controls="playgrounds-sidebar-avatars"
+            class="inline-flex items-center gap-1 rounded px-2 py-1 {sidebarTab ===
+            'avatars'
+              ? 'bg-skin-card text-skin-base'
+              : 'text-skin-base/45 hover:text-skin-base/75'}"
+            onclick={() => selectSidebarTab("avatars")}
+          >
+            <PgIcon name="layers" size={12} />
+            化身
           </button>
           <button
             type="button"
@@ -6466,6 +6486,17 @@
             ></iframe>
           {/if}
         </div>
+        <div
+          id="playgrounds-sidebar-avatars"
+          role="tabpanel"
+          aria-labelledby="playgrounds-sidebar-tab-avatars"
+          class="bg-skin-card flex min-h-0 flex-1 flex-col {sidebarTab ===
+          'avatars'
+            ? ''
+            : 'hidden'}"
+        >
+          <AvatarsPanel />
+        </div>
       {:else}
         <div class="playgrounds-files-rail">
           <button
@@ -6481,17 +6512,26 @@
           <button
             type="button"
             class="text-skin-base/55 hover:text-skin-base/80 px-0.5 text-[10px] font-semibold tracking-wider uppercase"
-            title="展開並顯示 Files"
+            title="展開並顯示沙盒"
             onclick={() => {
               filesSidebarOpen = true;
               selectSidebarTab("files");
-            }}>Files</button
+            }}>沙盒</button
           >
           <button
             type="button"
             class="text-skin-base/55 hover:text-skin-base/80 px-0.5 text-[10px] font-semibold tracking-wider uppercase"
             title="展開並顯示總管"
             onclick={() => selectSidebarTab("agent")}>總管</button
+          >
+          <button
+            type="button"
+            class="text-skin-base/55 hover:text-skin-base/80 px-0.5 text-[10px] font-semibold tracking-wider uppercase"
+            title="展開並顯示化身"
+            onclick={() => {
+              filesSidebarOpen = true;
+              selectSidebarTab("avatars");
+            }}>化身</button
           >
           <span class="text-skin-base/40 text-[10px]">{fileList.length}</span>
         </div>

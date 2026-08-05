@@ -1,6 +1,6 @@
 # 我是山姆鍋 — 架構與工程決策
 
-> **最後更新：** 2026-08-05（DEC-044：下方面板 dock／opt-in＋自選 SAM）  
+> **最後更新：** 2026-08-05（DEC-045：Visit／化身 tab＋identicon；signaling＝一次 offer／answer）
 > **對象：** 作者、AI agents；必要時給之後的自己讀
 
 本文件以輕量 **ADR**（Architecture Decision Record）記錄本站**顯著且耐久**的架構／工程選擇：選了什麼、為何不選其他、後續工作不可踩破的後果。細節規格仍以 [AGENTS.md](./AGENTS.md)、[TOOLS-PLAN.md](./TOOLS-PLAN.md) 等為準；此檔是可掃讀的決策索引，避免只活在 PR 與聊天裡。
@@ -84,6 +84,7 @@
 | [DEC-042](#dec-042-playgrounds-workers與-wildcard-場網) | Playgrounds：Workers 部署與 `*.samkuo.me` 場網 | Accepted |
 | [DEC-043](#dec-043-playgrounds-文件站-starlight與-docssamkuome) | Playgrounds 文件站：Starlight＠`docs.samkuo.me` | Accepted |
 | [DEC-044](#dec-044-playgrounds-下方面板-dockopt-in與自選-sam) | Playgrounds 下方面板 dock（opt-in＋自選 SAM） | Accepted |
+| [DEC-045](#dec-045-playgrounds-跨場-visitavatar與薄-signaling) | Playgrounds 跨場 Visit／Avatar 與薄 signaling | Accepted |
 
 ---
 
@@ -405,7 +406,7 @@
 - **Status:** Accepted（2026-08-01）
 - **Context:** 單一現行 Agent + `env.HOST`（DEC-017）適合編排／開發；缺的是多個 Participant 在同一工作沙盒規則下即時互動（對局、腦力激盪等）。規格見 [PG-MULTI-AGENT-SESSION-SPEC.md](./PG-MULTI-AGENT-SESSION-SPEC.md)。
 - **Decision:**
-  - **範圍：** 同一 Playgrounds 頁面內；**不含**遠端使用者／跨實例／WebRTC。
+  - **範圍：** 同一 Playgrounds 頁面內；**不含**遠端使用者／跨實例／WebRTC。（遠端 Visit／Avatar 入座見 [DEC-045](#dec-045-playgrounds-跨場-visitavatar與薄-signaling)；落地前勿假設存在。）
   - **權威：** 當前工作沙盒（Host SAM）經 `functions.js` 強制規則與領域狀態；遊樂場只提供**多人通訊與狀態通道**（座位生命週期、協定閘門、事件推送）。
   - **UX 分工：** 場景命名、場次管理、人類參與主流程由 **Host SAM** 決定；遊樂場介面**不**產品化 session 控制面。Starter 示範呼叫通道 API（Host 畫布 `/api/shell/session/*` 與／或 HOST 子集）。
   - **通道：** 參與 Agent 注入 **`env.SESSION`**（≠ HOST／TOOL）：`getSeat`／`getState`／`getEventChannel`／`act`／`leave`。入座看**協定相容**＋ **role（session 權限類）**，不要求與 Host 同一 SAM 內容。Agent **不規定**使用 LLM。
@@ -422,6 +423,7 @@
   - 勿把入座預設成「只能申請」；編排類 Host 常用邀請。
   - 契約變更同步 GLOSSARY／host-api／規格；狗糧範本證明無 LLM 即時迴圈與 Host 自管 UX。
   - Participant 背景執行長期應收斂到 DEC-024 `SamInstance`／Controller（隱藏 iframe 為過渡）。
+- **Revision（2026-08-05）：** 遠端 Visit／Avatar／薄 signaling（一次 offer／answer）見 [DEC-045](#dec-045-playgrounds-跨場-visitavatar與薄-signaling)；本筆本地範圍暫不變，遠端座位於 Visit Phase 3 再修訂。
 
 ### DEC-024: SAM 三層模型與 headless runtime
 
@@ -716,6 +718,7 @@
   - Phase 1：殼權威路徑改經通道／Runtime API，再搬 Worker。
 - **Revision（2026-08-04）：** Controller／`SamInstance` 改在 Dedicated Worker 執行；殼側 `RemoteSamInstance` 代理。
 - **Revision（2026-08-04）：** Phase 2 完成——Worker 內 `AgentRuntime` drain／alarm；FS 權威經 `fsOp`／HOST local 寫入在 Runtime；殼 `sandboxAuthority` 於 Runtime 活著時走通道；殼僅 Leader 選舉＋`drainGate`／`kickDrain`。
+- **Revision（2026-08-05）：** 跨場 Visit 的薄 signaling（一次 offer／answer）見 [DEC-045](#dec-045-playgrounds-跨場-visitavatar與薄-signaling)；≠ 本筆尚未交付的完整 Runtime 叢集。
 
 ### DEC-039: Playgrounds WASI CLI × OPFS fd 直連
 
@@ -835,6 +838,38 @@
   - 勿超過下方 SAM 硬頂；勿與 main 雙掛同一沙盒；勿因此開左／右槽。
   - 實作以 [PG-BOTTOM-DOCK-PLAN.md](./PG-BOTTOM-DOCK-PLAN.md) 為準。
 
+### DEC-045: Playgrounds 跨場 Visit／Avatar 與薄 signaling
+
+- **Status:** Accepted（2026-08-05；契約；實作依計劃分階段）
+- **Context:** 希望不同使用者的場可經網路相遇：訪客連入場主即時場後，場主側出現對方 **Avatar Agent**，並可邀請參與 session。須對齊 DEC-031 `homePeer`、DEC-038 WebRTC 路線、DEC-042 無伺服器租戶；場主**不**負擔資料面雲費。若 signaling 變成常駐中繼（trickle／心跳／重談／轉發資料），會變成隱性雲端房間，違背場網哲學。
+- **Decision:**
+  1. **Visit：** 邀請連入建立瀏覽器 peer（WebRTC）。開別人的場子域 ≠ Visit（那只是另一 origin 空場）。
+  2. **Avatar：** 連線完成後**雙方**化身列表皆出現對方 **投影／presence stub**（名片、`agentId`、連線態）；各自 Avatar 的 **`homePeer` 仍在本機**；**不**把對方沙盒權威搬進本機 OPFS。DataChannel 開啟時雙方互送 presence。
+  3. **場主 UX：** 左側側欄新增 **化身** tab（UI label＝`化身`；layout 鍵仍為 `avatars`），與 **Files／總管** 並列（三 tab）。內容＝目前連入的 Avatar 列表（非總管 iframe、非檔案樹）。無連線時為空態。連線流程僅分 **發起**（建邀請、等回覆）與 **加入**（貼邀請、建回覆）——對應 WebRTC initiator／responder；**不**用場主／訪客產品角色。UI 用語＝邀請／回覆／QR／同一區網；**不**暴露 offer／answer／SDP 等術語。兩區塊預設收起。
+  4. **頭像：** 每個 Avatar **預設 identicon**（本機依穩定 id 如 `agentId`／peer 公鑰衍生繪製；**不**預設拉外站圖）。日後可選自訂圖，不擋 MVP。
+  5. **Signaling（硬約束）：** 伺服器（或 OOB 貼上）**只**用來完成**一次** WebRTC **offer／answer**。每邀請房恰好 **1× offer**＋**1× answer**；採 **非 trickle**（ICE 收進後再發布；**無** candidate 訊息）。answer 取走、連線成功／失敗或 TTL → **銷房**；拒再寫。需重連 → **新邀請**。**禁止**經 signaling：DataChannel 流量、presence 心跳、session／mailbox／FS、renegotiation、第二輪 offer／answer。
+  6. **壓縮載荷（硬約束）：** 交換的不是完整原始 SDP 字串。雙方依**固定樣板**重建 SDP：先剪裁／抽取必要欄位（如 fingerprint、ICE ufrag／pwd、精簡 candidates），再編碼進樣板 payload。**交換方式＝QR 或文字**（複製／貼上）二選一，**同等一等**；同一壓縮字串可顯示為 QR 或純文字。載荷須小到**單張 QR 仍易掃**（過大則失敗提示，勿默認多碼拼圖）。薄 rendezvous 若存在，亦用同一格式。
+  7. **同區網選項：** 使用者可宣告 **peers 位於同一區網（LAN）**。此模式下 offer／answer **可進一步剪裁**（例如只帶 host／link-local candidates、略過需 STUN／relay 的候選；細節以樣板版號為準）。載荷須標明此模式，雙方一致解碼。誤選則連線可能失敗——應提示可改「一般／跨網」重發，勿默默升格加 candidates 走第二輪 signaling。
+  8. **資料面：** 連上後只走 WebRTC（一般模式可用 STUN；TURN 預設不做，可選使用者自備）。同區網模式可不依賴公網 STUN。
+  9. **Session：** 遠端入座沿用 DEC-023 語意（協定閘／`joinPolicy`／invite）；傳輸另橋。落地前 DEC-023 本地範圍不變。
+  10. **Rate limit：** signaling 必須可限流（IP／碼／TTL）；可疊 CF zone path 規則。
+  11. **敘事：** DEC-004——場與人串連，非多租戶協作 SaaS。
+  - 階段見 [PG-VISIT-PLAN.md](./PG-VISIT-PLAN.md)。
+- **Consequences:**
+  - 勿把 signaling 做成聊天室、房間中繼或 ICE trickle 匯流排。
+  - 勿假設 Visit＝開 `*.samkuo.me` 子域；勿跨 origin 自動搬資料。
+  - 勿把 Avatar 當本機 clone；勿給遠端座位完整 HOST。
+  - 勿把 Avatar 塞進總管 tab 或 Files 樹；勿預設外站頭像 CDN。
+  - 勿把完整 SDP 原文塞進 QR／文字交換；勿以多張 QR 拼圖當預設 UX；勿只做 QR 不做文字（或相反）。
+  - 勿在同區網失敗後經同一房補 candidates／重談；改新邀請或改模式。
+  - 勿預設營運 TURN 或把 session 真相放上 Workers／DO／R2。
+  - 同步 [GLOSSARY.md](./GLOSSARY.md)、[PG-VISIT-PLAN.md](./PG-VISIT-PLAN.md)；遠端座位落地時修訂 DEC-023。
+- **Revision（2026-08-05）：** 場主 UX＝左側 **Avatars** tab（並列 Files／總管）；頭像預設 identicon。
+- **Revision（2026-08-05）：** 側欄 UI label 改為「**化身**」（鍵名仍 `avatars`）。
+- **Revision（2026-08-05）：** offer／answer 經剪裁＋樣板編碼，確保 QR 可掃。
+- **Revision（2026-08-05）：** 交換方式＝**QR 或文字**（同等）。
+- **Revision（2026-08-05）：** 可選同區網模式，進一步剪裁 offer／answer。
+
 ---
 
 ## 4. 相關文件
@@ -873,6 +908,7 @@
 | [PG-BACKEND-RUNTIME-PLAN.md](./PG-BACKEND-RUNTIME-PLAN.md) | Backend Runtime 實作階段（DEC-038） |
 | [PG-MAIN-CONTENT-PLAN.md](./PG-MAIN-CONTENT-PLAN.md) | Main content Editor↔SAM tabs／plain 掛載（DEC-030） |
 | [PG-BOTTOM-DOCK-PLAN.md](./PG-BOTTOM-DOCK-PLAN.md) | 下方面板 dock／opt-in／自選 SAM（DEC-044） |
+| [PG-VISIT-PLAN.md](./PG-VISIT-PLAN.md) | 跨場 Visit／Avatar／薄 signaling（DEC-045） |
 | [PG-STANDALONE-PLAN.md](./PG-STANDALONE-PLAN.md) | 場網／Workers／開源／舊場暫留（DEC-041／042） |
 | [PG-CATALOG-PLAN.md](./PG-CATALOG-PLAN.md) | 小品型錄 YAML／PR 投稿（`catalog/entries/`） |
 | [PG-DOCS-PLAN.md](./PG-DOCS-PLAN.md) | 文件站 Starlight＠`docs.samkuo.me`（DEC-043） |

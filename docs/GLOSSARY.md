@@ -84,6 +84,13 @@
 | 殼層不假設 OPFS（遊樂場） | 殼／儲存邊界 | 遊樂場 UI **不得**假設「殼所在瀏覽器」OPFS 為沙盒權威；編輯／Files 經 Runtime 通道。見 DEC-038。 |
 | 訊息通道（Backend Runtime） | 訊息通道 | 殼↔Runtime 可替換傳輸：MVP＝`postMessage`；跨主機目標＝**WebRTC**。見 DEC-038、SPEC §1.4。 |
 | 跨主機叢集（遊樂場路線） | WebRTC 叢集 | 多主機瀏覽器經 WebRTC 成執行叢集；Runtime／workers 可在非殼所在主機。契約保留遷移；細節另規。見 DEC-038。 |
+| Visit（遊樂場） | Visit／連入 | 經邀請建立瀏覽器 peer（WebRTC）；≠ 開啟另一場子域空 origin。見 DEC-045、[PG-VISIT-PLAN.md](./PG-VISIT-PLAN.md)。 |
+| Avatar Agent（遊樂場 Visit） | Avatar／遠端投影／化身 | 連線後**雙方**化身列表中的對方 presence stub；`homePeer` 仍在各自本機；非本機 clone。頭像預設 **identicon**。見 DEC-045、[PG-VISIT-PLAN.md](./PG-VISIT-PLAN.md)。 |
+| Avatars tab（遊樂場） | 化身 tab | 左側側欄第三 tab（Files／總管／化身）；UI label＝`化身`；layout 鍵＝`avatars`；列出連入訪客 Avatar。見 DEC-045。 |
+| identicon（遊樂場 Avatar） | identicon | 依穩定 id 本機衍生的預設頭像；不預設外站圖。見 DEC-045。 |
+| 薄 signaling（遊樂場 Visit） | signaling | **只**完成一次 WebRTC offer／answer（非 trickle；每房 1× offer＋1× answer；用完銷房）。載荷經**剪裁＋固定樣板**編碼；以 **QR 或文字**交換（同等）；須仍能單張 QR 舒適掃描。不中繼資料／心跳／重談。見 DEC-045。 |
+| Visit 樣板 SDP（遊樂場） | 樣板壓縮／交換 payload | 自完整 SDP 抽取必要欄位，依固定樣板編解碼還原；**QR 與文字**（及可選 rendezvous）共用同一字串。可選**同區網**旗標以進一步剪裁 candidates。見 DEC-045、[PG-VISIT-PLAN.md](./PG-VISIT-PLAN.md)。 |
+| 同區網 Visit（遊樂場） | LAN／同區網模式 | 使用者宣告 peers 同一區網時，offer／answer 可更小；誤選須新邀請改模式，不經同房補 candidates。見 DEC-045。 |
 | Host 本地面／殼面（遊樂場後端） | HOST local｜shell | 本地面＝Runtime 內儲存／純資料；殼面＝終端 UI 指令（執行期不得再打 Runtime 權威儲存完成該指令）。見 DEC-038、SPEC §6。 |
 | Host Proxy／RPC（遊樂場後端） | 殼面終端通道 | Runtime→殼的殼面方法通道。**不是**整包 HOST 一律 RPC；**禁止**矛盾迴路（後端→殼→後端權威）。見 DEC-038。 |
 | UI←網路→後端（遊樂場 SAM） | UI 只經網路打後端 | 模擬 UI←網路→（`functions.js`∥`controller.js`）↔resources。畫布只打 `/api`→`functions.js`；不直連 Controller／bindings。見 AGENT-MODEL 規格、DEC-031。 |
@@ -111,7 +118,7 @@
 | agent.ui（遊樂場艦隊） | agent.ui 標註 | 顯示用註記（roleLabel／health／successorOf 等）；存 runtime `ui-annotations.json`；HOST `setAgentUi`；遊樂場介面只渲染。見 DEC-032。 |
 | SAM 實例（遊樂場） | 實例 | 一沙盒對應一 SAM 實例（Code＋Data＋Configuration；即使未執行）。`clone` 產另一實例，之後程式碼分叉。數量爆炸主因常是實例增殖，而非僅「新建」。見 DEC-028。 |
 | clonedFrom／cloneIntent（沙盒 meta） | 血統／clone 意圖 | `clonedFrom`＝直接來源 `sandboxId`；`cloneIntent` 區分人手保留、總管代建、自迭代、session 分身等，供管理面分區與 GC。見 DEC-028。 |
-| Agent 區（遊樂場） | Agent 區 | 左側側欄與 Files 以 Tab 切換的 iframe；內容為**總管**（現行 Agent 席）的 UI。遊樂場介面 Tab 標籤顯示「總管」；程式／layout 鍵仍可為 `agent`。見 DEC-017。下方 dock 預設 Console；REPL／Shell／自選 SAM 為 opt-in（DEC-044）。 |
+| Agent 區（遊樂場） | Agent 區 | 左側側欄與 Files／**化身** 以 Tab 切換的 iframe；內容為**總管**（現行 Agent 席）的 UI。遊樂場介面 Tab 標籤顯示「總管」；程式／layout 鍵仍可為 `agent`。見 DEC-017。Avatar 列表見 DEC-045（**化身** tab，非此 iframe）。下方 dock 預設 Console；REPL／Shell／自選 SAM 為 opt-in（DEC-044）。 |
 | host binding（遊樂場） | host binding／`env.HOST` | 遊樂場介面注入給現行 Agent（總管）`functions.js` 的環境 API；總管經 tools／functions 與 OPFS／畫布互動的完整編排通道。一般 SAM 的窄 compute 見 `env.COMPUTE`／DEC-036。 |
 | sandbox-intrinsic（遊樂場） | 沙盒內建／intrinsic | 該沙盒自己的檔案樹、`env.vars`、自己的 KV／DB、自己的畫布↔functions 等；**預設可開、不必** `sam:capabilities` 宣告。見 DEC-036、[PG-SAM-BINDINGS-SPEC.md](./PG-SAM-BINDINGS-SPEC.md)。 |
 | environment capability（遊樂場） | 環境能力／capability | 共用或跨邊界服務的機器 token（如 `runPython`）；須 `sam:capabilities` 宣告＋使用者同意才準入。見 DEC-036。 |
