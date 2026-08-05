@@ -14,6 +14,11 @@
     {
       "pattern": "docs.samkuo.me",
       "custom_domain": true
+    },
+    // More specific than field-net `*.samkuo.me/*` so docs is not swallowed.
+    {
+      "pattern": "docs.samkuo.me/*",
+      "zone_name": "samkuo.me"
     }
   ]
 }

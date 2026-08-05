@@ -804,7 +804,7 @@
   7. **敘事：** 讀者向文案依 DEC-004（非產品／品牌／行銷腔）。
   8. **階段**以 [PG-DOCS-PLAN.md](./PG-DOCS-PLAN.md) 為準。
 - **Consequences:**
-  - 場網 Worker 繼續拒絕 `docs` 當場；文件上線後，誤進場網之 `docs` host 宜 302→文件站（見計劃）。
+  - 場網 Worker 繼續拒絕 `docs` 當場；wildcard 下 `docs` 流量以 **service binding** 轉發 `playgrounds-docs`（**禁止** 302→自身 URL，避免重導迴圈）。較具體 Route `docs.samkuo.me/*` 優先於 `*.samkuo.me/*`。
   - ADR／計劃原文可續留 `docs/`；Starlight 為呈現層，須約定單一更新路徑，避免雙份漂移。
   - CI 可將文件部署與場殼部署分開。
   - 同步 [GLOSSARY.md](./GLOSSARY.md)、[AGENTS.md](../AGENTS.md)、[PG-DOCS-PLAN.md](./PG-DOCS-PLAN.md)。

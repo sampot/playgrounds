@@ -137,7 +137,7 @@ CI：path filter——僅 `docs-site/**`（及約定之內容來源路徑）變�
 
 1. **`docs` 維持** `PLAYGROUNDS_FIELD_RESERVED_SUBDOMAINS`／Worker `RESERVED`——**永不**當場殼。
 2. 文件由 **`playgrounds-docs`（名稱可調）Worker** 的 Custom Domain 服務；與場網 `playgrounds` Worker 分離。
-3. 若請求誤進場網 Worker 且 host＝`docs.samkuo.me`：現行 302→`https://samkuo.me/`；文件站上線後宜改 **302→`https://docs.samkuo.me/`**（僅此誤路由後備；正常流量應打中 docs Custom Domain）。
+3. 若請求誤進場網 Worker 且 host＝`docs.samkuo.me`：**勿** 302→`https://docs.samkuo.me/`（wildcard 下會自我重導＝`ERR_TOO_MANY_REDIRECTS`）。改以 **service binding** 轉發 `playgrounds-docs`，並盡量設較具體 Route `docs.samkuo.me/*` → docs Worker。
 4. Wildcard Route `*.samkuo.me/*` 上線後，保留名檢查仍必須先於 ASSETS（既有 `run_worker_first`）。
 5. 宿主 UI／README／部落格可鏈 docs；**勿**做成產品 Help Center 文案。
 

@@ -1,6 +1,10 @@
 /**
- * Playgrounds field-net edge (DEC-042).
- * Serves Astro static assets; rejects reserved subdomains when on *.samkuo.me.
+ * Playgrounds field-net edge (DEC-042／043).
+ * Serves Astro static assets; reserved subdomains must not run as fields.
+ *
+ * With zone route `*.samkuo.me/*`, `docs` also hits this Worker. Forward to
+ * `playgrounds-docs` via service binding — never 302 to docs.samkuo.me
+ * (that loops: ERR_TOO_MANY_REDIRECTS).
  */
 
 const FIELD_SUFFIX = ".samkuo.me";
@@ -14,6 +18,8 @@ type AssetsFetcher = {
 
 type WorkerEnv = {
   ASSETS: AssetsFetcher;
+  /** Service binding → playgrounds-docs (DEC-043). */
+  DOCS?: AssetsFetcher;
 };
 
 function reservedSubdomain(hostname: string): string | null {
@@ -28,11 +34,17 @@ export default {
   async fetch(request: Request, env: WorkerEnv): Promise<Response> {
     const url = new URL(request.url);
     const reserved = reservedSubdomain(url.hostname);
-    if (reserved) {
-      // docs = Starlight site (DEC-043); other reserved → apex.
-      if (reserved === "docs") {
-        return Response.redirect("https://docs.samkuo.me/", 302);
+    if (reserved === "docs") {
+      if (env.DOCS) {
+        return env.DOCS.fetch(request);
       }
+      return new Response(
+        "docs.samkuo.me is reserved for the docs Worker (playgrounds-docs).",
+        { status: 502, headers: { "content-type": "text/plain; charset=utf-8" } }
+      );
+    }
+    if (reserved) {
+      // Prefer apex over serving a field shell on site infra names.
       return Response.redirect("https://samkuo.me/", 302);
     }
     return env.ASSETS.fetch(request);
