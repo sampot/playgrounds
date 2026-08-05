@@ -159,3 +159,13 @@ export type {
   RosterHomeSeatBinding,
   RosterTunnelSend,
 } from "./rosterHomeSessionTunnel";
+
+export {
+  materializeRosterInviteSeat,
+  RosterInviteMaterializeError,
+} from "./rosterInviteSeatMaterialize";
+export type {
+  RosterSeatMaterializeResult,
+  RosterSeatMaterializeVia,
+  RosterSeatMaterializeDeps,
+} from "./rosterInviteSeatMaterialize";

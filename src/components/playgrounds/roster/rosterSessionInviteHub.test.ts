@@ -35,11 +35,42 @@ describe("rosterSessionInviteHub", () => {
     const invite = inviteRosterAvatarToSession({ role: "participant" });
     expect(invite.sessionId).toBe("sess-9");
     expect(invite.protocol.protocolId).toBe("brainstorm.v1");
+    expect(invite.catalogId).toBeUndefined();
     expect(send).toHaveBeenCalledWith(
       expect.objectContaining({
         kind: "session_invite",
         sessionId: "sess-9",
         role: "participant",
+      }),
+      "peer-1"
+    );
+  });
+
+  it("coding-orch invite prefills catalogId／source／worker role", () => {
+    const send = vi.fn();
+    registerRosterRelayTransport({
+      send,
+      getPeerAgentId: () => "peer-1",
+      getProjectionSandboxId: () => "proj-1",
+    });
+    setRosterOpenSession({
+      sessionId: "sess-c",
+      status: "open",
+      protocol: {
+        protocolId: "coding-orchestration.v1",
+        apiVersion: "1",
+        roles: ["host", "worker"],
+      },
+    });
+    const invite = inviteRosterAvatarToSession();
+    expect(invite.role).toBe("worker");
+    expect(invite.catalogId).toBe("pg-llm-agent");
+    expect(invite.source).toBe("sampot/pg-llm-agent");
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        catalogId: "pg-llm-agent",
+        source: "sampot/pg-llm-agent",
+        role: "worker",
       }),
       "peer-1"
     );

@@ -22,6 +22,7 @@ export function createSessionParticipantStarterFiles(): FileMap {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>腦力激盪參與者</title>
+    <meta name="sam:protocol" content="brainstorm.v1:participant" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>

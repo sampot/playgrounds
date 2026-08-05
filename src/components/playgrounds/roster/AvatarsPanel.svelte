@@ -7,11 +7,7 @@
   import { buildCanvasEntryUrl } from "../canvasSwProtocol";
   import { applyIframeColorScheme } from "../playgroundsTheme";
   import type { FileMap } from "../projectTypes";
-  import { createProject } from "../sandboxAuthority";
-  import {
-    createSessionParticipantStarterFiles,
-    SESSION_PARTICIPANT_DEFAULT_ROLE,
-  } from "../sessionParticipantStarter";
+  import { SESSION_PARTICIPANT_DEFAULT_ROLE } from "../sessionParticipantStarter";
   import {
     acceptRosterOffer,
     applyRosterAnswer,
@@ -51,6 +47,7 @@
     publishRosterRelayedSessionEvent,
     applySessionActResultFromRelay,
     bindingFromSeatBound,
+    materializeRosterInviteSeat,
     type RosterAvatarRelayMsg,
     type RosterAvatarStub,
     type RosterPeerHandlers,
@@ -431,35 +428,49 @@
   async function acceptIncomingInvite(): Promise<void> {
     const invite = pendingIncoming;
     if (!invite || !peerAgentId) return;
+    const peerId = peerAgentId;
     inviteBusy = true;
     error = null;
+    status = "解析型錄／安裝座位中…";
     try {
       const role = invite.role || SESSION_PARTICIPANT_DEFAULT_ROLE;
-      const files = createSessionParticipantStarterFiles();
-      const meta = await createProject(`遠端座位 · ${role}`, files, {
-        agentManaged: true,
-        inWorkingSet: false,
-        cloneIntent: "session_seat",
-        source: "playgrounds-roster-session-seat",
-      });
+      const seated = await materializeRosterInviteSeat(invite);
       sendAvatarRelay(
         {
           kind: SESSION_INVITE_ACCEPT_KIND,
           inviteId: invite.inviteId,
           sessionId: invite.sessionId,
           role,
-          homeSandboxId: meta.id,
+          homeSandboxId: seated.sandboxId,
         },
-        peerAgentId
+        peerId
       );
-      homeSandboxByInvite.set(invite.inviteId, meta.id);
+      homeSandboxByInvite.set(invite.inviteId, seated.sandboxId);
       pendingIncoming = null;
-      status = "已接受邀請（本機參與者已備妥；等待 seat_bound）";
+      const viaLabel =
+        seated.via === "catalog"
+          ? "型錄安裝"
+          : seated.via === "installed"
+            ? "本機 clone"
+            : "內建範本";
+      status = `已接受邀請（${viaLabel}；等待 seat_bound）`;
     } catch (e) {
-      error =
+      const message =
         e instanceof Error
-          ? `接受邀請失敗：${e.message}`
-          : `接受邀請失敗：${String(e)}`;
+          ? e.message
+          : String(e);
+      error = `接受邀請失敗：${message}`;
+      status = null;
+      sendAvatarRelay(
+        {
+          kind: SESSION_INVITE_REJECT_KIND,
+          inviteId: invite.inviteId,
+          sessionId: invite.sessionId,
+          reason: message.slice(0, 200),
+        },
+        peerId
+      );
+      pendingIncoming = null;
     } finally {
       inviteBusy = false;
     }
@@ -484,12 +495,10 @@
   function handleInviteAvatar(): void {
     error = null;
     try {
-      const invite = inviteRosterAvatarToSession({
-        role: SESSION_PARTICIPANT_DEFAULT_ROLE,
-      });
+      const invite = inviteRosterAvatarToSession();
       outboundInviteId = invite.inviteId;
       outboundSessionId = invite.sessionId;
-      status = `已送出入座邀請（${invite.protocol.protocolId}）`;
+      status = `已送出入座邀請（${invite.protocol.protocolId}／${invite.role}）`;
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     }

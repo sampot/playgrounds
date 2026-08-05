@@ -47,6 +47,8 @@ describe("session dogfood starters", () => {
     expect(fn).not.toContain("agent-a");
     expect(files["app.js"]).toContain("BroadcastChannel");
     expect(files["app.js"]).toContain(BRAINSTORM_PROTOCOL_ID);
+    expect(files["index.html"]).toContain('sam:protocol');
+    expect(files["index.html"]).toContain("brainstorm.v1:participant");
     expect(files["app.js"]).toContain("isRetryable");
     expect(files["app.js"]).toContain("待機");
     expect(files["app.js"]).toContain("主持沙盒");

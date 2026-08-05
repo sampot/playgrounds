@@ -1,8 +1,8 @@
 # Playgrounds 跨場 Roster／Avatar 計劃（DEC-045）
 
-> **狀態：** Phase 0 完成；Phase 1–2.5 **已落地**；Phase 3 **第一／二刀已落地**（邀請握手＋proxy 入座＋act／事件隧道；**lazy install 未通**）  
+> **狀態：** Phase 0–3 **已落地**（邀請握手＋proxy 入座＋act／事件隧道＋型錄匹配／lazy install）；Phase 4 UX 未開始  
 > **權威決策：** [DECISIONS.md](./DECISIONS.md) **DEC-045**  
-> **相關：** DEC-017（側欄 Files／總管）、DEC-023（本地 session；邀請＋protocol 規格＋型錄 lazy install）、DEC-031（peer／homePeer／virtual actor）、DEC-038（WebRTC 通道路線）、DEC-042（場網／無租戶）、[GLOSSARY.md](./GLOSSARY.md)
+> **相關：** DEC-017（側欄 Files／總管）、DEC-023（本地 session；邀請＋protocol 規格＋型錄 lazy install）、DEC-031（peer／homePeer／virtual actor）、DEC-038（WebRTC 通道路線）、DEC-042（場網／無租戶）、DEC-046（型錄查詢）、[GLOSSARY.md](./GLOSSARY.md)
 
 一句話：**薄 signaling 只完成一次經樣板壓縮的 offer／answer；連上後只走 WebRTC；Roster＝本場連線使用者名冊；每位連線者在本場自動出現一個 Avatar（薄投影 SAM／User agent），權威與執行仍在對方 `homePeer`，經 Roster DataChannel 轉。Session 入座不為 Avatar 特規——邀請附完整 protocol 規格，遊樂場以型錄為虛擬可用集合、lazy install 兌現相容 SAM。**
 
@@ -19,7 +19,7 @@
 
 **權威：** 投影不擁有對方 OPFS／Durable 權威；訊息與 `act`／事件經 Roster DataChannel 轉回對方 `homePeer`（Host 場仍為 session 權威）。斷線 → 撕掉本場投影實例，不殘留對方權威資料。
 
-**Phase 1–3.2 現況：** 連上即 spawn 投影 Avatar；DataChannel 含 `avatar_relay`（ping／pong、`session_invite*`、`session_seat_bound`／`session_act`／`session_act_result`／`session_event`）。Host 可邀化身入座（brainstorm.v1 狗糧）；座位標記 `remote`（proxy）；權威 act 在 Host，homePeer 經隧道發言並收事件。**尚未**型錄 lazy install（Phase 3 第三刀）。
+**Phase 1–3 現況：** 連上即 spawn 投影 Avatar；DataChannel 含 `avatar_relay`（ping／pong、session invite／act／event）。Host 可邀化身入座；座位標記 `remote`（proxy）；權威 act 在 Host，homePeer 經隧道發言並收事件。接受時走型錄／已安裝解析，必要時 lazy install（coding-orch＋`pg-llm-agent`）；`brainstorm.v1` 無型錄命中時退回內建 participant starter。
 
 ### Session 與協定（不特規 Avatar）
 
@@ -40,7 +40,7 @@
 
 - 兩台瀏覽器可經邀請連成 peer；本場 Roster 列出連線使用者。
 - 連線完成後**雙方**各為對方建立／顯示 Avatar（投影；`homePeer` 仍在各自本機）。
-- Avatar 可經 **DEC-023** 入座（邀請＋完整 protocol 規格＋型錄 lazy install；遠端橋＝後段 Phase；執行仍打回 homePeer）。
+- Avatar 可經 **DEC-023** 入座（邀請＋完整 protocol 規格＋型錄 lazy install；執行仍打回 homePeer）。
 - 場主**不**負擔資料面雲費；signaling 極薄、可 rate limit、可 OOB。
 
 ## 非目標
@@ -103,7 +103,7 @@ layout 還原：側欄 tab 鍵 `avatars`（與 `files`／`agent` 一併 persist�
 | **1. Transport** | 非 trickle＋樣板編解碼；**QR 與文字**；可選同區網進一步剪裁 | 一般／同區網皆可 handshake；DataChannel ping | **完成** |
 | **2. Presence stub＋側欄** | 連入後雙方列表＋identicon；斷線清除 | 雙方互見對方 stub（投影 SAM 前身） | **完成** |
 | **2.5. 投影 Avatar SAM** | 連上即在本場 spawn 薄投影 Avatar；卡片掛其 UI；DataChannel 轉發 | 斷線撕投影；權威仍在 homePeer | **完成** |
-| **3. Session bridge** | 遠端 invite／`act`／事件經投影轉 homePeer；**邀請附完整 protocol 規格**；型錄匹配／**lazy install**；修訂 DEC-023 遠端範圍 | 狗糧可邀遠端 Avatar 入座；與本機 Participant 同一協定閘 | **進行中**（3.1 邀請＋proxy；**3.2 act／事件隧道**；lazy install 未通） |
+| **3. Session bridge** | 遠端 invite／`act`／事件經投影轉 homePeer；**邀請附完整 protocol 規格**；型錄匹配／**lazy install**；修訂 DEC-023 遠端範圍 | 狗糧可邀遠端 Avatar 入座；與本機 Participant 同一協定閘 | **完成**（3.1 邀請＋proxy；3.2 act／事件；3.3 型錄／lazy install） |
 | **4. UX** | 開放連入／邀請連結／權限 | 非工程使用者可走完 | 未開始 |
 | **5.（可選）** | 自備 TURN；mailbox 跨 peer；自訂頭像 | 另規 | 未開始 |
 
@@ -129,3 +129,4 @@ layout 還原：側欄 tab 鍵 `avatars`（與 `files`／`agent` 一併 persist�
 | 2026-08-05 | Phase 2.5：`roster_avatar` 投影 SAM＋卡片 iframe；`avatar_relay` ping／pong |
 | 2026-08-05 | Phase 3 第一刀：`session_invite*` 握手；Host 投影 proxy 入座；化身 tab 接受／拒絕；act 橋未通 |
 | 2026-08-05 | Phase 3 第二刀：`session_seat_bound`／`session_act`／`session_act_result`／`session_event`；Host 權威 act＋事件 fanout；homePeer tunnel `env.SESSION`；lazy install 仍開 |
+| 2026-08-05 | Phase 3 第三刀：接受路徑 `resolveInviteCandidatesWithInstalled`＋clone／GitHub lazy install；brainstorm 內建後備；coding-orch 預填 `pg-llm-agent` |

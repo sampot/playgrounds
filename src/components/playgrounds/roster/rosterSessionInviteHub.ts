@@ -12,6 +12,12 @@ import {
   type SessionSeatBoundPayload,
 } from "./rosterSessionBridge";
 
+/** Catalog hint when inviting into coding-orchestration.v1 (DEC-045／046). */
+const CODING_ORCH_PROTOCOL_ID = "coding-orchestration.v1";
+const CODING_ORCH_CATALOG_ID = "pg-llm-agent";
+const CODING_ORCH_CATALOG_SOURCE = "sampot/pg-llm-agent";
+const CODING_ORCH_DEFAULT_ROLE = "worker";
+
 export type RosterSessionOpenSnapshot = {
   sessionId: string;
   protocol: MultiAgentSession["protocol"];
@@ -159,19 +165,32 @@ export function rosterCanInviteToSession(): boolean {
  */
 export function inviteRosterAvatarToSession(opts?: {
   role?: string;
+  catalogId?: string;
+  source?: string;
 }): SessionInvitePayload {
   if (!openSession) throw new Error("尚未開啟多人通道");
   if (!sendRelay) throw new Error("化身連線尚未就緒");
   const peerId = getPeerAgentId?.();
   if (!peerId) throw new Error("還沒有連線中的化身");
+  const isCodingOrch =
+    openSession.protocol.protocolId === CODING_ORCH_PROTOCOL_ID;
   const role =
     opts?.role?.trim() ||
-    openSession.protocol.roles.find(r => r !== "human") ||
-    "participant";
+    (isCodingOrch
+      ? CODING_ORCH_DEFAULT_ROLE
+      : openSession.protocol.roles.find(r => r !== "human") || "participant");
+  const catalogId =
+    opts?.catalogId?.trim() ||
+    (isCodingOrch ? CODING_ORCH_CATALOG_ID : undefined);
+  const source =
+    opts?.source?.trim() ||
+    (isCodingOrch ? CODING_ORCH_CATALOG_SOURCE : undefined);
   const invite = buildSessionInvitePayload({
     sessionId: openSession.sessionId,
     protocol: openSession.protocol,
     role,
+    ...(catalogId ? { catalogId } : {}),
+    ...(source ? { source } : {}),
   });
   sendRelay(invite, peerId);
   return invite;

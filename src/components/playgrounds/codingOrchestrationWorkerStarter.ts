@@ -26,6 +26,7 @@ export function createCodingOrchestrationWorkerStarterFiles(): FileMap {
     <meta name="color-scheme" content="light dark" />
     <title>Coding worker</title>
     <meta name="sam:needs-controller" content="1" />
+    <meta name="sam:protocol" content="coding-orchestration.v1:worker" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
