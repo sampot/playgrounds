@@ -23,10 +23,8 @@
     {
       "pattern": "play.samkuo.me",
       "custom_domain": true
-    },
-    {
-      "pattern": "*.samkuo.me/*",
-      "zone_name": "samkuo.me"
     }
+    // Zone route `*.samkuo.me/*` → this Worker is set in the dashboard
+    // (manual; do not re-add here — deploy token lacks workers_routes:edit).
   ]
 }

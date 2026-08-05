@@ -9,5 +9,5 @@
       "@utils/*": ["./src/utils/*"]
     }
   },
-  "exclude": ["dist", "node_modules", "worker-configuration.d.ts"]
+  "exclude": ["dist", "docs-site", "node_modules", "worker-configuration.d.ts"]
 }

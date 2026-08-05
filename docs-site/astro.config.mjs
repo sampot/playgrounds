@@ -2,9 +2,12 @@
 import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
 
+const site = "https://docs.samkuo.me";
+const ogImageUrl = new URL("/og.png", site).href;
+
 // Docs for 遊樂場（DEC-043）— personal site identity, not a product brand (DEC-004).
 export default defineConfig({
-  site: "https://docs.samkuo.me",
+  site,
   trailingSlash: "always",
   server: { port: 4322 },
   integrations: [
@@ -37,6 +40,22 @@ export default defineConfig({
             name: "author",
             content: "我是山姆鍋",
           },
+        },
+        {
+          tag: "meta",
+          attrs: { property: "og:image", content: ogImageUrl },
+        },
+        {
+          tag: "meta",
+          attrs: { property: "og:image:width", content: "1200" },
+        },
+        {
+          tag: "meta",
+          attrs: { property: "og:image:height", content: "630" },
+        },
+        {
+          tag: "meta",
+          attrs: { name: "twitter:image", content: ogImageUrl },
         },
       ],
       customCss: ["./src/styles/custom.css"],
