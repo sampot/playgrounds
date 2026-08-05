@@ -4,12 +4,28 @@
 
 export type SamFileMap = Record<string, string>;
 
+/** Session protocol decl from `sam:protocol` (DEC-046 Phase 4; shape matches catalog). */
+export interface SamHeadSessionProtocol {
+  protocolId: string;
+  apiVersion: string;
+  roles?: string[];
+}
+
 export interface SamHeadMeta {
   title?: string;
   toolKinds?: string[];
   toolGlobs?: string[];
   needsController?: boolean;
+  /**
+   * First `sam:protocol` token’s protocolId (legacy convenience).
+   * Prefer {@link sessionProtocols} for matching.
+   */
   protocol?: string;
+  /**
+   * Parsed from `sam:protocol` (comma-separated tokens:
+   * `id[@apiVersion][:role[+role…]]`; bare id ⇒ apiVersion `"1"`).
+   */
+  sessionProtocols?: SamHeadSessionProtocol[];
   /** Environment capability tokens from `sam:capabilities` (DEC-036). */
   capabilities?: string[];
 }

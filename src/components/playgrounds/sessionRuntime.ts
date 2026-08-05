@@ -186,6 +186,14 @@ export class SessionRuntime {
       protocolId,
       protocolApiVersion: apiVersion,
       paused: false,
+      ...(opts.remote
+        ? {
+            remote: {
+              peerAgentId: opts.remote.peerAgentId,
+              inviteId: opts.remote.inviteId,
+            },
+          }
+        : {}),
     };
     s.seats = [...s.seats, seat];
     return seat;

@@ -1,6 +1,6 @@
 # 我是山姆鍋 — 架構與工程決策
 
-> **最後更新：** 2026-08-05（DEC-045：Roster／化身 tab＋identicon；signaling＝一次 offer／answer）
+> **最後更新：** 2026-08-05（DEC-046 Draft：型錄結構化 JSON＋Playgrounds 查詢）
 > **對象：** 作者、AI agents；必要時給之後的自己讀
 
 本文件以輕量 **ADR**（Architecture Decision Record）記錄本站**顯著且耐久**的架構／工程選擇：選了什麼、為何不選其他、後續工作不可踩破的後果。細節規格仍以 [AGENTS.md](./AGENTS.md)、[TOOLS-PLAN.md](./TOOLS-PLAN.md) 等為準；此檔是可掃讀的決策索引，避免只活在 PR 與聊天裡。
@@ -85,6 +85,7 @@
 | [DEC-043](#dec-043-playgrounds-文件站-starlight與-docssamkuome) | Playgrounds 文件站：Starlight＠`docs.samkuo.me` | Accepted |
 | [DEC-044](#dec-044-playgrounds-下方面板-dockopt-in與自選-sam) | Playgrounds 下方面板 dock（opt-in＋自選 SAM） | Accepted |
 | [DEC-045](#dec-045-playgrounds-跨場-rosteravatar與薄-signaling) | Playgrounds 跨場 Roster／Avatar 與薄 signaling | Accepted |
+| [DEC-046](#dec-046-playgrounds-型錄結構化資料與查詢面) | Playgrounds 型錄結構化資料與查詢面 | Draft |
 
 ---
 
@@ -412,6 +413,7 @@
   - **通道：** 參與 Agent 注入 **`env.SESSION`**（≠ HOST／TOOL）：`getSeat`／`getState`／`getEventChannel`／`act`／`leave`。入座看**協定相容**＋ **role（session 權限類）**，不要求與 Host 同一 SAM 內容。Agent **不規定**使用 LLM。
   - **Role：** 代表 session 內可執行的操作權限，**不是** Agent 人格／隊名。狗糧以單一參與者範本＋ clone 多實例為準；協定通常只需少量 role（如 `human`／`participant`）。
   - **入座路徑（2026-08-03 修訂）：** 支援 Host **邀請**與參與者**申請**；`joinPolicy` 由 Host 在建立 session 時決定（可 `invite_only`／`apply`／`apply_with_approval`／`invite_or_apply`）。邀請仍須過協定閘；不得因邀請發給 HOST。見 SESSION 規格 §6.5。
+  - **邀請與 protocol 規格（2026-08-05 修訂）：** 邀請宜附帶**完整 session protocol 規格**（足以判斷相容：`protocolId`／`apiVersion`、roles／capabilities、訊息與 `act` 形狀，或可解析引用；可選 catalog／`?open=` 建議來源，權威＝規格相容非硬綁 repo）。遊樂場以 **SAM 小品型錄**為**虛擬可用**集合（類比 DEC-031 virtual actor：尚未安裝≠無能力；結構化查詢見 [DEC-046](#dec-046-playgrounds-型錄結構化資料與查詢面) Draft）；接受邀請時對已安裝實例或型錄做相容匹配，必要時 **lazy installation** 再入座／dehibernate。**不**為 Roster Avatar 另建協定路徑——遠端僅多 Roster 呈現與傳輸橋（DEC-045）。
   - **即時：** 事件以 **BroadcastChannel**（`playgrounds-session:<sessionId>`）推送；**不**以長輪詢當主路徑。`getState` 用於入座快照或 seq 缺口補齊。
   - **執行：** 最多 4 個背景 Participant canvas iframe；不佔用左側現行 Agent 槽。切換工作沙盒結束 session。
   - **編排：** HOST 子集 `openSession`／`closeSession`／`listSeats`／`joinSeat`／`leaveSeat`；Host 畫布另可走 `/api/shell/session/*`（含 spawn-participant 邀請）；單 HOST 不變。
@@ -421,9 +423,12 @@
   - 勿為每個並行 Agent 各做一份「角色範本」；人格在 SAM、權限在 role、數量靠 clone。
   - 勿在遊樂場硬選「房間／聊天室」等場景名當唯一 UI 詞；人話名稱活在各 Host。
   - 勿把入座預設成「只能申請」；編排類 Host 常用邀請。
+  - 勿為 Roster Avatar 另建協定／入座引擎；遠端與本機共用邀請＋型錄 lazy install（DEC-045）。
   - 契約變更同步 GLOSSARY／host-api／規格；狗糧範本證明無 LLM 即時迴圈與 Host 自管 UX。
   - Participant 背景執行長期應收斂到 DEC-024 `SamInstance`／Controller（隱藏 iframe 為過渡）。
 - **Revision（2026-08-05）：** 遠端 Roster／Avatar／薄 signaling（一次 offer／answer）見 [DEC-045](#dec-045-playgrounds-跨場-rosteravatar與薄-signaling)；本筆本地範圍暫不變，遠端座位於 Roster Phase 3 再修訂。
+- **Revision（2026-08-05）：** 邀請附完整 protocol 規格；型錄虛擬可用＋lazy install（類比 virtual actor）；Avatar 不特規協定路徑（與 DEC-045 對齊）。
+- **Revision（2026-08-05）：** Roster Phase 3 第一刀：遠端 `session_invite*` 握手＋Host 場 Avatar 投影 proxy 入座（`seat.remote`）；`act`／事件隧道與 lazy install 仍未通。
 
 ### DEC-024: SAM 三層模型與 headless runtime
 
@@ -512,7 +517,7 @@
 - **Decision:**
   1. **兩面 UX：** **Picker**＝使用者**工作集**（我建的，或我要求總管幫我建／留下的）；**管理面**＝遊樂場**實例總帳**（全部沙盒，含自動建立）。日常切換靠前者；盤點／回收靠後者。
   2. **兩軸正交：** `inWorkingSet`（Picker 可見）與 `agentManaged`（HOST 可刪）分開。HOST `createProject` 代使用者建立預設進工作集；HOST `cloneProject`（自迭代／座位等）預設**不**進工作集，可 `setWorkingSet` promote。人手新建／匯入／UI 複製預設進工作集。
-  3. **血統：** clone 寫入 `clonedFrom`；可選 `cloneIntent`（如 `user`／`steward_for_user`／`self_upgrade`／`session_seat`／`experiment`）。分叉後不暗示 Code 連動。
+  3. **血統：** clone 寫入 `clonedFrom`；可選 `cloneIntent`（如 `user`／`steward_for_user`／`self_upgrade`／`session_seat`／`roster_avatar`／`experiment`）。分叉後不暗示 Code 連動。
   4. **GC 優先於資料夾：** 升上總管、session 結束、管理面批次清可回收實例（agentManaged ∧ ¬工作集 ∧ 非現行總管）。**否決**深層沙盒資料夾 taxonomy、雲端專案超市當主結構。
   5. **遷移：** meta 缺 `inWorkingSet` 時——非 agentManaged 視為在工作集；agentManaged 視為不在（可在管理面加入）。
   - 階段與完成定義見 [PG-SANDBOX-INSTANCE-PLAN.md](./PG-SANDBOX-INSTANCE-PLAN.md)。
@@ -841,28 +846,29 @@
 ### DEC-045: Playgrounds 跨場 Roster／Avatar 與薄 signaling
 
 - **Status:** Accepted（2026-08-05；契約；實作依計劃分階段）
-- **Context:** 希望不同使用者的場可經網路相遇：連線後場側出現對方 **Avatar Agent**，並可邀請參與 session。須對齊 DEC-031 `homePeer`、DEC-038 WebRTC 路線、DEC-042 無伺服器租戶；場主**不**負擔資料面雲費。若 signaling 變成常駐中繼（trickle／心跳／重談／轉發資料），會變成隱性雲端房間，違背場網哲學。（機制舊稱 **Visit**；2026-08-05 起改名 **Roster**。Avatar／化身不變。）
+- **Context:** 希望不同使用者的場可經網路相遇：連線後本場 **Roster** 出現對方，並為每位連線者建立 **Avatar**（代替該使用者在本場現身的 User agent），以便後續邀請參與 session。須對齊 DEC-031 `homePeer`、DEC-038 WebRTC 路線、DEC-042 無伺服器租戶；場主**不**負擔資料面雲費。若 signaling 變成常駐中繼（trickle／心跳／重談／轉發資料），會變成隱性雲端房間，違背場網哲學。（機制舊稱 **Visit**；2026-08-05 起改名 **Roster**。）
 - **Decision:**
-  1. **Roster：** 邀請連入建立瀏覽器 peer（WebRTC）。開別人的場子域 ≠ Roster（那只是另一 origin 空場）。
-  2. **Avatar：** 連線完成後**雙方**化身列表皆出現對方 **投影／presence stub**（名片、`agentId`、連線態）；各自 Avatar 的 **`homePeer` 仍在本機**；**不**把對方沙盒權威搬進本機 OPFS。DataChannel 開啟時雙方互送 presence。
-  3. **場主 UX：** 左側側欄新增 **化身** tab（UI label＝`化身`；layout 鍵仍為 `avatars`），與 **Files／總管** 並列（三 tab）。內容＝目前連入的 Avatar 列表（非總管 iframe、非檔案樹）。無連線時為空態。連線流程僅分 **發起**（建邀請、等回覆）與 **加入**（貼邀請、建回覆）——對應 WebRTC initiator／responder；**不**用場主／訪客產品角色。UI 用語＝邀請／回覆／QR／同一區網；**不**暴露 offer／answer／SDP 等術語。兩區塊預設收起。
+  1. **Roster：** 跟**當前這場**連上的使用者**名冊**＋建立瀏覽器 peer（WebRTC）的連線機制。開別人的場子域 ≠ Roster（那只是另一 origin 空場）。
+  2. **Avatar／化身：** 每位連線使用者在**本場自動建立**的 **User agent 投影**——薄 SAM／proxy；可 agent 模式執行；有 UI。化身 tab 卡片＝該投影 SAM 的呈現面。權威與執行仍在對方 **`homePeer`**；本場經 **Roster DataChannel** 轉訊息／（後段）事件與 `act`。**不**把對方沙盒權威搬進本機 OPFS；**不是**對方本機 clone。斷線 → 撕掉本場投影。Phase 1–2 可以 presence stub（identicon／名／連線態）占位；目標＝spawn 真投影 SAM。
+  3. **場主 UX：** 左側側欄 **化身** tab（UI label＝`化身`；layout 鍵仍為 `avatars`），與 **Files／總管** 並列（三 tab）。內容＝目前 Roster 上的 Avatar（非總管 iframe、非檔案樹）。無連線時為空態。連線流程僅分 **發起**（建邀請、等回覆）與 **加入**（貼邀請、建回覆）——對應 WebRTC initiator／responder；**不**用場主／訪客產品角色。UI 用語＝邀請／回覆／QR／同一區網；**不**暴露 offer／answer／SDP 等術語。兩區塊預設收起。
   4. **頭像：** 每個 Avatar **預設 identicon**（本機依穩定 id 如 `agentId`／peer 公鑰衍生繪製；**不**預設拉外站圖）。日後可選自訂圖，不擋 MVP。
-  5. **Signaling（硬約束）：** 伺服器（或 OOB 貼上）**只**用來完成**一次** WebRTC **offer／answer**。每邀請房恰好 **1× offer**＋**1× answer**；採 **非 trickle**（ICE 收進後再發布；**無** candidate 訊息）。answer 取走、連線成功／失敗或 TTL → **銷房**；拒再寫。需重連 → **新邀請**。**禁止**經 signaling：DataChannel 流量、presence 心跳、session／mailbox／FS、renegotiation、第二輪 offer／answer。
+  5. **Signaling（硬約束）：** 伺服器（或 OOB 貼上）**只**用來完成**一次** WebRTC **offer／answer**。每邀請房恰好 **1× offer**＋**1× answer**；採 **非 trickle**（ICE 收進後再發布；**無** candidate 訊息）。answer 取走、連線成功／失敗或 TTL → **銷房**；拒再寫。需重連 → **新邀請**。**禁止**經 signaling：DataChannel 流量、presence 心跳、session／mailbox／FS、Avatar 投影流量、renegotiation、第二輪 offer／answer。
   6. **壓縮載荷（硬約束）：** 交換的不是完整原始 SDP 字串。雙方依**固定樣板**重建 SDP：先剪裁／抽取必要欄位（如 fingerprint、ICE ufrag／pwd、精簡 candidates），再編碼進樣板 payload。**交換方式＝QR 或文字**（複製／貼上）二選一，**同等一等**；同一壓縮字串可顯示為 QR 或純文字。載荷須小到**單張 QR 仍易掃**（過大則失敗提示，勿默認多碼拼圖）。薄 rendezvous 若存在，亦用同一格式。
   7. **同區網選項：** 使用者可宣告 **peers 位於同一區網（LAN）**。此模式下 offer／answer **可進一步剪裁**（例如只帶 host／link-local candidates、略過需公網 STUN／relay 的候選；細節以樣板版號為準）。載荷須標明此模式，雙方一致解碼。誤選則連線可能失敗——應提示可改「一般／跨網」重發，勿默默升格加 candidates 走第二輪 signaling。
-  8. **資料面：** 連上後只走 WebRTC（一般模式可用 STUN；TURN 預設不做，可選使用者自備）。同區網模式可不依賴公網 STUN。
-  9. **Session：** 遠端入座沿用 DEC-023 語意（協定閘／`joinPolicy`／invite）；傳輸另橋。落地前 DEC-023 本地範圍不變。
+  8. **資料面：** 連上後只走 WebRTC（一般模式可用 STUN；TURN 預設不做，可選使用者自備）。同區網模式可不依賴公網 STUN。Avatar 投影與對端通訊走同一 DataChannel（或同 peer 上約定之 channel），**不**經 signaling 伺服器。
+  9. **Session（不特規 Avatar）：** 遠端入座沿用 **DEC-023** 同一套邀請／協定閘／`joinPolicy`——**不**為 Avatar 另建協定系統。邀請附**完整 protocol 規格**；接收場以型錄為虛擬可用集合、**lazy install** 兌現相容 SAM（類比 virtual actor／dehibernate）。Avatar 只負責本場投影呈現（化身卡片可顯示邀請）與 Roster DataChannel 橋；本場看到的參與者是 Avatar 投影，執行／權威仍在對方 homePeer。落地前 DEC-023 本地範圍不變；遠端橋見計劃 Phase 3。
   10. **Rate limit：** signaling 必須可限流（IP／碼／TTL）；可疊 CF zone path 規則。
   11. **敘事：** DEC-004——場與人串連，非多租戶協作 SaaS。
   - 階段見 [PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)。
 - **Consequences:**
   - 勿把 signaling 做成聊天室、房間中繼或 ICE trickle 匯流排。
   - 勿假設 Roster＝開 `*.samkuo.me` 子域；勿跨 origin 自動搬資料。
-  - 勿把 Avatar 當本機 clone；勿給遠端座位完整 HOST。
+  - 勿把 Avatar 當本機 clone 或擁有對方 FS 的實體沙盒權威；勿給遠端座位完整 HOST。
+  - 勿為 Avatar 另開 session／protocol 引擎；協定兌現走 DEC-023＋型錄 lazy install。
   - 勿把 Avatar 塞進總管 tab 或 Files 樹；勿預設外站頭像 CDN。
   - 勿把完整 SDP 原文塞進 QR／文字交換；勿以多張 QR 拼圖當預設 UX；勿只做 QR 不做文字（或相反）。
   - 勿在同區網失敗後經同一房補 candidates／重談；改新邀請或改模式。
-  - 勿預設營運 TURN 或把 session 真相放上 Workers／DO／R2。
+  - 勿預設營運 TURN 或把 session／Avatar 真相放上 Workers／DO／R2。
   - 同步 [GLOSSARY.md](./GLOSSARY.md)、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)；遠端座位落地時修訂 DEC-023。
 - **Revision（2026-08-05）：** 場主 UX＝左側 **Avatars** tab（並列 Files／總管）；頭像預設 identicon。
 - **Revision（2026-08-05）：** 側欄 UI label 改為「**化身**」（鍵名仍 `avatars`）。
@@ -870,6 +876,31 @@
 - **Revision（2026-08-05）：** 交換方式＝**QR 或文字**（同等）。
 - **Revision（2026-08-05）：** 可選同區網模式，進一步剪裁 offer／answer。
 - **Revision（2026-08-05）：** **Rename：** Visit → **Roster**（計劃／程式）；Avatar／化身／`avatars` **不變**。
+- **Revision（2026-08-05）：** **Avatar 語意：** 本場**投影** User agent（薄 SAM／proxy）；Roster＝連線使用者名冊；權威在對方 `homePeer`；經 DataChannel 轉。Phase 1–2 stub 為前身；Phase 2.5＝spawn 投影 SAM。
+- **Revision（2026-08-05）：** Session 不特規 Avatar；邀請附完整 protocol 規格；型錄虛擬可用＋lazy install（與 DEC-023 對齊）。
+- **Revision（2026-08-05）：** Phase 2.5 落地：本機 `roster_avatar` 投影 SAM＋化身卡片 iframe；DataChannel `avatar_relay` ping／pong；斷線 teardown。
+- **Revision（2026-08-05）：** Phase 3 第一刀：`session_invite*` 握手；Host 投影 proxy 入座（`seat.remote`）；化身 tab／腦力激盪「邀請化身入座」；act／事件／lazy install 未通。
+
+
+### DEC-046: Playgrounds 型錄結構化資料與查詢面
+
+- **Status:** Draft（2026-08-05；契約；Phase 1–4 已落地——見 [PG-CATALOG-QUERY-PLAN.md](./PG-CATALOG-QUERY-PLAN.md)）
+- **Context:** `/sam/` 型錄頁已由 `catalog/**/*.yaml` 建置產 typed module（DEC-041）。Session 邀請須以型錄為**虛擬可用**集合並 **lazy install**（DEC-023／045），不能刮 HTML，也不應另設 CMS 或外站型錄權威。需要與網頁同源、機器可查的結構化產物與殼內查詢面。
+- **Decision:**
+  1. **權威不變：** 仍為宿主 repo `catalog/entries/*.yaml`（及 series／picks／page）；**不**以執行期爬 GitHub、**不**以 `PUBLIC_CATALOG_URL` 當權威。
+  2. **雙產物、一次 gen：** `npm run catalog:gen` 同時產出（a）既有 `samCatalog.generated.ts`（`/sam/`＋殼 import）；（b）版本化 JSON **`public/catalog/v1.json`**，部署後同源 **`GET /catalog/v1.json`**。兩邊必須同一次建置、CI 皆可 diff 防漂移。
+  3. **查詢面：** Playgrounds 提供程式 API（list／getById／findBySource／`matchCatalogForProtocol`／`resolveCatalogInviteCandidates`／`resolveInviteCandidates`）。同建置優先用捆進之 typed 資料；JSON 供 fetch／SW／除錯，失敗回退捆進副本。本機已安裝另以 `index.html` **`sam:protocol`** head 探測並與型錄合併。
+  4. **Protocols：** YAML 可選 `protocols[]`（`protocolId`＋`apiVersion`；可選 `roles`）。邀請附完整 protocol 規格時以此匹配；**未宣告不假裝支援**。Head：`sam:protocol`＝`id[@apiVersion][:roles…]`（逗號多筆；省略 version⇒`"1"`）。Lazy install 仍走 `?open=`（DEC-025）——查詢不執行安裝。見 [PG-CATALOG-QUERY-PLAN.md](./PG-CATALOG-QUERY-PLAN.md)。
+  5. **非目標：** CMS；刮 `/sam/` HTML；外站型錄權威。
+  - 階段見 [PG-CATALOG-QUERY-PLAN.md](./PG-CATALOG-QUERY-PLAN.md)；投稿規則仍見 [PG-CATALOG-PLAN.md](./PG-CATALOG-PLAN.md)。
+- **Consequences:**
+  - 勿手改 generated TS／JSON；勿讓頁面 HTML 成為機器權威。
+  - 勿假設每筆 YAML 已有 protocol 欄；未宣告則不能假裝支援任意 session protocol。
+  - 同步 GLOSSARY、CATALOG／QUERY 計劃、CI 產物清單。
+- **Revision（2026-08-05）：** Phase 1–2 落地（JSON emit＋query API）。
+- **Revision（2026-08-05）：** Phase 3：`protocols` 欄＋`matchCatalogForProtocol`；`pg-llm-agent` 狗糧宣告。
+- **Revision（2026-08-05）：** Phase 4：本機 `sam:protocol` 探測＋`resolveInviteCandidates` 合併。
+
 
 ---
 
@@ -912,6 +943,7 @@
 | [PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md) | 跨場 Roster／Avatar／薄 signaling（DEC-045） |
 | [PG-STANDALONE-PLAN.md](./PG-STANDALONE-PLAN.md) | 場網／Workers／開源／舊場暫留（DEC-041／042） |
 | [PG-CATALOG-PLAN.md](./PG-CATALOG-PLAN.md) | 小品型錄 YAML／PR 投稿（`catalog/entries/`） |
+| [PG-CATALOG-QUERY-PLAN.md](./PG-CATALOG-QUERY-PLAN.md) | 型錄結構化 JSON＋Playgrounds 查詢／lazy install（DEC-046 Draft） |
 | [PG-DOCS-PLAN.md](./PG-DOCS-PLAN.md) | 文件站 Starlight＠`docs.samkuo.me`（DEC-043） |
 | [playgrounds-host-api.md](./playgrounds-host-api.md) | Host API v1 快速參考 |
 | `astro.config.ts`／`src/config.ts` | 建置與站台設定實作 |

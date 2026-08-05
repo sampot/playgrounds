@@ -1,14 +1,14 @@
 # SAM catalog（投稿）
 
-Authority for the field `/sam/` page lives here: one YAML file per entry under [`entries/`](./entries/). Build-time codegen writes `src/data/samCatalog.generated.ts`; the app imports helpers from `src/data/samCatalog.ts`.
+Authority for the field `/sam/` page lives here: one YAML file per entry under [`entries/`](./entries/). Build-time codegen writes `src/data/samCatalog.generated.ts` and `public/catalog/v1.json`; the app imports helpers from `src/data/samCatalog.ts` (see [PG-CATALOG-QUERY-PLAN.md](../docs/PG-CATALOG-QUERY-PLAN.md)).
 
 ## Add an entry
 
 1. Copy [`entries/_template.yaml`](./entries/_template.yaml) → `entries/<id>.yaml`  
    Filename = stable **id** (usually the repo name, e.g. `pg-breakout.yaml`).
 2. Fill required fields: `title`, `kind`, `series`, `blurb`, `source`.
-3. Optional: `license`, `status: draft` (drafts are omitted from the site).
-4. Run `npm run catalog:gen` and commit the updated `samCatalog.generated.ts` with your YAML.
+3. Optional: `license`, `status: draft` (drafts are omitted from the site), `protocols` (session protocol decls for invite match).
+4. Run `npm run catalog:gen` and commit the updated `samCatalog.generated.ts` **and** `public/catalog/v1.json` with your YAML.
 5. Open a PR. Prefer the catalog PR template if present.
 
 `source` may be `owner/repo` or a full GitHub／GitLab URL. Same-origin 「一鍵開」uses `/?open=<source>`.
@@ -24,7 +24,7 @@ Authority for the field `/sam/` page lives here: one YAML file per entry under [
 ## Commands
 
 ```bash
-npm run catalog:gen   # regenerate typed module from YAML
+npm run catalog:gen   # regenerate typed module + /catalog/v1.json from YAML
 npm test
 npm run build         # runs catalog:gen then check + astro build
 ```

@@ -1,8 +1,9 @@
 /**
- * Load catalog/*.yaml → src/data/samCatalog.generated.ts
+ * Load catalog/*.yaml → src/data/samCatalog.generated.ts + public/catalog/v1.json
  * Run: npm run catalog:gen
+ * See docs/PG-CATALOG-QUERY-PLAN.md (DEC-046).
  */
-import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parse as parseYaml } from "yaml";
@@ -11,6 +12,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const catalogDir = join(root, "catalog");
 const entriesDir = join(catalogDir, "entries");
 const outPath = join(root, "src/data/samCatalog.generated.ts");
+const jsonOutPath = join(root, "public/catalog/v1.json");
 
 const KINDS = ["tool", "agent", "game", "toy", "media"] as const;
 type Kind = (typeof KINDS)[number];
@@ -23,6 +25,7 @@ type EntryYaml = {
   source?: unknown;
   license?: unknown;
   status?: unknown;
+  protocols?: unknown;
 };
 
 type SeriesYaml = {
@@ -133,6 +136,12 @@ const files = readdirSync(entriesDir)
   .filter(f => f.endsWith(".yaml") && !f.startsWith("_"))
   .sort();
 
+type GenProtocol = {
+  protocolId: string;
+  apiVersion: string;
+  roles?: string[];
+};
+
 type GenEntry = {
   id: string;
   title: string;
@@ -141,7 +150,53 @@ type GenEntry = {
   blurb: string;
   source: string;
   license?: string;
+  protocols?: GenProtocol[];
 };
+
+function parseProtocols(raw: unknown, where: string): GenProtocol[] | undefined {
+  if (raw === undefined || raw === null) return undefined;
+  if (!Array.isArray(raw)) {
+    fail(`${where}: protocols must be an array`);
+  }
+  if (raw.length === 0) return undefined;
+  const out: GenProtocol[] = [];
+  const seen = new Set<string>();
+  for (let i = 0; i < raw.length; i++) {
+    const item = raw[i];
+    const pWhere = `${where}.protocols[${i}]`;
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      fail(`${pWhere}: must be an object`);
+    }
+    const row = item as Record<string, unknown>;
+    const protocolId = asString(row.protocolId, "protocolId", pWhere);
+    const apiVersion = asString(row.apiVersion, "apiVersion", pWhere);
+    const key = `${protocolId}@${apiVersion}`;
+    if (seen.has(key)) {
+      fail(`${pWhere}: duplicate ${key}`);
+    }
+    seen.add(key);
+    const decl: GenProtocol = { protocolId, apiVersion };
+    if (row.roles !== undefined && row.roles !== null) {
+      if (!Array.isArray(row.roles) || row.roles.length === 0) {
+        fail(`${pWhere}: roles must be a non-empty array when set`);
+      }
+      const roles: string[] = [];
+      const roleSeen = new Set<string>();
+      for (const r of row.roles) {
+        if (typeof r !== "string" || !r.trim()) {
+          fail(`${pWhere}: roles entries must be non-empty strings`);
+        }
+        const t = r.trim();
+        if (roleSeen.has(t)) fail(`${pWhere}: duplicate role "${t}"`);
+        roleSeen.add(t);
+        roles.push(t);
+      }
+      decl.roles = roles;
+    }
+    out.push(decl);
+  }
+  return out;
+}
 
 const entries: GenEntry[] = [];
 const idSeen = new Set<string>();
@@ -175,6 +230,8 @@ for (const file of files) {
   if (doc.license !== undefined && doc.license !== null) {
     entry.license = asString(doc.license, "license", where);
   }
+  const protocols = parseProtocols(doc.protocols, where);
+  if (protocols) entry.protocols = protocols;
   entries.push(entry);
 }
 
@@ -217,6 +274,7 @@ const entryLines = entries
       source: e.source,
     };
     if (e.license) obj.license = e.license;
+    if (e.protocols) obj.protocols = e.protocols;
     return `  ${emitObject(obj, 1)},`;
   })
   .join("\n");
@@ -237,6 +295,12 @@ const out = `/* eslint-disable */
  */
 export type GeneratedSamKind = "tool" | "agent" | "game" | "toy" | "media";
 
+export interface GeneratedSamProtocol {
+  protocolId: string;
+  apiVersion: string;
+  roles?: string[];
+}
+
 export interface GeneratedSamEntry {
   id: string;
   title: string;
@@ -245,6 +309,7 @@ export interface GeneratedSamEntry {
   blurb: string;
   source: string;
   license?: string;
+  protocols?: GeneratedSamProtocol[];
 }
 
 export const GENERATED_SAM_KIND_ORDER: GeneratedSamKind[] = [
@@ -276,6 +341,32 @@ ${entryLines}
 `;
 
 writeFileSync(outPath, out);
+
+const catalogJson = {
+  v: 1 as const,
+  kinds: kindOrder.map(id => ({ id, label: kindLabels[id]! })),
+  series: seriesByKind,
+  picks: pickIds,
+  page,
+  entries: entries.map(e => {
+    const row: Record<string, unknown> = {
+      id: e.id,
+      title: e.title,
+      kind: e.kind,
+      series: e.series,
+      blurb: e.blurb,
+      source: e.source,
+    };
+    if (e.license) row.license = e.license;
+    if (e.protocols) row.protocols = e.protocols;
+    return row;
+  }),
+};
+
+mkdirSync(dirname(jsonOutPath), { recursive: true });
+writeFileSync(jsonOutPath, `${JSON.stringify(catalogJson, null, 2)}\n`);
+
 console.log(
   `[catalog:gen] wrote ${entries.length} listed entries → ${outPath}`
 );
+console.log(`[catalog:gen] wrote ${jsonOutPath}`);

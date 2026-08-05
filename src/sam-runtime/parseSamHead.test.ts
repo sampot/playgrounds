@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { parseSamHead, resolveSamMeta } from "./parseSamHead.ts";
+import {
+  parseSamHead,
+  parseSamProtocolToken,
+  resolveSamMeta,
+} from "./parseSamHead.ts";
 
 describe("parseSamHead", () => {
   it("reads title and sam: meta tags", () => {
@@ -17,7 +21,26 @@ describe("parseSamHead", () => {
     expect(meta.toolGlobs).toEqual(["*.md", "README*"]);
     expect(meta.needsController).toBe(true);
     expect(meta.protocol).toBe("brainstorm.v1");
+    expect(meta.sessionProtocols).toEqual([
+      { protocolId: "brainstorm.v1", apiVersion: "1" },
+    ]);
     expect(meta.capabilities).toEqual(["runPython", "runCmd"]);
+  });
+
+  it("parses sam:protocol tokens with apiVersion and roles", () => {
+    const html = `<head>
+      <meta name="sam:protocol" content="coding-orchestration.v1@1:worker+host, brainstorm.v1@2" />
+    </head>`;
+    const meta = parseSamHead(html);
+    expect(meta.protocol).toBe("coding-orchestration.v1");
+    expect(meta.sessionProtocols).toEqual([
+      {
+        protocolId: "coding-orchestration.v1",
+        apiVersion: "1",
+        roles: ["worker", "host"],
+      },
+      { protocolId: "brainstorm.v1", apiVersion: "2" },
+    ]);
   });
 
   it("accepts content-before-name meta order", () => {
@@ -34,6 +57,20 @@ describe("parseSamHead", () => {
     const meta = parseSamHead(html);
     expect(meta.needsController).toBeUndefined();
     expect(meta.toolKinds).toEqual(["a"]);
+  });
+});
+
+describe("parseSamProtocolToken", () => {
+  it("defaults apiVersion and splits roles on +", () => {
+    expect(parseSamProtocolToken("foo.v1")).toEqual({
+      protocolId: "foo.v1",
+      apiVersion: "1",
+    });
+    expect(parseSamProtocolToken("foo.v1@9:a+b")).toEqual({
+      protocolId: "foo.v1",
+      apiVersion: "9",
+      roles: ["a", "b"],
+    });
   });
 });
 

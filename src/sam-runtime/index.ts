@@ -16,11 +16,18 @@ export {
   type SamExecutionContext,
   type SamFileMap,
   type SamHeadMeta,
+  type SamHeadSessionProtocol,
   type SamSendOptions,
   type SamSpawnResult,
   type ScheduleOptions,
 } from "./types.ts";
-export { parseSamHead, resolveSamMeta } from "./parseSamHead.ts";
+export {
+  SAM_PROTOCOL_DEFAULT_API_VERSION,
+  parseSamHead,
+  parseSamProtocolContent,
+  parseSamProtocolToken,
+  resolveSamMeta,
+} from "./parseSamHead.ts";
 export { SamScheduler } from "./scheduler.ts";
 export { SamInstance, type SamInstanceOptions } from "./instance.ts";
 export { createMemoryKv, createHostStub, type MemoryKv } from "./bindings.ts";

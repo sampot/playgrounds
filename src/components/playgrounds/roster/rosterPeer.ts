@@ -16,6 +16,17 @@ export type RosterPresenceMsg = {
   name: string;
 };
 
+/** Phase 2.5 DataChannel envelope (not session protocol). */
+export type RosterAvatarRelayMsg = {
+  type: "avatar_relay";
+  from: string;
+  to?: string;
+  payload: {
+    kind: string;
+    [key: string]: unknown;
+  };
+};
+
 export type RosterPeerHandlers = {
   onChannelOpen?: () => void;
   onChannelClose?: () => void;
@@ -223,4 +234,16 @@ export function isPresenceMessage(data: unknown): data is RosterPresenceMsg {
     typeof m.agentId === "string" &&
     typeof m.name === "string"
   );
+}
+
+export function isAvatarRelayMessage(
+  data: unknown
+): data is RosterAvatarRelayMsg {
+  if (!data || typeof data !== "object") return false;
+  const m = data as Record<string, unknown>;
+  if (m.type !== "avatar_relay" || typeof m.from !== "string") return false;
+  if (m.to !== undefined && typeof m.to !== "string") return false;
+  if (!m.payload || typeof m.payload !== "object") return false;
+  const payload = m.payload as Record<string, unknown>;
+  return typeof payload.kind === "string";
 }

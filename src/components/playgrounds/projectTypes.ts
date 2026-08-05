@@ -49,7 +49,12 @@ export function cloneFileMapForTransfer(files: FileMap): FileMap {
  * Orthogonal to `agentManaged` and `inWorkingSet`.
  */
 export type CloneIntent =
-  "user" | "steward_for_user" | "self_upgrade" | "session_seat" | "experiment";
+  | "user"
+  | "steward_for_user"
+  | "self_upgrade"
+  | "session_seat"
+  | "roster_avatar"
+  | "experiment";
 
 export interface ProjectMeta {
   id: string;

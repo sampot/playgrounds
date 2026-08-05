@@ -54,7 +54,7 @@
 | Playgrounds（場網：`*.samkuo.me`） | 遊樂場 | 站內導覽／UI 用「遊樂場」；程式識別仍為 `playgrounds`。**預設場**＝[`https://play.samkuo.me/`](https://play.samkuo.me/)；任意 `https://<name>.samkuo.me/`＝同程式、異 origin（DEC-042）。部落格 `https://samkuo.me/playgrounds/`＝**凍結舊場**（提醒匯出；**不再**跟場網同步更新；資料綁 origin）。非站上 `/tools/` 登錄表。主軸：瀏覽器內開發／實驗**單頁小程式（SAM）**；非部署環境。**有防護能力的實驗場**：隔離在瀏覽器 origin／OPFS——見 DEC-040。開源宿主／權威碼 [`sampot/playgrounds`](https://github.com/sampot/playgrounds)；部署＝Cloudflare Workers。**對外敘事勿**產品／品牌／行銷腔（DEC-004）。 |
 | 場網／場（Playgrounds） | 場／場網 | `*.samkuo.me` 上每個一級子域是一個**場**（獨立 origin）；場網＝此 wildcard 部署面。預設場名 **`play`**。保留名（非一般場）：`www`／`blog`／`api`／`docs` 等（`PLAYGROUNDS_FIELD_RESERVED_SUBDOMAINS`）。見 DEC-042。 |
 | Playgrounds 文件站 | 文件／`docs.samkuo.me` | 「我是山姆鍋」底下遊樂場的工程與用法文件站 [`https://docs.samkuo.me/`](https://docs.samkuo.me/)（Astro Starlight；獨立 Worker；站標含山姆鍋 Logo）。**不是**場、不跑遊樂場殼；Playgrounds **不是**品牌名。範例場 URL 仍用 `play.samkuo.me`。見 DEC-043、[PG-DOCS-PLAN.md](./PG-DOCS-PLAN.md)。 |
-| SAM 小品型錄 | 小品／`/sam/` | 開源 SAM 範本清單（遊戲、工具、代理…）；權威頁＝場網 [`https://play.samkuo.me/sam/`](https://play.samkuo.me/sam/)（任意場＝同 origin 的 `/sam/`；與場殼同 Worker）。一鍵開＝同場 `/?open=<source>`。資料權威＝[`catalog/entries/`](../catalog/entries/)（YAML；建置產 `samCatalog.generated.ts`）。部落格舊 `/sam/` 轉址至此。非 `/tools/`、非文件站。見 DEC-041、[PG-CATALOG-PLAN.md](./PG-CATALOG-PLAN.md)。 |
+| SAM 小品型錄 | 小品／`/sam/` | 開源 SAM 範本清單（遊戲、工具、代理…）；權威頁＝場網 [`https://play.samkuo.me/sam/`](https://play.samkuo.me/sam/)（任意場＝同 origin 的 `/sam/`；與場殼同 Worker）。一鍵開＝同場 `/?open=<source>`。資料權威＝[`catalog/entries/`](../catalog/entries/)（YAML；建置產 `samCatalog.generated.ts`；Draft 另產 `/catalog/v1.json` 供 Playgrounds 查詢）。部落格舊 `/sam/` 轉址至此。非 `/tools/`、非文件站。見 DEC-041／046、[PG-CATALOG-PLAN.md](./PG-CATALOG-PLAN.md)、[PG-CATALOG-QUERY-PLAN.md](./PG-CATALOG-QUERY-PLAN.md)。 |
 | Playgrounds chrome／app shell（舊稱殼頁） | 遊樂場（必要時：**遊樂場介面**） | 場網上根路徑 `/`（過渡舊場仍為 `/playgrounds/`）的外框 UI（工具列、編輯器、側欄、密鑰庫、fleet…），相對沙盒內畫布／總管 iframe。**正式對外預設寫「遊樂場」**；需對照畫布／注入／dialog 時寫 **「遊樂場介面」**。舊稱「殼頁」——**勿**對外再用「殼」。程式識別可續用 `shell*`。 |
 | sandbox（Playgrounds 單位；舊稱 project／專案） | 沙盒 | 遊樂場裡用來管理 **SAM 實例**的容器（OPFS 一份樹＋執行期狀態＋畫布；一沙盒一實例；程式識別為 **`sandboxId`**，舊稱 `projectId`）。**不是**對桌面的第二層安全沙盒敘事——防護邊界在遊樂場（DEC-040）。僅能透過允許的方式（HOST／DELEGATE／SESSION 等）與環境及其他沙盒／SAM 互動。勿與產品名「遊樂場」混用；說明隱喻時可寫「像遊樂場裡的沙坑」，產品單位名固定「沙盒」。 |
 | 整場重置（遊樂場） | 重置遊樂場 | 人類 UI（管理沙盒）清光本機 Playgrounds 持久化後回到該 origin 首次開啟的空場（場網＝`/`；過渡舊場＝`/playgrounds/`）。**不**經 `env.HOST`。見 DEC-040。跨 origin（含換 `<name>`）不共用 OPFS——須匯出／匯入（DEC-041／042）。 |
@@ -84,9 +84,9 @@
 | 殼層不假設 OPFS（遊樂場） | 殼／儲存邊界 | 遊樂場 UI **不得**假設「殼所在瀏覽器」OPFS 為沙盒權威；編輯／Files 經 Runtime 通道。見 DEC-038。 |
 | 訊息通道（Backend Runtime） | 訊息通道 | 殼↔Runtime 可替換傳輸：MVP＝`postMessage`；跨主機目標＝**WebRTC**。見 DEC-038、SPEC §1.4。 |
 | 跨主機叢集（遊樂場路線） | WebRTC 叢集 | 多主機瀏覽器經 WebRTC 成執行叢集；Runtime／workers 可在非殼所在主機。契約保留遷移；細節另規。見 DEC-038。 |
-| Roster（遊樂場） | Roster／連入 | 經邀請建立瀏覽器 peer（WebRTC）；≠ 開啟另一場子域空 origin。舊稱 Visit。見 DEC-045、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)。 |
-| Avatar Agent（遊樂場 Roster） | Avatar／遠端投影／化身 | 連線後**雙方**化身列表中的對方 presence stub；`homePeer` 仍在各自本機；非本機 clone。頭像預設 **identicon**。見 DEC-045、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)。 |
-| Avatars tab（遊樂場） | 化身 tab | 左側側欄第三 tab（Files／總管／化身）；UI label＝`化身`；layout 鍵＝`avatars`；列出連入訪客 Avatar。見 DEC-045。 |
+| Roster（遊樂場） | Roster／連線名冊 | 跟**當前這場**連上的使用者列表＋建立 peer（WebRTC）的連線機制；≠ 開啟另一場子域空 origin。舊稱 Visit。見 DEC-045、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)。 |
+| Avatar Agent（遊樂場 Roster） | Avatar／化身／投影 User agent | 每位連線使用者在**本場**自動建立的薄 SAM／proxy（User agent 投影）；可 agent 模式執行；化身 tab 卡片＝其 UI。權威與執行在對方 **`homePeer`**；經 Roster DataChannel 轉。**非**本機 clone。Session 入座**不特規**——走 DEC-023 邀請（附完整 protocol 規格）＋型錄 lazy install。頭像預設 **identicon**。Phase 2.5：本機 ephemeral `roster_avatar` 投影＋`avatar_relay`。見 DEC-045、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)。 |
+| Avatars tab（遊樂場） | 化身 tab | 左側側欄第三 tab（Files／總管／化身）；UI label＝`化身`；layout 鍵＝`avatars`；列出／呈現 Roster 上的 Avatar（投影）。見 DEC-045。 |
 | identicon（遊樂場 Avatar） | identicon | 依穩定 id 本機衍生的預設頭像；不預設外站圖。見 DEC-045。 |
 | 薄 signaling（遊樂場 Roster） | signaling | **只**完成一次 WebRTC offer／answer（非 trickle；每房 1× offer＋1× answer；用完銷房）。載荷經**剪裁＋固定樣板**編碼；以 **QR 或文字**交換（同等）；須仍能單張 QR 舒適掃描。不中繼資料／心跳／重談。見 DEC-045。 |
 | Roster 樣板 SDP（遊樂場） | 樣板壓縮／交換 payload | 自完整 SDP 抽取必要欄位，依固定樣板編解碼還原；**QR 與文字**（及可選 rendezvous）共用同一字串。可選**同區網**旗標以進一步剪裁 candidates。見 DEC-045、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)。 |
@@ -95,7 +95,7 @@
 | Host Proxy／RPC（遊樂場後端） | 殼面終端通道 | Runtime→殼的殼面方法通道。**不是**整包 HOST 一律 RPC；**禁止**矛盾迴路（後端→殼→後端權威）。見 DEC-038。 |
 | UI←網路→後端（遊樂場 SAM） | UI 只經網路打後端 | 模擬 UI←網路→（`functions.js`∥`controller.js`）↔resources。畫布只打 `/api`→`functions.js`；不直連 Controller／bindings。見 AGENT-MODEL 規格、DEC-031。 |
 | Supervisor（遊樂場 Agent） | Supervisor | 上層編排用 Agent 角色：偵測失敗、spawn 接班人（新 ID）、更新路由；遊樂場不內建跨 peer HA。見 AGENT-MODEL 規格。 |
-| head metadata（SAM） | head metadata | 放在 `index.html` `<head>` 的沙盒宣告（**`sam:*` meta**、`<title>` 等）；**不**另設頂層 `manifest.json` 為權威；**不**以 `.playgrounds-meta.json` 後備宣告。 |
+| head metadata（SAM） | head metadata | 放在 `index.html` `<head>` 的沙盒宣告（**`sam:*` meta**、`<title>` 等）；**不**另設頂層 `manifest.json` 為權威；**不**以 `.playgrounds-meta.json` 後備宣告。Session 協定宣告：`sam:protocol`＝`id[@apiVersion][:role[+…]]`（逗號多筆）。 |
 | sam-runtime | sam-runtime | 可攜 SAM 實例 runtime（`src/sam-runtime/`）：載入 Controller／Infrastructure、排程、多實例；與 DOM／OPFS 解耦。 |
 | headless host（SAM） | headless host | 不渲染 UI 的宿主（如 Node `src/sam-host/node/`）；可同時跑多個 `SamInstance`。 |
 | 沙盒包裹（遊樂場） | 沙盒包裹 | 匯入／匯出整份沙盒時的檔案；副檔名 **`.sam`**（內容為 ZIP，僅便於辨識為 Playgrounds／SAM）。介面用語為「匯入／匯出沙盒」；需與一般 ZIP 區隔時才說「沙盒包裹」。**只接受 `.sam` 匯入**。預設為原始碼；可選附帶執行期狀態目錄 **`.playgrounds-state/`**（KV／DB／Secrets；見 DEC-018）。舊稱「專案包裹」。 |
@@ -160,7 +160,7 @@
 | Host agent（session） | Host agent | 以 Agent 形態執行並擔任該場 **Host SAM** 的實例。總管若參與 session，必須是 Host agent（非 Participant 座位）。見 DEC-033、SESSION 規格 §4.3。 |
 | Participant Agent（session） | 參與 Agent | 以座位連入 session 的 Agent 實例；走窄 `env.SESSION`，**不是**完整 `env.HOST`。通道層不規定必須使用 LLM；不要求與 Host 同一沙盒內容。多位＝clone 沙盒實例。 |
 | session role（遊樂場） | session 角色／權限 role | Host 宣告的 session **權限類**（如 `participant`／`worker`）；決定可做哪些 `act`。**不是** Agent 人格標籤。 |
-| session protocol（遊樂場） | session 協定 | Host 宣告的**領域協同契約**（`protocolId`／`apiVersion`／roles／capabilities／事件與 act 形狀）；通道只做相容閘門。例：`brainstorm.v1`、`coding-orchestration.v1`。 |
+| session protocol（遊樂場） | session 協定 | Host 宣告的**領域協同契約**（`protocolId`／`apiVersion`／roles／capabilities／事件與 act 形狀）；通道只做相容閘門。例：`brainstorm.v1`、`coding-orchestration.v1`。邀請宜附**完整規格**（或可解析引用）供接收場匹配。見 DEC-023。 |
 | join policy（遊樂場 session） | 入座政策／`joinPolicy` | Host **建立 session 時**決定的入座路徑：邀請（invite）、申請（apply）、並存、是否需核准。參與者**不必**自行申請；常見由 Host 邀請／spawn 入座。見 SESSION 規格 §6.5。 |
 | coding orchestration（遊樂場） | coding 編排／`coding-orchestration.v1` | LLM 總管（Host agent）指派 coding agent、彙整結果以完成 coding 任務的 session protocol；**`joinPolicy: invite_only`**；座位 role 名仍為 `worker`；**每一場使用者↔總管對話 session 對應恰好一場多方 session**。產品路徑：總管 [`pg-steward`](https://github.com/sampot/pg-steward) 自任 Host；coding agent [`pg-llm-agent`](https://github.com/sampot/pg-llm-agent)。工人執行面目標＝與 Tool 共用的**委派 grant**（DEC-037）；`host_apply` 為可選後備。狗糧 starter 僅驗證／教學。見 DEC-033／037、[PG-CODING-ORCHESTRATION-PROTOCOL.md](./PG-CODING-ORCHESTRATION-PROTOCOL.md)、[PG-DELEGATE-GRANT-PLAN.md](./PG-DELEGATE-GRANT-PLAN.md)、[PG-LLM-AGENT-PLAN.md](./PG-LLM-AGENT-PLAN.md)。**不是**通用模擬 MAS 的定義。 |
 | workflow（遊樂場） | 工作流程／workflow | 有狀態的多步驟流程。**定義**用 YAML（`workflow.v1`）；**實例**生命週期＝Agent 實例（單游標）。Runtime 範本 **`sampot/pg-workflow`**；Visual Editor＝**`sampot/pg-wfedit`**（Tool SAM）；遊樂場不特化。見 DEC-034、WORKFLOW／WFEDIT 規格。勿與 GitHub Actions 的 workflow 混稱時，可寫「遊樂場 workflow」。 |
@@ -170,6 +170,8 @@
 | workflow cursor（遊樂場） | 游標／cursor | 實例當前唯一 active `stepId`；MVP 不支援多游標平行。見 DEC-034。 |
 | await_ui（遊樂場 workflow） | `await_ui` | 等人在**該實例 UI** 送 signal 的步驟；不走多方 session role。見 WORKFLOW-DEFINITION 規格。 |
 | run／runFile（遊樂場 workflow） | `run`／`runFile` | action 腳本：`run`＝YAML 內嵌短 JS；`runFile`＝外部 `.js`（必支援）；互斥、契約同形。見 DEC-034。 |
+| 型錄查詢（遊樂場） | catalog query／`/catalog/v1.json` | 建置自 YAML 產結構化型錄；殼內 API 與可選同源 `GET /catalog/v1.json`；list／get／source／protocol 匹配；本機已安裝可經 `sam:protocol` head 探測並與型錄合併。見 DEC-046 Draft、[PG-CATALOG-QUERY-PLAN.md](./PG-CATALOG-QUERY-PLAN.md)。 |
+| lazy installation（遊樂場 session／型錄） | lazy install／延遲安裝 | 接受 session 邀請時，若尚無相容 SAM，自**小品型錄**（或邀請提示之來源）安裝後再入座；型錄項視為**虛擬可用**（類比 virtual actor：有需要才物化）。與 Avatar 無關的特規——本機與遠端同一路徑。見 DEC-023／045。 |
 | session binding（遊樂場） | `env.SESSION` | 參與座位期間注入的窄 API：座位資訊、狀態投影、事件訂閱、`act`／`leave`；≠ HOST／TOOL。 |
 | edge functions（遊樂場後端） | functions／edge functions | 對齊 Cloudflare Workers 形 `fetch` handler 的輔助後端；遊樂場可模擬 bindings，上線再部署真 edge。 |
 

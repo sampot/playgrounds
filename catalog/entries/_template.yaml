@@ -1,6 +1,6 @@
 # Copy this file to <id>.yaml (filename = stable catalog id, e.g. pg-mytoy.yaml).
 # Required fields: title, kind, series, blurb, source
-# Optional: status (listed|draft; draft omitted from site), license
+# Optional: status (listed|draft; draft omitted from site), license, protocols
 
 title: 顯示名稱
 kind: toy # tool | agent | game | toy | media
@@ -9,3 +9,8 @@ blurb: 一句話說明這款 SAM 做什麼、怎麼玩。
 source: owner/repo # or https://github.com/owner/repo / https://gitlab.com/owner/repo
 license: MIT
 status: listed # listed | draft
+# Optional — session protocols this SAM can join (for invite / lazy-install match):
+# protocols:
+#   - protocolId: coding-orchestration.v1
+#     apiVersion: "1"
+#     roles: [worker]

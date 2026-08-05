@@ -5,6 +5,12 @@
  */
 export type GeneratedSamKind = "tool" | "agent" | "game" | "toy" | "media";
 
+export interface GeneratedSamProtocol {
+  protocolId: string;
+  apiVersion: string;
+  roles?: string[];
+}
+
 export interface GeneratedSamEntry {
   id: string;
   title: string;
@@ -13,6 +19,7 @@ export interface GeneratedSamEntry {
   blurb: string;
   source: string;
   license?: string;
+  protocols?: GeneratedSamProtocol[];
 }
 
 export const GENERATED_SAM_KIND_ORDER: GeneratedSamKind[] = [
@@ -316,6 +323,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     blurb: "BYOK coding agent（編排子代理）。改 .agent/system.md 調人格；密鑰走密鑰庫；可多份 clone。",
     source: "sampot/pg-llm-agent",
     license: "MIT",
+    protocols: [{"protocolId":"coding-orchestration.v1","apiVersion":"1","roles":["worker"]}],
   },
   {
     id: "pg-logigate",

@@ -13,7 +13,7 @@ Reader-facing narrative stays personal／non-product (blog DEC-004).
 ## Commands
 
 - `npm run dev` — local host (standalone paths: `/` + `/sam/` + `/canvas/`)
-- `npm run catalog:gen` — regenerate catalog typed module from `catalog/**/*.yaml`
+- `npm run catalog:gen` — regenerate catalog typed module + `public/catalog/v1.json` from `catalog/**/*.yaml`
 - `npm test` — Vitest（runs `catalog:gen` via pretest）
 - `npm run build` — `catalog:gen` + `astro check` + static build
 - `npm run deploy` — `wrangler deploy` (self-host / Deploy to Cloudflare button; root `wrangler.jsonc`)
@@ -24,7 +24,8 @@ Reader-facing narrative stays personal／non-product (blog DEC-004).
 
 - `src/components/playgrounds/` — shell UI
 - `catalog/` — SAM catalog YAML sources（`/sam/` authority; see `catalog/README.md`）
-- `src/data/samCatalog.ts` — catalog API（imports generated data）
+- `src/data/samCatalog.ts` — catalog API／query（imports generated data；`/catalog/v1.json`）
+- `public/catalog/v1.json` — machine-readable catalog（same gen as typed module）
 - `src/pages/sam/` — catalog page
 - `src/sam-runtime/` — portable SAM runtime
 - `src/sam-host/` — Node headless host

@@ -1,0 +1,638 @@
+{
+  "v": 1,
+  "kinds": [
+    {
+      "id": "tool",
+      "label": "工具"
+    },
+    {
+      "id": "agent",
+      "label": "代理"
+    },
+    {
+      "id": "game",
+      "label": "遊戲"
+    },
+    {
+      "id": "toy",
+      "label": "玩具"
+    },
+    {
+      "id": "media",
+      "label": "影音繪圖"
+    }
+  ],
+  "series": {
+    "tool": [
+      "流程",
+      "前端",
+      "資料",
+      "協定",
+      "環境",
+      "日常"
+    ],
+    "agent": [
+      "總管",
+      "子代理",
+      "流程"
+    ],
+    "game": [
+      "精緻可玩",
+      "街機",
+      "懷舊",
+      "機台",
+      "桌遊"
+    ],
+    "toy": [
+      "生成",
+      "模擬"
+    ],
+    "media": [
+      "繪圖",
+      "聲音"
+    ]
+  },
+  "picks": [
+    "pg-skyburst",
+    "pg-breakout",
+    "pg-moletap",
+    "pg-banqi",
+    "pg-inkbloom",
+    "pg-hashlab"
+  ],
+  "page": {
+    "title": "SAM 小品",
+    "description": "開源純前端 SAM 型錄（僅供作為 Playgrounds 範本）：工具、代理、遊戲、玩具與影音繪圖——一鍵開進遊樂場。",
+    "lede": "純前端單頁小程式（SAM），開源授權見各 repo。<strong>僅供作為 Playgrounds 範本</strong>——點「一鍵開」會在本場遊樂場載入；想改功能或手感，開進來再叫 AI 改一版。不是獨立產品或正式服務。",
+    "footnote": "本頁所列皆<strong>僅供作為 Playgrounds 範本</strong>，方便一鍵開進沙盒試玩或改寫。歡迎以 PR 投稿（見 catalog/README.md）。遊戲類名稱與造型多為原創，並註明致敬的玩法類型；非正式商業機台或作品復刻。文件見 <a href=\"https://docs.samkuo.me/\" rel=\"noopener noreferrer\">docs.samkuo.me</a>；過程分享仍在 <a href=\"https://samkuo.me/\" rel=\"noopener noreferrer\">samkuo.me</a>。"
+  },
+  "entries": [
+    {
+      "id": "pg-banqi",
+      "title": "暗棋對弈",
+      "kind": "game",
+      "series": "懷舊",
+      "blurb": "翻子吃子，簡易人機；華語圈暗棋小品。",
+      "source": "sampot/pg-banqi",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-basecodec",
+      "title": "Base 編解碼",
+      "kind": "tool",
+      "series": "協定",
+      "blurb": "Base64／URL-safe／Base32／Base58；資料不離開瀏覽器。",
+      "source": "sampot/pg-basecodec",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-bounceland",
+      "title": "彈珠沙盒",
+      "kind": "toy",
+      "series": "模擬",
+      "blurb": "點按加球，簡易重力與彈跳；不是物理引擎。",
+      "source": "sampot/pg-bounceland",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-breakout",
+      "title": "打磚塊",
+      "kind": "game",
+      "series": "街機",
+      "blurb": "擋板反彈清磚，過關加速；致敬打磚塊玩法類型。",
+      "source": "sampot/pg-breakout",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-cellife",
+      "title": "生命格子",
+      "kind": "toy",
+      "series": "模擬",
+      "blurb": "康威生命遊戲：點畫細胞、演化、隨機與清空。",
+      "source": "sampot/pg-cellife",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-chmod",
+      "title": "Unix 權限",
+      "kind": "tool",
+      "series": "環境",
+      "blurb": "rwx ↔ 八進位、umask 提示。",
+      "source": "sampot/pg-chmod",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-colorcast",
+      "title": "色票互轉",
+      "kind": "tool",
+      "series": "日常",
+      "blurb": "hex／rgb／oklch 互轉與取色。",
+      "source": "sampot/pg-colorcast",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-contrast",
+      "title": "對比度檢查",
+      "kind": "tool",
+      "series": "前端",
+      "blurb": "前景／背景色票，WCAG AA／AAA（一般與大字）。",
+      "source": "sampot/pg-contrast",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-cronread",
+      "title": "Cron 解讀",
+      "kind": "tool",
+      "series": "環境",
+      "blurb": "五／六欄表達式解讀與接下來觸發時間。",
+      "source": "sampot/pg-cronread",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-cssunits",
+      "title": "CSS 單位小算",
+      "kind": "tool",
+      "series": "前端",
+      "blurb": "px↔rem、clamp() 字串與視窗寬預覽。",
+      "source": "sampot/pg-cssunits",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-csvjson",
+      "title": "CSV ↔ JSON",
+      "kind": "tool",
+      "series": "資料",
+      "blurb": "分隔符／標頭互轉；可掛成工具開 .csv。",
+      "source": "sampot/pg-csvjson",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-dbtool",
+      "title": "SQLite 資料庫",
+      "kind": "tool",
+      "series": "資料",
+      "blurb": "檢視與修改工作沙盒 env.DB；grant .bindings/db，表列／分頁／SQL 主控台。",
+      "source": "sampot/pg-dbtool",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-diginet",
+      "title": "數字透網",
+      "kind": "toy",
+      "series": "模擬",
+      "blurb": "手寫數字走小型神經網路：訊號粒子、節點呼吸、機率條與權重熱圖。",
+      "source": "sampot/pg-diginet",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-envkit",
+      "title": ".env 工坊",
+      "kind": "tool",
+      "series": "環境",
+      "blurb": "解析、遮罩、匯出；非密鑰庫。可掛工具開 .env。",
+      "source": "sampot/pg-envkit",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-gomoku",
+      "title": "五子棋",
+      "kind": "game",
+      "series": "桌遊",
+      "blurb": "15×15 雙人／人機／AI 對 AI。",
+      "source": "sampot/pg-gomoku",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-hashlab",
+      "title": "雜湊小算",
+      "kind": "tool",
+      "series": "協定",
+      "blurb": "SHA／MD5／可選 HMAC；文字或檔案，資料不離開瀏覽器。",
+      "source": "sampot/pg-hashlab",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-htmlpreview",
+      "title": "HTML／CSS 預覽",
+      "kind": "tool",
+      "series": "前端",
+      "blurb": "片段即時預覽；可掛成工具檢視工作沙盒的 .html。",
+      "source": "sampot/pg-htmlpreview",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-httpmsg",
+      "title": "HTTP 訊息工坊",
+      "kind": "tool",
+      "series": "協定",
+      "blurb": "貼 raw request／response，拆 headers 與 body。",
+      "source": "sampot/pg-httpmsg",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-httpref",
+      "title": "HTTP 速查",
+      "kind": "tool",
+      "series": "協定",
+      "blurb": "常見狀態碼與 MIME 速查。",
+      "source": "sampot/pg-httpref",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-idmint",
+      "title": "識別碼小造",
+      "kind": "tool",
+      "series": "環境",
+      "blurb": "UUID v4／NanoID 批量產生。",
+      "source": "sampot/pg-idmint",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-ignoregen",
+      "title": "gitignore 小造",
+      "kind": "tool",
+      "series": "環境",
+      "blurb": "勾選常見堆疊產 .gitignore 片段。",
+      "source": "sampot/pg-ignoregen",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-imglook",
+      "title": "圖片／data URL",
+      "kind": "tool",
+      "series": "前端",
+      "blurb": "尺寸、MIME、複製 data URL；可掛成工具開工作沙盒圖檔。",
+      "source": "sampot/pg-imglook",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-inkbloom",
+      "title": "墨暈流紋",
+      "kind": "toy",
+      "series": "生成",
+      "blurb": "點按拖曳留下粒子墨跡，看流紋慢慢長出來。",
+      "source": "sampot/pg-inkbloom",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-jsondiff",
+      "title": "JSON 結構對照",
+      "kind": "tool",
+      "series": "資料",
+      "blurb": "路徑級新增／刪除／變更；可掛成工具對照工作沙盒 .json。",
+      "source": "sampot/pg-jsondiff",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-jsonfmt",
+      "title": "JSON 整形",
+      "kind": "tool",
+      "series": "資料",
+      "blurb": "pretty／minify、簡易路徑查詢、錯誤定位。",
+      "source": "sampot/pg-jsonfmt",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-jungle",
+      "title": "鬥獸棋",
+      "kind": "game",
+      "series": "懷舊",
+      "blurb": "獸穴、陷阱、河界跳躍，簡易人機。",
+      "source": "sampot/pg-jungle",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-jwtpeek",
+      "title": "JWT 窺視",
+      "kind": "tool",
+      "series": "協定",
+      "blurb": "解碼 header／payload、過期提示；可選本機 HMAC 驗證。",
+      "source": "sampot/pg-jwtpeek",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-leaptrail",
+      "title": "躍階旅人",
+      "kind": "game",
+      "series": "街機",
+      "blurb": "短關平台跳躍：撿星、踩敵、抵達旗幟。",
+      "source": "sampot/pg-leaptrail",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-llm-agent",
+      "title": "Coding Agent",
+      "kind": "agent",
+      "series": "子代理",
+      "blurb": "BYOK coding agent（編排子代理）。改 .agent/system.md 調人格；密鑰走密鑰庫；可多份 clone。",
+      "source": "sampot/pg-llm-agent",
+      "license": "MIT",
+      "protocols": [
+        {
+          "protocolId": "coding-orchestration.v1",
+          "apiVersion": "1",
+          "roles": [
+            "worker"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pg-logigate",
+      "title": "邏輯閘沙盒",
+      "kind": "toy",
+      "series": "模擬",
+      "blurb": "開關、AND／OR／NOT、LED 接線；半加器範例，看 0／1 沿線流動。",
+      "source": "sampot/pg-logigate",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-mali",
+      "title": "小瑪莉",
+      "kind": "game",
+      "series": "機台",
+      "blurb": "復古燈圈跑燈：押注、跑燈、結算；純娛樂。",
+      "source": "sampot/pg-mali",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-mazeglow",
+      "title": "迴廊拾光",
+      "kind": "game",
+      "series": "街機",
+      "blurb": "迷宮撿光點、躲開或反制追逐者。",
+      "source": "sampot/pg-mazeglow",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-mdpreview",
+      "title": "Markdown 預覽",
+      "kind": "tool",
+      "series": "前端",
+      "blurb": "GFM、Mermaid、數學公式；可掛成工具檢視工作沙盒的 .md。",
+      "source": "sampot/pg-mdpreview",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-mockdata",
+      "title": "假資料小造",
+      "kind": "tool",
+      "series": "資料",
+      "blurb": "依簡易 schema 產 JSON；可選種子重現。",
+      "source": "sampot/pg-mockdata",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-moletap",
+      "title": "地洞敲敲",
+      "kind": "game",
+      "series": "懷舊",
+      "blurb": "夜市節奏敲擊，連擊加分；致敬打地鼠玩法類型。",
+      "source": "sampot/pg-moletap",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-netcid",
+      "title": "IP／CIDR 小算",
+      "kind": "tool",
+      "series": "協定",
+      "blurb": "IPv4 網段、廣播、可用主機數。",
+      "source": "sampot/pg-netcid",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-ogpreview",
+      "title": "OG／meta 預覽",
+      "kind": "tool",
+      "series": "前端",
+      "blurb": "從 HTML head 模擬社群分享卡；可掛工具看 index.html。",
+      "source": "sampot/pg-ogpreview",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-pempeek",
+      "title": "PEM 窺視",
+      "kind": "tool",
+      "series": "協定",
+      "blurb": "憑證 subject／SAN／效期；不做信任鏈驗證。",
+      "source": "sampot/pg-pempeek",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-pinfall",
+      "title": "釘雨落珠",
+      "kind": "game",
+      "series": "機台",
+      "blurb": "發射、撞釘、入洞得分；致敬小鋼珠玩法類型。",
+      "source": "sampot/pg-pinfall",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-pyrun",
+      "title": "瀏覽器 Python",
+      "kind": "tool",
+      "series": "環境",
+      "blurb": "Pyodide 執行 Python、micropip 套件、可分享連結。",
+      "source": "sampot/pg-pyrun",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-qrcode",
+      "title": "QR Code",
+      "kind": "tool",
+      "series": "前端",
+      "blurb": "文字／URL 產碼、下載 PNG。",
+      "source": "sampot/pg-qrcode",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-regexlab",
+      "title": "正規式試場",
+      "kind": "tool",
+      "series": "資料",
+      "blurb": "JavaScript RegExp：旗標、相符列表、取代。",
+      "source": "sampot/pg-regexlab",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-semver",
+      "title": "Semver 對照",
+      "kind": "tool",
+      "series": "環境",
+      "blurb": "比較與 ^／~ 範圍；可掛工具讀 package.json。",
+      "source": "sampot/pg-semver",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-sketchpad",
+      "title": "素描板",
+      "kind": "media",
+      "series": "繪圖",
+      "blurb": "顏色、筆粗、復原與匯出 PNG；極簡畫布。",
+      "source": "sampot/pg-sketchpad",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-skyburst",
+      "title": "蒼穹連射",
+      "kind": "game",
+      "series": "精緻可玩",
+      "blurb": "垂直捲軸射擊：三戰區、武裝升級、爆散與首領彈幕。",
+      "source": "sampot/pg-skyburst",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-sqlfmt",
+      "title": "SQL 整形",
+      "kind": "tool",
+      "series": "資料",
+      "blurb": "pretty（不執行）；可掛成工具開 .sql。",
+      "source": "sampot/pg-sqlfmt",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-starshot",
+      "title": "星屑出擊",
+      "kind": "game",
+      "series": "街機",
+      "blurb": "固定畫面太空射擊，幾何機體與波次敵人。",
+      "source": "sampot/pg-starshot",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-steward",
+      "title": "總管",
+      "kind": "agent",
+      "series": "總管",
+      "blurb": "總管遊樂場的專屬 Agent，負責執行你交辦的任務，包括開發單頁小程式。需要自備 LLM API Key。",
+      "source": "sampot/pg-steward",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-svglook",
+      "title": "SVG 檢視",
+      "kind": "tool",
+      "series": "前端",
+      "blurb": "縮放、viewBox、data URL；可掛成工具檢視工作沙盒的 .svg。",
+      "source": "sampot/pg-svglook",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-textdiff",
+      "title": "文字對照",
+      "kind": "tool",
+      "series": "資料",
+      "blurb": "左右貼上，行級 diff。",
+      "source": "sampot/pg-textdiff",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-textkit",
+      "title": "文字小工",
+      "kind": "tool",
+      "series": "前端",
+      "blurb": "HTML entity 編解碼、slug。",
+      "source": "sampot/pg-textkit",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-tictactoe",
+      "title": "井字遊戲",
+      "kind": "game",
+      "series": "桌遊",
+      "blurb": "3×3 雙人、人機與 AI 對 AI（Minimax）。",
+      "source": "sampot/pg-tictactoe",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-tomlfmt",
+      "title": "TOML 整形",
+      "kind": "tool",
+      "series": "資料",
+      "blurb": "驗證與 pretty；可掛成工具編輯工作沙盒的 .toml。",
+      "source": "sampot/pg-tomlfmt",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-tzlook",
+      "title": "時區對照",
+      "kind": "tool",
+      "series": "日常",
+      "blurb": "Unix epoch／ISO 與多個 IANA 時區。",
+      "source": "sampot/pg-tzlook",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-unilook",
+      "title": "Unicode 檢視",
+      "kind": "tool",
+      "series": "環境",
+      "blurb": "code point、UTF-8 bytes、BOM／換行偵測。",
+      "source": "sampot/pg-unilook",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-urlkit",
+      "title": "URL／Query 工坊",
+      "kind": "tool",
+      "series": "協定",
+      "blurb": "解析／組裝 URL、編輯 query、encodeURIComponent。",
+      "source": "sampot/pg-urlkit",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-voicelab",
+      "title": "聲語匣",
+      "kind": "media",
+      "series": "聲音",
+      "blurb": "瀏覽器 TTS／STT：念文字、聽說話、回聲一句。",
+      "source": "sampot/pg-voicelab",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-wavepad",
+      "title": "波形叮叮",
+      "kind": "media",
+      "series": "聲音",
+      "blurb": "Web Audio 振盪器與即時波形；點播放才發聲。",
+      "source": "sampot/pg-wavepad",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-wfedit",
+      "title": "流程視覺編輯",
+      "kind": "tool",
+      "series": "流程",
+      "blurb": "垂直主軸編輯 workflow.yaml（workflow.v1）；掛成工具寫宿主定義，不跑引擎。",
+      "source": "sampot/pg-wfedit",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-wingrace",
+      "title": "翼途競飛",
+      "kind": "game",
+      "series": "懷舊",
+      "blurb": "簡化飛行棋：擲骰起飛、撞回、終點跑道。",
+      "source": "sampot/pg-wingrace",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-workflow",
+      "title": "工作流程",
+      "kind": "agent",
+      "series": "流程",
+      "blurb": "有狀態多步驟 workflow（workflow.v1）；狗糧為內容審核，實例活在 Agent 沙盒。",
+      "source": "sampot/pg-workflow",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-yamlfmt",
+      "title": "YAML 整形",
+      "kind": "tool",
+      "series": "資料",
+      "blurb": "驗證與 pretty；可掛成工具編輯工作沙盒的 .yml／.yaml。",
+      "source": "sampot/pg-yamlfmt",
+      "license": "MIT"
+    }
+  ]
+}

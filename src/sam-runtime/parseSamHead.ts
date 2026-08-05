@@ -3,7 +3,10 @@
  * Authority is head only — keys use the `sam:` prefix. No side-meta merge.
  */
 
-import type { SamHeadMeta } from "./types.ts";
+import type { SamHeadMeta, SamHeadSessionProtocol } from "./types.ts";
+
+/** Default apiVersion when `sam:protocol` token omits `@version` (DEC-046). */
+export const SAM_PROTOCOL_DEFAULT_API_VERSION = "1";
 
 function decodeEntities(text: string): string {
   return text
@@ -62,6 +65,50 @@ function parseBool(raw: string | undefined): boolean | undefined {
   return undefined;
 }
 
+/**
+ * Parse one `sam:protocol` token: `id[@apiVersion][:role[+role…]]`.
+ * Bare id ⇒ apiVersion {@link SAM_PROTOCOL_DEFAULT_API_VERSION}.
+ */
+export function parseSamProtocolToken(
+  raw: string
+): SamHeadSessionProtocol | undefined {
+  const token = raw.trim();
+  if (!token) return undefined;
+  const m = token.match(/^([^@:\s]+)(?:@([^:\s]+))?(?::(.+))?$/u);
+  if (!m?.[1]) return undefined;
+  const protocolId = m[1];
+  const apiVersion = (m[2]?.trim() || SAM_PROTOCOL_DEFAULT_API_VERSION).trim();
+  if (!apiVersion) return undefined;
+  const rolesRaw = m[3]?.trim();
+  const roles = rolesRaw
+    ? rolesRaw
+        .split(/[+|]/u)
+        .map(s => s.trim())
+        .filter(Boolean)
+    : undefined;
+  const decl: SamHeadSessionProtocol = { protocolId, apiVersion };
+  if (roles?.length) decl.roles = roles;
+  return decl;
+}
+
+/**
+ * Parse `sam:protocol` content into structured decls (comma-separated tokens).
+ * Duplicate `protocolId@apiVersion` keys: last wins (roles merged? no — last replaces).
+ */
+export function parseSamProtocolContent(
+  raw: string | undefined
+): SamHeadSessionProtocol[] | undefined {
+  if (raw === undefined || !raw.trim()) return undefined;
+  const byKey = new Map<string, SamHeadSessionProtocol>();
+  for (const part of raw.split(",")) {
+    const decl = parseSamProtocolToken(part);
+    if (!decl) continue;
+    byKey.set(`${decl.protocolId}@${decl.apiVersion}`, decl);
+  }
+  if (!byKey.size) return undefined;
+  return [...byKey.values()];
+}
+
 /** Parse SAM head metadata from an HTML document string (`sam:*` keys). */
 export function parseSamHead(html: string): SamHeadMeta {
   const head = extractHead(html);
@@ -75,12 +122,16 @@ export function parseSamHead(html: string): SamHeadMeta {
       ) || undefined
     : undefined;
 
+  const protocolRaw = metaContent(head, "sam:protocol");
+  const sessionProtocols = parseSamProtocolContent(protocolRaw);
+
   return {
     title,
     toolKinds: splitList(metaContent(head, "sam:tool-kinds")),
     toolGlobs: splitList(metaContent(head, "sam:tool-globs")),
     needsController: parseBool(metaContent(head, "sam:needs-controller")),
-    protocol: metaContent(head, "sam:protocol") || undefined,
+    protocol: sessionProtocols?.[0]?.protocolId || protocolRaw?.trim() || undefined,
+    ...(sessionProtocols?.length ? { sessionProtocols } : {}),
     capabilities: splitList(metaContent(head, "sam:capabilities")),
   };
 }

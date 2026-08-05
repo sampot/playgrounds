@@ -34,6 +34,14 @@ export interface SessionSeat {
   protocolId?: string;
   protocolApiVersion?: string;
   paused: boolean;
+  /**
+   * Roster remote proxy seat (DEC-045 Phase 3): local sandbox is Avatar
+   * projection; authority／execution stay at homePeer.
+   */
+  remote?: {
+    peerAgentId: string;
+    inviteId: string;
+  };
 }
 
 export interface MultiAgentSession {
@@ -66,6 +74,11 @@ export interface JoinSeatOptions {
   apiVersion: string;
   /** invite = Host pull-in; apply = participant request. Default apply. */
   via?: SessionJoinVia;
+  /** When set, marks the seat as a Roster Avatar proxy. */
+  remote?: {
+    peerAgentId: string;
+    inviteId: string;
+  };
 }
 
 export interface OpenSessionOptions {

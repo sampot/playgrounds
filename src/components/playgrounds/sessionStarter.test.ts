@@ -29,7 +29,9 @@ describe("session dogfood starters", () => {
     expect(files["app.js"]).toContain("/api/session/act");
     expect(files["app.js"]).toContain("/api/shell/session");
     expect(files["app.js"]).toContain("spawn-participant");
+    expect(files["app.js"]).toContain("invite-roster");
     expect(files["index.html"]).toContain("開始這一場");
+    expect(files["index.html"]).toContain("邀請化身入座");
   });
 
   it("participant starter uses SESSION without LLM", () => {

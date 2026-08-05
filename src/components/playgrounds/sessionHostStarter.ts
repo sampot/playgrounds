@@ -43,6 +43,7 @@ export function createSessionHostStarterFiles(): FileMap {
       <div id="controls" class="controls">
         <button type="button" id="btn-open" class="primary">開始這一場</button>
         <button type="button" id="btn-spawn" class="secondary" disabled>加入一位參與者</button>
+        <button type="button" id="btn-invite-roster" class="secondary" disabled>邀請化身入座</button>
         <button type="button" id="btn-pause" class="secondary" disabled>暫停</button>
         <button type="button" id="btn-close" class="secondary" disabled>結束</button>
       </div>
@@ -112,6 +113,7 @@ const form = document.getElementById("form");
 const textEl = document.getElementById("text");
 const btnOpen = document.getElementById("btn-open");
 const btnSpawn = document.getElementById("btn-spawn");
+const btnInviteRoster = document.getElementById("btn-invite-roster");
 const btnPause = document.getElementById("btn-pause");
 const btnClose = document.getElementById("btn-close");
 const submitBtn = form.querySelector('button[type="submit"]');
@@ -153,7 +155,8 @@ function renderSeats(seats) {
   seatsEl.innerHTML = "";
   for (const seat of seats || []) {
     const li = document.createElement("li");
-    const label = (seat.kind === "human" ? "人類" : "參與者") + " · " + seat.role;
+    const remote = seat.remote ? " · 遠端化身" : "";
+    const label = (seat.kind === "human" ? "人類" : "參與者") + " · " + seat.role + remote;
     li.appendChild(document.createTextNode(label));
     if (seat.kind !== "human" && seat.seatId) {
       const leave = document.createElement("button");
@@ -169,6 +172,7 @@ function renderSeats(seats) {
 function syncControls() {
   btnOpen.disabled = active;
   btnSpawn.disabled = !active || paused;
+  btnInviteRoster.disabled = !active || paused;
   btnPause.disabled = !active;
   btnClose.disabled = !active;
   btnPause.textContent = paused ? "繼續" : "暫停";
@@ -274,6 +278,20 @@ async function onSpawn() {
   }
 }
 
+async function onInviteRoster() {
+  setStatus("邀請化身入座…");
+  try {
+    const invited = await shell("/invite-roster", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ role: "participant" }),
+    });
+    setStatus("已送出邀請（" + invited.protocolId + "）— 對方請在化身 tab 接受");
+  } catch (e) {
+    setStatus(String(e.message || e));
+  }
+}
+
 async function onLeave(seatId) {
   try {
     await shell("/leave", {
@@ -292,6 +310,7 @@ btnOpen.addEventListener("click", () => void onOpen());
 btnClose.addEventListener("click", () => void onClose());
 btnPause.addEventListener("click", () => void onPauseToggle());
 btnSpawn.addEventListener("click", () => void onSpawn());
+btnInviteRoster.addEventListener("click", () => void onInviteRoster());
 
 form.addEventListener("submit", async (e) => {
   e.preventDefault();

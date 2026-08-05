@@ -275,6 +275,23 @@ describe("SessionRuntime", () => {
     expect(seat.sandboxId).toBe("p1");
   });
 
+  it("stores remote roster proxy metadata on joinAgent", () => {
+    const rt = setup();
+    rt.open("host-1", protocol);
+    const seat = rt.joinAgent({
+      sandboxId: "avatar-proj",
+      role: "participant",
+      protocolId: "brainstorm.v1",
+      apiVersion: "1",
+      via: "invite",
+      remote: { peerAgentId: "peer-a", inviteId: "inv-9" },
+    });
+    expect(seat.remote).toEqual({
+      peerAgentId: "peer-a",
+      inviteId: "inv-9",
+    });
+  });
+
   it("defaults via to apply when omitted", () => {
     const rt = setup();
     rt.open("host-1", { ...protocol, joinPolicy: "invite_only" });

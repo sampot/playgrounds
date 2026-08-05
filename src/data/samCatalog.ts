@@ -13,9 +13,13 @@ import {
   GENERATED_SAM_SERIES_ORDER,
   type GeneratedSamEntry,
   type GeneratedSamKind,
+  type GeneratedSamProtocol,
 } from "./samCatalog.generated";
 
 export type SamKind = GeneratedSamKind;
+
+/** Catalog-declared session protocol support (DEC-046 Phase 3). */
+export type SamCatalogProtocol = GeneratedSamProtocol;
 
 /** Shelf / genre within a kind (e.g. arcade under games, or a tool family). */
 export type SamSeries = string;
@@ -40,7 +44,23 @@ export interface SamEntry {
    */
   source: string;
   license?: string;
+  /** Optional session protocols this SAM can join (catalog declaration). */
+  protocols?: readonly SamCatalogProtocol[];
 }
+
+/**
+ * Invite / Host session protocol spec for catalog matching (DEC-023／046).
+ * Enough to gate compatibility; richer shapes may be attached by callers.
+ */
+export type SessionProtocolSpec = {
+  protocolId: string;
+  apiVersion: string;
+  /** If set, entry must declare this role (or omit `roles` on the decl). */
+  role?: string;
+  /** Optional hints — used to order / pin candidates, not to bypass protocol match. */
+  catalogId?: string;
+  source?: string;
+};
 
 function toSamEntry(e: GeneratedSamEntry): SamEntry {
   return {
@@ -52,6 +72,7 @@ function toSamEntry(e: GeneratedSamEntry): SamEntry {
     blurb: e.blurb,
     source: e.source,
     ...(e.license ? { license: e.license } : {}),
+    ...(e.protocols?.length ? { protocols: e.protocols } : {}),
   };
 }
 
@@ -83,6 +104,268 @@ export const samCatalog: SamEntry[] = GENERATED_SAM_CATALOG.map(toSamEntry);
 
 /** Hero / SEO / footnote copy for `/sam/`. */
 export const samCatalogPage = GENERATED_SAM_PAGE;
+
+/** Homologous static catalog URL (DEC-046 / PG-CATALOG-QUERY-PLAN). */
+export const SAM_CATALOG_JSON_PATH = "/catalog/v1.json" as const;
+
+/**
+ * Normalize catalog `source` for equality checks (trim; lowercase host in URLs;
+ * strip trailing slash; collapse github.com/owner/repo → owner/repo).
+ */
+export function normalizeCatalogSource(source: string): string {
+  let s = source.trim();
+  if (!s) return "";
+  const lower = s.toLowerCase();
+  const gh = lower.match(
+    /^(?:https?:\/\/)?(?:www\.)?github\.com\/([^/#?]+)\/([^/#?]+)/i
+  );
+  if (gh) {
+    return `${gh[1]}/${gh[2].replace(/\.git$/i, "")}`.toLowerCase();
+  }
+  const gl = lower.match(
+    /^(?:https?:\/\/)?(?:www\.)?gitlab\.com\/([^/#?]+\/[^/#?]+)/i
+  );
+  if (gl) {
+    return gl[1].replace(/\.git$/i, "").toLowerCase();
+  }
+  if (s.includes("/") && !s.includes("://")) {
+    return s.replace(/\.git$/i, "").toLowerCase();
+  }
+  return s.replace(/\/+$/, "").toLowerCase();
+}
+
+/** All listed catalog entries (same authority as `/catalog/v1.json`). */
+export function listCatalogEntries(
+  catalog: readonly SamEntry[] = samCatalog
+): readonly SamEntry[] {
+  return catalog;
+}
+
+/** Lookup by stable catalog id. */
+export function getCatalogEntry(
+  id: string,
+  catalog: readonly SamEntry[] = samCatalog
+): SamEntry | undefined {
+  const key = id.trim();
+  if (!key) return undefined;
+  return catalog.find(e => e.id === key);
+}
+
+/**
+ * Find entry whose `source` matches (after {@link normalizeCatalogSource}).
+ * Also matches when `source` equals catalog `id` or `sampot/<id>`.
+ */
+export function findCatalogBySource(
+  source: string,
+  catalog: readonly SamEntry[] = samCatalog
+): SamEntry | undefined {
+  const want = normalizeCatalogSource(source);
+  if (!want) return undefined;
+  for (const e of catalog) {
+    if (normalizeCatalogSource(e.source) === want) return e;
+    if (e.id.toLowerCase() === want) return e;
+    if (normalizeCatalogSource(`sampot/${e.id}`) === want) return e;
+  }
+  return undefined;
+}
+
+/** Whether a catalog protocol decl satisfies an invite / session spec. */
+export function catalogProtocolMatches(
+  decl: SamCatalogProtocol,
+  spec: Pick<SessionProtocolSpec, "protocolId" | "apiVersion" | "role">
+): boolean {
+  if (decl.protocolId !== spec.protocolId) return false;
+  if (decl.apiVersion !== spec.apiVersion) return false;
+  if (spec.role) {
+    // No roles listed ⇒ any role for this protocolId@apiVersion.
+    if (decl.roles && decl.roles.length > 0 && !decl.roles.includes(spec.role)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/** True if the entry declares at least one matching protocol. */
+export function entrySupportsProtocol(
+  entry: Pick<SamEntry, "protocols">,
+  spec: Pick<SessionProtocolSpec, "protocolId" | "apiVersion" | "role">
+): boolean {
+  const list = entry.protocols;
+  if (!list?.length) return false;
+  return list.some(p => catalogProtocolMatches(p, spec));
+}
+
+/**
+ * Catalog entries that declare compatibility with `spec`.
+ * Entries without `protocols` are never returned (do not pretend support).
+ * Optional `catalogId`／`source` hints only reorder matches (hints first).
+ */
+export function matchCatalogForProtocol(
+  spec: SessionProtocolSpec,
+  catalog: readonly SamEntry[] = samCatalog
+): SamEntry[] {
+  const protocolId = spec.protocolId?.trim();
+  const apiVersion = spec.apiVersion?.trim();
+  if (!protocolId || !apiVersion) return [];
+
+  const gate = { protocolId, apiVersion, role: spec.role?.trim() || undefined };
+  const matched = catalog.filter(e => entrySupportsProtocol(e, gate));
+  if (matched.length <= 1) return matched;
+
+  const hintId = spec.catalogId?.trim();
+  const hintSource = spec.source?.trim();
+  const rank = (e: SamEntry): number => {
+    if (hintId && e.id === hintId) return 0;
+    if (hintSource && normalizeCatalogSource(e.source) === normalizeCatalogSource(hintSource)) {
+      return 1;
+    }
+    if (hintSource && e.id.toLowerCase() === hintSource.toLowerCase()) return 1;
+    return 2;
+  };
+  return [...matched].sort((a, b) => rank(a) - rank(b) || a.id.localeCompare(b.id));
+}
+
+/**
+ * Resolve catalog candidates for a session invite (query only — no install).
+ * Prefers protocol matches; if none and hints are present, does **not** fall back
+ * to id/source-only (protocol gate stays honest). Use get/find helpers for those.
+ */
+export function resolveCatalogInviteCandidates(
+  spec: SessionProtocolSpec,
+  catalog: readonly SamEntry[] = samCatalog
+): SamEntry[] {
+  return matchCatalogForProtocol(spec, catalog);
+}
+
+/** Installed local SAM probe row (head-derived protocols; DEC-046 Phase 4). */
+export type InstalledSamProbe = {
+  sandboxId: string;
+  name: string;
+  source?: string;
+  protocols?: readonly SamCatalogProtocol[];
+};
+
+/**
+ * Invite resolution candidate: catalog virtual and/or already-installed local.
+ * Query only — does not install or join a seat.
+ */
+export type InviteCandidate = {
+  /** Set when a local sandbox already matches. */
+  sandboxId?: string;
+  /** Catalog id when known (listed or linked via source). */
+  catalogId?: string;
+  title: string;
+  source?: string;
+  origin: "catalog" | "installed" | "both";
+};
+
+/** Installed probes that declare compatibility with `spec`. */
+export function matchInstalledForProtocol(
+  spec: SessionProtocolSpec,
+  installed: readonly InstalledSamProbe[]
+): InstalledSamProbe[] {
+  const protocolId = spec.protocolId?.trim();
+  const apiVersion = spec.apiVersion?.trim();
+  if (!protocolId || !apiVersion) return [];
+  const gate = { protocolId, apiVersion, role: spec.role?.trim() || undefined };
+  return installed.filter(p => entrySupportsProtocol(p, gate));
+}
+
+function installedDedupKey(p: InstalledSamProbe): string {
+  if (p.source?.trim()) return `src:${normalizeCatalogSource(p.source)}`;
+  return `id:${p.sandboxId}`;
+}
+
+function catalogCoveredByInstalled(
+  entry: SamEntry,
+  installed: readonly InstalledSamProbe[],
+  catalog: readonly SamEntry[]
+): InstalledSamProbe | undefined {
+  for (const p of installed) {
+    if (!p.source?.trim()) continue;
+    const linked = findCatalogBySource(p.source, catalog);
+    if (linked?.id === entry.id) return p;
+    if (normalizeCatalogSource(p.source) === normalizeCatalogSource(entry.source)) {
+      return p;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Merge catalog + installed protocol matches for invite resolution.
+ * Installed／both first (ready to seat); catalog-only next (lazy install).
+ * Hints only reorder within the same readiness band.
+ */
+export function resolveInviteCandidates(
+  spec: SessionProtocolSpec,
+  options?: {
+    catalog?: readonly SamEntry[];
+    installed?: readonly InstalledSamProbe[];
+  }
+): InviteCandidate[] {
+  const catalog = options?.catalog ?? samCatalog;
+  const installedHits = matchInstalledForProtocol(spec, options?.installed ?? []);
+  const catalogHits = matchCatalogForProtocol(spec, catalog);
+
+  const out: InviteCandidate[] = [];
+  const coveredCatalogIds = new Set<string>();
+  const usedInstalled = new Set<string>();
+
+  for (const p of installedHits) {
+    usedInstalled.add(installedDedupKey(p));
+    const linked = p.source?.trim()
+      ? findCatalogBySource(p.source, catalog)
+      : undefined;
+    if (linked) coveredCatalogIds.add(linked.id);
+    out.push({
+      sandboxId: p.sandboxId,
+      ...(linked ? { catalogId: linked.id } : {}),
+      title: linked?.title ?? p.name,
+      source: p.source?.trim() || linked?.source,
+      origin: linked ? "both" : "installed",
+    });
+  }
+
+  for (const e of catalogHits) {
+    if (coveredCatalogIds.has(e.id)) continue;
+    const overlap = catalogCoveredByInstalled(e, installedHits, catalog);
+    if (overlap && usedInstalled.has(installedDedupKey(overlap))) continue;
+    out.push({
+      catalogId: e.id,
+      title: e.title,
+      source: e.source,
+      origin: "catalog",
+    });
+  }
+
+  const hintId = spec.catalogId?.trim();
+  const hintSource = spec.source?.trim();
+  const readiness = (c: InviteCandidate): number =>
+    c.origin === "catalog" ? 1 : 0;
+  const hintRank = (c: InviteCandidate): number => {
+    if (hintId && c.catalogId === hintId) return 0;
+    if (
+      hintSource &&
+      c.source &&
+      normalizeCatalogSource(c.source) === normalizeCatalogSource(hintSource)
+    ) {
+      return 1;
+    }
+    if (hintSource && c.catalogId?.toLowerCase() === hintSource.toLowerCase()) {
+      return 1;
+    }
+    return 2;
+  };
+  return out.sort(
+    (a, b) =>
+      readiness(a) - readiness(b) ||
+      hintRank(a) - hintRank(b) ||
+      (a.catalogId ?? a.sandboxId ?? "").localeCompare(
+        b.catalogId ?? b.sandboxId ?? ""
+      )
+  );
+}
 
 /**
  * Normalize catalog `source` for `?open=` (trim; leave URLs／owner/repo as-is).

@@ -14,6 +14,7 @@ export interface ShellSessionHttpSeat {
   kind: string;
   sandboxId: string;
   paused: boolean;
+  remote?: { peerAgentId: string; inviteId: string };
 }
 
 export interface ShellSessionHttpStatus {
@@ -66,6 +67,15 @@ export interface ShellSessionHttpHandlers {
     seatId: string;
     role: string;
     name: string;
+  }>;
+  /** Invite connected Roster Avatar into the open session (DEC-045 Phase 3). */
+  inviteRoster?: (opts?: {
+    role?: string;
+  }) => Promise<{
+    inviteId: string;
+    sessionId: string;
+    role: string;
+    protocolId: string;
   }>;
 }
 
@@ -210,6 +220,18 @@ export async function handleShellSessionHttp(
           sourceSandboxId: body.sourceSandboxId,
         })
       );
+    }
+    if (path === `${base}/invite-roster` && method === "POST") {
+      if (!handlers.inviteRoster) {
+        return json(
+          { error: "此殼未支援邀請化身", code: "not_found" },
+          404
+        );
+      }
+      const body = (await request.json().catch(() => ({}))) as {
+        role?: string;
+      };
+      return json(await handlers.inviteRoster({ role: body.role }));
     }
     return json({ error: "找不到路由", code: "not_found" }, 404);
   } catch (e) {

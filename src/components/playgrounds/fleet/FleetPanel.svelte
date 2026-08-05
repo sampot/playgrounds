@@ -219,6 +219,8 @@
         return "自迭代";
       case "session_seat":
         return "座位";
+      case "roster_avatar":
+        return "化身";
       case "experiment":
         return "試驗";
       default:

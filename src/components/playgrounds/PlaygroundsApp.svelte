@@ -8,6 +8,12 @@
   import PlaygroundsShell from "./PlaygroundsShell.svelte";
   import AvatarsPanel from "./roster/AvatarsPanel.svelte";
   import {
+    inviteRosterAvatarToSession,
+    registerRosterInviteAcceptedHandler,
+    setRosterOpenSession,
+    getRosterProjectionSandboxId,
+  } from "./roster";
+  import {
     assertCanvasEntryServed,
     buildCanvasEntryUrl,
     ensureCanvasServiceWorker,
@@ -549,6 +555,7 @@
   /** Leader / follower / solo (DEC-031 Phase 3). */
   let agentRuntimeStatus = $state<AgentRuntimeHubStatus | null>(null);
   let unsubAgentRuntimeRole: (() => void) | null = null;
+  let unregRosterInviteAccepted: (() => void) | null = null;
   let agentIframeEl = $state<HTMLIFrameElement | null>(null);
   /** Agent canvas loaded for this project id; cold while Files tab on boot. */
   let agentUiMountedId: string | null = null;
@@ -1329,6 +1336,8 @@
         return "自迭代";
       case "session_seat":
         return "session 分身";
+      case "roster_avatar":
+        return "化身投影";
       case "experiment":
         return "試驗";
       default:
@@ -2781,9 +2790,19 @@
   }
 
   function syncMultiAgentSessionView() {
-    multiAgentSession = sessionRuntime.getSession()
-      ? { ...sessionRuntime.getSession()!, seats: [...sessionRuntime.listSeats()] }
+    const s = sessionRuntime.getSession();
+    multiAgentSession = s
+      ? { ...s, seats: [...sessionRuntime.listSeats()] }
       : null;
+    if (s && (s.status === "open" || s.status === "paused")) {
+      setRosterOpenSession({
+        sessionId: s.sessionId,
+        protocol: s.protocol,
+        status: s.status,
+      });
+    } else {
+      setRosterOpenSession(null);
+    }
   }
 
   async function closeMultiAgentSession(opts?: {
@@ -3170,6 +3189,7 @@
     protocolId: string;
     apiVersion: string;
     via?: "invite" | "apply";
+    remote?: { peerAgentId: string; inviteId: string };
   }) {
     if (!multiAgentSession) {
       throw new HostBridgeError("session_inactive", "請先開啟多人通道");
@@ -3190,6 +3210,7 @@
       seat = sessionRuntime.joinAgent({
         ...opts,
         via: opts.via === "invite" ? "invite" : "apply",
+        ...(opts.remote ? { remote: opts.remote } : {}),
       });
     } catch (e) {
       if (e instanceof HostBridgeError) throw e;
@@ -3234,12 +3255,61 @@
     syncMultiAgentSessionView();
     // Canvas load happens once from iframe {@attach} (must not mutate
     // participantIframes inside rebuild — that caused effect_update_depth_exceeded).
-    status = `已入座 ${opts.role}（${opts.sandboxId.slice(0, 8)}…）`;
+    status = opts.remote
+      ? `化身已入座（遠端 proxy · ${opts.role}）`
+      : `已入座 ${opts.role}（${opts.sandboxId.slice(0, 8)}…）`;
     return {
       seatId: seat.seatId,
       role: seat.role,
       sandboxId: opts.sandboxId,
     };
+  }
+
+  async function inviteRosterAvatarSeat(opts?: { role?: string }) {
+    const invite = inviteRosterAvatarToSession({ role: opts?.role });
+    status = `已邀請化身入座（${invite.protocol.protocolId}）`;
+    return {
+      inviteId: invite.inviteId,
+      sessionId: invite.sessionId,
+      role: invite.role,
+      protocolId: invite.protocol.protocolId,
+    };
+  }
+
+  async function onRosterInviteAccepted(ev: {
+    peerAgentId: string;
+    inviteId: string;
+    sessionId: string;
+    role: string;
+  }): Promise<void> {
+    const session = sessionRuntime.getSession();
+    if (!session || session.sessionId !== ev.sessionId) {
+      status = "收到化身接受，但通道已關閉或 session 不符";
+      return;
+    }
+    const sandboxId = getRosterProjectionSandboxId(ev.peerAgentId);
+    if (!sandboxId) {
+      status = "找不到化身投影沙盒，無法入座";
+      return;
+    }
+    try {
+      await joinMultiAgentSeat({
+        sandboxId,
+        role: ev.role,
+        protocolId: session.protocol.protocolId,
+        apiVersion: session.protocol.apiVersion,
+        via: "invite",
+        remote: {
+          peerAgentId: ev.peerAgentId,
+          inviteId: ev.inviteId,
+        },
+      });
+    } catch (e) {
+      status =
+        e instanceof Error
+          ? `化身入座失敗：${e.message}`
+          : `化身入座失敗：${String(e)}`;
+    }
   }
 
   async function leaveMultiAgentSeat(seatId: string) {
@@ -5101,6 +5171,10 @@
       pathname: window.location.pathname,
       hostname: window.location.hostname,
     });
+    const unregRosterInvite = registerRosterInviteAcceptedHandler(ev =>
+      onRosterInviteAccepted(ev)
+    );
+    unregRosterInviteAccepted = unregRosterInvite;
     if (
       isPlaygroundsLegacyMount(
         window.location.pathname,
@@ -5257,6 +5331,7 @@
               kind: seat.kind,
               sandboxId: seat.sandboxId,
               paused: seat.paused,
+              ...(seat.remote ? { remote: { ...seat.remote } } : {}),
             })),
           };
         },
@@ -5288,6 +5363,7 @@
         join: opts => joinMultiAgentSeat(opts),
         leave: seatId => leaveMultiAgentSeat(seatId),
         spawnParticipant: opts => spawnMultiAgentParticipant(opts),
+        inviteRoster: opts => inviteRosterAvatarSeat(opts),
       },
       onConsole: line => {
         pushWorkConsoleLine(line.level, line.text);
@@ -5574,9 +5650,12 @@
   });
 
   onDestroy(() => {
+    unregRosterInviteAccepted?.();
+    unregRosterInviteAccepted = null;
     unsubAgentRuntimeRole?.();
     unsubAgentRuntimeRole = null;
     setSessionMailboxFanout(null);
+    setRosterOpenSession(null);
     for (const [, pending] of pendingDomSnapshots) {
       clearTimeout(pending.timer);
       pending.reject(new HostBridgeError("cancelled", "遊樂場已卸載"));

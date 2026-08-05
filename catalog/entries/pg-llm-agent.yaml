@@ -5,3 +5,8 @@ blurb: BYOK coding agent（編排子代理）。改 .agent/system.md 調人格�
 source: sampot/pg-llm-agent
 license: MIT
 status: listed
+# Session protocols this SAM can join (catalog declaration; DEC-046).
+protocols:
+  - protocolId: coding-orchestration.v1
+    apiVersion: "1"
+    roles: [worker]
