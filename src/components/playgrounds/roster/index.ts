@@ -183,5 +183,9 @@ export type { RosterInviteFromLocation } from "./rosterInviteUrl";
 export {
   startRosterCameraQrScan,
   rosterCameraScanSupported,
+  detectRosterQrFromVideoFrame,
 } from "./rosterQrCamera";
-export type { RosterCameraScanStop } from "./rosterQrCamera";
+export type {
+  RosterCameraScanStop,
+  RosterCameraDetectDeps,
+} from "./rosterQrCamera";

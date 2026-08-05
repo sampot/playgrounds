@@ -1,6 +1,7 @@
 /**
  * Live camera QR scan for Roster invite／reply (DEC-045 Phase 4.2).
- * Prefers BarcodeDetector；falls back to canvas + `qr/decode`.
+ * BarcodeDetector when available；otherwise **must** decode via npm `qr`
+ * (`decodeRosterQrFromImage` → `qr/decode`).
  */
 
 import { decodeRosterQrFromImage, RosterQrError } from "./rosterQr";
@@ -13,34 +14,59 @@ type BarcodeDetectorLike = {
   ) => Promise<Array<{ rawValue?: string }>>;
 };
 
-function getBarcodeDetector():
-  | (new (opts?: { formats?: string[] }) => BarcodeDetectorLike)
-  | null {
+export type RosterCameraDetectDeps = {
+  /** null ⇒ skip native detector；use npm `qr` only. */
+  getDetector: () => BarcodeDetectorLike | null;
+  decodeImage: typeof decodeRosterQrFromImage;
+  createCanvas: () => HTMLCanvasElement;
+};
+
+function getBarcodeDetector(): BarcodeDetectorLike | null {
   const g = globalThis as {
     BarcodeDetector?: new (opts?: {
       formats?: string[];
     }) => BarcodeDetectorLike;
   };
-  return typeof g.BarcodeDetector === "function" ? g.BarcodeDetector : null;
+  if (typeof g.BarcodeDetector !== "function") return null;
+  try {
+    return new g.BarcodeDetector({ formats: ["qr_code"] });
+  } catch {
+    return null;
+  }
 }
 
-async function detectOnce(
+const defaultDetectDeps: RosterCameraDetectDeps = {
+  getDetector: getBarcodeDetector,
+  decodeImage: decodeRosterQrFromImage,
+  createCanvas: () => document.createElement("canvas"),
+};
+
+/**
+ * Decode one video frame. Prefer BarcodeDetector；if unsupported or empty,
+ * fall back to npm `qr` via canvas ImageData.
+ */
+export async function detectRosterQrFromVideoFrame(
   video: HTMLVideoElement,
-  detector: BarcodeDetectorLike | null
+  deps: Partial<RosterCameraDetectDeps> = {}
 ): Promise<string | null> {
+  const d: RosterCameraDetectDeps = { ...defaultDetectDeps, ...deps };
   if (video.readyState < 2 || video.videoWidth < 8 || video.videoHeight < 8) {
     return null;
   }
+
+  const detector = d.getDetector();
   if (detector) {
     try {
       const codes = await detector.detect(video);
       const raw = codes.find(c => typeof c.rawValue === "string")?.rawValue;
       if (raw?.trim()) return raw.trim();
     } catch {
-      /* fall through to canvas decode */
+      /* fall through to npm qr */
     }
   }
-  const canvas = document.createElement("canvas");
+
+  // No BarcodeDetector (or no hit yet): npm `qr` package decode.
+  const canvas = d.createCanvas();
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
@@ -48,7 +74,7 @@ async function detectOnce(
   ctx.drawImage(video, 0, 0);
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   try {
-    return decodeRosterQrFromImage(imageData);
+    return d.decodeImage(imageData);
   } catch {
     return null;
   }
@@ -64,6 +90,7 @@ export async function startRosterCameraQrScan(opts: {
   intervalMs?: number;
   /** Injected for tests. */
   getUserMedia?: (constraints: MediaStreamConstraints) => Promise<MediaStream>;
+  detectDeps?: Partial<RosterCameraDetectDeps>;
 }): Promise<RosterCameraScanStop> {
   const getUserMedia =
     opts.getUserMedia ??
@@ -106,16 +133,6 @@ export async function startRosterCameraQrScan(opts: {
     );
   }
 
-  const BD = getBarcodeDetector();
-  let detector: BarcodeDetectorLike | null = null;
-  if (BD) {
-    try {
-      detector = new BD({ formats: ["qr_code"] });
-    } catch {
-      detector = null;
-    }
-  }
-
   const intervalMs = opts.intervalMs ?? 350;
   let stopped = false;
   let timer: ReturnType<typeof setInterval> | null = null;
@@ -133,16 +150,14 @@ export async function startRosterCameraQrScan(opts: {
   timer = setInterval(() => {
     if (stopped || inflight) return;
     inflight = true;
-    void detectOnce(video, detector)
+    void detectRosterQrFromVideoFrame(video, opts.detectDeps)
       .then(text => {
         if (stopped || !text) return;
         stop();
         opts.onCode(text);
       })
       .catch(e => {
-        opts.onError?.(
-          e instanceof Error ? e : new Error(String(e))
-        );
+        opts.onError?.(e instanceof Error ? e : new Error(String(e)));
       })
       .finally(() => {
         inflight = false;

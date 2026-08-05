@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  detectRosterQrFromVideoFrame,
   rosterCameraScanSupported,
   startRosterCameraQrScan,
 } from "./rosterQrCamera";
@@ -7,6 +8,38 @@ import {
 describe("rosterQrCamera", () => {
   it("rosterCameraScanSupported reflects getUserMedia", () => {
     expect(typeof rosterCameraScanSupported()).toBe("boolean");
+  });
+
+  it("without BarcodeDetector uses npm qr decodeImage", async () => {
+    const decodeImage = vi.fn(() => "wire-from-npm-qr");
+    const video = {
+      readyState: 4,
+      videoWidth: 64,
+      videoHeight: 64,
+    } as unknown as HTMLVideoElement;
+
+    const getImageData = vi.fn(() => ({
+      width: 64,
+      height: 64,
+      data: new Uint8ClampedArray(64 * 64 * 4),
+    }));
+    const ctx = {
+      drawImage: vi.fn(),
+      getImageData,
+    };
+    const canvas = {
+      width: 0,
+      height: 0,
+      getContext: () => ctx,
+    };
+
+    const text = await detectRosterQrFromVideoFrame(video, {
+      getDetector: () => null,
+      decodeImage: decodeImage as never,
+      createCanvas: () => canvas as unknown as HTMLCanvasElement,
+    });
+    expect(text).toBe("wire-from-npm-qr");
+    expect(decodeImage).toHaveBeenCalledOnce();
   });
 
   it("stop ends tracks and clears video", async () => {
