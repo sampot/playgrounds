@@ -6,18 +6,18 @@
 import encodeQR from "qr";
 import decodeQR from "qr/decode.js";
 
-export class VisitQrError extends Error {
+export class RosterQrError extends Error {
   constructor(
     readonly code: string,
     message: string
   ) {
     super(message);
-    this.name = "VisitQrError";
+    this.name = "RosterQrError";
   }
 }
 
 /** Encode text to PNG bytes via raw modules → canvas (no SVG). */
-export async function encodeVisitQrPng(
+export async function encodeRosterQrPng(
   text: string,
   opts?: { scale?: number; border?: number }
 ): Promise<Uint8Array> {
@@ -25,7 +25,7 @@ export async function encodeVisitQrPng(
   const border = opts?.border ?? 2;
   const raw = encodeQR(text, "raw", { scale: 1, border, ecc: "medium" });
   if (!Array.isArray(raw) || raw.length === 0) {
-    throw new VisitQrError("encode_failed", "QR 編碼失敗");
+    throw new RosterQrError("encode_failed", "QR 編碼失敗");
   }
   const modules = raw.length;
   const px = modules * scale;
@@ -35,12 +35,12 @@ export async function encodeVisitQrPng(
     if (typeof OffscreenCanvas !== "undefined") {
       const canvas = new OffscreenCanvas(px, px);
       const ctx = canvas.getContext("2d");
-      if (!ctx) throw new VisitQrError("no_canvas", "無法建立 canvas");
+      if (!ctx) throw new RosterQrError("no_canvas", "無法建立 canvas");
       paintRaw(ctx, raw, scale);
       const blob = await canvas.convertToBlob({ type: "image/png" });
       return new Uint8Array(await blob.arrayBuffer());
     }
-    throw new VisitQrError(
+    throw new RosterQrError(
       "no_canvas",
       "目前環境無法產生 PNG QR（需要 canvas）"
     );
@@ -50,7 +50,7 @@ export async function encodeVisitQrPng(
   canvas.width = px;
   canvas.height = px;
   const ctx = canvas.getContext("2d");
-  if (!ctx) throw new VisitQrError("no_canvas", "無法建立 canvas");
+  if (!ctx) throw new RosterQrError("no_canvas", "無法建立 canvas");
   paintRaw(ctx, raw, scale);
 
   const blob = await new Promise<Blob>((resolve, reject) => {
@@ -81,11 +81,11 @@ function paintRaw(
   }
 }
 
-export async function encodeVisitQrPngDataUrl(
+export async function encodeRosterQrPngDataUrl(
   text: string,
   opts?: { scale?: number; border?: number }
 ): Promise<string> {
-  const bytes = await encodeVisitQrPng(text, opts);
+  const bytes = await encodeRosterQrPng(text, opts);
   let bin = "";
   for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]!);
   const b64 =
@@ -96,7 +96,7 @@ export async function encodeVisitQrPngDataUrl(
 }
 
 /** Decode QR from ImageData / RGBA image (camera frame or file). */
-export function decodeVisitQrFromImage(img: {
+export function decodeRosterQrFromImage(img: {
   width: number;
   height: number;
   data: Uint8Array | Uint8ClampedArray | number[];
@@ -104,7 +104,7 @@ export function decodeVisitQrFromImage(img: {
   try {
     return decodeQR(img);
   } catch (e) {
-    throw new VisitQrError(
+    throw new RosterQrError(
       "decode_failed",
       e instanceof Error ? e.message : String(e)
     );
@@ -112,9 +112,9 @@ export function decodeVisitQrFromImage(img: {
 }
 
 /** Decode QR from a PNG/JPEG File or Blob via canvas. */
-export async function decodeVisitQrFromBlob(blob: Blob): Promise<string> {
+export async function decodeRosterQrFromBlob(blob: Blob): Promise<string> {
   if (typeof createImageBitmap === "undefined" && typeof document === "undefined") {
-    throw new VisitQrError("no_bitmap", "無法解碼影像");
+    throw new RosterQrError("no_bitmap", "無法解碼影像");
   }
   const bitmap = await createImageBitmap(blob);
   try {
@@ -122,10 +122,10 @@ export async function decodeVisitQrFromBlob(blob: Blob): Promise<string> {
     canvas.width = bitmap.width;
     canvas.height = bitmap.height;
     const ctx = canvas.getContext("2d");
-    if (!ctx) throw new VisitQrError("no_canvas", "無法建立 canvas");
+    if (!ctx) throw new RosterQrError("no_canvas", "無法建立 canvas");
     ctx.drawImage(bitmap, 0, 0);
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    return decodeVisitQrFromImage(imageData);
+    return decodeRosterQrFromImage(imageData);
   } finally {
     bitmap.close();
   }

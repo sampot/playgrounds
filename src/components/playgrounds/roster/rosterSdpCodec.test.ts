@@ -5,7 +5,7 @@ import {
   isLanCandidateIp,
   prepareFieldsForExchange,
   rebuildSdpFromFields,
-} from "./visitSdpCodec";
+} from "./rosterSdpCodec";
 
 const SAMPLE_OFFER = [
   "v=0",
@@ -28,7 +28,7 @@ const SAMPLE_OFFER = [
   "",
 ].join("\r\n");
 
-describe("visitSdpCodec", () => {
+describe("rosterSdpCodec", () => {
   it("extracts fields and rebuilds offer", () => {
     const fields = extractSdpFields(SAMPLE_OFFER);
     expect(fields.ufrag).toBe("AbCd");

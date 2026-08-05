@@ -1,4 +1,4 @@
-# Playgrounds 跨場 Visit／Avatar 計劃（DEC-045）
+# Playgrounds 跨場 Roster／Avatar 計劃（DEC-045）
 
 > **狀態：** Phase 0 完成；Phase 1–2 **已落地**；Phase 3+ 未開始  
 > **權威決策：** [DECISIONS.md](./DECISIONS.md) **DEC-045**  
@@ -10,7 +10,7 @@
 
 ## 目標
 
-- 兩台瀏覽器可經邀請連成 peer（Visit）。
+- 兩台瀏覽器可經邀請連成 peer（Roster）。
 - 連線完成後**雙方**化身列表都出現對方 Avatar（P2P presence；`homePeer` 仍在各自本機）。
 - Avatar 可經既有 DEC-023 入座路徑被邀請參與 session（遠端座位＝後段 Phase）。
 - 場主**不**負擔資料面雲費；signaling 極薄、可 rate limit、可 OOB。
@@ -21,7 +21,7 @@
 - Trickle ICE、renegotiation、第二輪 offer／answer 走同一房。
 - 預設營運 TURN；跨 origin 自動搬 OPFS／SecretStore（DEC-042）。
 - 把 Avatar clone 成場主本機沙盒權威。
-- 完整 WebRTC Runtime 叢集（DEC-038 長線；本計劃先 Visit）。
+- 完整 WebRTC Runtime 叢集（DEC-038 長線；本計劃先 Roster）。
 - 把 Avatar 塞進總管 iframe 或 Files 樹。
 
 ---
@@ -39,7 +39,7 @@
 
 layout 還原：側欄 tab 鍵 `avatars`（與 `files`／`agent` 一併 persist）。
 
-實作：`src/components/playgrounds/visit/`（`AvatarsPanel.svelte`、`visitSdpCodec`／`visitWire`／`visitPeer`／`visitQr`／`visitIdenticon`／`visitStore`）。QR 套件＝npm **`qr`**；產出 **PNG**（禁止 SVG）。
+實作：`src/components/playgrounds/roster/`（`AvatarsPanel.svelte`、`rosterSdpCodec`／`rosterWire`／`rosterPeer`／`rosterQr`／`rosterIdenticon`／`rosterStore`）。QR 套件＝npm **`qr`**；產出 **PNG**（禁止 SVG）。
 
 ---
 
@@ -93,3 +93,4 @@ layout 還原：側欄 tab 鍵 `avatars`（與 `files`／`agent` 一併 persist�
 | 2026-08-05 | 場主開房／訪客連入預設收起 |
 | 2026-08-05 | 連線後雙方互送 presence，化身列表互見 |
 | 2026-08-05 | UX：發起／加入連線；邀請／回覆（不說場主／訪客、offer／answer） |
+| 2026-08-05 | **Rename：** Visit → **Roster**（計劃 `PG-ROSTER-PLAN.md`；實作 `roster/*`）；Avatar／化身／`avatars` tab **不變** |

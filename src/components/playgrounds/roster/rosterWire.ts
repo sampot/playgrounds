@@ -1,26 +1,26 @@
 /**
- * Visit wire format: compact base64url JSON for QR / text exchange (DEC-045).
+ * Roster wire format: compact base64url JSON for QR / text exchange (DEC-045).
  */
 
 import {
-  VISIT_SDP_TPL,
-  type VisitIceCandidate,
-  type VisitSdpFields,
-  type VisitSdpRole,
-  VisitSdpError,
+  ROSTER_SDP_TPL,
+  type RosterIceCandidate,
+  type RosterSdpFields,
+  type RosterSdpRole,
+  RosterSdpError,
   prepareFieldsForExchange,
   rebuildSdpFromFields,
-} from "./visitSdpCodec";
+} from "./rosterSdpCodec";
 
-export const VISIT_WIRE_VERSION = 1 as const;
+export const ROSTER_WIRE_VERSION = 1 as const;
 
 /** Soft cap so a single QR stays scannable. */
-export const VISIT_WIRE_MAX_CHARS = 1200;
+export const ROSTER_WIRE_MAX_CHARS = 1200;
 
-export type VisitWirePayload = {
-  v: typeof VISIT_WIRE_VERSION;
-  role: VisitSdpRole;
-  tpl: typeof VISIT_SDP_TPL;
+export type RosterWirePayload = {
+  v: typeof ROSTER_WIRE_VERSION;
+  role: RosterSdpRole;
+  tpl: typeof ROSTER_SDP_TPL;
   lan?: boolean;
   /** ice-ufrag */
   u: string;
@@ -42,13 +42,13 @@ export type VisitWirePayload = {
   >;
 };
 
-export class VisitWireError extends Error {
+export class RosterWireError extends Error {
   constructor(
     readonly code: string,
     message: string
   ) {
     super(message);
-    this.name = "VisitWireError";
+    this.name = "RosterWireError";
   }
 }
 
@@ -83,8 +83,8 @@ function utf8Decode(bytes: Uint8Array): string {
 }
 
 function candidateToTuple(
-  c: VisitIceCandidate
-): VisitWirePayload["c"][number] {
+  c: RosterIceCandidate
+): RosterWirePayload["c"][number] {
   if (c.rest) {
     return [
       c.foundation,
@@ -109,8 +109,8 @@ function candidateToTuple(
 }
 
 function tupleToCandidate(
-  t: VisitWirePayload["c"][number]
-): VisitIceCandidate {
+  t: RosterWirePayload["c"][number]
+): RosterIceCandidate {
   return {
     foundation: String(t[0]),
     component: Number(t[1]),
@@ -124,13 +124,13 @@ function tupleToCandidate(
 }
 
 export function fieldsToWirePayload(
-  fields: VisitSdpFields,
-  opts: { role: VisitSdpRole; lan?: boolean }
-): VisitWirePayload {
-  const payload: VisitWirePayload = {
-    v: VISIT_WIRE_VERSION,
+  fields: RosterSdpFields,
+  opts: { role: RosterSdpRole; lan?: boolean }
+): RosterWirePayload {
+  const payload: RosterWirePayload = {
+    v: ROSTER_WIRE_VERSION,
     role: opts.role,
-    tpl: VISIT_SDP_TPL,
+    tpl: ROSTER_SDP_TPL,
     u: fields.ufrag,
     p: fields.pwd,
     fa: fields.fingerprintAlgo,
@@ -145,7 +145,7 @@ export function fieldsToWirePayload(
   return payload;
 }
 
-export function wirePayloadToFields(payload: VisitWirePayload): VisitSdpFields {
+export function wirePayloadToFields(payload: RosterWirePayload): RosterSdpFields {
   const fpRaw = payload.f.includes(":")
     ? payload.f
     : payload.f.replace(/(.{2})(?=.)/g, "$1:");
@@ -162,92 +162,92 @@ export function wirePayloadToFields(payload: VisitWirePayload): VisitSdpFields {
   };
 }
 
-export function encodeVisitWire(payload: VisitWirePayload): string {
-  if (payload.v !== VISIT_WIRE_VERSION) {
-    throw new VisitWireError("bad_version", `不支援的 wire 版本：${payload.v}`);
+export function encodeRosterWire(payload: RosterWirePayload): string {
+  if (payload.v !== ROSTER_WIRE_VERSION) {
+    throw new RosterWireError("bad_version", `不支援的 wire 版本：${payload.v}`);
   }
-  if (payload.tpl !== VISIT_SDP_TPL) {
-    throw new VisitWireError("bad_tpl", `不支援的樣板：${payload.tpl}`);
+  if (payload.tpl !== ROSTER_SDP_TPL) {
+    throw new RosterWireError("bad_tpl", `不支援的樣板：${payload.tpl}`);
   }
   const json = JSON.stringify(payload);
   const wire = toBase64Url(utf8Encode(json));
-  if (wire.length > VISIT_WIRE_MAX_CHARS) {
-    throw new VisitWireError(
+  if (wire.length > ROSTER_WIRE_MAX_CHARS) {
+    throw new RosterWireError(
       "too_large",
-      `交換字串過長（${wire.length}＞${VISIT_WIRE_MAX_CHARS}）；請改用同區網模式或減少 candidates`
+      `交換字串過長（${wire.length}＞${ROSTER_WIRE_MAX_CHARS}）；請改用同區網模式或減少 candidates`
     );
   }
   return wire;
 }
 
-export function decodeVisitWire(wire: string): VisitWirePayload {
+export function decodeRosterWire(wire: string): RosterWirePayload {
   const trimmed = wire.trim().replace(/\s+/g, "");
   if (!trimmed) {
-    throw new VisitWireError("empty", "交換字串為空");
+    throw new RosterWireError("empty", "交換字串為空");
   }
-  if (trimmed.length > VISIT_WIRE_MAX_CHARS * 2) {
-    throw new VisitWireError("too_large", "交換字串過長");
+  if (trimmed.length > ROSTER_WIRE_MAX_CHARS * 2) {
+    throw new RosterWireError("too_large", "交換字串過長");
   }
   let json: string;
   try {
     json = utf8Decode(fromBase64Url(trimmed));
   } catch {
-    throw new VisitWireError("bad_encoding", "無法解碼 base64url");
+    throw new RosterWireError("bad_encoding", "無法解碼 base64url");
   }
   let parsed: unknown;
   try {
     parsed = JSON.parse(json);
   } catch {
-    throw new VisitWireError("bad_json", "交換字串不是有效 JSON");
+    throw new RosterWireError("bad_json", "交換字串不是有效 JSON");
   }
   if (!parsed || typeof parsed !== "object") {
-    throw new VisitWireError("bad_shape", "交換 payload 格式錯誤");
+    throw new RosterWireError("bad_shape", "交換 payload 格式錯誤");
   }
-  const p = parsed as Partial<VisitWirePayload>;
-  if (p.v !== VISIT_WIRE_VERSION) {
-    throw new VisitWireError("bad_version", `不支援的 wire 版本：${p.v}`);
+  const p = parsed as Partial<RosterWirePayload>;
+  if (p.v !== ROSTER_WIRE_VERSION) {
+    throw new RosterWireError("bad_version", `不支援的 wire 版本：${p.v}`);
   }
-  if (p.tpl !== VISIT_SDP_TPL) {
-    throw new VisitWireError("bad_tpl", `不支援的樣板：${p.tpl}`);
+  if (p.tpl !== ROSTER_SDP_TPL) {
+    throw new RosterWireError("bad_tpl", `不支援的樣板：${p.tpl}`);
   }
   if (p.role !== "offer" && p.role !== "answer") {
-    throw new VisitWireError("bad_role", "role 必須為 offer 或 answer");
+    throw new RosterWireError("bad_role", "role 必須為 offer 或 answer");
   }
   if (typeof p.u !== "string" || typeof p.p !== "string" || typeof p.f !== "string") {
-    throw new VisitWireError("incomplete", "缺少 u／p／f");
+    throw new RosterWireError("incomplete", "缺少 u／p／f");
   }
   if (!Array.isArray(p.c)) {
-    throw new VisitWireError("incomplete", "缺少 candidates");
+    throw new RosterWireError("incomplete", "缺少 candidates");
   }
-  return p as VisitWirePayload;
+  return p as RosterWirePayload;
 }
 
-export function encodeSdpToVisitWire(
+export function encodeSdpToRosterWire(
   sdp: string,
-  opts: { role: VisitSdpRole; lan?: boolean }
+  opts: { role: RosterSdpRole; lan?: boolean }
 ): string {
   const fields = prepareFieldsForExchange(sdp, { lan: opts.lan });
-  return encodeVisitWire(fieldsToWirePayload(fields, opts));
+  return encodeRosterWire(fieldsToWirePayload(fields, opts));
 }
 
-/** Prefer this over encodeSdpToVisitWire when fields already prepared. */
-export function encodeFieldsToVisitWire(
-  fields: VisitSdpFields,
-  opts: { role: VisitSdpRole; lan?: boolean }
+/** Prefer this over encodeSdpToRosterWire when fields already prepared. */
+export function encodeFieldsToRosterWire(
+  fields: RosterSdpFields,
+  opts: { role: RosterSdpRole; lan?: boolean }
 ): string {
-  return encodeVisitWire(fieldsToWirePayload(fields, opts));
+  return encodeRosterWire(fieldsToWirePayload(fields, opts));
 }
 
-export function decodeVisitWireToSdp(wire: string): {
-  role: VisitSdpRole;
+export function decodeRosterWireToSdp(wire: string): {
+  role: RosterSdpRole;
   lan: boolean;
   sdp: string;
-  payload: VisitWirePayload;
+  payload: RosterWirePayload;
 } {
-  const payload = decodeVisitWire(wire);
+  const payload = decodeRosterWire(wire);
   const fields = wirePayloadToFields(payload);
   if (fields.candidates.length === 0) {
-    throw new VisitSdpError("no_candidates", "交換字串沒有 ICE candidates");
+    throw new RosterSdpError("no_candidates", "交換字串沒有 ICE candidates");
   }
   const sdp = rebuildSdpFromFields(fields, payload.role);
   return {

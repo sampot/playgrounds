@@ -1,20 +1,20 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
   import {
-    acceptVisitOffer,
-    applyVisitAnswer,
-    createVisitOffer,
-    decodeVisitQrFromBlob,
-    encodeVisitQrPngDataUrl,
+    acceptRosterOffer,
+    applyRosterAnswer,
+    createRosterOffer,
+    decodeRosterQrFromBlob,
+    encodeRosterQrPngDataUrl,
     isPresenceMessage,
-    listVisitAvatars,
-    clearVisitAvatars,
-    removeVisitAvatar,
-    subscribeVisitAvatars,
-    upsertVisitAvatar,
-    type VisitAvatarStub,
-    type VisitPeerHandlers,
-    type VisitPeerSession,
+    listRosterAvatars,
+    clearRosterAvatars,
+    removeRosterAvatar,
+    subscribeRosterAvatars,
+    upsertRosterAvatar,
+    type RosterAvatarStub,
+    type RosterPeerHandlers,
+    type RosterPeerSession,
   } from "./index";
 
   const btn =
@@ -35,8 +35,8 @@
   let pasteInvite = $state("");
   let pasteReply = $state("");
 
-  let session = $state<VisitPeerSession | null>(null);
-  let avatars = $state<VisitAvatarStub[]>([]);
+  let session = $state<RosterPeerSession | null>(null);
+  let avatars = $state<RosterAvatarStub[]>([]);
   let localName = $state("我");
   let peerAgentId = $state<string | null>(null);
   /** Collapsed by default: start = initiator, join = responder. */
@@ -45,30 +45,30 @@
 
   const localAgentId = (() => {
     try {
-      const key = "playgrounds-visit-agent-id";
+      const key = "playgrounds-roster-agent-id";
       let id = sessionStorage.getItem(key);
       if (!id) {
         id =
           typeof crypto !== "undefined" && crypto.randomUUID
             ? crypto.randomUUID()
-            : `visit-${Date.now().toString(36)}`;
+            : `roster-${Date.now().toString(36)}`;
         sessionStorage.setItem(key, id);
       }
       return id;
     } catch {
-      return `visit-${Date.now().toString(36)}`;
+      return `roster-${Date.now().toString(36)}`;
     }
   })();
 
   let unsub: (() => void) | null = null;
 
   onMount(() => {
-    avatars = listVisitAvatars();
-    unsub = subscribeVisitAvatars(() => {
-      avatars = listVisitAvatars();
+    avatars = listRosterAvatars();
+    unsub = subscribeRosterAvatars(() => {
+      avatars = listRosterAvatars();
     });
     try {
-      const n = localStorage.getItem("playgrounds-visit-display-name");
+      const n = localStorage.getItem("playgrounds-roster-display-name");
       if (n) localName = n;
     } catch {
       /* ignore */
@@ -83,7 +83,7 @@
   function persistName(): void {
     try {
       localStorage.setItem(
-        "playgrounds-visit-display-name",
+        "playgrounds-roster-display-name",
         localName.trim() || "我"
       );
     } catch {
@@ -118,7 +118,7 @@
   }): void {
     if (data.agentId === localAgentId) return;
     peerAgentId = data.agentId;
-    upsertVisitAvatar({
+    upsertRosterAvatar({
       agentId: data.agentId,
       name: data.name,
       connectionState: "connected",
@@ -133,15 +133,15 @@
 
   function onPeerDisconnected(): void {
     if (peerAgentId) {
-      removeVisitAvatar(peerAgentId);
+      removeRosterAvatar(peerAgentId);
       peerAgentId = null;
     } else {
-      clearVisitAvatars();
+      clearRosterAvatars();
     }
     status = "連線已結束";
   }
 
-  function peerHandlers(): VisitPeerHandlers {
+  function peerHandlers(): RosterPeerHandlers {
     return {
       onMessage: data => {
         if (isPresenceMessage(data)) onRemotePresence(data);
@@ -190,10 +190,10 @@
     resetExchangeUi();
     closeSession();
     peerAgentId = null;
-    clearVisitAvatars();
+    clearRosterAvatars();
     persistName();
     try {
-      const result = await createVisitOffer({
+      const result = await createRosterOffer({
         lan,
         localPresence: localPresence(),
         handlers: peerHandlers(),
@@ -203,7 +203,7 @@
       status = "已建立邀請 — 請交給對方，並等待對方的回覆";
       busy = false;
       try {
-        inviteQrUrl = await encodeVisitQrPngDataUrl(result.wire);
+        inviteQrUrl = await encodeRosterQrPngDataUrl(result.wire);
       } catch (qrErr) {
         error =
           qrErr instanceof Error
@@ -229,7 +229,7 @@
     error = null;
     busy = true;
     try {
-      await applyVisitAnswer(session, wire);
+      await applyRosterAnswer(session, wire);
       status = "已收下回覆，正在連線…";
     } catch (e) {
       error = friendlyError(e instanceof Error ? e.message : String(e));
@@ -255,10 +255,10 @@
     pasteReply = "";
     closeSession();
     peerAgentId = null;
-    clearVisitAvatars();
+    clearRosterAvatars();
     persistName();
     try {
-      const result = await acceptVisitOffer({
+      const result = await acceptRosterOffer({
         offerWire: wire,
         lan,
         localPresence: localPresence(),
@@ -274,7 +274,7 @@
       status = "已建立回覆 — 請回傳給發起連線的一方";
       busy = false;
       try {
-        replyQrUrl = await encodeVisitQrPngDataUrl(result.wire);
+        replyQrUrl = await encodeRosterQrPngDataUrl(result.wire);
       } catch (qrErr) {
         error =
           qrErr instanceof Error
@@ -307,7 +307,7 @@
     error = null;
     busy = true;
     try {
-      const text = await decodeVisitQrFromBlob(file);
+      const text = await decodeRosterQrFromBlob(file);
       if (which === "invite") pasteInvite = text;
       else pasteReply = text;
       status = "已從 QR 讀取";

@@ -6,7 +6,7 @@
   import PlaygroundsPythonRepl from "./PlaygroundsPythonRepl.svelte";
   import PlaygroundsJsRepl from "./PlaygroundsJsRepl.svelte";
   import PlaygroundsShell from "./PlaygroundsShell.svelte";
-  import AvatarsPanel from "./visit/AvatarsPanel.svelte";
+  import AvatarsPanel from "./roster/AvatarsPanel.svelte";
   import {
     assertCanvasEntryServed,
     buildCanvasEntryUrl,
@@ -804,6 +804,9 @@
         parsed.sidebarTab === "avatars"
       ) {
         sidebarTab = parsed.sidebarTab;
+      } else if ((parsed as { sidebarTab?: string }).sidebarTab === "roster") {
+        // Transient mis-key during rename; Avatars tab remains `avatars`
+        sidebarTab = "avatars";
       }
       if (parsed.bottomTab === "agent") {
         // Migrate: Agent moved from bottom panel to left sidebar.

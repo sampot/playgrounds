@@ -2,9 +2,9 @@
  * In-memory Avatar presence stubs for the host Avatars tab (DEC-045).
  */
 
-import { identiconDataUrl } from "./visitIdenticon";
+import { identiconDataUrl } from "./rosterIdenticon";
 
-export type VisitAvatarStub = {
+export type RosterAvatarStub = {
   agentId: string;
   name: string;
   connectedAt: number;
@@ -14,29 +14,29 @@ export type VisitAvatarStub = {
 
 type Listener = () => void;
 
-const avatars = new Map<string, VisitAvatarStub>();
+const avatars = new Map<string, RosterAvatarStub>();
 const listeners = new Set<Listener>();
 
 function emit(): void {
   for (const l of listeners) l();
 }
 
-export function subscribeVisitAvatars(listener: Listener): () => void {
+export function subscribeRosterAvatars(listener: Listener): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);
 }
 
-export function listVisitAvatars(): VisitAvatarStub[] {
+export function listRosterAvatars(): RosterAvatarStub[] {
   return [...avatars.values()].sort((a, b) => a.connectedAt - b.connectedAt);
 }
 
-export function upsertVisitAvatar(input: {
+export function upsertRosterAvatar(input: {
   agentId: string;
   name: string;
   connectionState?: string;
-}): VisitAvatarStub {
+}): RosterAvatarStub {
   const existing = avatars.get(input.agentId);
-  const stub: VisitAvatarStub = {
+  const stub: RosterAvatarStub = {
     agentId: input.agentId,
     name: input.name || input.agentId,
     connectedAt: existing?.connectedAt ?? Date.now(),
@@ -48,7 +48,7 @@ export function upsertVisitAvatar(input: {
   return stub;
 }
 
-export function setVisitAvatarConnectionState(
+export function setRosterAvatarConnectionState(
   agentId: string,
   connectionState: string
 ): void {
@@ -58,12 +58,12 @@ export function setVisitAvatarConnectionState(
   emit();
 }
 
-export function removeVisitAvatar(agentId: string): void {
+export function removeRosterAvatar(agentId: string): void {
   if (!avatars.delete(agentId)) return;
   emit();
 }
 
-export function clearVisitAvatars(): void {
+export function clearRosterAvatars(): void {
   if (avatars.size === 0) return;
   avatars.clear();
   emit();

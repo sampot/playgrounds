@@ -1,22 +1,22 @@
 /**
- * Visit WebRTC peer: one non-trickle offer/answer + DataChannel (DEC-045).
+ * Roster WebRTC peer: one non-trickle offer/answer + DataChannel (DEC-045).
  */
 
 import {
   prepareFieldsForExchange,
-  type VisitSdpRole,
-} from "./visitSdpCodec";
-import { encodeFieldsToVisitWire, decodeVisitWireToSdp } from "./visitWire";
+  type RosterSdpRole,
+} from "./rosterSdpCodec";
+import { encodeFieldsToRosterWire, decodeRosterWireToSdp } from "./rosterWire";
 
 const DEFAULT_STUN = [{ urls: "stun:stun.cloudflare.com:3478" }];
 
-export type VisitPresenceMsg = {
+export type RosterPresenceMsg = {
   type: "presence";
   agentId: string;
   name: string;
 };
 
-export type VisitPeerHandlers = {
+export type RosterPeerHandlers = {
   onChannelOpen?: () => void;
   onChannelClose?: () => void;
   onConnectionState?: (state: RTCPeerConnectionState) => void;
@@ -24,7 +24,7 @@ export type VisitPeerHandlers = {
   onError?: (err: Error) => void;
 };
 
-export type VisitPeerSession = {
+export type RosterPeerSession = {
   pc: RTCPeerConnection;
   getChannel: () => RTCDataChannel | null;
   role: "host" | "guest";
@@ -62,13 +62,13 @@ function sendPresence(
       type: "presence",
       agentId: presence.agentId,
       name: presence.name,
-    } satisfies VisitPresenceMsg)
+    } satisfies RosterPresenceMsg)
   );
 }
 
 function attachChannel(
   channel: RTCDataChannel,
-  handlers: VisitPeerHandlers,
+  handlers: RosterPeerHandlers,
   localPresence?: { agentId: string; name: string }
 ): void {
   channel.binaryType = "arraybuffer";
@@ -106,8 +106,8 @@ function wrapSession(
   pc: RTCPeerConnection,
   role: "host" | "guest",
   getChannel: () => RTCDataChannel | null,
-  handlers: VisitPeerHandlers
-): VisitPeerSession {
+  handlers: RosterPeerHandlers
+): RosterPeerSession {
   pc.addEventListener("connectionstatechange", () => {
     handlers.onConnectionState?.(pc.connectionState);
   });
@@ -138,16 +138,16 @@ function wrapSession(
 }
 
 /** Host: create offer wire string (after ICE complete). */
-export async function createVisitOffer(opts: {
+export async function createRosterOffer(opts: {
   lan?: boolean;
-  handlers?: VisitPeerHandlers;
+  handlers?: RosterPeerHandlers;
   /** Sent when DataChannel opens (mutual presence). */
   localPresence?: { agentId: string; name: string };
-}): Promise<{ session: VisitPeerSession; wire: string }> {
+}): Promise<{ session: RosterPeerSession; wire: string }> {
   const lan = Boolean(opts.lan);
   const handlers = opts.handlers ?? {};
   const pc = createPc(lan);
-  const channel = pc.createDataChannel("visit", { ordered: true });
+  const channel = pc.createDataChannel("roster", { ordered: true });
   attachChannel(channel, handlers, opts.localPresence);
 
   const offer = await pc.createOffer();
@@ -156,23 +156,23 @@ export async function createVisitOffer(opts: {
   const local = pc.localDescription?.sdp;
   if (!local) throw new Error("缺少 local SDP");
   const fields = prepareFieldsForExchange(local, { lan });
-  const wire = encodeFieldsToVisitWire(fields, { role: "offer", lan });
+  const wire = encodeFieldsToRosterWire(fields, { role: "offer", lan });
   const session = wrapSession(pc, "host", () => channel, handlers);
   return { session, wire };
 }
 
 /** Guest: accept offer wire → produce answer wire. */
-export async function acceptVisitOffer(opts: {
+export async function acceptRosterOffer(opts: {
   offerWire: string;
   lan?: boolean;
-  handlers?: VisitPeerHandlers;
+  handlers?: RosterPeerHandlers;
   /** @deprecated use localPresence */
   presence?: { agentId: string; name: string };
   localPresence?: { agentId: string; name: string };
-}): Promise<{ session: VisitPeerSession; wire: string }> {
+}): Promise<{ session: RosterPeerSession; wire: string }> {
   const handlers = opts.handlers ?? {};
   const localPresence = opts.localPresence ?? opts.presence;
-  const decoded = decodeVisitWireToSdp(opts.offerWire);
+  const decoded = decodeRosterWireToSdp(opts.offerWire);
   if (decoded.role !== "offer") {
     throw new Error("期待 offer 字串");
   }
@@ -192,8 +192,8 @@ export async function acceptVisitOffer(opts: {
   const local = pc.localDescription?.sdp;
   if (!local) throw new Error("缺少 local SDP");
   const fields = prepareFieldsForExchange(local, { lan });
-  const wire = encodeFieldsToVisitWire(fields, {
-    role: "answer" satisfies VisitSdpRole,
+  const wire = encodeFieldsToRosterWire(fields, {
+    role: "answer" satisfies RosterSdpRole,
     lan,
   });
   const session = wrapSession(pc, "guest", () => channel, handlers);
@@ -201,11 +201,11 @@ export async function acceptVisitOffer(opts: {
 }
 
 /** Host: apply answer wire. */
-export async function applyVisitAnswer(
-  session: VisitPeerSession,
+export async function applyRosterAnswer(
+  session: RosterPeerSession,
   answerWire: string
 ): Promise<void> {
-  const decoded = decodeVisitWireToSdp(answerWire);
+  const decoded = decodeRosterWireToSdp(answerWire);
   if (decoded.role !== "answer") {
     throw new Error("期待 answer 字串");
   }
@@ -215,7 +215,7 @@ export async function applyVisitAnswer(
   });
 }
 
-export function isPresenceMessage(data: unknown): data is VisitPresenceMsg {
+export function isPresenceMessage(data: unknown): data is RosterPresenceMsg {
   if (!data || typeof data !== "object") return false;
   const m = data as Record<string, unknown>;
   return (

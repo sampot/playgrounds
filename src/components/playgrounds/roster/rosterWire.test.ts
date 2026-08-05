@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { prepareFieldsForExchange } from "./visitSdpCodec";
+import { prepareFieldsForExchange } from "./rosterSdpCodec";
 import {
-  VISIT_WIRE_MAX_CHARS,
-  decodeVisitWire,
-  decodeVisitWireToSdp,
-  encodeFieldsToVisitWire,
-  encodeVisitWire,
+  ROSTER_WIRE_MAX_CHARS,
+  decodeRosterWire,
+  decodeRosterWireToSdp,
+  encodeFieldsToRosterWire,
+  encodeRosterWire,
   fieldsToWirePayload,
-} from "./visitWire";
+} from "./rosterWire";
 
 const SAMPLE_OFFER = [
   "v=0",
@@ -28,15 +28,15 @@ const SAMPLE_OFFER = [
   "",
 ].join("\r\n");
 
-describe("visitWire", () => {
+describe("rosterWire", () => {
   it("round-trips lan offer", () => {
     const fields = prepareFieldsForExchange(SAMPLE_OFFER, { lan: true });
-    const wire = encodeFieldsToVisitWire(fields, {
+    const wire = encodeFieldsToRosterWire(fields, {
       role: "offer",
       lan: true,
     });
-    expect(wire.length).toBeLessThanOrEqual(VISIT_WIRE_MAX_CHARS);
-    const decoded = decodeVisitWireToSdp(wire);
+    expect(wire.length).toBeLessThanOrEqual(ROSTER_WIRE_MAX_CHARS);
+    const decoded = decodeRosterWireToSdp(wire);
     expect(decoded.role).toBe("offer");
     expect(decoded.lan).toBe(true);
     expect(decoded.sdp).toContain("192.168.1.10");
@@ -49,10 +49,10 @@ describe("visitWire", () => {
     const payload = fieldsToWirePayload(fields, { role: "offer" });
     // Blow up fingerprint field to force size.
     payload.f = "AA".repeat(8000);
-    expect(() => encodeVisitWire(payload)).toThrow(/過長/);
+    expect(() => encodeRosterWire(payload)).toThrow(/過長/);
   });
 
   it("rejects bad wire", () => {
-    expect(() => decodeVisitWire("@@@")).toThrow();
+    expect(() => decodeRosterWire("@@@")).toThrow();
   });
 });

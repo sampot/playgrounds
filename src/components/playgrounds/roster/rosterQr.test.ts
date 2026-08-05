@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import encodeQR from "qr";
 import decodeQR from "qr/decode.js";
-import { encodeVisitQrPng, encodeVisitQrPngDataUrl } from "./visitQr";
+import { encodeRosterQrPng, encodeRosterQrPngDataUrl } from "./rosterQr";
 
-describe("visitQr", () => {
+describe("rosterQr", () => {
   it("raw modules round-trip via decodeQR", () => {
-    const text = "visit-wire-test";
+    const text = "roster-wire-test";
     const raw = encodeQR(text, "raw", { scale: 1, border: 2 });
     const h = raw.length;
     const w = raw[0]!.length;
@@ -34,18 +34,18 @@ describe("visitQr", () => {
     expect(decoded).toBe(text);
   });
 
-  it("encodeVisitQrPng produces PNG bytes when OffscreenCanvas exists", async () => {
+  it("encodeRosterQrPng produces PNG bytes when OffscreenCanvas exists", async () => {
     if (typeof OffscreenCanvas === "undefined") {
       // jsdom / node without OffscreenCanvas — skip runtime png
       expect(true).toBe(true);
       return;
     }
-    const bytes = await encodeVisitQrPng("hello");
+    const bytes = await encodeRosterQrPng("hello");
     expect(bytes[0]).toBe(0x89);
     expect(bytes[1]).toBe(0x50); // P
     expect(bytes[2]).toBe(0x4e); // N
     expect(bytes[3]).toBe(0x47); // G
-    const url = await encodeVisitQrPngDataUrl("hello");
+    const url = await encodeRosterQrPngDataUrl("hello");
     expect(url.startsWith("data:image/png;base64,")).toBe(true);
   });
 });

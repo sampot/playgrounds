@@ -1,13 +1,13 @@
 /**
- * Visit SDP template codec (DEC-045): extract / rebuild DataChannel-only SDP.
+ * Roster SDP template codec (DEC-045): extract / rebuild DataChannel-only SDP.
  * Template id: dc1
  */
 
-export const VISIT_SDP_TPL = "dc1" as const;
+export const ROSTER_SDP_TPL = "dc1" as const;
 
-export type VisitSdpRole = "offer" | "answer";
+export type RosterSdpRole = "offer" | "answer";
 
-export type VisitIceCandidate = {
+export type RosterIceCandidate = {
   foundation: string;
   component: number;
   protocol: string;
@@ -19,7 +19,7 @@ export type VisitIceCandidate = {
   rest?: string;
 };
 
-export type VisitSdpFields = {
+export type RosterSdpFields = {
   ufrag: string;
   pwd: string;
   fingerprintAlgo: string;
@@ -28,16 +28,16 @@ export type VisitSdpFields = {
   mid: string;
   sctpPort: number;
   maxMessageSize: number;
-  candidates: VisitIceCandidate[];
+  candidates: RosterIceCandidate[];
 };
 
-export class VisitSdpError extends Error {
+export class RosterSdpError extends Error {
   constructor(
     readonly code: string,
     message: string
   ) {
     super(message);
-    this.name = "VisitSdpError";
+    this.name = "RosterSdpError";
   }
 }
 
@@ -63,8 +63,8 @@ export function isLanCandidateIp(ip: string): boolean {
 }
 
 export function filterCandidatesForLan(
-  candidates: VisitIceCandidate[]
-): VisitIceCandidate[] {
+  candidates: RosterIceCandidate[]
+): RosterIceCandidate[] {
   const udpHost = candidates.filter(
     c => c.type === "host" && c.protocol.toLowerCase() === "udp"
   );
@@ -73,7 +73,7 @@ export function filterCandidatesForLan(
   return preferred.length > 0 ? preferred : udpHost;
 }
 
-function parseCandidateLine(line: string): VisitIceCandidate | null {
+function parseCandidateLine(line: string): RosterIceCandidate | null {
   // a=candidate:<foundation> <comp> <proto> <prio> <ip> <port> typ <type> ...
   const body = line.startsWith("a=candidate:")
     ? line.slice("a=candidate:".length)
@@ -99,7 +99,7 @@ function parseCandidateLine(line: string): VisitIceCandidate | null {
   };
 }
 
-export function extractSdpFields(sdp: string): VisitSdpFields {
+export function extractSdpFields(sdp: string): RosterSdpFields {
   const lines = sdp.replace(/\r\n/g, "\n").split("\n");
   let ufrag = "";
   let pwd = "";
@@ -109,7 +109,7 @@ export function extractSdpFields(sdp: string): VisitSdpFields {
   let mid = "0";
   let sctpPort = 5000;
   let maxMessageSize = 262144;
-  const candidates: VisitIceCandidate[] = [];
+  const candidates: RosterIceCandidate[] = [];
 
   for (const raw of lines) {
     const line = raw.trim();
@@ -138,7 +138,7 @@ export function extractSdpFields(sdp: string): VisitSdpFields {
   }
 
   if (!ufrag || !pwd || !fingerprint) {
-    throw new VisitSdpError(
+    throw new RosterSdpError(
       "incomplete_sdp",
       "SDP 缺少 ice-ufrag／ice-pwd／fingerprint"
     );
@@ -158,8 +158,8 @@ export function extractSdpFields(sdp: string): VisitSdpFields {
 }
 
 export function rebuildSdpFromFields(
-  fields: VisitSdpFields,
-  role: VisitSdpRole
+  fields: RosterSdpFields,
+  role: RosterSdpRole
 ): string {
   const setup =
     role === "answer" && fields.setup === "actpass"
@@ -197,13 +197,13 @@ export function rebuildSdpFromFields(
 export function prepareFieldsForExchange(
   sdp: string,
   opts: { lan?: boolean }
-): VisitSdpFields {
+): RosterSdpFields {
   const fields = extractSdpFields(sdp);
   let candidates = fields.candidates.filter(c => c.type !== "relay");
   if (opts.lan) {
     candidates = filterCandidatesForLan(candidates);
     if (candidates.length === 0) {
-      throw new VisitSdpError(
+      throw new RosterSdpError(
         "no_lan_candidates",
         "同區網模式找不到可用的 host candidate"
       );
