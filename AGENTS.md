@@ -2,8 +2,10 @@
 
 This repo is the **Playgrounds** browser host ([sampot/playgrounds](https://github.com/sampot/playgrounds)).
 
-- **DEC-041:** extract from blog; legacy `samkuo.me/playgrounds/` kept with migrate tip
+- **DEC-041:** extract from blog; legacy `samkuo.me/playgrounds/` is a **frozen** snapshot (migrate tip; no further feature sync from this repo)
 - **DEC-042:** deploy on **Cloudflare Workers**; field net **`*.samkuo.me`** (same code, per-origin storage); default field **`play.samkuo.me`**
+
+This repo is the **authoritative** host codebase. Do not push feature parity back into the blog mount.
 
 Reader-facing narrative stays personal／non-product (blog DEC-004).
 
@@ -12,7 +14,7 @@ Reader-facing narrative stays personal／non-product (blog DEC-004).
 - `npm run dev` — local host (standalone paths: `/` + `/canvas/`)
 - `npm test` — Vitest
 - `npm run build` — `astro check` + static build
-- Deploy (planned): `wrangler deploy` after build (wildcard `*.samkuo.me`)
+- `npm run deploy` — build + `wrangler deploy` (`play.samkuo.me`)
 
 ## Layout
 
@@ -25,7 +27,7 @@ Reader-facing narrative stays personal／non-product (blog DEC-004).
 
 - Standalone field: `PUBLIC_PLAYGROUNDS_BASE_PATH=` → home `/`, canvas `/canvas/`
 - Default document host: `https://play.samkuo.me`
-- Any field: `https://<name>.samkuo.me` (reserved names e.g. `www`, `blog`, `api`, `play` as official default)
+- Any field: `https://<name>.samkuo.me` (reserved names e.g. `www`, `blog`, `api`, `docs`, `old-blog`; `play` = official default)
 - In-app share links: prefer `location.origin`; docs examples use `play`
 
 Do not auto-migrate OPFS across origins. Do not provision per-name server tenants.

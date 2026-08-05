@@ -6,7 +6,7 @@ Browser host for **SAM** (Single-page Application Module) sandboxes: OPFS worksp
 - **Field net:** any `https://<name>.samkuo.me/` — same build, separate browser origin (OPFS / secrets / SW)
 - **Deploy target:** Cloudflare Workers (static assets + wildcard `*.samkuo.me`)
 - **Author notes:** [samkuo.me](https://samkuo.me/) (personal blog; not a product site)
-- **Transition:** `https://samkuo.me/playgrounds/` still works; export `.sam` then import on the field you want (data is origin-bound)
+- **Legacy (frozen):** `https://samkuo.me/playgrounds/` still opens with a migrate tip but is **not** updated with this repo; export `.sam` then import on the field you want (data is origin-bound)
 
 Decisions: DEC-041 (extract / legacy mount), DEC-042 (Workers / wildcard / `play`) — see `docs/` (snapshot from the blog docs set).
 
@@ -21,6 +21,7 @@ npm run dev
 ```bash
 npm test
 npm run build
+npm run deploy   # Cloudflare Workers (play.samkuo.me)
 ```
 
 ## Open a SAM

@@ -48,7 +48,15 @@ function isStandaloneHost() {
     if (!h.endsWith(".samkuo.me")) return false;
     const sub = h.slice(0, -".samkuo.me".length);
     if (!sub || sub.includes(".")) return false;
-    if (sub === "www" || sub === "blog" || sub === "api") return false;
+    if (
+      sub === "www" ||
+      sub === "blog" ||
+      sub === "api" ||
+      sub === "docs" ||
+      sub === "old-blog"
+    ) {
+      return false;
+    }
     return true;
   } catch {
     return false;

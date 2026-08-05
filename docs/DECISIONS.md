@@ -756,16 +756,18 @@
   1. **場網部署與預設 host：** 見 **DEC-042**（Workers＋`*.samkuo.me`；文件預設場 **`play.samkuo.me`**）。初版曾寫單一 `playgrounds.samkuo.me`／Pages——以 DEC-042 為準。
   2. **根路徑 `/`：** 場網上入口為 `/`（非再掛 `/playgrounds/`）；畫布虛擬站為 **`/canvas/<sandboxId>/…`**（對應舊 `/playgrounds/canvas/…`）。`?open=` 等 query 契約不變，僅主機與 path 前綴改變。
   3. **單一開源 repo：** 整個 Playgrounds 宿主抽成一個公開儲存庫（**[`sampot/playgrounds`](https://github.com/sampot/playgrounds)**）——含遊樂場介面、`src/sam-runtime/`、`src/sam-host/`、畫布／離線 SW、Host API 與必要工程契約文件。**不**拆成 runtime／UI 兩套件當交付形。
-  4. **舊場暫留：** `https://samkuo.me/playgrounds/` **暫不移除**（同一套碼或凍結快照皆可，過渡期由計劃定）。UI **提醒**使用者：正式場在場網（預設 `play.samkuo.me`）；本機資料綁 origin，請**匯出沙盒（`.sam`）後到新網址匯入**；SecretStore／prefs／WebAuthn 包裝須在新 origin 重設。**不做**跨 origin 自動遷移、**不做**站內 proxy 搬 OPFS。
+  4. **舊場暫留→凍結：** `https://samkuo.me/playgrounds/` **暫不移除**，但自遷移橫幅上線後視為**凍結快照**：**不再**與場網／[`sampot/playgrounds`](https://github.com/sampot/playgrounds) 做功能對齊或雙向同步更新。UI **提醒**使用者：正式場在場網（預設 `play.samkuo.me`）；本機資料綁 origin，請**匯出沙盒（`.sam`）後到新網址匯入**；SecretStore／prefs／WebAuthn 包裝須在新 origin 重設。**不做**跨 origin 自動遷移、**不做**站內 proxy 搬 OPFS。
   5. **部落格職責：** 文章／`/sam/` 型錄／導覽可留在 `samkuo.me`；新深鏈與型錄「開啟」指向場網（預設 `play`）。讀者可見敘事仍依 DEC-004（勿產品／品牌／行銷腔）；開源＝公開原始碼與可自架，不是產品站。
-  6. **階段**以 [PG-STANDALONE-PLAN.md](./PG-STANDALONE-PLAN.md) 為準。
+  6. **程式權威：** 遊樂場宿主後續開發／部署以 **[`sampot/playgrounds`](https://github.com/sampot/playgrounds)**（場網 Workers）為準；`myblog` 內 `src/components/playgrounds/` 等舊場樹**不**再當主線。
+  7. **階段**以 [PG-STANDALONE-PLAN.md](./PG-STANDALONE-PLAN.md) 為準。
 - **Consequences:**
   - 路徑／origin 須配置化（base path、canvas 前綴、預設 `?open=` origin）；消滅硬編碼 `https://samkuo.me/playgrounds` 作為唯一權威。
   - 場網 SW scope 可為 `/` 且**只**服務遊樂場；部落格 `public/sw.js` 日後可卸下 canvas／遊樂場離線職責（過渡期可雙軌）。
   - 開源 repo 不含部落格文章、`CONTENT-PLAN`、站台品牌主殼；工程 `AGENTS.md`／DEC 精簡版可進 OSS。
   - 同步 [GLOSSARY.md](./GLOSSARY.md)、[AGENTS.md](./AGENTS.md)；舊 DEC-016 路徑敘事加「權威改場網見 DEC-041／042」。
-  - 舊場下線時點另立修訂；在此之前不得默默刪除 `samkuo.me/playgrounds/`。
+  - 舊場**下線**（刪路由／拆碼）時點另立修訂；在此之前不得默默刪除 `samkuo.me/playgrounds/`。凍結≠下線。
 - **Revision（2026-08-05）：** 部署標的與 wildcard 場網改由 DEC-042 定義；預設展示場改 `play.samkuo.me`。
+- **Revision（2026-08-05）：** 舊場凍結——遷移提示已上後，`/playgrounds/` **不再**與場網同步功能更新；權威碼在 `sampot/playgrounds`。
 
 ### DEC-042: Playgrounds Workers 與 `*.samkuo.me` 場網
 
@@ -776,7 +778,7 @@
   2. **場網：** DNS／route **`*.samkuo.me`** → 同一 Worker；任意一級子域（通過命名規則者）提供**同一** `dist`。Worker **不**為每個 name 建後端實例；訪即用。
   3. **預設場：** 文件、部落格深鏈、遷移提醒的預設 host＝**`https://play.samkuo.me`**（根路徑 `/`；畫布 `/canvas/<sandboxId>/…`）。
   4. **獨立場：** `https://<name>.samkuo.me/`＝獨立 origin＝獨立本機狀態。`<name>` 只是 origin 標籤，不是雲端專案 ID。
-  5. **命名：** `<name>`＝DNS 標籤形（建議 `[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?`）。**保留名**（Worker 可 404／302，勿當一般實驗場）：至少含 apex 語意與站台既有用途——例如 `www`、`blog`、`api`、與 NT²／站務相關子域；**`play` 為官方預設場名**（文件標定；是否禁止他人「搶用」由實作保留表決定，預設保留）。
+  5. **命名：** `<name>`＝DNS 標籤形（建議 `[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?`）。**保留名**（Worker 可 404／302，勿當一般實驗場）：至少 `www`、`blog`、`api`、`docs`、`old-blog`、與 NT²／站務相關子域；**`play` 為官方預設場名**（文件標定；是否禁止他人「搶用」由實作保留表決定，預設保留）。實作表見 `PLAYGROUNDS_FIELD_RESERVED_SUBDOMAINS`。
   6. **分享連結：** 場內「複製開啟連結」預設用 **`location.origin`**（在哪個場複製就分享哪個場）；文件範例用 `https://play.samkuo.me/?open=…`。
   7. **SecretStore／WebAuthn：** 預設 **每 origin（每 name）獨立**；不為跨 name 共用而把 RP ID 設成父域（除非日後另立決策）。
   8. **階段**併入 [PG-STANDALONE-PLAN.md](./PG-STANDALONE-PLAN.md) Phase 4（Workers／wildcard／`play`）。

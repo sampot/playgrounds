@@ -17,6 +17,8 @@ export const PLAYGROUNDS_FIELD_RESERVED_SUBDOMAINS = [
   "www",
   "blog",
   "api",
+  "docs",
+  "old-blog",
 ] as const;
 
 /** Canonical home URL (trailing slash). */

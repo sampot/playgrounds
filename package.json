@@ -10,6 +10,8 @@
     "check": "astro check",
     "build": "npm run check && astro build",
     "preview": "astro preview",
+    "deploy": "npm run build && wrangler deploy",
+    "deploy:dry": "npm run build && wrangler deploy --dry-run",
     "test": "vitest run",
     "test:watch": "vitest",
     "sam-host": "node --experimental-strip-types --experimental-transform-types src/sam-host/node/cli.ts"
@@ -38,7 +40,8 @@
     "@astrojs/svelte": "^9.0.1",
     "@types/sql.js": "^1.4.11",
     "svelte": "^5.56.8",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.10",
+    "wrangler": "^4.118.0"
   },
   "engines": {
     "node": ">=24"

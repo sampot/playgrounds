@@ -49,6 +49,8 @@ describe("detectPlaygroundsBasePath", () => {
     expect(isPlaygroundsFieldHost("www.samkuo.me")).toBe(false);
     expect(isPlaygroundsFieldHost("blog.samkuo.me")).toBe(false);
     expect(isPlaygroundsFieldHost("api.samkuo.me")).toBe(false);
+    expect(isPlaygroundsFieldHost("docs.samkuo.me")).toBe(false);
+    expect(isPlaygroundsFieldHost("old-blog.samkuo.me")).toBe(false);
     expect(isPlaygroundsFieldHost("play.samkuo.me")).toBe(true);
   });
 });
@@ -106,7 +108,9 @@ describe("canonical open URL", () => {
     );
     expect(
       buildCanonicalOpenUrl("acme/demo", { as: "agent", fresh: true })
-    ).toBe(`${PLAYGROUNDS_CANONICAL_ORIGIN}/?open=acme%2Fdemo&as=agent&fresh=1`);
+    ).toBe(
+      `${PLAYGROUNDS_CANONICAL_ORIGIN}/?open=acme%2Fdemo&as=agent&fresh=1`
+    );
   });
 });
 

@@ -19,13 +19,33 @@ const {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex, follow" />
     <meta name="description" content={description} />
+    <meta name="theme-color" content="#f8faf9" />
     <title>{title}</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <!-- Same contract as blog Layout: localStorage theme / font-size → html data-* -->
+    <script is:inline src="/toggle-theme.js?v=4"></script>
+    <script is:inline src="/toggle-font-size.js?v=3"></script>
   </head>
   <body>
     <div class="playgrounds-page">
-      <header class="border-skin-line text-skin-base/70 flex shrink-0 items-center justify-between gap-3 border-b px-3 py-1.5 text-xs">
-        <span>遊樂場 · Playgrounds</span>
+      <header
+        class="playgrounds-host-header border-skin-line text-skin-base/70 flex shrink-0 items-center justify-between gap-3 border-b px-3 py-1.5 text-xs"
+      >
+        <a
+          class="playgrounds-host-brand text-skin-base/80 flex min-w-0 items-center gap-2 no-underline"
+          href="/"
+          aria-label="遊樂場首頁"
+        >
+          <img
+            class="playgrounds-host-logo"
+            src="/favicon.svg"
+            alt=""
+            width="20"
+            height="20"
+            decoding="async"
+          />
+          <span>遊樂場 · Playgrounds</span>
+        </a>
         <a
           class="text-skin-accent underline decoration-dashed underline-offset-2"
           href="https://samkuo.me/"

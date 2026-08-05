@@ -48,6 +48,12 @@
     --color-card-muted: 20 83 75;
     --color-border: 45 74 68;
   }
+  html[data-font-size="lg"] {
+    font-size: 112.5%;
+  }
+  html[data-font-size="xl"] {
+    font-size: 125%;
+  }
   html,
   body {
     height: 100%;
@@ -69,11 +75,22 @@
   min-height: 0;
   overflow: hidden;
 }
-.playgrounds-page > .site-header {
+.playgrounds-page > .site-header,
+.playgrounds-page > .playgrounds-host-header {
   flex-shrink: 0;
 }
-.playgrounds-page.sandbox-maximized > .site-header {
+/* Blog: `.site-header`; standalone host: `.playgrounds-host-header` (not site-header so toolbar appearance stays always-on). */
+.playgrounds-page.preview-maximized > .site-header,
+.playgrounds-page.preview-maximized > .playgrounds-host-header,
+.playgrounds-page.sandbox-maximized > .site-header,
+.playgrounds-page.sandbox-maximized > .playgrounds-host-header {
   display: none;
+}
+.playgrounds-host-logo {
+  display: block;
+  width: 1.25rem;
+  height: 1.25rem;
+  flex-shrink: 0;
 }
 .playgrounds-page .playgrounds-main {
   position: relative;
@@ -162,6 +179,71 @@
 }
 .playgrounds-toolbar-menu {
   flex-shrink: 0;
+}
+.playgrounds-toolbar-trailing {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  flex-shrink: 0;
+}
+/* Appearance: always on standalone (no site header); on blog only when header hidden. */
+.playgrounds-toolbar-appearance {
+  display: none;
+  align-items: center;
+  gap: 0.15rem;
+  flex-shrink: 0;
+}
+.playgrounds-page:not(:has(> .site-header)) .playgrounds-toolbar-appearance,
+.playgrounds-page.sandbox-maximized .playgrounds-toolbar-appearance,
+.playgrounds-page.preview-maximized .playgrounds-toolbar-appearance {
+  display: inline-flex;
+}
+.playgrounds-font-size-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+}
+.playgrounds-appearance-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 0;
+  border-radius: 0.25rem;
+  background: transparent;
+  color: rgb(var(--color-text-base));
+  cursor: pointer;
+}
+.playgrounds-appearance-btn:hover:not(:disabled) {
+  color: rgb(var(--color-accent));
+}
+.playgrounds-appearance-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+.playgrounds-appearance-btn svg {
+  width: 1rem;
+  height: 1rem;
+}
+/* Unlayered + beat `.playgrounds-root svg { display: inline-block }` */
+.playgrounds-root svg.theme-icon-sun,
+html[data-theme="dark"] .playgrounds-root svg.theme-icon-moon {
+  display: none;
+}
+.playgrounds-root svg.theme-icon-moon,
+html[data-theme="dark"] .playgrounds-root svg.theme-icon-sun {
+  display: inline-block;
+}
+.playgrounds-font-label {
+  font-weight: 600;
+  line-height: 1;
+}
+.playgrounds-font-label-sm {
+  font-size: 11px;
+}
+.playgrounds-font-label-lg {
+  font-size: 15px;
 }
 .playgrounds-sidebar--agent-linked {
   box-shadow: inset 2px 0 0 0 rgb(var(--color-accent));
@@ -455,6 +537,19 @@ html[data-theme="dark"] .playgrounds-dialog-icon--danger {
 .playgrounds-workspace.preview-collapsed .playgrounds-preview-pane {
   display: none;
 }
+/* Maximized templates must beat files-collapsed / preview-collapsed
+   (those use higher specificity). Otherwise the sole visible pane lands
+   in a collapsed track and looks stuck on the left. */
+.playgrounds-workspace:is(.preview-maximized, .editor-maximized),
+.playgrounds-workspace.files-collapsed:is(.preview-maximized, .editor-maximized),
+.playgrounds-workspace.preview-collapsed:is(.preview-maximized, .editor-maximized),
+.playgrounds-workspace.files-collapsed.preview-collapsed:is(
+  .preview-maximized,
+  .editor-maximized
+) {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+}
 .playgrounds-workspace.preview-maximized > :not(.playgrounds-preview-pane) {
   display: none;
 }
@@ -575,6 +670,16 @@ html[data-theme="dark"] .playgrounds-dialog-icon--danger {
   }
   .playgrounds-workspace.files-collapsed.preview-collapsed {
     grid-template-columns: 2.5rem 0.25rem minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+  }
+  .playgrounds-workspace:is(.preview-maximized, .editor-maximized),
+  .playgrounds-workspace.files-collapsed:is(.preview-maximized, .editor-maximized),
+  .playgrounds-workspace.preview-collapsed:is(.preview-maximized, .editor-maximized),
+  .playgrounds-workspace.files-collapsed.preview-collapsed:is(
+    .preview-maximized,
+    .editor-maximized
+  ) {
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr);
   }
   .playgrounds-workspace.preview-maximized > :not(.playgrounds-preview-pane) {

@@ -1,6 +1,6 @@
 # Playgrounds 場網、Workers 與開源抽取計劃（DEC-041／042）
 
-> **狀態：** Phase 0–3／6 完成；Phase 4＝Workers＋`*.samkuo.me`＋`play`（契約已定，部署／碼對齊待做）；Phase 5 部分  
+> **狀態：** Phase 0–3／6／**7a（舊場凍結）** 完成；Phase 4＝`play` 已上線（wildcard Route 待 token）；Phase 5 部分；Phase 7b 下線另令  
 > **權威決策：** [DECISIONS.md](./DECISIONS.md) DEC-041（抽取／舊場）、**DEC-042**（Workers／wildcard／`play`）  
 > **相關：** DEC-004（對外敘事）、DEC-009／016（SW／路徑）、DEC-025（`?open=`）、DEC-024（`sam-runtime`）、DEC-040（整場重置／origin 資料）
 
@@ -34,12 +34,12 @@
 | 預設場畫布 | `https://play.samkuo.me/canvas/<sandboxId>/…` |
 | 預設一鍵開啟 | `https://play.samkuo.me/?open=<…>`（參數同 DEC-025） |
 | 任意獨立場 | `https://<name>.samkuo.me/`（同一 `dist`） |
-| 過渡舊場 | `https://samkuo.me/playgrounds/`（暫留；提醒遷移） |
+| 過渡舊場（**凍結**） | `https://samkuo.me/playgrounds/`（暫留、提醒遷移；**不再**跟場網同步更新） |
 | 舊畫布 | `https://samkuo.me/playgrounds/canvas/<sandboxId>/…` |
 
 開源 repo：**[`sampot/playgrounds`](https://github.com/sampot/playgrounds)**。
 
-**保留名（勿當一般實驗場；Worker 可拒）：** 至少 `www`、`blog`、`api`、站務／NT² 既有子域；**`play`＝官方預設場**（保留表列入）。
+**保留名（勿當一般實驗場；Worker 可拒）：** 至少 `www`、`blog`、`api`、`docs`、`old-blog`、站務／NT² 既有子域；**`play`＝官方預設場**（實作表：`PLAYGROUNDS_FIELD_RESERVED_SUBDOMAINS`）。
 
 ---
 
@@ -61,10 +61,11 @@
 | **1. 配置化** | `playgroundsPaths`／`playgroundsUrls`；雙 canvas 前綴；SW 雙前綴；canonical／場判定＝`play`＋`*.samkuo.me` | blog／standalone 可建 | **已完成** |
 | **2. 舊場遷移 UX** | 舊場橫幅＋連 `play.samkuo.me` | `/playgrounds/` 可見提醒 | **已完成** |
 | **3. 抽 repo** | [`sampot/playgrounds`](https://github.com/sampot/playgrounds) public | clone／test／build 綠 | **已完成** |
-| **4. Workers＋wildcard** | `wrangler`／Static Assets；DNS `*.samkuo.me`；standalone 判定＝`*.samkuo.me`；canonical＝`play.samkuo.me`；分享＝`location.origin`；保留名表 | `play` 與任一實驗 name 可開獨立空場；同程式 | **未開始** |
+| **4. Workers＋wildcard** | `wrangler`／Static Assets；DNS `*.samkuo.me`；standalone 判定＝`*.samkuo.me`；canonical＝`play.samkuo.me`；分享＝`location.origin`；保留名表 | `play` 與任一實驗 name 可開獨立空場；同程式 | **部分**（`play` 已部署；wildcard Worker Route 待 token） |
 | **5. 部落格接線** | 導覽／`/sam/`／tools／文件範例 → `play`（部署後）；舊場續留 | 點進預設場；舊場仍可用 | **部分** |
 | **6. 開源 hygiene** | LICENSE／README／AGENTS；public repo | 可 clone | **已完成** |
-| **7. 舊場凍結／下線（另令）** | 作者明示後 | 不自動執行 | 未開始 |
+| **7a. 舊場凍結** | 遷移橫幅已上；**停止**把場網功能同步進 `myblog` `/playgrounds/`；權威＝`sampot/playgrounds` | Agents／開發不再對齊舊場；舊場可落後 | **已完成**（作者 2026-08-05） |
+| **7b. 舊場下線** | 刪路由／拆碼（另令） | 不自動執行 | 未開始 |
 
 ---
 
@@ -72,9 +73,11 @@
 
 - **Host 判定：** `hostname` 為 `*.samkuo.me` 且非 apex／非保留 → standalone（base `""`、canvas `/canvas/`）。
 - **Canonical：** 文件與預設分享範例＝`https://play.samkuo.me`；場內 copy link＝`location.origin`。
-- **Worker：** 同一 ASSETS；保留名 early return；其餘 SPA fallback → `index.html`；`/canvas/*` 仍交瀏覽器＋各 origin SW。
-- **CI：** `npm run build` → `wrangler deploy`（取代 Pages action）。
+- **Worker：** [`sampot/playgrounds`](https://github.com/sampot/playgrounds) — `wrangler.jsonc`＋`src/worker.ts`（ASSETS SPA；保留名 302→`samkuo.me`）；Custom Domain＝`play.samkuo.me`；`workers.dev`＝`playgrounds.eavatar.workers.dev`。
+- **DNS：** 已刪舊停車 `*.samkuo.me` A→208.91…；現為 proxied `*` A／AAAA（場網預備）。**Worker Route** `*.samkuo.me/*` 需 zone token 含 `#workers_routes:edit`（現行 token 僅能裝 Custom Domain）。
+- **CI：** `npm run build` → `wrangler deploy`（OSS workflow 已改 wrangler-action）。
 - **WebAuthn：** 每 origin 獨立（DEC-042）。
+- **保留名（實作）：** `www`／`blog`／`api`／`docs`／`old-blog`（後者避免蓋掉舊 GitHub Pages）。
 
 ---
 
@@ -87,12 +90,13 @@
 
 ## 完成檢查（整體）
 
-- [ ] `play.samkuo.me/` 為日常預設場
-- [ ] 至少一個非保留 `<name>.samkuo.me` 為獨立空場（同程式）
+- [x] `play.samkuo.me/` 為日常預設場（Workers Custom Domain 已上）
+- [ ] 至少一個非保留 `<name>.samkuo.me` 為獨立空場（同程式；待 wildcard Route）
 - [ ] `?open=` 文件與部落格深鏈指向 `play`（或現行場 origin）
-- [ ] 舊 `/playgrounds/` 仍可開且有遷移提醒（直至 Phase 7）
-- [ ] Workers 部署＋wildcard DNS 運作
-- [ ] GLOSSARY／導覽與 DEC-041／042 一致
+- [x] 舊 `/playgrounds/` 仍可開且有遷移提醒（凍結；下線＝Phase 7b）
+- [x] 舊場**不再**與場網同步功能更新（Phase 7a）
+- [x] Workers 部署＋wildcard DNS（Route 待 token）
+- [x] GLOSSARY／導覽與 DEC-041／042 一致
 
 ---
 
@@ -103,3 +107,5 @@
 | 2026-08-05 | 初版：根路徑 `/`、舊場暫留、單一 repo |
 | 2026-08-05 | Phase 1–3／5：配置、橫幅、抽 repo 公開 |
 | 2026-08-05 | **DEC-042：** 部署改 Workers；場網 `*.samkuo.me`；預設場 `play.samkuo.me`（取代 `playgrounds.samkuo.me`／Pages） |
+| 2026-08-05 | Phase 4：`play.samkuo.me` Workers Static Assets 上線；刪停車 wildcard；proxied `*` DNS；Route 待 token |
+| 2026-08-05 | **Phase 7a：** 舊場凍結——`/playgrounds/` 不再跟場網同步更新 |

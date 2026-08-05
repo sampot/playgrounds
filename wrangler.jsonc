@@ -1,0 +1,26 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "playgrounds",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-08-05",
+  "workers_dev": true,
+  "preview_urls": true,
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    // Hostname reserved check must run before asset SPA fallback.
+    "run_worker_first": true
+  },
+  // play = Custom Domain (works with current API token).
+  // Field-net `*.samkuo.me/*` Worker Route needs zone permission
+  // `#workers_routes:edit` (or All Zones); DNS `*` already proxied — add route in
+  // dashboard or widen token, then uncomment:
+  // { "pattern": "*.samkuo.me/*", "zone_name": "samkuo.me" }
+  "routes": [
+    {
+      "pattern": "play.samkuo.me",
+      "custom_domain": true
+    }
+  ]
+}
