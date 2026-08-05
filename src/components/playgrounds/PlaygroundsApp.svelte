@@ -532,7 +532,7 @@
   let projectPickerFilterEl = $state<HTMLInputElement | null>(null);
   let actionsMenuOpen = $state(false);
   let actionsMenuWrapEl = $state<HTMLDivElement | null>(null);
-  let bottomPanelOpen = $state(true);
+  let bottomPanelOpen = $state(false);
   let bottomPanelMaximized = $state(false);
   /** DEC-044: opt-in dock (Console always; builtins／SAM explicit). */
   let enabledBottomBuiltins = $state<BottomBuiltinId[]>([]);
@@ -6480,7 +6480,7 @@
         <div
           class="border-skin-line flex h-8 shrink-0 items-center gap-0.5 border-b px-1 text-[10px] font-semibold tracking-wider uppercase"
           role="tablist"
-          aria-label="沙盒、總管與化身"
+          aria-label="沙盒、總管與線上"
         >
           <button
             type="button"
@@ -6527,9 +6527,10 @@
               ? 'bg-skin-card text-skin-base'
               : 'text-skin-base/45 hover:text-skin-base/75'}"
             onclick={() => selectSidebarTab("avatars")}
+            title="線上（連線中的人）"
           >
             <PgIcon name="layers" size={12} />
-            化身
+            線上
           </button>
           <button
             type="button"
@@ -6837,11 +6838,11 @@
           <button
             type="button"
             class="text-skin-base/55 hover:text-skin-base/80 px-0.5 text-[10px] font-semibold tracking-wider uppercase"
-            title="展開並顯示化身"
+            title="展開並顯示線上"
             onclick={() => {
               filesSidebarOpen = true;
               selectSidebarTab("avatars");
-            }}>化身</button
+            }}>線上</button
           >
           <span class="text-skin-base/40 text-[10px]">{fileList.length}</span>
         </div>

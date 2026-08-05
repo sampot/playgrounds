@@ -1,5 +1,5 @@
 /**
- * In-memory Avatar presence + projection sandbox links for the 化身 tab (DEC-045).
+ * In-memory Avatar presence + projection sandbox links for the 線上 tab (DEC-045).
  */
 
 import { identiconDataUrl } from "./rosterIdenticon";

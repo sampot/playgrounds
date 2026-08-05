@@ -851,8 +851,8 @@
 - **Context:** 希望不同使用者的場可經網路相遇：連線後本場 **Roster** 出現對方，並為每位連線者建立 **Avatar**（代替該使用者在本場現身的 User agent），以便後續邀請參與 session。須對齊 DEC-031 `homePeer`、DEC-038 WebRTC 路線、DEC-042 無伺服器租戶；場主**不**負擔資料面雲費。若 signaling 變成常駐中繼（trickle／心跳／重談／轉發資料），會變成隱性雲端房間，違背場網哲學。（機制舊稱 **Visit**；2026-08-05 起改名 **Roster**。）
 - **Decision:**
   1. **Roster：** 跟**當前這場**連上的使用者**名冊**＋建立瀏覽器 peer（WebRTC）的連線機制。開別人的場子域 ≠ Roster（那只是另一 origin 空場）。
-  2. **Avatar／化身：** 每位連線使用者在**本場自動建立**的 **User agent 投影**——薄 SAM／proxy；可 agent 模式執行；有 UI。化身 tab 卡片＝該投影 SAM 的呈現面。權威與執行仍在對方 **`homePeer`**；本場經 **Roster DataChannel** 轉訊息／（後段）事件與 `act`。**不**把對方沙盒權威搬進本機 OPFS；**不是**對方本機 clone。斷線 → 撕掉本場投影。Phase 1–2 可以 presence stub（identicon／名／連線態）占位；目標＝spawn 真投影 SAM。
-  3. **場主 UX：** 左側側欄 **化身** tab（UI label＝`化身`；layout 鍵仍為 `avatars`），與 **Files／總管** 並列（三 tab）。內容＝目前 Roster 上的 Avatar（非總管 iframe、非檔案樹）。無連線時為空態。連線流程僅分 **發起**（建邀請、等回覆）與 **加入**（貼邀請、建回覆）——對應 WebRTC initiator／responder；**不**用場主／訪客產品角色。UI 用語＝邀請／回覆／QR／同一區網；**不**暴露 offer／answer／SDP 等術語。兩區塊預設收起。
+  2. **Avatar／化身：** 每位連線使用者在**本場自動建立**的 **User agent 投影**——薄 SAM／proxy；可 agent 模式執行；有 UI。**線上** tab 卡片＝該投影 SAM 的呈現面。權威與執行仍在對方 **`homePeer`**；本場經 **Roster DataChannel** 轉訊息／（後段）事件與 `act`。**不**把對方沙盒權威搬進本機 OPFS；**不是**對方本機 clone。斷線 → 撕掉本場投影。Phase 1–2 可以 presence stub（identicon／名／連線態）占位；目標＝spawn 真投影 SAM。
+  3. **場主 UX：** 左側側欄 **線上** tab（UI label＝`線上`；layout 鍵仍為 `avatars`），與 **Files／總管** 並列（三 tab）。內容＝目前 Roster 上的 Avatar／化身投影（非總管 iframe、非檔案樹）。無連線時為空態。連線流程僅分 **發起**（建邀請、等回覆）與 **加入**（貼邀請、建回覆）——對應 WebRTC initiator／responder；**不**用場主／訪客產品角色。UI 用語＝邀請／回覆／QR／同一區網；**不**暴露 offer／answer／SDP 等術語。兩區塊預設收起。
   4. **頭像：** 每個 Avatar **預設 identicon**（本機依穩定 id 如 `agentId`／peer 公鑰衍生繪製；**不**預設拉外站圖）。日後可選自訂圖，不擋 MVP。
   5. **Signaling（硬約束）：** 伺服器（或 OOB 貼上）**只**用來完成**一次** WebRTC **offer／answer**。每邀請房恰好 **1× offer**＋**1× answer**；採 **非 trickle**（ICE 收進後再發布；**無** candidate 訊息）。answer 取走、連線成功／失敗或 TTL → **銷房**；拒再寫。需重連 → **新邀請**。**禁止**經 signaling：DataChannel 流量、presence 心跳、session／mailbox／FS、Avatar 投影流量、renegotiation、第二輪 offer／answer。
   6. **壓縮載荷（硬約束）：** 交換的不是完整原始 SDP 字串。雙方依**固定樣板**重建 SDP：先剪裁／抽取必要欄位（如 fingerprint、ICE ufrag／pwd、精簡 candidates），再編碼進樣板 payload。**交換方式＝QR 或文字**（複製／貼上）二選一，**同等一等**；同一壓縮字串可顯示為 QR 或純文字。載荷須小到**單張 QR 仍易掃**（過大則失敗提示，勿默認多碼拼圖）。薄 rendezvous 若存在，亦用同一格式。
@@ -874,6 +874,7 @@
   - 同步 [GLOSSARY.md](./GLOSSARY.md)、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)；遠端座位落地時修訂 DEC-023。
 - **Revision（2026-08-05）：** 場主 UX＝左側 **Avatars** tab（並列 Files／總管）；頭像預設 identicon。
 - **Revision（2026-08-05）：** 側欄 UI label 改為「**化身**」（鍵名仍 `avatars`）。
+- **Revision（2026-08-05）：** 側欄 UI label 改為「**線上**」（鍵名仍 `avatars`；「化身」保留為 Avatar 投影概念用語）。
 - **Revision（2026-08-05）：** offer／answer 經剪裁＋樣板編碼，確保 QR 可掃。
 - **Revision（2026-08-05）：** 交換方式＝**QR 或文字**（同等）。
 - **Revision（2026-08-05）：** 可選同區網模式，進一步剪裁 offer／answer。

@@ -85,7 +85,7 @@
   let avatars = $state<RosterAvatarStub[]>([]);
   let localName = $state("我");
   let peerAgentId = $state<string | null>(null);
-  /** Collapsed by default: start = initiator, join = responder. */
+  /** Exchange panels: shown only after CTA (or deep-link); hidden when connected. */
   let startOpen = $state(false);
   let joinOpen = $state(false);
 
@@ -137,6 +137,26 @@
     canInvite = rosterCanInviteToSession();
   }
 
+  function openStartPanel(): void {
+    if (cameraScanning === "invite") stopLiveCameraScan();
+    joinOpen = false;
+    startOpen = true;
+    error = null;
+  }
+
+  function openJoinPanel(): void {
+    if (cameraScanning === "reply") stopLiveCameraScan();
+    startOpen = false;
+    joinOpen = true;
+    error = null;
+  }
+
+  function closeExchangePanels(): void {
+    stopLiveCameraScan();
+    startOpen = false;
+    joinOpen = false;
+  }
+
   onMount(() => {
     avatars = listRosterAvatars();
     unsub = subscribeRosterAvatars(() => {
@@ -172,15 +192,13 @@
       pendingLinkOffer = parsed.wire;
       pasteInvite = parsed.wire;
       lan = parsed.lan;
-      joinOpen = true;
-      startOpen = false;
+      openJoinPanel();
       status = "收到邀請連結 — 確認後即可加入";
     } else {
       // Answer links are for pasting back to the initiator, not auto-navigate.
       pasteReply = parsed.wire;
-      startOpen = true;
-      joinOpen = false;
-      status = "已從連結讀取回覆 — 請在「發起連線」確認回覆";
+      openStartPanel();
+      status = "已從連結讀取回覆 — 請確認回覆";
     }
   }
 
@@ -347,8 +365,7 @@
     });
     status = `已與「${data.name}」連上`;
     resetExchangeUi();
-    startOpen = false;
-    joinOpen = false;
+    closeExchangePanels();
     error = null;
     refreshCanInvite();
 
@@ -742,7 +759,7 @@
   async function confirmPendingLinkOffer(): Promise<void> {
     if (!pendingLinkOffer) return;
     pasteInvite = pendingLinkOffer;
-    joinOpen = true;
+    openJoinPanel();
     await handleJoinWithInvite();
   }
 
@@ -870,30 +887,10 @@
 
     <section class="space-y-2">
       <h3 class="text-skin-base m-0 text-[11px] font-semibold tracking-wide">
-        已連線的化身
+        已連線
       </h3>
       {#if avatars.length === 0}
         <p class="text-skin-base/45 m-0 text-[11px]">還沒有連上任何人</p>
-        <div class="flex flex-wrap gap-1">
-          <button
-            type="button"
-            class={btn}
-            disabled={busy}
-            onclick={() => {
-              startOpen = true;
-              joinOpen = false;
-            }}>發起連線</button
-          >
-          <button
-            type="button"
-            class={btn}
-            disabled={busy}
-            onclick={() => {
-              joinOpen = true;
-              startOpen = false;
-            }}>加入連線</button
-          >
-        </div>
       {:else}
         <ul class="m-0 list-none space-y-2 p-0">
           {#each avatars as a (a.agentId)}
@@ -931,6 +928,27 @@
             </li>
           {/each}
         </ul>
+      {/if}
+      <div class="flex flex-wrap gap-1">
+        <button
+          type="button"
+          class={btn}
+          disabled={busy}
+          onclick={openStartPanel}
+          >{avatars.length ? "再發起連線" : "發起連線"}</button
+        >
+        <button
+          type="button"
+          class={btn}
+          disabled={busy}
+          onclick={openJoinPanel}
+          >{avatars.length ? "再加入連線" : "加入連線"}</button
+        >
+      </div>
+      {#if avatars.length > 0}
+        <p class="text-skin-base/40 m-0 text-[10px]">
+          再發起／加入會結束目前連線並換成新的對方
+        </p>
       {/if}
     </section>
 
@@ -1020,18 +1038,14 @@
       <p class="text-red-600/90 m-0 text-[11px]">{error}</p>
     {/if}
 
-    <details class="border-skin-line rounded border" bind:open={startOpen}>
-      <summary
-        class="text-skin-base/80 hover:bg-skin-card cursor-pointer list-none px-2 py-1.5 text-[11px] font-semibold tracking-wide select-none [&::-webkit-details-marker]:hidden"
-      >
-        <span class="inline-flex items-center gap-1">
-          <span class="text-skin-base/40 w-3 tabular-nums" aria-hidden="true"
-            >{startOpen ? "▾" : "▸"}</span
+    {#if startOpen}
+      <section class="border-skin-line space-y-2 rounded border p-2">
+        <div class="flex items-center justify-between gap-2">
+          <h3 class="text-skin-base m-0 text-[11px] font-semibold">發起連線</h3>
+          <button type="button" class={btn} onclick={closeExchangePanels}
+            >隱藏</button
           >
-          發起連線
-        </span>
-      </summary>
-      <div class="border-skin-line space-y-2 border-t p-2">
+        </div>
         <p class="text-skin-base/50 m-0 text-[11px]">
           建立邀請交給對方，再貼上對方的回覆即可連上。
         </p>
@@ -1126,21 +1140,17 @@
             aria-label="相機預覽"
           ></video>
         {/if}
-      </div>
-    </details>
+      </section>
+    {/if}
 
-    <details class="border-skin-line rounded border" bind:open={joinOpen}>
-      <summary
-        class="text-skin-base/80 hover:bg-skin-card cursor-pointer list-none px-2 py-1.5 text-[11px] font-semibold tracking-wide select-none [&::-webkit-details-marker]:hidden"
-      >
-        <span class="inline-flex items-center gap-1">
-          <span class="text-skin-base/40 w-3 tabular-nums" aria-hidden="true"
-            >{joinOpen ? "▾" : "▸"}</span
+    {#if joinOpen}
+      <section class="border-skin-line space-y-2 rounded border p-2">
+        <div class="flex items-center justify-between gap-2">
+          <h3 class="text-skin-base m-0 text-[11px] font-semibold">加入連線</h3>
+          <button type="button" class={btn} onclick={closeExchangePanels}
+            >隱藏</button
           >
-          加入連線
-        </span>
-      </summary>
-      <div class="border-skin-line space-y-2 border-t p-2">
+        </div>
         <p class="text-skin-base/50 m-0 text-[11px]">
           貼上對方的邀請（或邀請連結），建立回覆後再傳回去。
         </p>
@@ -1229,7 +1239,7 @@
             aria-label="回覆文字"
           ></textarea>
         {/if}
-      </div>
-    </details>
+      </section>
+    {/if}
   </div>
 </div>

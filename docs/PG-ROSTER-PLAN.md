@@ -13,7 +13,7 @@
 | 概念 | 意思 |
 | --- | --- |
 | **Roster** | 跟**當前這場**連上的使用者列表（連線名冊）＋ peer／DataChannel 管線。舊稱 Visit。 |
-| **Avatar／化身** | 每位連線使用者在**本場**自動建立的 **User agent 投影**：薄 SAM／proxy；可 agent 模式執行；有 UI。化身 tab 卡片＝該投影 SAM 的呈現面（不是場殼手畫的終態列表項）。 |
+| **Avatar／化身** | 每位連線使用者在**本場**自動建立的 **User agent 投影**：薄 SAM／proxy；可 agent 模式執行；有 UI。**線上** tab 卡片＝該投影 SAM 的呈現面（不是場殼手畫的終態列表項）。 |
 | **homePeer 真身** | 對方場裡的實際 agent／執行與沙盒權威；mailbox／狀態真相在彼。 |
 | **為什麼叫化身** | Avatar 代替真實使用者，在本場裡當虛擬代理／投影——不是對方本機的 clone。 |
 
@@ -51,7 +51,7 @@
 - 把對方沙盒 **clone** 成本場權威；把 Avatar 當成擁有對方 FS 的本機實體 agent。
 - 為 Avatar **另建**一套 session／protocol 系統（與 DEC-023 分叉）。
 - 完整 WebRTC Runtime 叢集（DEC-038 長線；本計劃先 Roster／Avatar 投影）。
-- 把 Avatar 塞進總管 iframe 或 Files 樹（化身 tab 專屬呈現）。
+- 把 Avatar 塞進總管 iframe 或 Files 樹（線上 tab 專屬呈現）。
 
 ---
 
@@ -59,8 +59,8 @@
 
 | 項 | 決定 |
 | --- | --- |
-| **位置** | 左側側欄 **化身** tab（label＝`化身`；鍵 `avatars`），與 **Files／總管** 並列（三 tab） |
-| **內容** | 預設＝Avatar（投影）列表／卡片；**發起連線**／**加入連線** 平常收起。角色＝initiator／responder（UI 不說場主／訪客；亦不暴露 offer／answer 等術語） |
+| **位置** | 左側側欄 **線上** tab（label＝`線上`；鍵 `avatars`），與 **Files／總管** 並列（三 tab）。內容＝連線中的 Avatar／化身投影列表（概念名仍可稱化身；tab 用語對一般使用者用「線上」） |
+| **內容** | 預設＝已連線列表；**發起／加入** 為 CTA，表單按需展開（連線後仍可再發起／加入；會替換目前 peer）。角色＝initiator／responder（UI 不說場主／訪客；亦不暴露 offer／answer 等術語） |
 | **空態** | 無連線時列表為空 |
 | **頭像** | 每個 Avatar **預設 identicon**（本機由穩定 id 衍生；不預設外站圖） |
 | **自訂圖** | 可後段；不擋 MVP |
@@ -120,6 +120,7 @@ layout 還原：側欄 tab 鍵 `avatars`（與 `files`／`agent` 一併 persist�
 | 2026-08-05 | 可選同區網：offer／answer 進一步剪裁 |
 | 2026-08-05 | Phase 1–2 落地：`visit/*`＋Avatars tab；QR＝`qr` 套件／PNG |
 | 2026-08-05 | 側欄 UI label：Avatars → **化身** |
+| 2026-08-05 | 側欄 UI label：化身 → **線上**（概念仍稱 Avatar／化身；鍵 `avatars`） |
 | 2026-08-05 | 場主開房／訪客連入預設收起 |
 | 2026-08-05 | 連線後雙方互送 presence，化身列表互見 |
 | 2026-08-05 | UX：發起／加入連線；邀請／回覆（不說場主／訪客、offer／answer） |
