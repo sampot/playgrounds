@@ -885,6 +885,7 @@
 - **Revision（2026-08-05）：** Phase 3 第二刀：`session_seat_bound`／`session_act*`／`session_event`；Host 權威 act＋對 `seat.remote` fanout 事件；homePeer tunnel bridge；lazy install 仍開。
 - **Revision（2026-08-05）：** Phase 3 第三刀：接受路徑型錄匹配／lazy install（`pg-llm-agent` 狗糧）；brainstorm 內建後備；Phase 3 Session bridge **完成**（Phase 4 UX 另開）。
 - **Revision（2026-08-05）：** Phase 4.1：`#roster=<wire>` 邀請／回覆連結（與 QR／文字同一壓縮格式）；開啟連結需確認後加入；不經 Worker 房間、不自動入座 session。
+- **Revision（2026-08-05）：** Phase 4.2：化身 tab 相機即時掃 QR（邀請／回覆）；檔案上傳掃碼仍可用。
 
 
 ### DEC-046: Playgrounds 型錄結構化資料與查詢面

@@ -179,3 +179,9 @@ export {
   clearRosterInviteHashFromLocation,
 } from "./rosterInviteUrl";
 export type { RosterInviteFromLocation } from "./rosterInviteUrl";
+
+export {
+  startRosterCameraQrScan,
+  rosterCameraScanSupported,
+} from "./rosterQrCamera";
+export type { RosterCameraScanStop } from "./rosterQrCamera";

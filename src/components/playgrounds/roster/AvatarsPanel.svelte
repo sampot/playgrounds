@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onDestroy, onMount } from "svelte";
+  import { onDestroy, onMount, tick } from "svelte";
   import {
     ensureCanvasServiceWorker,
     syncCanvasSnapshot,
@@ -52,11 +52,14 @@
     extractRosterWireFromText,
     parseRosterInviteFromLocation,
     clearRosterInviteHashFromLocation,
+    startRosterCameraQrScan,
+    rosterCameraScanSupported,
     type RosterAvatarRelayMsg,
     type RosterAvatarStub,
     type RosterPeerHandlers,
     type RosterPeerSession,
     type SessionInvitePayload,
+    type RosterCameraScanStop,
   } from "./index";
   import { registerSessionBridge } from "../sessionBridge";
 
@@ -93,6 +96,10 @@
   let inviteBusy = $state(false);
   /** Offer wire arrived via `#roster=` — confirm before joining. */
   let pendingLinkOffer = $state<string | null>(null);
+  let cameraSupported = $state(false);
+  let cameraScanning = $state<"invite" | "reply" | null>(null);
+  let scanVideoEl = $state<HTMLVideoElement | null>(null);
+  let stopCameraScan: RosterCameraScanStop | null = null;
   /** inviteId → homePeer participant sandbox (accept path). */
   const homeSandboxByInvite = new Map<string, string>();
   /** sessionId → BroadcastChannel name for relayed events. */
@@ -150,6 +157,7 @@
       /* ignore */
     }
     window.addEventListener("message", onWindowMessage);
+    cameraSupported = rosterCameraScanSupported();
     consumeRosterInviteHash();
   });
 
@@ -177,6 +185,7 @@
   }
 
   onDestroy(() => {
+    stopLiveCameraScan();
     unsub?.();
     unsubHub?.();
     unregTransport?.();
@@ -802,6 +811,48 @@
       busy = false;
     }
   }
+
+  function stopLiveCameraScan(): void {
+    stopCameraScan?.();
+    stopCameraScan = null;
+    cameraScanning = null;
+  }
+
+  async function startLiveCameraScan(which: "invite" | "reply"): Promise<void> {
+    if (!cameraSupported || busy) return;
+    error = null;
+    stopLiveCameraScan();
+    cameraScanning = which;
+    await tick();
+    const video = scanVideoEl;
+    if (!video) {
+      cameraScanning = null;
+      error = "無法顯示相機預覽";
+      return;
+    }
+    try {
+      stopCameraScan = await startRosterCameraQrScan({
+        video,
+        onCode: text => {
+          const wire = extractRosterWireFromText(text) || text.trim();
+          if (which === "invite") {
+            pasteInvite = wire;
+            status = "已用相機讀取邀請 QR";
+          } else {
+            pasteReply = wire;
+            status = "已用相機讀取回覆 QR";
+          }
+          stopLiveCameraScan();
+        },
+        onError: err => {
+          error = friendlyError(err.message);
+        },
+      });
+    } catch (e) {
+      stopLiveCameraScan();
+      error = friendlyError(e instanceof Error ? e.message : String(e));
+    }
+  }
 </script>
 
 <div class="flex min-h-0 flex-1 flex-col overflow-auto p-2 text-[12px]">
@@ -1041,7 +1092,7 @@
           ></textarea>
         </label>
         <label class={btn}>
-          掃描回覆 QR
+          從檔案讀取回覆 QR
           <input
             type="file"
             accept="image/png,image/jpeg,image/*"
@@ -1050,6 +1101,31 @@
             onchange={e => void onScanFile(e, "reply")}
           />
         </label>
+        {#if cameraSupported}
+          {#if cameraScanning === "reply"}
+            <button
+              type="button"
+              class={btn}
+              onclick={stopLiveCameraScan}>停止相機</button
+            >
+          {:else}
+            <button
+              type="button"
+              class={btn}
+              disabled={busy}
+              onclick={() => void startLiveCameraScan("reply")}>相機掃回覆</button
+            >
+          {/if}
+        {/if}
+        {#if cameraScanning === "reply"}
+          <video
+            bind:this={scanVideoEl}
+            class="border-skin-line bg-black mx-auto block max-h-48 w-full rounded border object-cover"
+            playsinline
+            muted
+            aria-label="相機預覽"
+          ></video>
+        {/if}
       </div>
     </details>
 
@@ -1083,7 +1159,7 @@
         </label>
         <div class="flex flex-wrap gap-1">
           <label class={btn}>
-            掃描邀請 QR
+            從檔案讀取邀請 QR
             <input
               type="file"
               accept="image/png,image/jpeg,image/*"
@@ -1092,6 +1168,22 @@
               onchange={e => void onScanFile(e, "invite")}
             />
           </label>
+          {#if cameraSupported}
+            {#if cameraScanning === "invite"}
+              <button
+                type="button"
+                class={btn}
+                onclick={stopLiveCameraScan}>停止相機</button
+              >
+            {:else}
+              <button
+                type="button"
+                class={btn}
+                disabled={busy}
+                onclick={() => void startLiveCameraScan("invite")}>相機掃邀請</button
+              >
+            {/if}
+          {/if}
           <button
             type="button"
             class={btn}
@@ -1111,6 +1203,15 @@
             onclick={() => void copyReplyLink()}>複製回覆連結</button
           >
         </div>
+        {#if cameraScanning === "invite"}
+          <video
+            bind:this={scanVideoEl}
+            class="border-skin-line bg-black mx-auto block max-h-48 w-full rounded border object-cover"
+            playsinline
+            muted
+            aria-label="相機預覽"
+          ></video>
+        {/if}
         {#if replyQrUrl}
           <img
             src={replyQrUrl}

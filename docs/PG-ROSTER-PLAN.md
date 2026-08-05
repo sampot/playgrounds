@@ -1,6 +1,6 @@
 # Playgrounds 跨場 Roster／Avatar 計劃（DEC-045）
 
-> **狀態：** Phase 0–3 **已落地**；Phase 4.1 **已落地**（`#roster=` 邀請連結；薄 CF room／TURN 未做）  
+> **狀態：** Phase 0–3 **已落地**；Phase 4.1–4.2 **已落地**（邀請連結＋相機掃 QR；薄 CF room／TURN 未做）  
 > **權威決策：** [DECISIONS.md](./DECISIONS.md) **DEC-045**  
 > **相關：** DEC-017（側欄 Files／總管）、DEC-023（本地 session；邀請＋protocol 規格＋型錄 lazy install）、DEC-031（peer／homePeer／virtual actor）、DEC-038（WebRTC 通道路線）、DEC-042（場網／無租戶）、DEC-046（型錄查詢）、[GLOSSARY.md](./GLOSSARY.md)
 
@@ -104,7 +104,7 @@ layout 還原：側欄 tab 鍵 `avatars`（與 `files`／`agent` 一併 persist�
 | **2. Presence stub＋側欄** | 連入後雙方列表＋identicon；斷線清除 | 雙方互見對方 stub（投影 SAM 前身） | **完成** |
 | **2.5. 投影 Avatar SAM** | 連上即在本場 spawn 薄投影 Avatar；卡片掛其 UI；DataChannel 轉發 | 斷線撕投影；權威仍在 homePeer | **完成** |
 | **3. Session bridge** | 遠端 invite／`act`／事件經投影轉 homePeer；**邀請附完整 protocol 規格**；型錄匹配／**lazy install**；修訂 DEC-023 遠端範圍 | 狗糧可邀遠端 Avatar 入座；與本機 Participant 同一協定閘 | **完成**（3.1 邀請＋proxy；3.2 act／事件；3.3 型錄／lazy install） |
-| **4. UX** | 開放連入／邀請連結／權限 | 非工程使用者可走完 | **進行中**（4.1：`#roster=` 邀請／回覆連結＋確認加入；薄 room／相機 QR／TURN 另段） |
+| **4. UX** | 開放連入／邀請連結／權限 | 非工程使用者可走完 | **進行中**（4.1 連結；**4.2 相機掃 QR**；薄 room／TURN 另段） |
 | **5.（可選）** | 自備 TURN；mailbox 跨 peer；自訂頭像 | 另規 | 未開始 |
 
 ---
@@ -131,3 +131,4 @@ layout 還原：側欄 tab 鍵 `avatars`（與 `files`／`agent` 一併 persist�
 | 2026-08-05 | Phase 3 第二刀：`session_seat_bound`／`session_act`／`session_act_result`／`session_event`；Host 權威 act＋事件 fanout；homePeer tunnel `env.SESSION`；lazy install 仍開 |
 | 2026-08-05 | Phase 3 第三刀：接受路徑 `resolveInviteCandidatesWithInstalled`＋clone／GitHub lazy install；brainstorm 內建後備；coding-orch 預填 `pg-llm-agent` |
 | 2026-08-05 | Phase 4.1：`#roster=<wire>` 邀請連結；複製邀請／回覆連結；開啟連結確認後加入；貼上可剝 URL |
+| 2026-08-05 | Phase 4.2：相機即時掃邀請／回覆 QR（BarcodeDetector 或 canvas＋`qr/decode`）；檔案上傳掃碼保留 |
