@@ -23,9 +23,9 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Deploy Worker
+      - name: Deploy Worker (official field-net)
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy
+          command: deploy -c wrangler.official.jsonc

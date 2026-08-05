@@ -9,7 +9,7 @@
 /* eslint-disable no-restricted-globals */
 
 // Bump when offline strategy or canvas bridge changes (clears sticky Cache API entries).
-const CACHE_NAME = "samkuo-offline-v12";
+const CACHE_NAME = "samkuo-offline-v13";
 /** Embedded in BRIDGE string — change when console mirror behaviour changes. */
 const CANVAS_BRIDGE_REV = 9;
 const OFFLINE_URL = "/offline/";
@@ -34,32 +34,17 @@ const API_METHODS = new Set(["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"]);
 /** @type {Map<string, { sandboxId: string, generation: number, files: Record<string, { type: string, body: string|ArrayBuffer }> }>} */
 const snapshots = new Map();
 
-/** Align with src/utils/playgroundsUrls.ts `isPlaygroundsFieldHost` (DEC-042). */
+/**
+ * Root-mount shell hosts: field net, self-host (Workers/Pages/Vercel/Netlify),
+ * and local preview. Only the legacy blog apex keeps the `/playgrounds/` mount.
+ */
 function isStandaloneHost() {
   try {
     const h = self.location.hostname.toLowerCase().replace(/\.$/, "");
-    if (
-      h === "play.localhost" ||
-      h === "playgrounds.localhost" ||
-      h.endsWith(".play.localhost")
-    ) {
-      return true;
-    }
-    if (!h.endsWith(".samkuo.me")) return false;
-    const sub = h.slice(0, -".samkuo.me".length);
-    if (!sub || sub.includes(".")) return false;
-    if (
-      sub === "www" ||
-      sub === "blog" ||
-      sub === "api" ||
-      sub === "docs" ||
-      sub === "old-blog"
-    ) {
-      return false;
-    }
+    if (h === "samkuo.me" || h === "www.samkuo.me") return false;
     return true;
   } catch {
-    return false;
+    return true;
   }
 }
 

@@ -1,0 +1,19 @@
+# Single-site Playgrounds host (Deploy to Netlify from README).
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "24"
+  # Root mount: home `/`, canvas `/canvas/`, catalog `/sam/`.
+  PUBLIC_PLAYGROUNDS_BASE_PATH = ""
+
+# Shown in the Deploy to Netlify UI (descriptions, not secret values).
+[template.environment]
+  PUBLIC_PLAYGROUNDS_BASE_PATH = "Leave empty for root mount (/ + /canvas/ + /sam/)."
+
+# SPA fallback after real static files (Astro pages, `/_astro/*`, SW assets).
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

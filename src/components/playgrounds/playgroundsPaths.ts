@@ -96,7 +96,7 @@ export function resetPlaygroundsPathsForTests(): void {
  * Infer deploy mode from location (DEC-042).
  * - Field host `play.samkuo.me` / other `*.samkuo.me` → standalone root.
  * - Path under `/playgrounds` → blog mount.
- * - Else → standalone (local preview at `/`).
+ * - Else → standalone (local preview, Vercel/Netlify/Workers self-host at `/`).
  */
 export function detectPlaygroundsBasePath(
   pathname: string,

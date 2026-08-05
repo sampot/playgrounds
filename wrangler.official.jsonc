@@ -1,0 +1,32 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  // Author field-net deploy (play.samkuo.me + docs service binding).
+  // One-click self-host uses root wrangler.jsonc instead.
+  "name": "playgrounds",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-08-05",
+  "workers_dev": true,
+  "preview_urls": true,
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    // Hostname reserved check must run before asset SPA fallback.
+    "run_worker_first": true
+  },
+  // Wildcard catches docs too — forward via service binding (see src/worker.ts).
+  "services": [
+    {
+      "binding": "DOCS",
+      "service": "playgrounds-docs"
+    }
+  ],
+  "routes": [
+    {
+      "pattern": "play.samkuo.me",
+      "custom_domain": true
+    }
+    // Zone route `*.samkuo.me/*` → this Worker is set in the dashboard
+    // (manual; do not re-add here — deploy token lacks workers_routes:edit).
+  ]
+}

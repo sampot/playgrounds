@@ -45,6 +45,22 @@ describe("detectPlaygroundsBasePath", () => {
     });
   });
 
+  it("detects one-click self-host platforms as standalone root", () => {
+    expect(
+      detectPlaygroundsBasePath("/", "playgrounds.username.workers.dev")
+    ).toEqual({ basePath: "", mode: "standalone" });
+    expect(
+      detectPlaygroundsBasePath("/", "playgrounds.vercel.app")
+    ).toEqual({ basePath: "", mode: "standalone" });
+    expect(
+      detectPlaygroundsBasePath("/", "playful-name.netlify.app")
+    ).toEqual({ basePath: "", mode: "standalone" });
+    expect(detectPlaygroundsBasePath("/", "play.example.com")).toEqual({
+      basePath: "",
+      mode: "standalone",
+    });
+  });
+
   it("does not treat reserved subdomains as fields", () => {
     expect(isPlaygroundsFieldHost("www.samkuo.me")).toBe(false);
     expect(isPlaygroundsFieldHost("blog.samkuo.me")).toBe(false);
