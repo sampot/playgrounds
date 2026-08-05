@@ -18,7 +18,7 @@
 ## 非目標
 
 - 跨 origin 自動搬 OPFS／SecretStore／prefs。
-- 把 `/sam/` 型錄或部落格文章搬進宿主 repo。
+- 把部落格文章搬進宿主 repo（過程分享仍在 `samkuo.me`）。
 - 對外改寫成產品／品牌站（DEC-004 仍適用）。
 - 過渡期內刪除 `https://samkuo.me/playgrounds/`。
 - 為每個 `<name>` 建後端實例、帳號或雲端專案庫。
@@ -34,6 +34,7 @@
 | 預設場畫布 | `https://play.samkuo.me/canvas/<sandboxId>/…` |
 | 預設一鍵開啟 | `https://play.samkuo.me/?open=<…>`（參數同 DEC-025） |
 | 任意獨立場 | `https://<name>.samkuo.me/`（同一 `dist`） |
+| SAM 小品型錄 | `https://play.samkuo.me/sam/`（任意場＝`https://<name>.samkuo.me/sam/`；與場殼同 Worker） |
 | 過渡舊場（**凍結**） | `https://samkuo.me/playgrounds/`（暫留、提醒遷移；**不再**跟場網同步更新） |
 | 舊畫布 | `https://samkuo.me/playgrounds/canvas/<sandboxId>/…` |
 
@@ -62,7 +63,7 @@
 | **2. 舊場遷移 UX** | 舊場橫幅＋連 `play.samkuo.me` | `/playgrounds/` 可見提醒 | **已完成** |
 | **3. 抽 repo** | [`sampot/playgrounds`](https://github.com/sampot/playgrounds) public | clone／test／build 綠 | **已完成** |
 | **4. Workers＋wildcard** | `wrangler`／Static Assets；DNS `*.samkuo.me`；standalone 判定＝`*.samkuo.me`；canonical＝`play.samkuo.me`；分享＝`location.origin`；保留名表 | `play` 與任一實驗 name 可開獨立空場；同程式 | **已完成**（`play` Custom Domain；`*.samkuo.me/*` 儀表板手動，勿寫回 `wrangler.jsonc`） |
-| **5. 部落格接線** | 導覽／`/sam/`／tools／文件範例 → `play`（部署後）；舊場續留 | 點進預設場；舊場仍可用 | **部分** |
+| **5. 部落格接線** | 導覽／tools／文件範例 → `play`；`/sam/` 權威改場網（部落格可轉址）；舊場續留 | 點進預設場；小品在場網 | **部分** |
 | **6. 開源 hygiene** | LICENSE／README／AGENTS；public repo | 可 clone | **已完成** |
 | **7a. 舊場凍結** | 遷移橫幅已上；**停止**把場網功能同步進 `myblog` `/playgrounds/`；權威＝`sampot/playgrounds` | Agents／開發不再對齊舊場；舊場可落後 | **已完成**（作者 2026-08-05） |
 | **7b. 舊場下線** | 刪路由／拆碼（另令） | 不自動執行 | 未開始 |
@@ -110,4 +111,4 @@
 | 2026-08-05 | **DEC-042：** 部署改 Workers；場網 `*.samkuo.me`；預設場 `play.samkuo.me`（取代 `playgrounds.samkuo.me`／Pages） |
 | 2026-08-05 | Phase 4：`play.samkuo.me` Workers Static Assets 上線；刪停車 wildcard；proxied `*` DNS；Route 待 token |
 | 2026-08-05 | Phase 4：**`*.samkuo.me/*` 儀表板手動完成**；自 `wrangler.jsonc` 移除（deploy 不再自動改 Route） |
-| 2026-08-05 | **Phase 7a：** 舊場凍結——`/playgrounds/` 不再跟場網同步更新 |
+| 2026-08-05 | **小品型錄：** `/sam/` 權威改場網宿主（同 Worker；部落格轉址） |

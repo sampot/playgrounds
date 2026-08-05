@@ -13,6 +13,8 @@ description: 沙盒單位、單頁小程式（SAM），以及匯出／匯入。
 
 沙盒裡跑的是 **SAM**（Single-page Application Module／單頁小程式）：至少有 `index.html` 入口；可選 `functions.js`（Infrastructure）、`controller.js`（Controller）。詳見 [SAM](/concepts/sam/)。
 
+開源範本清單在場網 [小品型錄](https://play.samkuo.me/sam/)（`/sam/`）。
+
 ## 匯出／匯入
 
 介面用語是「匯入／匯出沙盒」。檔案副檔名 **`.sam`**（內容為 ZIP，只接受 `.sam`）。

@@ -5891,7 +5891,10 @@
       ? ''
       : 'preview-collapsed'} {previewMaximized
       ? 'preview-maximized'
-      : ''} {editorMaximized ? 'editor-maximized' : ''}"
+      : ''} {editorMaximized ? 'editor-maximized' : ''} {shellBootReady &&
+    projects.length === 0
+      ? 'onboarding-empty'
+      : ''}"
   >
     <!-- Files / Agent sidebar -->
     <aside
@@ -6503,7 +6506,7 @@
                 <div class="playgrounds-play-empty">
                   <h3 class="playgrounds-empty-state-title">先玩一款小品</h3>
                   <p class="playgrounds-empty-state-desc playgrounds-play-empty-desc">
-                    遊樂場可以改程式，也可以先開一款遊戲或小工具玩玩。點下面會從公開來源載入到你的瀏覽器（不必先懂沙盒）。
+                    點一款就會載入到這個瀏覽器——先玩玩，再改程式也行。
                   </p>
                   <ul class="playgrounds-play-picks" aria-label="推薦小品">
                     {#each playPicks as entry (entry.repo)}

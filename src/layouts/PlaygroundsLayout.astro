@@ -4,16 +4,29 @@ import "@styles/global.css";
 interface Props {
   title?: string;
   description?: string;
+  /** App shell (OPFS UI) vs scrollable content page (e.g. `/sam/`). */
+  variant?: "app" | "page";
+  /** Path under site origin, e.g. `/sam/og.png`. Defaults to `/og.png`. */
+  ogImage?: string;
+  /** Default noindex for the field app; catalog may opt into indexing. */
+  robots?: string;
+  /** Highlight host-header nav item. */
+  activeNav?: "field" | "sam" | "docs";
 }
 
 const {
   title = "遊樂場 · 我是山姆鍋",
   description = "我是山姆鍋的瀏覽器遊樂場：開發與實驗單頁小程式（SAM）；沙盒存於 OPFS。",
+  variant = "app",
+  ogImage = "/og.png",
+  robots = "noindex, follow",
+  activeNav = "field",
 } = Astro.props;
 
 const site = Astro.site ?? new URL("https://play.samkuo.me");
 const canonicalUrl = new URL(Astro.url.pathname, site).href;
-const ogImageUrl = new URL("/og.png", site).href;
+const ogImageUrl = new URL(ogImage, site).href;
+const isPage = variant === "page";
 ---
 
 <!doctype html>
@@ -21,7 +34,7 @@ const ogImageUrl = new URL("/og.png", site).href;
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="robots" content="noindex, follow" />
+    <meta name="robots" content={robots} />
     <meta name="description" content={description} />
     <meta name="theme-color" content="#f8faf9" />
     <title>{title}</title>
@@ -45,9 +58,9 @@ const ogImageUrl = new URL("/og.png", site).href;
     <script is:inline src="/toggle-font-size.js?v=3"></script>
   </head>
   <body>
-    <div class="playgrounds-page">
+    <div class:list={["playgrounds-page", isPage && "playgrounds-page--scroll"]}>
       <header
-        class="playgrounds-host-header border-skin-line text-skin-base/70 flex shrink-0 items-center justify-between gap-3 border-b px-3 py-1.5 text-xs"
+        class="playgrounds-host-header border-skin-line text-skin-base/70 flex shrink-0 items-center gap-3 border-b px-3 py-1.5 text-xs"
       >
         <div class="playgrounds-host-brand flex min-w-0 items-center gap-2">
           <a
@@ -68,18 +81,47 @@ const ogImageUrl = new URL("/og.png", site).href;
           </a>
           <span class="text-skin-base/40" aria-hidden="true">·</span>
           <a
-            class="text-skin-base/80 no-underline"
+            class:list={[
+              "no-underline",
+              activeNav === "field"
+                ? "text-skin-base font-medium"
+                : "text-skin-base/80",
+            ]}
             href="/"
-            aria-label="遊樂場首頁">遊樂場</a
+            aria-label="遊樂場首頁"
+            aria-current={activeNav === "field" ? "page" : undefined}>遊樂場</a
+          >
+          <span class="text-skin-base/40" aria-hidden="true">·</span>
+          <a
+            class:list={[
+              "no-underline",
+              activeNav === "sam"
+                ? "text-skin-base font-medium"
+                : "text-skin-base/80",
+            ]}
+            href="/sam/"
+            aria-current={activeNav === "sam" ? "page" : undefined}>小品</a
+          >
+          <span class="text-skin-base/40" aria-hidden="true">·</span>
+          <a
+            class:list={[
+              "no-underline",
+              activeNav === "docs"
+                ? "text-skin-base font-medium"
+                : "text-skin-base/80",
+            ]}
+            href="https://docs.samkuo.me/"
+            rel="noopener noreferrer"
+            aria-current={activeNav === "docs" ? "page" : undefined}>文件</a
           >
         </div>
-        <a
-          class="text-skin-accent underline decoration-dashed underline-offset-2"
-          href="https://docs.samkuo.me/"
-          rel="noopener noreferrer">文件</a
-        >
       </header>
-      <main id="main-content" class="app-shell playgrounds-main">
+      <main
+        id="main-content"
+        class:list={[
+          isPage ? "playgrounds-page-main" : "app-shell playgrounds-main",
+        ]}
+      >
         <slot />
       </main>
     </div>

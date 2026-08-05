@@ -19,7 +19,7 @@
 
 ## 非目標
 
-- 把部落格文章、`/sam/` 型錄、CONTENT-PLAN 搬進文件站。
+- 把部落格文章、CONTENT-PLAN 搬進文件站（小品型錄在場網 `/sam/`，亦不進文件站）。
 - 帳號、留言、後端搜尋、CMS、多租戶「產品文件中心」。
 - 文件站離線 PWA／註冊 Service Worker（場網 SW 職責不變）。
 - 把 Starlight 嵌進場殼 Astro app（同 `astro.config`／同 `dist`）。

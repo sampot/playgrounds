@@ -1,0 +1,624 @@
+---
+import PlaygroundsLayout from "@layouts/PlaygroundsLayout.astro";
+import SamCatalogIcon from "@components/SamCatalogIcon.astro";
+import {
+  SAM_KIND_LABEL,
+  samCatalog,
+  samCatalogByKind,
+  samGithubHref,
+  samOpenHref,
+  type SamKind,
+} from "../../data/samCatalog";
+
+const title = "SAM 小品";
+const description =
+  "山姆鍋開源的純前端 SAM 型錄（僅供作為 Playgrounds 範本）：工具、代理、遊戲、玩具與影音繪圖——一鍵開進遊樂場。";
+
+const kindBlocks = samCatalogByKind();
+const countByKind = Object.fromEntries(
+  kindBlocks.map(b => [b.kind, samCatalog.filter(e => e.kind === b.kind).length])
+) as Partial<Record<SamKind, number>>;
+const gameCount = countByKind.game ?? 0;
+const toolCount = countByKind.tool ?? 0;
+const agentCount = countByKind.agent ?? 0;
+const toyCount = countByKind.toy ?? 0;
+const mediaCount = countByKind.media ?? 0;
+
+const countFor = (kind: SamKind) => countByKind[kind] ?? 0;
+---
+
+<PlaygroundsLayout
+  title={`${title} · 我是山姆鍋`}
+  description={description}
+  variant="page"
+  ogImage="/sam/og.png"
+  robots="index, follow"
+  activeNav="sam"
+>
+  <div class="sam-catalog">
+    <header class="catalog-hero">
+      <h1>{title}</h1>
+      <p class="lede">
+        純前端單頁小程式（SAM），MIT 開源。<strong>僅供作為 Playgrounds 範本</strong>——點「一鍵開」會在本場遊樂場載入；想改功能或手感，開進來再叫 AI 改一版。不是獨立產品或正式服務。
+      </p>
+      <p class="meta">
+        共 {samCatalog.length} 款（工具 {toolCount} · 代理 {agentCount} · 遊戲{" "}
+        {gameCount} · 玩具 {toyCount} · 影音繪圖 {mediaCount}）
+      </p>
+    </header>
+
+    <div class="kind-tabs" data-sam-kind-tabs>
+      <div class="tablist" role="tablist" aria-label="小品類型">
+        {
+          kindBlocks.map(({ kind, label }, index) => (
+            <button
+              type="button"
+              class="tab"
+              role="tab"
+              id={`tab-${kind}`}
+              aria-controls={`panel-${kind}`}
+              aria-selected={index === 0 ? "true" : "false"}
+              tabindex={index === 0 ? 0 : -1}
+              data-kind={kind}
+            >
+              {label}
+              <span class="tab-count">{countFor(kind)}</span>
+            </button>
+          ))
+        }
+      </div>
+
+      {
+        kindBlocks.map(({ kind, seriesBlocks }, index) => (
+          <div
+            class="tab-panel"
+            role="tabpanel"
+            id={`panel-${kind}`}
+            aria-labelledby={`tab-${kind}`}
+            data-kind={kind}
+            hidden={index !== 0}
+          >
+            {seriesBlocks.length > 1 && (
+              <nav
+                class="series-jump"
+                aria-label={`${SAM_KIND_LABEL[kind]}系列`}
+              >
+                <span class="series-jump-label">系列</span>
+                <ul class="series-jump-list">
+                  {seriesBlocks.map(({ series, entries }) => (
+                    <li>
+                      <a
+                        class="series-jump-link"
+                        href={`#series-${kind}-${series}`}
+                        data-series-jump
+                        data-kind={kind}
+                      >
+                        {series}
+                        <span class="series-jump-count">{entries.length}</span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </nav>
+            )}
+            {seriesBlocks.map(({ series, entries }) => (
+              <section
+                class="series"
+                aria-labelledby={`series-${kind}-${series}`}
+              >
+                <div class="series-head">
+                  <h2 id={`series-${kind}-${series}`}>{series}</h2>
+                  <span class="series-count">{entries.length}</span>
+                </div>
+                <ul class="catalog-grid">
+                  {entries.map(entry => (
+                    <li class="catalog-tile">
+                      <div class="tile-body">
+                        <div class="tile-head">
+                          <SamCatalogIcon repo={entry.repo} title={entry.title} />
+                          <h3 class="catalog-title">{entry.title}</h3>
+                        </div>
+                        <p class="catalog-blurb">{entry.blurb}</p>
+                      </div>
+                      <div class="tile-foot">
+                        <a
+                          class="catalog-repo"
+                          href={samGithubHref(entry.repo)}
+                          rel="noopener noreferrer"
+                          target="_blank"
+                        >
+                          {entry.repo}
+                        </a>
+                        <a class="btn-open" href={samOpenHref(entry)}>
+                          一鍵開
+                        </a>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ))}
+          </div>
+        ))
+      }
+    </div>
+
+    <p class="footnote">
+      本頁所列皆<strong>僅供作為 Playgrounds 範本</strong>，方便一鍵開進沙盒試玩或改寫。遊戲類名稱與造型多為原創，並註明致敬的玩法類型；非正式商業機台或作品復刻。文件見
+      <a href="https://docs.samkuo.me/" rel="noopener noreferrer">docs.samkuo.me</a
+      >；過程分享仍在
+      <a href="https://samkuo.me/" rel="noopener noreferrer">samkuo.me</a>。
+    </p>
+  </div>
+</PlaygroundsLayout>
+
+<script>
+  function initSamKindTabs() {
+    const root = document.querySelector("[data-sam-kind-tabs]");
+    if (!(root instanceof HTMLElement)) return;
+    if (root.dataset.tabsReady === "1") return;
+    root.dataset.tabsReady = "1";
+
+    const tabs = [...root.querySelectorAll<HTMLElement>('[role="tab"]')];
+    const panels = [...root.querySelectorAll<HTMLElement>('[role="tabpanel"]')];
+    if (!tabs.length) return;
+
+    const kinds = new Set(
+      tabs.map(t => t.dataset.kind).filter((k): k is string => Boolean(k))
+    );
+
+    function parseSeriesHash(raw: string): { kind: string; id: string } | null {
+      const m = /^series-(tool|agent|game|toy|media)-(.+)$/.exec(raw);
+      if (!m?.[1] || !m[2]) return null;
+      if (!kinds.has(m[1])) return null;
+      return { kind: m[1], id: `series-${m[1]}-${m[2]}` };
+    }
+
+    function select(kind: string | undefined, { pushHash = true } = {}) {
+      if (!kind || !kinds.has(kind)) kind = tabs[0]?.dataset.kind;
+      if (!kind) return;
+
+      for (const tab of tabs) {
+        const on = tab.dataset.kind === kind;
+        tab.setAttribute("aria-selected", on ? "true" : "false");
+        tab.tabIndex = on ? 0 : -1;
+      }
+      for (const panel of panels) {
+        panel.hidden = panel.dataset.kind !== kind;
+      }
+      if (pushHash) {
+        const next = `#${kind}`;
+        if (location.hash !== next) {
+          history.replaceState(null, "", next);
+        }
+      }
+    }
+
+    function applyHash({ scroll = true } = {}) {
+      const raw = decodeURIComponent(location.hash.replace(/^#/, ""));
+      const series = parseSeriesHash(raw);
+      if (series) {
+        select(series.kind, { pushHash: false });
+        if (scroll) {
+          requestAnimationFrame(() => {
+            document.getElementById(series.id)?.scrollIntoView({
+              behavior: "smooth",
+              block: "start",
+            });
+          });
+        }
+        return;
+      }
+      select(kinds.has(raw) ? raw : tabs[0]?.dataset.kind, { pushHash: false });
+    }
+
+    root.addEventListener("click", ev => {
+      const jump = (ev.target as Element | null)?.closest?.(
+        "[data-series-jump]"
+      );
+      if (jump instanceof HTMLAnchorElement && root.contains(jump)) {
+        const kind = jump.dataset.kind;
+        if (kind) select(kind, { pushHash: false });
+        return;
+      }
+      const btn = (ev.target as Element | null)?.closest?.('[role="tab"]');
+      if (!(btn instanceof HTMLElement) || !root.contains(btn)) return;
+      select(btn.dataset.kind);
+      btn.focus();
+    });
+
+    root.addEventListener("keydown", ev => {
+      const current = (ev.target as Element | null)?.closest?.('[role="tab"]');
+      if (!(current instanceof HTMLElement) || !root.contains(current)) return;
+      const i = tabs.indexOf(current);
+      if (i < 0) return;
+      let next = -1;
+      if (ev.key === "ArrowRight" || ev.key === "ArrowDown")
+        next = (i + 1) % tabs.length;
+      if (ev.key === "ArrowLeft" || ev.key === "ArrowUp")
+        next = (i - 1 + tabs.length) % tabs.length;
+      if (ev.key === "Home") next = 0;
+      if (ev.key === "End") next = tabs.length - 1;
+      if (next < 0) return;
+      ev.preventDefault();
+      select(tabs[next]?.dataset.kind);
+      tabs[next]?.focus();
+    });
+
+    applyHash({ scroll: true });
+    window.addEventListener("hashchange", () => applyHash({ scroll: true }));
+  }
+
+  function initSamCatalogCta() {
+    const catalog = document.querySelector(".sam-catalog");
+    if (!(catalog instanceof HTMLElement)) return;
+    if (catalog.dataset.ctaReady === "1") return;
+    catalog.dataset.ctaReady = "1";
+
+    const clearOpen = (except?: Element | null) => {
+      for (const tile of catalog.querySelectorAll(".catalog-tile.is-cta-open")) {
+        if (tile !== except) tile.classList.remove("is-cta-open");
+      }
+    };
+
+    catalog.addEventListener("pointerup", ev => {
+      const target = ev.target as Element | null;
+      const tile = target?.closest?.(".catalog-tile");
+      if (!(tile instanceof HTMLElement) || !catalog.contains(tile)) return;
+
+      if (target?.closest?.(".btn-open, .catalog-repo")) return;
+
+      clearOpen(tile);
+      tile.classList.add("is-cta-open");
+    });
+
+    document.addEventListener(
+      "pointerdown",
+      ev => {
+        const target = ev.target as Element | null;
+        if (target?.closest?.(".catalog-tile")) return;
+        clearOpen();
+      },
+      true
+    );
+  }
+
+  initSamKindTabs();
+  initSamCatalogCta();
+</script>
+
+<style>
+  .sam-catalog {
+    margin-inline: auto;
+    width: 100%;
+    max-width: 64rem;
+    padding: 1.25rem 1rem 7rem;
+  }
+
+  .catalog-hero {
+    margin-bottom: 2rem;
+    max-width: 42rem;
+  }
+
+  .catalog-hero h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+
+  @media (min-width: 640px) {
+    .catalog-hero h1 {
+      font-size: 1.875rem;
+    }
+  }
+
+  .lede {
+    margin-top: 0.75rem;
+    font-size: 1rem;
+    line-height: 1.625;
+    color: rgb(var(--color-text-base) / 0.9);
+  }
+
+  .lede a,
+  .footnote a {
+    color: rgb(var(--color-accent));
+    text-decoration: underline;
+    text-decoration-style: dashed;
+    text-underline-offset: 4px;
+  }
+
+  .lede strong,
+  .footnote strong {
+    font-weight: 600;
+    color: rgb(var(--color-text-base));
+  }
+
+  .meta {
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
+    color: rgb(var(--color-text-base) / 0.55);
+  }
+
+  .kind-tabs {
+    margin-bottom: 2.5rem;
+  }
+
+  .tablist {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin: 0 0 1.5rem;
+    padding: 0.25rem;
+    border: 1px solid rgb(var(--color-border));
+    border-radius: 0.65rem;
+    background: rgb(var(--color-card) / 0.35);
+  }
+
+  .tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0;
+    border: 0;
+    border-radius: 0.45rem;
+    background: transparent;
+    color: rgb(var(--color-text-base) / 0.72);
+    font: inherit;
+    font-size: 0.95rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    padding: 0.55rem 0.95rem;
+    cursor: pointer;
+  }
+
+  .tab:hover {
+    color: rgb(var(--color-text-base));
+    background: rgb(var(--color-card) / 0.55);
+  }
+
+  .tab[aria-selected="true"] {
+    color: rgb(var(--color-fill));
+    background: rgb(var(--color-accent));
+  }
+
+  .tab-count {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.75rem;
+    font-weight: 550;
+    opacity: 0.8;
+  }
+
+  .tab-panel[hidden] {
+    display: none;
+  }
+
+  .series-jump {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.45rem 0.75rem;
+    margin: 0 0 1.35rem;
+    padding: 0.15rem 0 0.85rem;
+    border-bottom: 1px solid rgb(var(--color-border) / 0.7);
+  }
+
+  .series-jump-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: rgb(var(--color-text-base) / 0.45);
+  }
+
+  .series-jump-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .series-jump-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border-radius: 0.4rem;
+    border: 1px solid rgb(var(--color-border));
+    background: rgb(var(--color-card) / 0.35);
+    color: rgb(var(--color-text-base) / 0.78);
+    font-size: 0.875rem;
+    font-weight: 550;
+    letter-spacing: 0.03em;
+    padding: 0.28rem 0.65rem;
+    text-decoration: none;
+  }
+
+  .series-jump-link:hover {
+    border-color: rgb(var(--color-accent) / 0.45);
+    color: rgb(var(--color-text-base));
+    background: rgb(var(--color-card) / 0.65);
+  }
+
+  .series-jump-count {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.7rem;
+    font-weight: 550;
+    opacity: 0.65;
+  }
+
+  .series {
+    margin: 0 0 2.5rem;
+    width: 100%;
+    max-width: none;
+    padding: 0;
+  }
+
+  .series:last-child {
+    margin-bottom: 0;
+  }
+
+  .series-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid rgb(var(--color-border));
+  }
+
+  .series-head h2 {
+    margin: 0;
+    font-size: 1.125rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    scroll-margin-top: 1.5rem;
+  }
+
+  .series-count {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.75rem;
+    color: rgb(var(--color-text-base) / 0.45);
+  }
+
+  .catalog-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(15.5rem, 1fr));
+    column-gap: 0.75rem;
+    row-gap: 0.9rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    container-type: inline-size;
+    container-name: catalog-grid;
+  }
+
+  .catalog-tile {
+    display: flex;
+    min-height: 11.5rem;
+    flex-direction: column;
+    justify-content: space-between;
+    border-radius: 0.5rem;
+    border: 1px solid rgb(var(--color-border) / 0.65);
+    background-color: transparent;
+    padding: 1rem;
+    transition:
+      border-color 150ms ease,
+      background-color 150ms ease,
+      box-shadow 150ms ease;
+  }
+
+  @container catalog-grid (max-width: 31.74rem) {
+    .catalog-tile:nth-child(even) {
+      background-color: rgb(var(--color-card));
+      border-color: rgb(var(--color-border));
+      box-shadow: inset 3px 0 0 rgb(var(--color-accent) / 0.55);
+    }
+  }
+
+  @container catalog-grid (min-width: 31.75rem) and (max-width: 47.99rem) {
+    .catalog-tile:nth-child(4n + 3),
+    .catalog-tile:nth-child(4n + 4) {
+      background-color: rgb(var(--color-card));
+      border-color: rgb(var(--color-border));
+      box-shadow: inset 3px 0 0 rgb(var(--color-accent) / 0.55);
+    }
+  }
+
+  @container catalog-grid (min-width: 48rem) {
+    .catalog-tile:nth-child(6n + 4),
+    .catalog-tile:nth-child(6n + 5),
+    .catalog-tile:nth-child(6n + 6) {
+      background-color: rgb(var(--color-card));
+      border-color: rgb(var(--color-border));
+      box-shadow: inset 3px 0 0 rgb(var(--color-accent) / 0.55);
+    }
+  }
+
+  .catalog-tile:hover {
+    border-color: rgb(var(--color-accent) / 0.55);
+    background-color: rgb(var(--color-card));
+    box-shadow: inset 3px 0 0 rgb(var(--color-accent));
+  }
+
+  .tile-body {
+    min-width: 0;
+  }
+
+  .tile-head {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    min-width: 0;
+  }
+
+  .catalog-title {
+    margin: 0;
+    font-size: 1.125rem;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+  }
+
+  .catalog-blurb {
+    margin: 0.625rem 0 0;
+    font-size: 0.875rem;
+    line-height: 1.625;
+    color: rgb(var(--color-text-base) / 0.75);
+  }
+
+  .tile-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-top: 1rem;
+  }
+
+  .catalog-repo {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.75rem;
+    color: rgb(var(--color-text-base) / 0.45);
+    text-decoration: none;
+  }
+
+  .catalog-repo:hover {
+    color: rgb(var(--color-accent));
+  }
+
+  .btn-open {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.375rem;
+    background: rgb(var(--color-accent));
+    color: rgb(var(--color-fill));
+    font-size: 0.875rem;
+    font-weight: 600;
+    padding: 0.375rem 0.875rem;
+    text-decoration: none;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 150ms ease;
+  }
+
+  .catalog-tile:hover .btn-open,
+  .catalog-tile:focus-within .btn-open,
+  .catalog-tile.is-cta-open .btn-open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .footnote {
+    margin-top: 1rem;
+    max-width: 42rem;
+    font-size: 0.875rem;
+    line-height: 1.625;
+    color: rgb(var(--color-text-base) / 0.55);
+  }
+</style>

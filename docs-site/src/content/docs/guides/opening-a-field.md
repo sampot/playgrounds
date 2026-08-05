@@ -13,6 +13,10 @@ description: 預設場 play.samkuo.me，以及任意一級子域當獨立場。
 
 畫布虛擬站在同一 origin 的 `/canvas/<sandboxId>/…`。
 
+## 小品型錄
+
+開源 SAM 範本清單在同一場的 [`/sam/`](https://play.samkuo.me/sam/)（預設場範例）。點「一鍵開」會在**目前這場**用 `/?open=` 載入，不是另開產品站。
+
 ## 自開一場
 
 任意符合命名規則的一級子域都可以當獨立場（wildcard 就緒後）：

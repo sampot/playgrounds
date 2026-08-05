@@ -11,7 +11,7 @@ description: 與場網／文件站相關的 Accepted 決策；全文在 repo。
 | DEC-016 | 瀏覽器遊樂場與 OPFS | 遊樂場主軸 |
 | DEC-025 | 一鍵開啟 `?open=` | 深鏈契約 |
 | DEC-040 | 防護邊界與整場重置 | origin／重置語意 |
-| DEC-041 | 獨立子網域與開源抽取 | OSS 宿主；舊場凍結 |
+| DEC-041 | 獨立子網域與開源抽取 | OSS 宿主；舊場凍結；小品 `/sam/` 在場網 |
 | DEC-042 | Workers 與 `*.samkuo.me` 場網 | 預設場 `play`；保留名 |
 | DEC-043 | 文件站 Starlight＠`docs.samkuo.me` | 本站；獨立 Worker |
 
