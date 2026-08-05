@@ -33,7 +33,7 @@ describe("sam open helpers", () => {
   it("builds open source and playgrounds href", () => {
     expect(samOpenSource("pg-breakout")).toBe("sampot/pg-breakout");
     expect(samOpenHref({ repo: "pg-breakout", title: "打磚塊" })).toBe(
-      "https://playgrounds.samkuo.me/?open=sampot%2Fpg-breakout&name=%E6%89%93%E7%A3%9A%E5%A1%8A"
+      "https://play.samkuo.me/?open=sampot%2Fpg-breakout&name=%E6%89%93%E7%A3%9A%E5%A1%8A"
     );
   });
 });

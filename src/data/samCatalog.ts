@@ -518,8 +518,23 @@ export function samOpenSource(repo: string): string {
   return `sampot/${repo}`;
 }
 
-/** Playgrounds one-click open URL (canonical subdomain; DEC-041). */
+/**
+ * One-click open from the blog catalog.
+ * Uses the transitional blog mount until `play.samkuo.me` is deployed
+ * (Phase 4). Share/copy links use {@link buildCanonicalOpenUrl} (DEC-041／042).
+ */
 export function samOpenHref(entry: Pick<SamEntry, "repo" | "title">): string {
+  const params = new URLSearchParams({
+    open: samOpenSource(entry.repo),
+    name: entry.title,
+  });
+  return `/playgrounds/?${params.toString()}`;
+}
+
+/** Formal-field open URL (subdomain root). Prefer after Phase 4 cutover. */
+export function samOpenCanonicalHref(
+  entry: Pick<SamEntry, "repo" | "title">
+): string {
   return buildCanonicalOpenUrl(samOpenSource(entry.repo), {
     name: entry.title,
   });

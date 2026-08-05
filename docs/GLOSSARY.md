@@ -51,10 +51,11 @@
 | actuator | 致動器 | 勿寫「效應器」；Visual-QA 語境指模擬滑鼠／鍵盤這類輸出端。 |
 | deterministic | 確定性 | 如「確定性測試」「確定性劇本」；勿整句留英文 deterministic。 |
 | digital avatar / digital twin（本站語境） | 數位化身／數位分身 | 指部落格等可公開重播的自我呈現，非產品功能名；可與「影分身」典故並用，勿寫成永生／不死行銷口吻。 |
-| Playgrounds（權威：`playgrounds.samkuo.me`） | 遊樂場 | 站內導覽／UI 用「遊樂場」；程式識別仍為 `playgrounds`。**正式場**＝[`https://playgrounds.samkuo.me/`](https://playgrounds.samkuo.me/)（根路徑；DEC-041）。過渡期部落格路徑 `https://samkuo.me/playgrounds/` **暫留**並提醒匯出遷移（資料綁 origin）。非站上 `/tools/` 登錄表。主軸：瀏覽器內開發／實驗**單頁小程式（SAM）**，並作**個人工具執行場**；非部署環境。**有防護能力的實驗場**：隔離在瀏覽器 origin／OPFS，**避免污染使用者桌面**（不以 File System Access 持久掛載本機目錄為主路徑）——見 DEC-040。開源宿主單一 repo（建議 `sampot/playgrounds`）。**對外敘事裡「遊樂場」亦涵蓋其介面層**；勿再寫「殼頁」。**讀者可見文／UI：勿**把遊樂場或本站寫成產品／品牌或用行銷腔（見 DEC-004、`AGENTS.md`）。 |
-| Playgrounds chrome／app shell（舊稱殼頁） | 遊樂場（必要時：**遊樂場介面**） | 正式場根路徑 `/`（過渡舊場仍為 `/playgrounds/`）的外框 UI（工具列、編輯器、側欄、密鑰庫、fleet…），相對沙盒內畫布／總管 iframe。**正式對外預設寫「遊樂場」**；需對照畫布／注入／dialog 時寫 **「遊樂場介面」**。舊稱「殼頁」（易與下方 **Shell 面板**混淆）——**勿**對外再用「殼」。程式識別可續用 `shell*`（如 `shellHostBridge`）。 |
+| Playgrounds（場網：`*.samkuo.me`） | 遊樂場 | 站內導覽／UI 用「遊樂場」；程式識別仍為 `playgrounds`。**預設場**＝[`https://play.samkuo.me/`](https://play.samkuo.me/)；任意 [`https://<name>.samkuo.me/`](https://play.samkuo.me/)＝同程式、異 origin（DEC-042）。過渡期部落格 `https://samkuo.me/playgrounds/` **暫留**並提醒匯出（資料綁 origin）。非站上 `/tools/` 登錄表。主軸：瀏覽器內開發／實驗**單頁小程式（SAM）**；非部署環境。**有防護能力的實驗場**：隔離在瀏覽器 origin／OPFS——見 DEC-040。開源宿主 [`sampot/playgrounds`](https://github.com/sampot/playgrounds)；部署＝Cloudflare Workers。**對外敘事勿**產品／品牌／行銷腔（DEC-004）。 |
+| 場網／場（Playgrounds） | 場／場網 | `*.samkuo.me` 上每個一級子域是一個**場**（獨立 origin）；場網＝此 wildcard 部署面。預設場名 **`play`**。見 DEC-042。 |
+| Playgrounds chrome／app shell（舊稱殼頁） | 遊樂場（必要時：**遊樂場介面**） | 場網上根路徑 `/`（過渡舊場仍為 `/playgrounds/`）的外框 UI（工具列、編輯器、側欄、密鑰庫、fleet…），相對沙盒內畫布／總管 iframe。**正式對外預設寫「遊樂場」**；需對照畫布／注入／dialog 時寫 **「遊樂場介面」**。舊稱「殼頁」——**勿**對外再用「殼」。程式識別可續用 `shell*`。 |
 | sandbox（Playgrounds 單位；舊稱 project／專案） | 沙盒 | 遊樂場裡用來管理 **SAM 實例**的容器（OPFS 一份樹＋執行期狀態＋畫布；一沙盒一實例；程式識別為 **`sandboxId`**，舊稱 `projectId`）。**不是**對桌面的第二層安全沙盒敘事——防護邊界在遊樂場（DEC-040）。僅能透過允許的方式（HOST／DELEGATE／SESSION 等）與環境及其他沙盒／SAM 互動。勿與產品名「遊樂場」混用；說明隱喻時可寫「像遊樂場裡的沙坑」，產品單位名固定「沙盒」。 |
-| 整場重置（遊樂場） | 重置遊樂場 | 人類 UI（管理沙盒）清光本機 Playgrounds 持久化後回到該 origin 首次開啟的空場（正式場＝`/`；過渡舊場＝`/playgrounds/`）。**不**經 `env.HOST`。見 DEC-040。跨子網域不共用 OPFS——換正式場須匯出／匯入（DEC-041）。 |
+| 整場重置（遊樂場） | 重置遊樂場 | 人類 UI（管理沙盒）清光本機 Playgrounds 持久化後回到該 origin 首次開啟的空場（場網＝`/`；過渡舊場＝`/playgrounds/`）。**不**經 `env.HOST`。見 DEC-040。跨 origin（含換 `<name>`）不共用 OPFS——須匯出／匯入（DEC-041／042）。 |
 | SAM／Single-page Application Module | 單頁小程式 | 沙盒裡的可執行模組：**Single-page Application Module** 的縮寫。定義上必有 UI 入口（固定 `index.html`）；可選 **Infrastructure**（`functions.js`）與 **Controller**（`controller.js`）。**不**強制短小（大型前端仍算 SAM）。勿與 AWS SAM（Serverless Application Model）混淆。見 DEC-024／027。 |
 | Playgrounds 主要語言 | JavaScript（主）／Python（數據） | 可執行契約與範本以 **JS** 為準；數據分析用 **Python**（REPL／`runPython`）。**不**以 TypeScript 型別檢查或 TS 執行管線當產品主軸。見 DEC-027。 |
 | listDir（遊樂場 HOST） | `list_dir`／`HOST.listDir` | 可裁切目錄列舉（prefix／depth／maxEntries）；大沙盒導航用，搭配 `search`。既有 `listFiles` 仍保留。見 DEC-027、[PG-FILE-NAV-PLAN.md](./PG-FILE-NAV-PLAN.md)。 |
@@ -89,9 +90,9 @@
 | sam-runtime | sam-runtime | 可攜 SAM 實例 runtime（`src/sam-runtime/`）：載入 Controller／Infrastructure、排程、多實例；與 DOM／OPFS 解耦。 |
 | headless host（SAM） | headless host | 不渲染 UI 的宿主（如 Node `src/sam-host/node/`）；可同時跑多個 `SamInstance`。 |
 | 沙盒包裹（遊樂場） | 沙盒包裹 | 匯入／匯出整份沙盒時的檔案；副檔名 **`.sam`**（內容為 ZIP，僅便於辨識為 Playgrounds／SAM）。介面用語為「匯入／匯出沙盒」；需與一般 ZIP 區隔時才說「沙盒包裹」。**只接受 `.sam` 匯入**。預設為原始碼；可選附帶執行期狀態目錄 **`.playgrounds-state/`**（KV／DB／Secrets；見 DEC-018）。舊稱「專案包裹」。 |
-| open-from-URL／一鍵開啟（遊樂場） | 從網址開啟 | deep link：**正式** `https://playgrounds.samkuo.me/?open=<來源>`（可選 `as`／`state`／`name`／`fresh`）；過渡舊場仍為 `/playgrounds/?open=`。匯入 `.sam` 或複製 public GitHub／GitLab；同源去重。見 DEC-025／041。行銷口語可稱「一鍵開 SAM 小」；**正式文件／UI 主標**用本列用詞；**無** `/sam` 短鏈。 |
+| open-from-URL／一鍵開啟（遊樂場） | 從網址開啟 | deep link：文件預設 `https://play.samkuo.me/?open=<來源>`；任意場 `https://<name>.samkuo.me/?open=`；過渡舊場 `/playgrounds/?open=`（可選 `as`／`state`／`name`／`fresh`）。匯入 `.sam` 或複製 public GitHub／GitLab；同源去重。見 DEC-025／041／042。行銷口語可稱「一鍵開 SAM 小」；**正式文件／UI 主標**用本列用詞；**無** `/sam` 短鏈。 |
 | 執行期狀態（遊樂場） | 執行期狀態／Durable 狀態 | 相對沙盒原始碼樹的 side store：`env.KV`、`env.DB`（checkpoints 另存；舊 per-sandbox Secrets 已廢）。搬動 SAM（export／import／clone／HOST clone）時可顯式選擇是否一併處理；**預設不帶**。密鑰改 **SecretStore**（DEC-029），**永不**進 `.sam`。 |
-| Preview 面板（遊樂場） | 畫布 | 程式在同源 iframe 的**渲染／執行結果**（正式場經 `/canvas/` SW 虛擬站台；過渡舊場仍為 `/playgrounds/canvas/`），不是靜態預覽稿，也不是 chat artifact。程式識別可仍含 `preview`。工作沙盒走原畫布。見 DEC-041。 |
+| Preview 面板（遊樂場） | 畫布 | 程式在同源 iframe 的**渲染／執行結果**（場網經 `/canvas/` SW 虛擬站台；過渡舊場仍為 `/playgrounds/canvas/`），不是靜態預覽稿，也不是 chat artifact。程式識別可仍含 `preview`。工作沙盒走原畫布。見 DEC-041／042。 |
 | Console 面板（遊樂場） | Console | 下方面板：工作沙盒畫布 `console.*`／runtime 錯誤（經 bridge `postMessage`）。預設**不**鏡像到瀏覽器 DevTools；可在「選項 → 設定」開啟。見 DEC-016。 |
 | 工作沙盒（遊樂場） | 工作沙盒 | 遊樂場介面當前開啟、編輯器與原畫布所對應的 OPFS 沙盒（`activeId`）——即當前編輯的那份 SAM。舊稱「工作專案」。 |
 | Steward／現行 Agent（遊樂場） | 總管 | 產品角色（English：**Steward**）：**取代 UI／產品文案中的「現行 Agent」**。使用者（遊樂場主人）的**唯一對口**（下指示、拿結果）；代為管理遊樂場，持有完整 `env.HOST` 的那一席。Agent 仍是 SAM 種類；多個 Agent 裡只有被設為總管的那位有 HOST。技術槽位 `activeAgentProjectId`（文件／API 可續稱現行 Agent）。**實例顯示名由使用者自訂**；「總管」是角色類名。舊稱「管家」（含「家」與遊樂場隱喻不合）。預設≠ session Participant；若總管要**參與** session，必須以 **Host agent** 身分（主持沙盒＝總管席）。勿與未兼任總管的 Host SAM、一般／參與 Agent 混淆。見 DEC-017／023／033。 |

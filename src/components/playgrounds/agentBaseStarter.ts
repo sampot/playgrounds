@@ -318,7 +318,7 @@ export default {
 | **Agent** | 可經 Controller **主動或背景**跑 | 監控、排程、入座參與、領域代理人 |
 | **總管（Steward）** | 一種被設為遊樂場對口的 Agent；持完整 \`env.HOST\` | 聽使用者指示打理沙盒（開源小品 \`sampot/pg-steward\` 含 BYOK） |
 
-Agent **不必**使用 LLM。若要開箱當總管，請從小品開啟 [\`pg-steward\`](https://playgrounds.samkuo.me/?open=sampot%2Fpg-steward&name=%E7%B8%BD%E7%AE%A1)，再開啟後設為總管。
+Agent **不必**使用 LLM。若要開箱當總管，請從小品開啟 [\`pg-steward\`](https://play.samkuo.me/?open=sampot%2Fpg-steward&name=%E7%B8%BD%E7%AE%A1)，再開啟後設為總管。
 
 ## 怎麼試
 

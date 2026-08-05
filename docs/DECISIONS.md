@@ -81,6 +81,7 @@
 | [DEC-039](#dec-039-playgrounds-wasi-cli-opfs-fd-直連) | Playgrounds WASI CLI × OPFS fd 直連（大檔） | Accepted |
 | [DEC-040](#dec-040-playgrounds-防護邊界與場內沙盒語意整場重置) | Playgrounds 防護邊界與場內沙盒語意；整場重置 | Accepted |
 | [DEC-041](#dec-041-playgrounds-獨立子網域與開源抽取) | Playgrounds 獨立子網域與開源抽取 | Accepted |
+| [DEC-042](#dec-042-playgrounds-workers與-wildcard-場網) | Playgrounds：Workers 部署與 `*.samkuo.me` 場網 | Accepted |
 
 ---
 
@@ -130,6 +131,7 @@
   - 遊樂場能力敘事以 DEC-016～041 與 PG-*-PLAN 為準，勿承諾未落地功能。
 - **Revision（2026-08-04）：** 明訂對外勿以產品／品牌／行銷描述遊樂場或本站；內容主軸用語由「推廣」改「分享」。
 - **Revision（2026-08-05）：** 正式場改子網域／可開源（DEC-041）；對外敘事仍非產品站。
+- **Revision（2026-08-05）：** 預設場 `play.samkuo.me`、場網 `*.samkuo.me`（DEC-042）；敘事仍非產品站。
 
 ### DEC-005: 互動 UI 用 Svelte islands（不用 React）
 
@@ -254,7 +256,7 @@
 
 ### DEC-016: Playgrounds（瀏覽器遊樂場與 OPFS）
 
-- **Status:** Accepted（2026-07-31；路徑自 `/ide/` 改為 `/playgrounds/`，並廢止舊 UI 測試頁；同日修訂：workspace 文字｜二進位；**不採**瀏覽器代抓 APKINDEX／`.apk`；同日再修：**畫布改 SW 虛擬靜態站**；產品定位為輕量 Web 實驗場；同日再修：**`functions.js` Workers 形 `/api/*`**；同日再修：**模擬 `env.KV`**；同日再修：**HOST.runPython／Pyodide Worker 例外**，見 DEC-019；**2026-07-31 再修：移除 v86／Alpine 虛擬機面板，改下方 Python REPL**；**2026-08-01 再修：專案單位正式名 SAM／單頁小程式；匯入／匯出沙盒包裹副檔名 `.sam`（只接受 `.sam`）**；**2026-08-02 再修：遊樂場對外中文名「遊樂場」；單位（舊稱專案）為「沙盒（sandbox）」**；**2026-08-05：權威部署改子網域見 [DEC-041](#dec-041-playgrounds-獨立子網域與開源抽取)**）
+- **Status:** Accepted（2026-07-31；路徑自 `/ide/` 改為 `/playgrounds/`，並廢止舊 UI 測試頁；同日修訂：workspace 文字｜二進位；**不採**瀏覽器代抓 APKINDEX／`.apk`；同日再修：**畫布改 SW 虛擬靜態站**；產品定位為輕量 Web 實驗場；同日再修：**`functions.js` Workers 形 `/api/*`**；同日再修：**模擬 `env.KV`**；同日再修：**HOST.runPython／Pyodide Worker 例外**，見 DEC-019；**2026-07-31 再修：移除 v86／Alpine 虛擬機面板，改下方 Python REPL**；**2026-08-01 再修：專案單位正式名 SAM／單頁小程式；匯入／匯出沙盒包裹副檔名 `.sam`（只接受 `.sam`）**；**2026-08-02 再修：遊樂場對外中文名「遊樂場」；單位（舊稱專案）為「沙盒（sandbox）」**；**2026-08-05：場網部署見 [DEC-041](#dec-041-playgrounds-獨立子網域與開源抽取)／[DEC-042](#dec-042-playgrounds-workers與-wildcard-場網)**）
 - **Context:** 需要在瀏覽器內**開發與實驗單頁小程式（SAM＝Single-page Application Module）**（多檔資產 + **單一 HTML 入口** + **畫布**即時渲染），並可選加 **edge／serverless functions** 輔助；與 `/tools/` 小工具箱分離。要精簡專業、非陽春片段板；沙盒需本機持久化、匯入／匯出，並可自 GitHub public repo 複製到本地。可選瀏覽器內 **Python REPL**（數據／公式；非 Linux shell）。其中一種 SAM 可以是 **Agent UI**（見 DEC-017）。遊樂場**不是**部署環境；驗證通過後可部署到 edge cloud（例如 Cloudflare Workers／Pages）。舊 `/playgrounds/` UI 元件測試頁已移除，路徑改由此遊樂場占用。
 - **Decision:**
   - 路徑 **`/playgrounds/`**（非 `/tools/…`）；程式／文件識別名 **Playgrounds**；**對外中文名「遊樂場」**（導覽、頁面標題、UI）；其內單位為 **「沙盒（sandbox）」**（舊稱專案／project；程式識別可仍為 `projectId`）——每個沙盒是一個 SAM 的活動空間，僅經允許通道與環境及其他沙盒互動。實作目錄 **`src/components/playgrounds/`**（CSS／OPFS 前綴同名；舊 `ide`／`web-ide-projects`／`.ide-meta.json` 讀取時遷移）；主軸為 **輕量 Web**——每個沙盒是一個 **SAM（Single-page Application Module／單頁小程式）**：純靜態單頁，或靜態 + Workers 形 functions；邏輯上可多頁（客戶端路由），文件入口仍單一 HTML。**不**嵌 `/tools/python-runner/` UI；**允許**遊樂場隔離 **Web Worker + `HOST.runPython`（Pyodide，CDN＋釘版對齊 DEC-015）** 供 agent 做數據／公式驗證（套件釘允許清單；見 DEC-019／[PG-AGENT-PLAN.md](./PG-AGENT-PLAN.md) Phase 7）。同一 Worker 亦驅動下方人類 **Python REPL** 面板。
@@ -442,7 +444,7 @@
 - **Status:** Accepted（2026-08-01；同日 Phase 3：`as=`／去重／GitLab；**不做** `/sam` 短鏈；**2026-08-05：** 正式主機見 DEC-041）
 - **Context:** 匯入 `.sam` 與自 GitHub 複製已落地，但須手動操作；分享單頁小程式時希望「點一個 URL → 開沙盒 → 自動匯入」。需固定可分享的 deep link 形狀，且不引入站內 proxy 或雲端市集。
 - **Decision:**
-  - **方案 A：** query 契約固定 **`?open=<url-encoded 來源>`**（**不**另設 `/sam` 短鏈）；遊樂場 boot 時解析一次，成功後清除 `open`／`as`／`name`／`state`／`fresh`。**正式絕對 URL**＝`https://playgrounds.samkuo.me/?open=…`（根路徑；DEC-041）；過渡舊場仍為 `/playgrounds/?open=…`。
+  - **方案 A：** query 契約固定 **`?open=<url-encoded 來源>`**（**不**另設 `/sam` 短鏈）；遊樂場 boot 時解析一次，成功後清除 `open`／`as`／`name`／`state`／`fresh`。**文件預設絕對 URL**＝`https://play.samkuo.me/?open=…`（根路徑；DEC-042）；任意場為 `https://<name>.samkuo.me/?open=…`；過渡舊場仍為 `/playgrounds/?open=…`。
   - **辨型：** 路徑以 **`.sam`** 結尾的 http(s) URL → 沙盒包裹 `fetch`（GitHub／GitLab blob／raw 改寫為 raw）；GitHub URL 或 `owner/repo` → GitHub 複製；**GitLab.com** URL → GitLab 複製；無法辨型則錯誤提示。
   - **選用參數：** `as=work|tool|agent`（預設 work）；`state=ask|none`；`name=`；`fresh=1` 強制新建。
   - **同源去重：** 正規化 `meta.source` 與本次來源；命中則重用本機專案並套用 `as=`（除非 `fresh=1`）。
@@ -454,7 +456,8 @@
   - 文件／UI 主標用「從網址開啟」；行銷口語可用「一鍵開 SAM 小」，勿把諧音當正式譯名寫進 glossary 主欄。
   - 變更 `open`／`as` 語意或辨型規則時更新本決策、計劃、GLOSSARY。
   - 介紹文應說明 CORS／Git API rate limit；本機範本無遠端 `source` 時不可產生開啟連結；勿新增 `/sam` 短路由除非另立決策。
-- **Revision（2026-08-05）：** 正式絕對 URL 改 `playgrounds.samkuo.me/?open=`（DEC-041）；query 契約不變。
+- **Revision（2026-08-05）：** 正式絕對 URL 初訂 `playgrounds.samkuo.me/?open=`（DEC-041）。
+- **Revision（2026-08-05）：** 文件預設改 `play.samkuo.me/?open=`；場網 `*.samkuo.me`（DEC-042）；query 契約不變。
 
 ### DEC-026: Playgrounds Agent context hygiene
 
@@ -747,21 +750,42 @@
 
 ### DEC-041: Playgrounds 獨立子網域與開源抽取
 
-- **Status:** Accepted（2026-08-05）
+- **Status:** Accepted（2026-08-05；**2026-08-05 修訂：** 部署／場網見 [DEC-042](#dec-042-playgrounds-workers與-wildcard-場網)）
 - **Context:** 遊樂場宿主（介面＋`sam-runtime`＋SW／畫布）仍嵌在部落格儲存庫 `myblog`，路徑 `https://samkuo.me/playgrounds/`。小品已多為獨立開源 repo（`pg-steward`、`pg-llm-agent`、`pg-workflow` 等），宿主卻無法單獨部署或公開協作。目標：正式場改到子網域、整包開源；部落格繼續寫過程分享（DEC-004 敘事不變）。OPFS／SecretStore／prefs 綁 origin，換網域＝新空場，不能自動搬資料。
 - **Decision:**
-  1. **權威 origin：** 正式遊樂場＝**`https://playgrounds.samkuo.me`**（Cloudflare Pages 等獨立部署）。
-  2. **根路徑 `/`：** 子網域上入口為 `/`（非再掛 `/playgrounds/`）；畫布虛擬站為 **`/canvas/<sandboxId>/…`**（對應舊 `/playgrounds/canvas/…`）。`?open=` 等 query 契約不變，僅主機與 path 前綴改變。
-  3. **單一開源 repo：** 整個 Playgrounds 宿主抽成一個公開儲存庫（建議名 **`sampot/playgrounds`**）——含遊樂場介面、`src/sam-runtime/`、`src/sam-host/`、畫布／離線 SW、Host API 與必要工程契約文件。**不**拆成 runtime／UI 兩套件當交付形。
-  4. **舊場暫留：** `https://samkuo.me/playgrounds/` **暫不移除**（同一套碼或凍結快照皆可，過渡期由計劃定）。UI **提醒**使用者：正式場在子網域；本機資料綁 origin，請**匯出沙盒（`.sam`）後到新網址匯入**；SecretStore／prefs／WebAuthn 包裝須在新 origin 重設。**不做**跨 origin 自動遷移、**不做**站內 proxy 搬 OPFS。
-  5. **部落格職責：** 文章／`/sam/` 型錄／導覽可留在 `samkuo.me`；新深鏈與型錄「開啟」指向子網域。讀者可見敘事仍依 DEC-004（勿產品／品牌／行銷腔）；開源＝公開原始碼與可自架，不是產品站。
+  1. **場網部署與預設 host：** 見 **DEC-042**（Workers＋`*.samkuo.me`；文件預設場 **`play.samkuo.me`**）。初版曾寫單一 `playgrounds.samkuo.me`／Pages——以 DEC-042 為準。
+  2. **根路徑 `/`：** 場網上入口為 `/`（非再掛 `/playgrounds/`）；畫布虛擬站為 **`/canvas/<sandboxId>/…`**（對應舊 `/playgrounds/canvas/…`）。`?open=` 等 query 契約不變，僅主機與 path 前綴改變。
+  3. **單一開源 repo：** 整個 Playgrounds 宿主抽成一個公開儲存庫（**[`sampot/playgrounds`](https://github.com/sampot/playgrounds)**）——含遊樂場介面、`src/sam-runtime/`、`src/sam-host/`、畫布／離線 SW、Host API 與必要工程契約文件。**不**拆成 runtime／UI 兩套件當交付形。
+  4. **舊場暫留：** `https://samkuo.me/playgrounds/` **暫不移除**（同一套碼或凍結快照皆可，過渡期由計劃定）。UI **提醒**使用者：正式場在場網（預設 `play.samkuo.me`）；本機資料綁 origin，請**匯出沙盒（`.sam`）後到新網址匯入**；SecretStore／prefs／WebAuthn 包裝須在新 origin 重設。**不做**跨 origin 自動遷移、**不做**站內 proxy 搬 OPFS。
+  5. **部落格職責：** 文章／`/sam/` 型錄／導覽可留在 `samkuo.me`；新深鏈與型錄「開啟」指向場網（預設 `play`）。讀者可見敘事仍依 DEC-004（勿產品／品牌／行銷腔）；開源＝公開原始碼與可自架，不是產品站。
   6. **階段**以 [PG-STANDALONE-PLAN.md](./PG-STANDALONE-PLAN.md) 為準。
 - **Consequences:**
   - 路徑／origin 須配置化（base path、canvas 前綴、預設 `?open=` origin）；消滅硬編碼 `https://samkuo.me/playgrounds` 作為唯一權威。
-  - 子網域 SW scope 可為 `/` 且**只**服務遊樂場；部落格 `public/sw.js` 日後可卸下 canvas／遊樂場離線職責（過渡期可雙軌）。
+  - 場網 SW scope 可為 `/` 且**只**服務遊樂場；部落格 `public/sw.js` 日後可卸下 canvas／遊樂場離線職責（過渡期可雙軌）。
   - 開源 repo 不含部落格文章、`CONTENT-PLAN`、站台品牌主殼；工程 `AGENTS.md`／DEC 精簡版可進 OSS。
-  - 同步 [GLOSSARY.md](./GLOSSARY.md)、[AGENTS.md](./AGENTS.md)；舊 DEC-016 路徑敘事加「權威改子網域見 DEC-041」。
+  - 同步 [GLOSSARY.md](./GLOSSARY.md)、[AGENTS.md](./AGENTS.md)；舊 DEC-016 路徑敘事加「權威改場網見 DEC-041／042」。
   - 舊場下線時點另立修訂；在此之前不得默默刪除 `samkuo.me/playgrounds/`。
+- **Revision（2026-08-05）：** 部署標的與 wildcard 場網改由 DEC-042 定義；預設展示場改 `play.samkuo.me`。
+
+### DEC-042: Playgrounds Workers 與 `*.samkuo.me` 場網
+
+- **Status:** Accepted（2026-08-05）
+- **Context:** DEC-041 已抽出開源宿主 [`sampot/playgrounds`](https://github.com/sampot/playgrounds)。需要：（1）以 **Cloudflare Workers**（靜態資產／ASSETS）為部署標的，便於 wildcard 自訂網域；（2）用 **子網域切割瀏覽器 origin**，讓多個「場」各自擁有 OPFS／SecretStore／SW，但**程式同一份**——無伺服器端租戶庫。預設展示／文件場名選定 **`play`**（`play.samkuo.me`）。
+- **Decision:**
+  1. **部署標的：** Playgrounds 宿主正式部署＝**Cloudflare Workers**（Astro 靜態產出＋Workers Static Assets 或等價；`wrangler deploy`）。**不以** Cloudflare Pages 為場網主路徑（部落格 `myblog` 仍可 Pages，見 DEC-001）。
+  2. **場網：** DNS／route **`*.samkuo.me`** → 同一 Worker；任意一級子域（通過命名規則者）提供**同一** `dist`。Worker **不**為每個 name 建後端實例；訪即用。
+  3. **預設場：** 文件、部落格深鏈、遷移提醒的預設 host＝**`https://play.samkuo.me`**（根路徑 `/`；畫布 `/canvas/<sandboxId>/…`）。
+  4. **獨立場：** `https://<name>.samkuo.me/`＝獨立 origin＝獨立本機狀態。`<name>` 只是 origin 標籤，不是雲端專案 ID。
+  5. **命名：** `<name>`＝DNS 標籤形（建議 `[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?`）。**保留名**（Worker 可 404／302，勿當一般實驗場）：至少含 apex 語意與站台既有用途——例如 `www`、`blog`、`api`、與 NT²／站務相關子域；**`play` 為官方預設場名**（文件標定；是否禁止他人「搶用」由實作保留表決定，預設保留）。
+  6. **分享連結：** 場內「複製開啟連結」預設用 **`location.origin`**（在哪個場複製就分享哪個場）；文件範例用 `https://play.samkuo.me/?open=…`。
+  7. **SecretStore／WebAuthn：** 預設 **每 origin（每 name）獨立**；不為跨 name 共用而把 RP ID 設成父域（除非日後另立決策）。
+  8. **階段**併入 [PG-STANDALONE-PLAN.md](./PG-STANDALONE-PLAN.md) Phase 4（Workers／wildcard／`play`）。
+- **Consequences:**
+  - 修訂 standalone host 判定：`*.samkuo.me`（非 apex／非保留）→ 根路徑模式；同步 `public/sw.js`／`playgroundsPaths`／canonical URL（`play.samkuo.me`）。
+  - `sampot/playgrounds` CI 改 `wrangler deploy`；DNS 通配憑證涵蓋一級 `*.samkuo.me`。
+  - 同步 GLOSSARY／AGENTS／DEC-025／OPEN-FROM-URL；DEC-041 權威 host 敘事以本決策為準。
+  - **勿**在邊緣為每個 name 做 OPFS／狀態代管；**勿**把 wildcard 做成需註冊帳號的多租戶產品。
+  - 二級以上子域（`a.b.samkuo.me`）非本決策範圍。
 
 ---
 
@@ -800,6 +824,6 @@
 | [PG-BACKEND-RUNTIME-SPEC.md](./PG-BACKEND-RUNTIME-SPEC.md) | 後端執行面／可替換通道（DEC-038；WebRTC 遷移路線） |
 | [PG-BACKEND-RUNTIME-PLAN.md](./PG-BACKEND-RUNTIME-PLAN.md) | Backend Runtime 實作階段（DEC-038） |
 | [PG-MAIN-CONTENT-PLAN.md](./PG-MAIN-CONTENT-PLAN.md) | Main content Editor↔SAM tabs／plain 掛載（DEC-030） |
-| [PG-STANDALONE-PLAN.md](./PG-STANDALONE-PLAN.md) | 獨立子網域／開源單一 repo／舊場暫留（DEC-041） |
+| [PG-STANDALONE-PLAN.md](./PG-STANDALONE-PLAN.md) | 場網／Workers／開源／舊場暫留（DEC-041／042） |
 | [playgrounds-host-api.md](./playgrounds-host-api.md) | Host API v1 快速參考 |
 | `astro.config.ts`／`src/config.ts` | 建置與站台設定實作 |

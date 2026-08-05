@@ -7,10 +7,15 @@
 
 export {
   PLAYGROUNDS_CANONICAL_ORIGIN,
+  PLAYGROUNDS_DEFAULT_FIELD_HOST,
   buildCanonicalOpenUrl,
+  isPlaygroundsFieldHost,
   playgroundsCanonicalHomeUrl,
 } from "../../utils/playgroundsUrls";
-import { PLAYGROUNDS_CANONICAL_ORIGIN } from "../../utils/playgroundsUrls";
+import {
+  PLAYGROUNDS_CANONICAL_ORIGIN,
+  isPlaygroundsFieldHost,
+} from "../../utils/playgroundsUrls";
 
 /** Legacy blog mount (transition; do not delete until Phase 7). */
 export const PLAYGROUNDS_LEGACY_ORIGIN = "https://samkuo.me";
@@ -88,8 +93,8 @@ export function resetPlaygroundsPathsForTests(): void {
 }
 
 /**
- * Infer deploy mode from location.
- * - Host `playgrounds.samkuo.me` / `playgrounds.*` → standalone root.
+ * Infer deploy mode from location (DEC-042).
+ * - Field host `play.samkuo.me` / other `*.samkuo.me` → standalone root.
  * - Path under `/playgrounds` → blog mount.
  * - Else → standalone (local preview at `/`).
  */
@@ -97,12 +102,7 @@ export function detectPlaygroundsBasePath(
   pathname: string,
   hostname = ""
 ): { basePath: string; mode: PlaygroundsDeployMode } {
-  const host = hostname.toLowerCase();
-  if (
-    host === "playgrounds.samkuo.me" ||
-    host.startsWith("playgrounds.") ||
-    host === "playgrounds.localhost"
-  ) {
+  if (isPlaygroundsFieldHost(hostname)) {
     return { basePath: "", mode: "standalone" };
   }
   if (

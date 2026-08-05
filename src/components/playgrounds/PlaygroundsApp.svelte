@@ -5359,7 +5359,7 @@
           class="text-skin-accent underline decoration-dashed underline-offset-2"
           href={playgroundsCanonicalHomeUrl()}
           rel="noopener noreferrer"
-          >playgrounds.samkuo.me</a
+          >play.samkuo.me</a
         >
         。此頁為過渡舊場；沙盒與密鑰綁在這個網址的瀏覽器資料，不會自動過去——請先匯出
         <code class="text-xs">.sam</code>
@@ -5616,7 +5616,7 @@
                 runActionsMenu(() => void handleCopyOpenLink(meta?.source))
               }
               title={canCopyOpenLink
-                ? "複製 playgrounds.samkuo.me/?open=… 連結，對方開啟後會自動匯入"
+                ? "複製 play.samkuo.me/?open=… 連結，對方開啟後會自動匯入"
                 : "需有可分享來源（GitHub 或 .sam 網址）。本機範本／匯入檔無法直接產生連結"}
             >
               <span class={menuIcon} aria-hidden="true"
@@ -7211,7 +7211,7 @@
             class="{btn} gap-1.5"
             disabled={busy || !canOpenShareSource}
             onclick={() => void handleCopyOpenLink(openShareSource)}
-            title="複製 playgrounds.samkuo.me/?open=… 到剪貼簿"
+            title="複製 play.samkuo.me/?open=… 到剪貼簿"
           >
             <PgIcon name="link" size={13} />
             複製開啟連結

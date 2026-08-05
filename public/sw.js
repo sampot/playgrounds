@@ -9,7 +9,7 @@
 /* eslint-disable no-restricted-globals */
 
 // Bump when offline strategy or canvas bridge changes (clears sticky Cache API entries).
-const CACHE_NAME = "samkuo-offline-v11";
+const CACHE_NAME = "samkuo-offline-v12";
 /** Embedded in BRIDGE string — change when console mirror behaviour changes. */
 const CANVAS_BRIDGE_REV = 9;
 const OFFLINE_URL = "/offline/";
@@ -34,14 +34,22 @@ const API_METHODS = new Set(["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"]);
 /** @type {Map<string, { sandboxId: string, generation: number, files: Record<string, { type: string, body: string|ArrayBuffer }> }>} */
 const snapshots = new Map();
 
+/** Align with src/utils/playgroundsUrls.ts `isPlaygroundsFieldHost` (DEC-042). */
 function isStandaloneHost() {
   try {
-    const h = self.location.hostname.toLowerCase();
-    return (
-      h === "playgrounds.samkuo.me" ||
-      h.startsWith("playgrounds.") ||
-      h === "playgrounds.localhost"
-    );
+    const h = self.location.hostname.toLowerCase().replace(/\.$/, "");
+    if (
+      h === "play.localhost" ||
+      h === "playgrounds.localhost" ||
+      h.endsWith(".play.localhost")
+    ) {
+      return true;
+    }
+    if (!h.endsWith(".samkuo.me")) return false;
+    const sub = h.slice(0, -".samkuo.me".length);
+    if (!sub || sub.includes(".")) return false;
+    if (sub === "www" || sub === "blog" || sub === "api") return false;
+    return true;
   } catch {
     return false;
   }

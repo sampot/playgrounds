@@ -1,14 +1,51 @@
 /**
- * Playgrounds share / deep-link URLs (DEC-041).
+ * Playgrounds share / deep-link URLs (DEC-041／042).
  * Kept under `utils/` so catalog／tools pages need not import the app shell.
  */
 
-/** Formal field after cutover. */
-export const PLAYGROUNDS_CANONICAL_ORIGIN = "https://playgrounds.samkuo.me";
+/** Default field host (document／migrate／share examples). */
+export const PLAYGROUNDS_DEFAULT_FIELD_HOST = "play.samkuo.me";
+
+/** Formal default field origin after cutover. */
+export const PLAYGROUNDS_CANONICAL_ORIGIN = `https://${PLAYGROUNDS_DEFAULT_FIELD_HOST}`;
+
+/**
+ * Subdomains that must not run as a Playgrounds field (DEC-042 reserved).
+ * `play` is the official default field — not listed here (it *is* a field).
+ */
+export const PLAYGROUNDS_FIELD_RESERVED_SUBDOMAINS = [
+  "www",
+  "blog",
+  "api",
+] as const;
 
 /** Canonical home URL (trailing slash). */
 export function playgroundsCanonicalHomeUrl(): string {
   return `${PLAYGROUNDS_CANONICAL_ORIGIN}/`;
+}
+
+/**
+ * True when hostname is a field-net host: `play.samkuo.me` or other
+ * single-label `*.samkuo.me` (excluding reserved), plus local test hosts.
+ */
+export function isPlaygroundsFieldHost(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/\.$/, "");
+  if (
+    host === "play.localhost" ||
+    host === "playgrounds.localhost" ||
+    host.endsWith(".play.localhost")
+  ) {
+    return true;
+  }
+  if (!host.endsWith(".samkuo.me")) return false;
+  const sub = host.slice(0, -".samkuo.me".length);
+  if (!sub || sub.includes(".")) return false;
+  if (
+    (PLAYGROUNDS_FIELD_RESERVED_SUBDOMAINS as readonly string[]).includes(sub)
+  ) {
+    return false;
+  }
+  return true;
 }
 
 /**

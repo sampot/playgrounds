@@ -395,7 +395,7 @@ export function canBuildOpenUrlFromSource(
 
 /**
  * Build a shareable Playgrounds deep link (DEC-041).
- * Default: canonical `https://playgrounds.samkuo.me/?open=…`.
+ * Default: canonical `https://play.samkuo.me/?open=…`.
  * Pass `origin` / `playgroundsPath` to override (same-origin copy / tests).
  */
 export function buildPlaygroundsOpenUrl(

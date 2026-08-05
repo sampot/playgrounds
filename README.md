@@ -2,18 +2,21 @@
 
 Browser host for **SAM** (Single-page Application Module) sandboxes: OPFS workspace, canvas via Service Worker, optional agents, WASI shell, SecretStore.
 
-- **Live:** [https://playgrounds.samkuo.me/](https://playgrounds.samkuo.me/)
+- **Default field:** [https://play.samkuo.me/](https://play.samkuo.me/)
+- **Field net:** any `https://<name>.samkuo.me/` — same build, separate browser origin (OPFS / secrets / SW)
+- **Deploy target:** Cloudflare Workers (static assets + wildcard `*.samkuo.me`)
 - **Author notes:** [samkuo.me](https://samkuo.me/) (personal blog; not a product site)
-- **Transition:** `https://samkuo.me/playgrounds/` still works; export `.sam` then import here (data is origin-bound)
+- **Transition:** `https://samkuo.me/playgrounds/` still works; export `.sam` then import on the field you want (data is origin-bound)
+
+Decisions: DEC-041 (extract / legacy mount), DEC-042 (Workers / wildcard / `play`) — see `docs/` (snapshot from the blog docs set).
 
 ## Develop
 
 ```bash
+cp .env.example .env   # PUBLIC_PLAYGROUNDS_BASE_PATH= for root mount
 npm install
 npm run dev
 ```
-
-Defaults to standalone paths (`/` + `/canvas/…`) via `PUBLIC_PLAYGROUNDS_BASE_PATH=` in `.env`.
 
 ```bash
 npm test
@@ -23,8 +26,10 @@ npm run build
 ## Open a SAM
 
 ```
-https://playgrounds.samkuo.me/?open=sampot/pg-steward&name=總管
+https://play.samkuo.me/?open=sampot/pg-steward&name=總管
 ```
+
+On another field, the same query works with that host (in-app “copy open link” should use `location.origin`).
 
 ## Layout
 

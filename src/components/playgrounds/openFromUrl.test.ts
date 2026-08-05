@@ -204,16 +204,14 @@ describe("defaultNameFromOpenIntent / sourceLabelFromOpenIntent", () => {
 describe("buildPlaygroundsOpenUrl / canBuildOpenUrlFromSource", () => {
   it("builds deep link on canonical origin by default (DEC-041)", () => {
     expect(buildPlaygroundsOpenUrl("acme/demo")).toBe(
-      "https://playgrounds.samkuo.me/?open=acme%2Fdemo"
+      "https://play.samkuo.me/?open=acme%2Fdemo"
     );
     expect(
       buildPlaygroundsOpenUrl("acme/demo", {
         as: "agent",
         fresh: true,
       })
-    ).toBe(
-      "https://playgrounds.samkuo.me/?open=acme%2Fdemo&as=agent&fresh=1"
-    );
+    ).toBe("https://play.samkuo.me/?open=acme%2Fdemo&as=agent&fresh=1");
   });
 
   it("allows legacy blog origin override", () => {

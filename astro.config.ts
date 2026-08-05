@@ -4,7 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 
 // Standalone Playgrounds host (DEC-041): root `/`, canvas `/canvas/`.
 export default defineConfig({
-  site: "https://playgrounds.samkuo.me",
+  site: "https://play.samkuo.me",
   trailingSlash: "always",
   devToolbar: { enabled: false },
   integrations: [svelte()],

@@ -6,6 +6,7 @@ import {
   configurePlaygroundsPaths,
   detectPlaygroundsBasePath,
   isPlaygroundsCanvasPathname,
+  isPlaygroundsFieldHost,
   isPlaygroundsLegacyMount,
   isPlaygroundsShellPathname,
   playgroundsCanvasPrefix,
@@ -29,14 +30,26 @@ describe("detectPlaygroundsBasePath", () => {
     ).toEqual({ basePath: "/playgrounds", mode: "blog" });
   });
 
-  it("detects standalone host and root", () => {
-    expect(
-      detectPlaygroundsBasePath("/", "playgrounds.samkuo.me")
-    ).toEqual({ basePath: "", mode: "standalone" });
+  it("detects field hosts (play + wildcard)", () => {
+    expect(detectPlaygroundsBasePath("/", "play.samkuo.me")).toEqual({
+      basePath: "",
+      mode: "standalone",
+    });
+    expect(detectPlaygroundsBasePath("/", "alice.samkuo.me")).toEqual({
+      basePath: "",
+      mode: "standalone",
+    });
     expect(detectPlaygroundsBasePath("/", "localhost")).toEqual({
       basePath: "",
       mode: "standalone",
     });
+  });
+
+  it("does not treat reserved subdomains as fields", () => {
+    expect(isPlaygroundsFieldHost("www.samkuo.me")).toBe(false);
+    expect(isPlaygroundsFieldHost("blog.samkuo.me")).toBe(false);
+    expect(isPlaygroundsFieldHost("api.samkuo.me")).toBe(false);
+    expect(isPlaygroundsFieldHost("play.samkuo.me")).toBe(true);
   });
 });
 
@@ -55,7 +68,7 @@ describe("path builders", () => {
   it("applies from location", () => {
     const cfg = applyPlaygroundsPathsFromLocation({
       pathname: "/",
-      hostname: "playgrounds.samkuo.me",
+      hostname: "play.samkuo.me",
     });
     expect(cfg.mode).toBe("standalone");
     expect(playgroundsHomePath()).toBe("/");
@@ -82,20 +95,18 @@ describe("pathname classifiers", () => {
 
   it("flags legacy mount for migrate banner", () => {
     expect(isPlaygroundsLegacyMount("/playgrounds/", "samkuo.me")).toBe(true);
-    expect(isPlaygroundsLegacyMount("/", "playgrounds.samkuo.me")).toBe(false);
+    expect(isPlaygroundsLegacyMount("/", "play.samkuo.me")).toBe(false);
   });
 });
 
 describe("canonical open URL", () => {
-  it("defaults to playgrounds.samkuo.me root", () => {
+  it("defaults to play.samkuo.me root", () => {
     expect(buildCanonicalOpenUrl("sampot/demo")).toBe(
       `${PLAYGROUNDS_CANONICAL_ORIGIN}/?open=sampot%2Fdemo`
     );
     expect(
       buildCanonicalOpenUrl("acme/demo", { as: "agent", fresh: true })
-    ).toBe(
-      `${PLAYGROUNDS_CANONICAL_ORIGIN}/?open=acme%2Fdemo&as=agent&fresh=1`
-    );
+    ).toBe(`${PLAYGROUNDS_CANONICAL_ORIGIN}/?open=acme%2Fdemo&as=agent&fresh=1`);
   });
 });
 
