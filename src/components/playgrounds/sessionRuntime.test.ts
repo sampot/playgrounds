@@ -292,6 +292,24 @@ describe("SessionRuntime", () => {
     });
   });
 
+  it("invokes afterPublish hook with published items", () => {
+    const rt = setup();
+    rt.open("host-1", protocol);
+    const seen: { sessionId: string; seq: number; event: unknown }[] = [];
+    rt.setAfterPublish(items => {
+      seen.push(...items);
+    });
+    const s = rt.getSession()!;
+    rt.publishEvents([{ type: "a" }, { type: "b" }]);
+    expect(seen).toHaveLength(2);
+    expect(seen[0]).toMatchObject({
+      sessionId: s.sessionId,
+      seq: 1,
+      event: { type: "a" },
+    });
+    expect(seen[1]).toMatchObject({ seq: 2, event: { type: "b" } });
+  });
+
   it("defaults via to apply when omitted", () => {
     const rt = setup();
     rt.open("host-1", { ...protocol, joinPolicy: "invite_only" });

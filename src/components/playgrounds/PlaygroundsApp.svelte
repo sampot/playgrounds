@@ -10,8 +10,16 @@
   import {
     inviteRosterAvatarToSession,
     registerRosterInviteAcceptedHandler,
+    registerRosterRemoteActHandler,
+    registerRosterHomeSeatReadyHandler,
     setRosterOpenSession,
     getRosterProjectionSandboxId,
+    sendSessionSeatBound,
+    sendRosterRelayPayload,
+    SESSION_EVENT_KIND,
+    SESSION_SEAT_BOUND_KIND,
+    buildSessionActResultPayload,
+    type SessionActPayload,
   } from "./roster";
   import {
     assertCanvasEntryServed,
@@ -144,6 +152,9 @@
     clearAllSessionBridges,
     registerSessionBridge,
     SessionBridgeError,
+    SESSION_API_VERSION,
+    SESSION_CAPABILITIES,
+    type SessionBridge,
   } from "./sessionBridge";
   import { SessionRuntime } from "./sessionRuntime";
   import FleetPanel from "./fleet/FleetPanel.svelte";
@@ -556,6 +567,8 @@
   let agentRuntimeStatus = $state<AgentRuntimeHubStatus | null>(null);
   let unsubAgentRuntimeRole: (() => void) | null = null;
   let unregRosterInviteAccepted: (() => void) | null = null;
+  let unregRosterRemoteAct: (() => void) | null = null;
+  let unregRosterHomeSeatReady: (() => void) | null = null;
   let agentIframeEl = $state<HTMLIFrameElement | null>(null);
   /** Agent canvas loaded for this project id; cold while Files tab on boot. */
   let agentUiMountedId: string | null = null;
@@ -576,6 +589,31 @@
   let openMainAsTool = $state(false);
   /** Multi-agent session (DEC-023). */
   const sessionRuntime = new SessionRuntime();
+  sessionRuntime.setAfterPublish(items => {
+    const session = sessionRuntime.getSession();
+    if (!session) return;
+    const remotes = session.seats.filter(
+      s => s.remote?.peerAgentId && typeof s.remote.peerAgentId === "string"
+    );
+    if (!remotes.length) return;
+    for (const item of items) {
+      for (const seat of remotes) {
+        try {
+          sendRosterRelayPayload(
+            {
+              kind: SESSION_EVENT_KIND,
+              sessionId: item.sessionId,
+              seq: item.seq,
+              event: item.event,
+            },
+            seat.remote!.peerAgentId
+          );
+        } catch {
+          /* peer DC may be down */
+        }
+      }
+    }
+  });
   let multiAgentSession = $state<MultiAgentSession | null>(null);
   let participantFilesById = $state<Record<string, FileMap>>({});
   /** Stable seat list for background iframes (do not put generation here — avoids attach loops). */
@@ -3183,6 +3221,63 @@
     }
   }
 
+  function createRemoteProjectionSessionBridge(opts: {
+    runtime: SessionRuntime;
+    seatId: string;
+  }): SessionBridge {
+    return {
+      async apiVersion() {
+        return SESSION_API_VERSION;
+      },
+      async capabilities() {
+        return [...SESSION_CAPABILITIES];
+      },
+      async getSeat() {
+        const session = opts.runtime.getSession();
+        if (!session) {
+          throw new SessionBridgeError("session_inactive", "目前沒有 session");
+        }
+        const seat = opts.runtime.getSeat(opts.seatId);
+        if (!seat) {
+          throw new SessionBridgeError("session_inactive", "座位已失效");
+        }
+        return {
+          sessionId: session.sessionId,
+          seatId: seat.seatId,
+          role: seat.role,
+          participantId: seat.sandboxId ?? seat.seatId,
+          hostSandboxId: session.hostSandboxId,
+          status: session.status,
+        };
+      },
+      async getState() {
+        throw new SessionBridgeError(
+          "forbidden",
+          "遠端座位狀態請在 homePeer 以事件為準"
+        );
+      },
+      async getEventChannel() {
+        const name = opts.runtime.getChannelName();
+        if (!name) {
+          throw new SessionBridgeError("session_inactive", "目前沒有 session");
+        }
+        return { name };
+      },
+      async act() {
+        throw new SessionBridgeError(
+          "forbidden",
+          "遠端座位請在 homePeer 發言（act 經 Roster 隧道）"
+        );
+      },
+      async leave() {
+        throw new SessionBridgeError(
+          "forbidden",
+          "遠端座位請由主持場請離"
+        );
+      },
+    };
+  }
+
   async function joinMultiAgentSeat(opts: {
     sandboxId: string;
     role: string;
@@ -3229,24 +3324,26 @@
       [opts.sandboxId]: pFiles,
     };
     await syncSessionSeatAgent(opts.sandboxId, pFiles);
-    registerSessionBridge(
-      seat.seatId,
-      opts.sandboxId,
-      createShellSessionBridge({
-        runtime: sessionRuntime,
-        seatId: seat.seatId,
-        sandboxId: opts.sandboxId,
-        getHostFiles: () => {
-          const hid = sessionRuntime.getSession()?.hostSandboxId;
-          return hid
-            ? resolveSessionHostFiles(hid)
-            : Promise.resolve(files);
-        },
-        onLeaveSeat: id => leaveMultiAgentSeat(id),
-        onHostFileWrites: (writes, targetSandboxId) =>
-          applyHostFileWrites(writes, targetSandboxId),
-      })
-    );
+    const bridge: SessionBridge = opts.remote
+      ? createRemoteProjectionSessionBridge({
+          runtime: sessionRuntime,
+          seatId: seat.seatId,
+        })
+      : createShellSessionBridge({
+          runtime: sessionRuntime,
+          seatId: seat.seatId,
+          sandboxId: opts.sandboxId,
+          getHostFiles: () => {
+            const hid = sessionRuntime.getSession()?.hostSandboxId;
+            return hid
+              ? resolveSessionHostFiles(hid)
+              : Promise.resolve(files);
+          },
+          onLeaveSeat: id => leaveMultiAgentSeat(id),
+          onHostFileWrites: (writes, targetSandboxId) =>
+            applyHostFileWrites(writes, targetSandboxId),
+        });
+    registerSessionBridge(seat.seatId, opts.sandboxId, bridge);
     participantGenerations.set(seat.seatId, 0);
     participantIframes = [
       ...participantIframes,
@@ -3293,7 +3390,7 @@
       return;
     }
     try {
-      await joinMultiAgentSeat({
+      const joined = await joinMultiAgentSeat({
         sandboxId,
         role: ev.role,
         protocolId: session.protocol.protocolId,
@@ -3304,11 +3401,122 @@
           inviteId: ev.inviteId,
         },
       });
+      const open = sessionRuntime.getSession();
+      if (open) {
+        sendSessionSeatBound(
+          {
+            kind: SESSION_SEAT_BOUND_KIND,
+            inviteId: ev.inviteId,
+            sessionId: open.sessionId,
+            seatId: joined.seatId,
+            role: joined.role,
+            channelName: open.channelName,
+          },
+          ev.peerAgentId
+        );
+        status = `化身已入座；seat_bound 已送出（${joined.role}）`;
+      }
     } catch (e) {
       status =
         e instanceof Error
           ? `化身入座失敗：${e.message}`
           : `化身入座失敗：${String(e)}`;
+    }
+  }
+
+  async function onRosterRemoteAct(ev: {
+    fromPeerId: string;
+    act: SessionActPayload;
+  }): Promise<void> {
+    const { act, fromPeerId } = ev;
+    const reply = (
+      ok: boolean,
+      result?: unknown,
+      error?: { code: string; message: string }
+    ) => {
+      try {
+        sendRosterRelayPayload(
+          buildSessionActResultPayload({
+            requestId: act.requestId,
+            sessionId: act.sessionId,
+            ok,
+            result,
+            error,
+          }),
+          fromPeerId
+        );
+      } catch {
+        /* ignore */
+      }
+    };
+    const session = sessionRuntime.getSession();
+    if (!session || session.sessionId !== act.sessionId) {
+      reply(false, undefined, {
+        code: "session_inactive",
+        message: "通道已關閉或 session 不符",
+      });
+      return;
+    }
+    const seat = sessionRuntime
+      .listSeats()
+      .find(
+        s =>
+          s.seatId === act.seatId &&
+          s.remote?.inviteId === act.inviteId &&
+          s.remote?.peerAgentId === fromPeerId
+      );
+    if (!seat?.sandboxId) {
+      reply(false, undefined, {
+        code: "not_found",
+        message: "找不到遠端座位",
+      });
+      return;
+    }
+    try {
+      const bridge = createShellSessionBridge({
+        runtime: sessionRuntime,
+        seatId: seat.seatId,
+        sandboxId: seat.sandboxId,
+        getHostFiles: () => {
+          const hid = sessionRuntime.getSession()?.hostSandboxId;
+          return hid
+            ? resolveSessionHostFiles(hid)
+            : Promise.resolve(files);
+        },
+        onLeaveSeat: id => leaveMultiAgentSeat(id),
+        onHostFileWrites: (writes, targetSandboxId) =>
+          applyHostFileWrites(writes, targetSandboxId),
+      });
+      const result = await bridge.act(act.payload);
+      reply(true, result);
+    } catch (e) {
+      const code =
+        e instanceof SessionBridgeError
+          ? e.code
+          : e instanceof HostBridgeError
+            ? e.code
+            : "act_rejected";
+      reply(false, undefined, {
+        code,
+        message: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+
+  async function onRosterHomeSeatReady(ev: {
+    sandboxId: string;
+    seatId: string;
+    sessionId: string;
+    inviteId: string;
+  }): Promise<void> {
+    try {
+      await openProject(ev.sandboxId);
+      status = `遠端座位橋已就緒（可發言）`;
+    } catch (e) {
+      status =
+        e instanceof Error
+          ? `開啟遠端座位失敗：${e.message}`
+          : `開啟遠端座位失敗：${String(e)}`;
     }
   }
 
@@ -5175,6 +5383,12 @@
       onRosterInviteAccepted(ev)
     );
     unregRosterInviteAccepted = unregRosterInvite;
+    unregRosterRemoteAct = registerRosterRemoteActHandler(ev =>
+      onRosterRemoteAct(ev)
+    );
+    unregRosterHomeSeatReady = registerRosterHomeSeatReadyHandler(ev =>
+      onRosterHomeSeatReady(ev)
+    );
     if (
       isPlaygroundsLegacyMount(
         window.location.pathname,
@@ -5652,6 +5866,10 @@
   onDestroy(() => {
     unregRosterInviteAccepted?.();
     unregRosterInviteAccepted = null;
+    unregRosterRemoteAct?.();
+    unregRosterRemoteAct = null;
+    unregRosterHomeSeatReady?.();
+    unregRosterHomeSeatReady = null;
     unsubAgentRuntimeRole?.();
     unsubAgentRuntimeRole = null;
     setSessionMailboxFanout(null);

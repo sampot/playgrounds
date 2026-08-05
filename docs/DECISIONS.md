@@ -429,6 +429,7 @@
 - **Revision（2026-08-05）：** 遠端 Roster／Avatar／薄 signaling（一次 offer／answer）見 [DEC-045](#dec-045-playgrounds-跨場-rosteravatar與薄-signaling)；本筆本地範圍暫不變，遠端座位於 Roster Phase 3 再修訂。
 - **Revision（2026-08-05）：** 邀請附完整 protocol 規格；型錄虛擬可用＋lazy install（類比 virtual actor）；Avatar 不特規協定路徑（與 DEC-045 對齊）。
 - **Revision（2026-08-05）：** Roster Phase 3 第一刀：遠端 `session_invite*` 握手＋Host 場 Avatar 投影 proxy 入座（`seat.remote`）；`act`／事件隧道與 lazy install 仍未通。
+- **Revision（2026-08-05）：** Roster Phase 3 第二刀：遠端 `act`／事件經 Roster DataChannel 隧道（權威仍在 Host 場 `/api/session/act`；homePeer 不開第二個 SessionRuntime）；lazy install 仍未通。
 
 ### DEC-024: SAM 三層模型與 headless runtime
 
@@ -880,6 +881,7 @@
 - **Revision（2026-08-05）：** Session 不特規 Avatar；邀請附完整 protocol 規格；型錄虛擬可用＋lazy install（與 DEC-023 對齊）。
 - **Revision（2026-08-05）：** Phase 2.5 落地：本機 `roster_avatar` 投影 SAM＋化身卡片 iframe；DataChannel `avatar_relay` ping／pong；斷線 teardown。
 - **Revision（2026-08-05）：** Phase 3 第一刀：`session_invite*` 握手；Host 投影 proxy 入座（`seat.remote`）；化身 tab／腦力激盪「邀請化身入座」；act／事件／lazy install 未通。
+- **Revision（2026-08-05）：** Phase 3 第二刀：`session_seat_bound`／`session_act*`／`session_event`；Host 權威 act＋對 `seat.remote` fanout 事件；homePeer tunnel bridge；lazy install 仍開。
 
 
 ### DEC-046: Playgrounds 型錄結構化資料與查詢面

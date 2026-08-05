@@ -1,6 +1,6 @@
 # Playgrounds 跨場 Roster／Avatar 計劃（DEC-045）
 
-> **狀態：** Phase 0 完成；Phase 1–2.5 **已落地**；Phase 3 **第一刀已落地**（遠端 session 邀請握手＋proxy 入座；act／事件／lazy install 未通）  
+> **狀態：** Phase 0 完成；Phase 1–2.5 **已落地**；Phase 3 **第一／二刀已落地**（邀請握手＋proxy 入座＋act／事件隧道；**lazy install 未通**）  
 > **權威決策：** [DECISIONS.md](./DECISIONS.md) **DEC-045**  
 > **相關：** DEC-017（側欄 Files／總管）、DEC-023（本地 session；邀請＋protocol 規格＋型錄 lazy install）、DEC-031（peer／homePeer／virtual actor）、DEC-038（WebRTC 通道路線）、DEC-042（場網／無租戶）、[GLOSSARY.md](./GLOSSARY.md)
 
@@ -17,9 +17,9 @@
 | **homePeer 真身** | 對方場裡的實際 agent／執行與沙盒權威；mailbox／狀態真相在彼。 |
 | **為什麼叫化身** | Avatar 代替真實使用者，在本場裡當虛擬代理／投影——不是對方本機的 clone。 |
 
-**權威：** 投影不擁有對方 OPFS／Durable 權威；訊息與（後段）`act`／事件經 Roster DataChannel 轉回對方 `homePeer`。斷線 → 撕掉本場投影實例，不殘留對方權威資料。
+**權威：** 投影不擁有對方 OPFS／Durable 權威；訊息與 `act`／事件經 Roster DataChannel 轉回對方 `homePeer`（Host 場仍為 session 權威）。斷線 → 撕掉本場投影實例，不殘留對方權威資料。
 
-**Phase 1–3.1 現況：** 連上即 spawn 投影 Avatar；DataChannel 含 `avatar_relay` ping／pong 與 **session_invite*** 握手。Host 可邀化身入座（brainstorm.v1 狗糧）；座位標記 `remote`（proxy）。**尚未**通 act／事件隧道或型錄 lazy install（Phase 3 第二刀）。
+**Phase 1–3.2 現況：** 連上即 spawn 投影 Avatar；DataChannel 含 `avatar_relay`（ping／pong、`session_invite*`、`session_seat_bound`／`session_act`／`session_act_result`／`session_event`）。Host 可邀化身入座（brainstorm.v1 狗糧）；座位標記 `remote`（proxy）；權威 act 在 Host，homePeer 經隧道發言並收事件。**尚未**型錄 lazy install（Phase 3 第三刀）。
 
 ### Session 與協定（不特規 Avatar）
 
@@ -103,7 +103,7 @@ layout 還原：側欄 tab 鍵 `avatars`（與 `files`／`agent` 一併 persist�
 | **1. Transport** | 非 trickle＋樣板編解碼；**QR 與文字**；可選同區網進一步剪裁 | 一般／同區網皆可 handshake；DataChannel ping | **完成** |
 | **2. Presence stub＋側欄** | 連入後雙方列表＋identicon；斷線清除 | 雙方互見對方 stub（投影 SAM 前身） | **完成** |
 | **2.5. 投影 Avatar SAM** | 連上即在本場 spawn 薄投影 Avatar；卡片掛其 UI；DataChannel 轉發 | 斷線撕投影；權威仍在 homePeer | **完成** |
-| **3. Session bridge** | 遠端 invite／`act`／事件經投影轉 homePeer；**邀請附完整 protocol 規格**；型錄匹配／**lazy install**；修訂 DEC-023 遠端範圍 | 狗糧可邀遠端 Avatar 入座；與本機 Participant 同一協定閘 | **進行中**（第一刀：邀請握手＋proxy 入座；act／lazy install 未通） |
+| **3. Session bridge** | 遠端 invite／`act`／事件經投影轉 homePeer；**邀請附完整 protocol 規格**；型錄匹配／**lazy install**；修訂 DEC-023 遠端範圍 | 狗糧可邀遠端 Avatar 入座；與本機 Participant 同一協定閘 | **進行中**（3.1 邀請＋proxy；**3.2 act／事件隧道**；lazy install 未通） |
 | **4. UX** | 開放連入／邀請連結／權限 | 非工程使用者可走完 | 未開始 |
 | **5.（可選）** | 自備 TURN；mailbox 跨 peer；自訂頭像 | 另規 | 未開始 |
 
@@ -128,3 +128,4 @@ layout 還原：側欄 tab 鍵 `avatars`（與 `files`／`agent` 一併 persist�
 | 2026-08-05 | **Session：** 不為 Avatar 特規協定；邀請附**完整 protocol 規格**；型錄＝虛擬可用＋**lazy install**（類比 virtual actor）；Phase 3 與 DEC-023 對齊 |
 | 2026-08-05 | Phase 2.5：`roster_avatar` 投影 SAM＋卡片 iframe；`avatar_relay` ping／pong |
 | 2026-08-05 | Phase 3 第一刀：`session_invite*` 握手；Host 投影 proxy 入座；化身 tab 接受／拒絕；act 橋未通 |
+| 2026-08-05 | Phase 3 第二刀：`session_seat_bound`／`session_act`／`session_act_result`／`session_event`；Host 權威 act＋事件 fanout；homePeer tunnel `env.SESSION`；lazy install 仍開 |

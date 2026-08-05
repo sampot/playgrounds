@@ -24,6 +24,10 @@
     isSessionInviteCancelPayload,
     isSessionInvitePayload,
     isSessionInviteRejectPayload,
+    isSessionSeatBoundPayload,
+    isSessionActPayload,
+    isSessionActResultPayload,
+    isSessionEventRelayPayload,
     listRosterAvatars,
     clearRosterAvatars,
     removeRosterAvatar,
@@ -40,13 +44,20 @@
     subscribeRosterSessionHub,
     inviteRosterAvatarToSession,
     notifyRosterInviteAccepted,
+    notifyRosterRemoteAct,
+    notifyRosterHomeSeatReady,
     rosterCanInviteToSession,
+    createRosterSessionTunnelBridge,
+    publishRosterRelayedSessionEvent,
+    applySessionActResultFromRelay,
+    bindingFromSeatBound,
     type RosterAvatarRelayMsg,
     type RosterAvatarStub,
     type RosterPeerHandlers,
     type RosterPeerSession,
     type SessionInvitePayload,
   } from "./index";
+  import { registerSessionBridge } from "../sessionBridge";
 
   const btn =
     "inline-flex items-center justify-center rounded-md border border-skin-line bg-skin-card px-2 py-1 text-xs font-medium text-skin-base transition hover:bg-skin-card disabled:opacity-40";
@@ -79,6 +90,12 @@
   let outboundSessionId = $state<string | null>(null);
   let canInvite = $state(false);
   let inviteBusy = $state(false);
+  /** inviteId → homePeer participant sandbox (accept path). */
+  const homeSandboxByInvite = new Map<string, string>();
+  /** sessionId → BroadcastChannel name for relayed events. */
+  const tunnelChannelBySession = new Map<string, string>();
+  /** inviteId → seatId for tunnel bridge teardown. */
+  const tunnelSeatByInvite = new Map<string, string>();
 
   const localAgentId = (() => {
     try {
@@ -168,6 +185,7 @@
   }
 
   async function teardownAllProjections(): Promise<void> {
+    clearHomeSessionTunnels();
     const ids = clearRosterAvatars();
     iframeByAgent.clear();
     filesByAgent.clear();
@@ -318,6 +336,16 @@
     }
   }
 
+  function clearHomeSessionTunnels(): void {
+    for (const [inviteId, seatId] of tunnelSeatByInvite) {
+      const sandboxId = homeSandboxByInvite.get(inviteId);
+      if (sandboxId) registerSessionBridge(seatId, sandboxId, null);
+    }
+    tunnelSeatByInvite.clear();
+    tunnelChannelBySession.clear();
+    homeSandboxByInvite.clear();
+  }
+
   function onAvatarRelay(msg: RosterAvatarRelayMsg): void {
     if (msg.from === localAgentId) return;
     const payload = msg.payload;
@@ -356,6 +384,46 @@
       }
       return;
     }
+    if (isSessionSeatBoundPayload(payload)) {
+      const homeSandboxId = homeSandboxByInvite.get(payload.inviteId);
+      if (!homeSandboxId || !peerAgentId) {
+        status = "收到 seat_bound，但本機參與者沙盒遺失";
+        return;
+      }
+      const binding = bindingFromSeatBound(
+        payload,
+        homeSandboxId,
+        peerAgentId
+      );
+      const bridge = createRosterSessionTunnelBridge({
+        binding,
+        send: (act, to) => sendAvatarRelay(act, to),
+      });
+      registerSessionBridge(binding.seatId, homeSandboxId, bridge);
+      tunnelChannelBySession.set(binding.sessionId, binding.channelName);
+      tunnelSeatByInvite.set(binding.inviteId, binding.seatId);
+      notifyRosterHomeSeatReady({
+        sandboxId: homeSandboxId,
+        seatId: binding.seatId,
+        sessionId: binding.sessionId,
+        inviteId: binding.inviteId,
+      });
+      status = "遠端座位橋已就緒（可發言）";
+      return;
+    }
+    if (isSessionActPayload(payload)) {
+      notifyRosterRemoteAct({ fromPeerId: msg.from, act: payload });
+      return;
+    }
+    if (isSessionActResultPayload(payload)) {
+      applySessionActResultFromRelay(payload);
+      return;
+    }
+    if (isSessionEventRelayPayload(payload)) {
+      const channel = tunnelChannelBySession.get(payload.sessionId);
+      if (channel) publishRosterRelayedSessionEvent(channel, payload);
+      return;
+    }
     // Deliver ping／pong into the local projection that represents the sender.
     postRelayToIframe(msg.from, payload);
   }
@@ -384,8 +452,9 @@
         },
         peerAgentId
       );
+      homeSandboxByInvite.set(invite.inviteId, meta.id);
       pendingIncoming = null;
-      status = "已接受邀請（本機參與者已備妥；act 橋尚未接通）";
+      status = "已接受邀請（本機參與者已備妥；等待 seat_bound）";
     } catch (e) {
       error =
         e instanceof Error
@@ -445,6 +514,7 @@
     pendingIncoming = null;
     outboundInviteId = null;
     outboundSessionId = null;
+    clearHomeSessionTunnels();
     if (peerAgentId) {
       const sandboxId = removeRosterAvatar(peerAgentId);
       filesByAgent.delete(peerAgentId);

@@ -65,6 +65,18 @@ function newId(prefix: string): string {
 export class SessionRuntime {
   private session: MultiAgentSession | null = null;
   private channel: BroadcastChannel | null = null;
+  private afterPublish:
+    | ((items: { sessionId: string; seq: number; event: unknown }[]) => void)
+    | null = null;
+
+  /** Hook for Roster remote event fanout (DEC-045 Phase 3.2). */
+  setAfterPublish(
+    fn:
+      | ((items: { sessionId: string; seq: number; event: unknown }[]) => void)
+      | null
+  ): void {
+    this.afterPublish = fn;
+  }
 
   getSession(): MultiAgentSession | null {
     return this.session;
@@ -244,10 +256,16 @@ export class SessionRuntime {
       seq: number;
       event: unknown;
     }[] = [];
+    const published: { sessionId: string; seq: number; event: unknown }[] = [];
     for (const event of events) {
       s.seq += 1;
       publishSessionEvent(this.channel, {
         type: "session-event",
+        sessionId: s.sessionId,
+        seq: s.seq,
+        event,
+      });
+      published.push({
         sessionId: s.sessionId,
         seq: s.seq,
         event,
@@ -264,6 +282,11 @@ export class SessionRuntime {
       }
     }
     void fanoutSessionEventsToMailboxes(mailboxItems);
+    try {
+      this.afterPublish?.(published);
+    } catch {
+      /* relay must not break local publish */
+    }
     return s.seq;
   }
 

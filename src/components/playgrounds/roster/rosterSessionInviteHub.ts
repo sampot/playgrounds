@@ -1,13 +1,15 @@
 /**
- * Coordinates PlaygroundsApp ↔ AvatarsPanel for roster session invites (Phase 3.1).
+ * Coordinates PlaygroundsApp ↔ AvatarsPanel for roster session invites／act (DEC-045).
  */
 
 import type { MultiAgentSession } from "../sessionTypes";
 import type { RosterAvatarRelayMsg } from "./rosterPeer";
 import {
   buildSessionInvitePayload,
+  type SessionActPayload,
   type SessionInviteAcceptPayload,
   type SessionInvitePayload,
+  type SessionSeatBoundPayload,
 } from "./rosterSessionBridge";
 
 export type RosterSessionOpenSnapshot = {
@@ -24,6 +26,18 @@ export type RosterInviteAcceptedEvent = {
   homeSandboxId?: string;
 };
 
+export type RosterRemoteActRequest = {
+  fromPeerId: string;
+  act: SessionActPayload;
+};
+
+export type RosterHomeSeatReadyEvent = {
+  sandboxId: string;
+  seatId: string;
+  sessionId: string;
+  inviteId: string;
+};
+
 type Listener = () => void;
 
 let openSession: RosterSessionOpenSnapshot | null = null;
@@ -35,6 +49,12 @@ let getProjectionSandboxId: ((peerAgentId: string) => string | undefined) | null
   null;
 let onAccepted:
   | ((ev: RosterInviteAcceptedEvent) => void | Promise<void>)
+  | null = null;
+let onRemoteAct:
+  | ((ev: RosterRemoteActRequest) => void | Promise<void>)
+  | null = null;
+let onHomeSeatReady:
+  | ((ev: RosterHomeSeatReadyEvent) => void | Promise<void>)
   | null = null;
 
 const listeners = new Set<Listener>();
@@ -84,12 +104,39 @@ export function registerRosterRelayTransport(opts: {
   };
 }
 
+/** Send any avatar_relay payload (invite／seat_bound／act／event). */
+export function sendRosterRelayPayload(
+  payload: RosterAvatarRelayMsg["payload"],
+  to?: string
+): void {
+  if (!sendRelay) throw new Error("化身連線尚未就緒");
+  sendRelay(payload, to);
+}
+
 export function registerRosterInviteAcceptedHandler(
   handler: (ev: RosterInviteAcceptedEvent) => void | Promise<void>
 ): () => void {
   onAccepted = handler;
   return () => {
     if (onAccepted === handler) onAccepted = null;
+  };
+}
+
+export function registerRosterRemoteActHandler(
+  handler: (ev: RosterRemoteActRequest) => void | Promise<void>
+): () => void {
+  onRemoteAct = handler;
+  return () => {
+    if (onRemoteAct === handler) onRemoteAct = null;
+  };
+}
+
+export function registerRosterHomeSeatReadyHandler(
+  handler: (ev: RosterHomeSeatReadyEvent) => void | Promise<void>
+): () => void {
+  onHomeSeatReady = handler;
+  return () => {
+    if (onHomeSeatReady === handler) onHomeSeatReady = null;
   };
 }
 
@@ -136,10 +183,29 @@ export function notifyRosterInviteAccepted(
   void onAccepted?.(ev);
 }
 
+export function notifyRosterRemoteAct(ev: RosterRemoteActRequest): void {
+  void onRemoteAct?.(ev);
+}
+
+export function notifyRosterHomeSeatReady(ev: RosterHomeSeatReadyEvent): void {
+  void onHomeSeatReady?.(ev);
+}
+
 export function getRosterProjectionSandboxId(
   peerAgentId: string
 ): string | undefined {
   return getProjectionSandboxId?.(peerAgentId);
+}
+
+export function getRosterConnectedPeerId(): string | null {
+  return getPeerAgentId?.() ?? null;
+}
+
+export function sendSessionSeatBound(
+  bound: SessionSeatBoundPayload,
+  toPeerId: string
+): void {
+  sendRosterRelayPayload(bound, toPeerId);
 }
 
 /** Test helper — clear hub state. */
@@ -149,6 +215,8 @@ export function resetRosterSessionHubForTests(): void {
   getPeerAgentId = null;
   getProjectionSandboxId = null;
   onAccepted = null;
+  onRemoteAct = null;
+  onHomeSeatReady = null;
   listeners.clear();
 }
 

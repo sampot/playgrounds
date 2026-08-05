@@ -82,13 +82,23 @@ export {
   SESSION_INVITE_ACCEPT_KIND,
   SESSION_INVITE_REJECT_KIND,
   SESSION_INVITE_CANCEL_KIND,
+  SESSION_SEAT_BOUND_KIND,
+  SESSION_ACT_KIND,
+  SESSION_ACT_RESULT_KIND,
+  SESSION_EVENT_KIND,
   buildSessionInvitePayload,
   isSessionInvitePayload,
   isSessionInviteAcceptPayload,
   isSessionInviteRejectPayload,
   isSessionInviteCancelPayload,
   isSessionInviteKindPayload,
+  isSessionSeatBoundPayload,
+  isSessionActPayload,
+  isSessionActResultPayload,
+  isSessionEventRelayPayload,
+  isSessionTunnelKindPayload,
   newSessionInviteId,
+  newSessionActRequestId,
   sessionInviteToCatalogSpec,
 } from "./rosterSessionBridge";
 export type {
@@ -98,6 +108,11 @@ export type {
   SessionInviteRejectPayload,
   SessionInviteCancelPayload,
   SessionInviteKindPayload,
+  SessionSeatBoundPayload,
+  SessionActPayload,
+  SessionActResultPayload,
+  SessionEventRelayPayload,
+  SessionTunnelKindPayload,
 } from "./rosterSessionBridge";
 
 export {
@@ -106,13 +121,41 @@ export {
   getRosterOpenSession,
   registerRosterRelayTransport,
   registerRosterInviteAcceptedHandler,
+  registerRosterRemoteActHandler,
+  registerRosterHomeSeatReadyHandler,
   inviteRosterAvatarToSession,
   notifyRosterInviteAccepted,
+  notifyRosterRemoteAct,
+  notifyRosterHomeSeatReady,
   getRosterProjectionSandboxId,
+  getRosterConnectedPeerId,
+  sendRosterRelayPayload,
+  sendSessionSeatBound,
   rosterCanInviteToSession,
   rosterInvitePeerAvailable,
 } from "./rosterSessionInviteHub";
 export type {
   RosterSessionOpenSnapshot,
   RosterInviteAcceptedEvent,
+  RosterRemoteActRequest,
+  RosterHomeSeatReadyEvent,
 } from "./rosterSessionInviteHub";
+
+export {
+  requestSessionActOverRelay,
+  resolveSessionActResult,
+  buildSessionActResultPayload,
+  clearSessionActPendingForTests,
+  DEFAULT_SESSION_ACT_TIMEOUT_MS,
+} from "./rosterSessionActTunnel";
+
+export {
+  createRosterSessionTunnelBridge,
+  publishRosterRelayedSessionEvent,
+  applySessionActResultFromRelay,
+  bindingFromSeatBound,
+} from "./rosterHomeSessionTunnel";
+export type {
+  RosterHomeSeatBinding,
+  RosterTunnelSend,
+} from "./rosterHomeSessionTunnel";
