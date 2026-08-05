@@ -1,0 +1,7 @@
+title: 鬥獸棋
+kind: game
+series: 懷舊
+blurb: 獸穴、陷阱、河界跳躍，簡易人機。
+source: sampot/pg-jungle
+license: MIT
+status: listed

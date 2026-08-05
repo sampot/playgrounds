@@ -1,0 +1,7 @@
+title: 生命格子
+kind: toy
+series: 模擬
+blurb: 康威生命遊戲：點畫細胞、演化、隨機與清空。
+source: sampot/pg-cellife
+license: MIT
+status: listed

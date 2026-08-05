@@ -1,0 +1,7 @@
+title: 雜湊小算
+kind: tool
+series: 協定
+blurb: SHA／MD5／可選 HMAC；文字或檔案，資料不離開瀏覽器。
+source: sampot/pg-hashlab
+license: MIT
+status: listed

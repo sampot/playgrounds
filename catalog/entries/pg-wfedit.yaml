@@ -1,0 +1,7 @@
+title: 流程視覺編輯
+kind: tool
+series: 流程
+blurb: 垂直主軸編輯 workflow.yaml（workflow.v1）；掛成工具寫宿主定義，不跑引擎。
+source: sampot/pg-wfedit
+license: MIT
+status: listed

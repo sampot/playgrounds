@@ -1,0 +1,37 @@
+# Kind tab order + per-kind series order + labels for /sam/
+kinds:
+  - id: tool
+    label: 工具
+  - id: agent
+    label: 代理
+  - id: game
+    label: 遊戲
+  - id: toy
+    label: 玩具
+  - id: media
+    label: 影音繪圖
+
+series:
+  tool:
+    - 流程
+    - 前端
+    - 資料
+    - 協定
+    - 環境
+    - 日常
+  agent:
+    - 總管
+    - 子代理
+    - 流程
+  game:
+    - 精緻可玩
+    - 街機
+    - 懷舊
+    - 機台
+    - 桌遊
+  toy:
+    - 生成
+    - 模擬
+  media:
+    - 繪圖
+    - 聲音

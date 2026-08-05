@@ -5,14 +5,14 @@ import {
   SAM_KIND_LABEL,
   samCatalog,
   samCatalogByKind,
-  samGithubHref,
+  samCatalogPage,
   samOpenHref,
+  samSourceHref,
   type SamKind,
 } from "../../data/samCatalog";
 
-const title = "SAM 小品";
-const description =
-  "山姆鍋開源的純前端 SAM 型錄（僅供作為 Playgrounds 範本）：工具、代理、遊戲、玩具與影音繪圖——一鍵開進遊樂場。";
+const title = samCatalogPage.title;
+const description = samCatalogPage.description;
 
 const kindBlocks = samCatalogByKind();
 const countByKind = Object.fromEntries(
@@ -38,9 +38,7 @@ const countFor = (kind: SamKind) => countByKind[kind] ?? 0;
   <div class="sam-catalog">
     <header class="catalog-hero">
       <h1>{title}</h1>
-      <p class="lede">
-        純前端單頁小程式（SAM），MIT 開源。<strong>僅供作為 Playgrounds 範本</strong>——點「一鍵開」會在本場遊樂場載入；想改功能或手感，開進來再叫 AI 改一版。不是獨立產品或正式服務。
-      </p>
+      <p class="lede" set:html={samCatalogPage.lede} />
       <p class="meta">
         共 {samCatalog.length} 款（工具 {toolCount} · 代理 {agentCount} · 遊戲{" "}
         {gameCount} · 玩具 {toyCount} · 影音繪圖 {mediaCount}）
@@ -123,11 +121,11 @@ const countFor = (kind: SamKind) => countByKind[kind] ?? 0;
                       <div class="tile-foot">
                         <a
                           class="catalog-repo"
-                          href={samGithubHref(entry.repo)}
+                          href={samSourceHref(entry.source)}
                           rel="noopener noreferrer"
                           target="_blank"
                         >
-                          {entry.repo}
+                          {entry.id}
                         </a>
                         <a class="btn-open" href={samOpenHref(entry)}>
                           一鍵開
@@ -143,12 +141,7 @@ const countFor = (kind: SamKind) => countByKind[kind] ?? 0;
       }
     </div>
 
-    <p class="footnote">
-      本頁所列皆<strong>僅供作為 Playgrounds 範本</strong>，方便一鍵開進沙盒試玩或改寫。遊戲類名稱與造型多為原創，並註明致敬的玩法類型；非正式商業機台或作品復刻。文件見
-      <a href="https://docs.samkuo.me/" rel="noopener noreferrer">docs.samkuo.me</a
-      >；過程分享仍在
-      <a href="https://samkuo.me/" rel="noopener noreferrer">samkuo.me</a>。
-    </p>
+    <p class="footnote" set:html={samCatalogPage.footnote} />
   </div>
 </PlaygroundsLayout>
 

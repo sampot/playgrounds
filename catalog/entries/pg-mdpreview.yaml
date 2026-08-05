@@ -1,0 +1,7 @@
+title: Markdown 預覽
+kind: tool
+series: 前端
+blurb: GFM、Mermaid、數學公式；可掛成工具檢視工作沙盒的 .md。
+source: sampot/pg-mdpreview
+license: MIT
+status: listed

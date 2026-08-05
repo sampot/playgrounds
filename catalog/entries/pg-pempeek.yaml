@@ -1,0 +1,7 @@
+title: PEM 窺視
+kind: tool
+series: 協定
+blurb: 憑證 subject／SAN／效期；不做信任鏈驗證。
+source: sampot/pg-pempeek
+license: MIT
+status: listed

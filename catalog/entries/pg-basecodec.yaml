@@ -1,0 +1,7 @@
+title: Base 編解碼
+kind: tool
+series: 協定
+blurb: Base64／URL-safe／Base32／Base58；資料不離開瀏覽器。
+source: sampot/pg-basecodec
+license: MIT
+status: listed

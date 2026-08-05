@@ -1,0 +1,7 @@
+title: 正規式試場
+kind: tool
+series: 資料
+blurb: JavaScript RegExp：旗標、相符列表、取代。
+source: sampot/pg-regexlab
+license: MIT
+status: listed

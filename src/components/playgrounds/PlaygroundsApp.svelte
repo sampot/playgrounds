@@ -179,6 +179,24 @@
     type MainTab,
     type MainTabId,
   } from "./mainContentTabs";
+  import {
+    addBottomSam,
+    addBuiltin,
+    BOTTOM_BUILTINS,
+    BottomDockError,
+    bottomSamTabId,
+    builtinLabel,
+    clearBottomSams,
+    isBottomBuiltinId,
+    MAX_BOTTOM_SAM,
+    migrateBottomDockFromLayout,
+    removeBottomSam,
+    removeBuiltin,
+    sandboxIdFromBottomSamTab,
+    type BottomBuiltinId,
+    type BottomSamPanel,
+    type BottomTabId,
+  } from "./bottomDock";
   import type { HostMainTabSummary } from "./hostBridge";
   import {
     appendWorkConsoleLine,
@@ -213,6 +231,7 @@
   import { captureDocumentToPng } from "./canvasCapture";
   import { clampDomSnapshotMaxChars } from "./domSnapshot";
   import { disposeHostPythonRunner } from "./hostPython";
+  import { disposeHostJsRunner } from "./hostJs";
   import { disposeHostWasiRunner } from "./hostWasi";
   import {
     cloneProject,
@@ -317,7 +336,7 @@
   import {
     SAM_KIND_LABEL,
     samCatalog,
-    samOpenSource,
+    samEntryOpenSource,
     samPlaygroundsPicks,
     type SamEntry,
   } from "../../data/samCatalog";
@@ -496,9 +515,13 @@
   let actionsMenuWrapEl = $state<HTMLDivElement | null>(null);
   let bottomPanelOpen = $state(true);
   let bottomPanelMaximized = $state(false);
-  let bottomTab = $state<"console" | "python" | "javascript" | "shell">(
-    "console"
-  );
+  /** DEC-044: opt-in dock (Console always; builtins／SAM explicit). */
+  let enabledBottomBuiltins = $state<BottomBuiltinId[]>([]);
+  let bottomSamPanels = $state<BottomSamPanel[]>([]);
+  let bottomTab = $state<BottomTabId>("console");
+  let addBottomPanelDialogOpen = $state(false);
+  let addBottomPanelDialogEl = $state<HTMLDialogElement | null>(null);
+  let addBottomSamPickId = $state("");
   /** Left sidebar: file tree vs agent chat. Default Files; restore from layout. */
   let sidebarTab = $state<"files" | "agent">("files");
   let previewOpen = $state(true);
@@ -510,6 +533,14 @@
   let pythonMounted = $state(false);
   let javascriptMounted = $state(false);
   let shellMounted = $state(false);
+  type BottomSamRuntime = {
+    files: FileMap;
+    meta: ProjectMeta | null;
+    error: string | null;
+    generation: number;
+  };
+  let bottomSamRuntimeById = $state<Record<string, BottomSamRuntime>>({});
+  const bottomSamIframeById = new Map<string, HTMLIFrameElement>();
   let activeAgentSandboxId = $state<string | null>(null);
   let agentMeta = $state<ProjectMeta | null>(null);
   let agentFiles = $state<FileMap>({});
@@ -682,7 +713,11 @@
           bottomPanelH,
           bottomPanelOpen,
           bottomPanelMaximized,
-          bottomTab,
+          bottomTab:
+            bottomTab === "console" || isBottomBuiltinId(bottomTab)
+              ? bottomTab
+              : "console",
+          enabledBottomBuiltins,
           sidebarTab,
           previewOpen,
           previewMaximized,
@@ -728,6 +763,7 @@
           | "python"
           | "javascript"
           | "shell";
+        enabledBottomBuiltins?: string[];
         sidebarTab?: "files" | "agent";
         previewOpen?: boolean;
         previewMaximized?: boolean;
@@ -764,25 +800,20 @@
       if (parsed.sidebarTab === "files" || parsed.sidebarTab === "agent") {
         sidebarTab = parsed.sidebarTab;
       }
-      if (
-        parsed.bottomTab === "console" ||
-        parsed.bottomTab === "python" ||
-        parsed.bottomTab === "javascript" ||
-        parsed.bottomTab === "shell"
-      ) {
-        bottomTab = parsed.bottomTab;
-        if (bottomTab === "python") pythonMounted = true;
-        if (bottomTab === "javascript") javascriptMounted = true;
-        if (bottomTab === "shell") shellMounted = true;
-      } else if (parsed.bottomTab === "terminal") {
-        // Migrate: v86 VM panel → Python REPL.
-        bottomTab = "python";
-        pythonMounted = true;
-      } else if (parsed.bottomTab === "agent") {
+      if (parsed.bottomTab === "agent") {
         // Migrate: Agent moved from bottom panel to left sidebar.
         sidebarTab = "agent";
-        bottomTab = "console";
       }
+      const dock = migrateBottomDockFromLayout({
+        enabledBottomBuiltins: parsed.enabledBottomBuiltins,
+        bottomTab: parsed.bottomTab,
+      });
+      enabledBottomBuiltins = dock.enabledBuiltins;
+      bottomTab = dock.activeTabId;
+      // Mount UI for restored builtins; do not boot Workers (DEC-044).
+      if (enabledBottomBuiltins.includes("python")) pythonMounted = true;
+      if (enabledBottomBuiltins.includes("javascript")) javascriptMounted = true;
+      if (enabledBottomBuiltins.includes("shell")) shellMounted = true;
       if (typeof parsed.previewOpen === "boolean") {
         previewOpen = parsed.previewOpen;
       }
@@ -898,15 +929,234 @@
     else maximizeBottomPanel();
   }
 
-  function selectBottomTab(
-    tab: "console" | "python" | "javascript" | "shell"
-  ) {
-    bottomTab = tab;
-    if (tab === "python") pythonMounted = true;
-    if (tab === "javascript") javascriptMounted = true;
-    if (tab === "shell") shellMounted = true;
+  function selectBottomTab(tab: BottomTabId) {
+    if (tab === "console") {
+      bottomTab = "console";
+    } else if (isBottomBuiltinId(tab)) {
+      if (!enabledBottomBuiltins.includes(tab)) return;
+      bottomTab = tab;
+      if (tab === "python") pythonMounted = true;
+      if (tab === "javascript") javascriptMounted = true;
+      if (tab === "shell") shellMounted = true;
+    } else {
+      const sid = sandboxIdFromBottomSamTab(tab);
+      if (!sid || !bottomSamPanels.some(p => p.sandboxId === sid)) return;
+      bottomTab = tab;
+      void ensureBottomSamPreview(sid);
+    }
     if (!bottomPanelOpen) bottomPanelOpen = true;
     persistLayout();
+  }
+
+  function enableBottomBuiltin(id: BottomBuiltinId) {
+    enabledBottomBuiltins = addBuiltin(enabledBottomBuiltins, id);
+    if (id === "python") pythonMounted = true;
+    if (id === "javascript") javascriptMounted = true;
+    if (id === "shell") shellMounted = true;
+    selectBottomTab(id);
+    closeAddBottomPanelDialog();
+  }
+
+  function disableBottomBuiltin(id: BottomBuiltinId) {
+    const next = removeBuiltin(enabledBottomBuiltins, bottomTab, id);
+    enabledBottomBuiltins = next.enabledBuiltins;
+    bottomTab = next.activeTabId;
+    if (id === "python") pythonMounted = false;
+    if (id === "javascript") {
+      javascriptMounted = false;
+      disposeHostJsRunner();
+    }
+    if (id === "shell") {
+      shellMounted = false;
+      disposeHostWasiRunner();
+    }
+    persistLayout();
+  }
+
+  function bottomDockCandidateProjects(): ProjectMeta[] {
+    const mainIds = new Set(
+      listCanvasTabs(mainTabs).map(t => t.sandboxId)
+    );
+    const bottomIds = new Set(bottomSamPanels.map(p => p.sandboxId));
+    return projects.filter(
+      p =>
+        p.id !== activeId &&
+        p.id !== activeAgentSandboxId &&
+        !mainIds.has(p.id) &&
+        !bottomIds.has(p.id)
+    );
+  }
+
+  function closeAddBottomPanelDialog() {
+    addBottomPanelDialogOpen = false;
+    try {
+      addBottomPanelDialogEl?.close();
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function openAddBottomPanelDialog() {
+    addBottomSamPickId = bottomDockCandidateProjects()[0]?.id ?? "";
+    addBottomPanelDialogOpen = true;
+    error = null;
+    queueMicrotask(() => addBottomPanelDialogEl?.showModal());
+  }
+
+  function blankBottomSamIframe(sandboxId: string) {
+    const el = bottomSamIframeById.get(sandboxId);
+    if (!el) return;
+    el.removeAttribute("srcdoc");
+    el.src = "about:blank";
+  }
+
+  function bindBottomSamIframe(
+    sandboxId: string,
+    el: HTMLIFrameElement | null
+  ) {
+    if (el) bottomSamIframeById.set(sandboxId, el);
+    else bottomSamIframeById.delete(sandboxId);
+  }
+
+  function bottomSamIframeAction(
+    node: HTMLIFrameElement,
+    sandboxId: string
+  ) {
+    bindBottomSamIframe(sandboxId, node);
+    return {
+      destroy() {
+        bindBottomSamIframe(sandboxId, null);
+      },
+    };
+  }
+
+  async function ensureBottomSamPreview(sandboxId: string) {
+    let rt = bottomSamRuntimeById[sandboxId];
+    if (!rt) {
+      try {
+        const pMeta = await readMeta(sandboxId);
+        const pFiles = await loadProjectFiles(sandboxId);
+        rt = {
+          files: pFiles,
+          meta: pMeta,
+          error: null,
+          generation: 0,
+        };
+        bottomSamRuntimeById = {
+          ...bottomSamRuntimeById,
+          [sandboxId]: rt,
+        };
+      } catch (e) {
+        bottomSamRuntimeById = {
+          ...bottomSamRuntimeById,
+          [sandboxId]: {
+            files: {},
+            meta: null,
+            error: e instanceof Error ? e.message : String(e),
+            generation: 0,
+          },
+        };
+        return;
+      }
+    }
+    await tick();
+    await rebuildBottomSamPreview(sandboxId);
+  }
+
+  async function rebuildBottomSamPreview(sandboxId: string) {
+    const rt = bottomSamRuntimeById[sandboxId];
+    const iframe = bottomSamIframeById.get(sandboxId);
+    if (!rt || !iframe) return;
+    if (!(DEFAULT_ENTRY in rt.files)) {
+      bottomSamRuntimeById = {
+        ...bottomSamRuntimeById,
+        [sandboxId]: {
+          ...rt,
+          error: `沙盒缺少 ${DEFAULT_ENTRY}`,
+        },
+      };
+      return;
+    }
+    try {
+      if (!canvasSwReady) {
+        await ensureCanvasServiceWorker();
+        canvasSwReady = true;
+      }
+      const generation = rt.generation + 1;
+      await syncCanvasSnapshot(sandboxId, generation, rt.files);
+      await assertCanvasEntryServed(sandboxId, generation, DEFAULT_ENTRY);
+      bottomSamRuntimeById = {
+        ...bottomSamRuntimeById,
+        [sandboxId]: { ...rt, generation, error: null },
+      };
+      iframe.removeAttribute("srcdoc");
+      iframe.src = buildCanvasEntryUrl(sandboxId, generation, DEFAULT_ENTRY);
+      armCanvasConsoleGate(iframe, shellPrefs.mirrorConsoleToBrowser);
+    } catch (e) {
+      bottomSamRuntimeById = {
+        ...bottomSamRuntimeById,
+        [sandboxId]: {
+          ...rt,
+          error: e instanceof Error ? e.message : String(e),
+        },
+      };
+      blankBottomSamIframe(sandboxId);
+    }
+  }
+
+  function clearAllBottomSamPanels() {
+    for (const p of bottomSamPanels) {
+      blankBottomSamIframe(p.sandboxId);
+      bottomSamIframeById.delete(p.sandboxId);
+    }
+    const cleared = clearBottomSams(bottomTab);
+    bottomSamPanels = cleared.samPanels;
+    bottomTab = cleared.activeTabId;
+    bottomSamRuntimeById = {};
+  }
+
+  async function addBottomSamPanel(sandboxId: string) {
+    const label =
+      projects.find(p => p.id === sandboxId)?.name ?? sandboxId;
+    try {
+      const next = addBottomSam(bottomSamPanels, {
+        sandboxId,
+        label,
+        mainSandboxIds: listCanvasTabs(mainTabs).map(t => t.sandboxId),
+        stewardSandboxId: activeAgentSandboxId,
+        workSandboxId: activeId,
+      });
+      bottomSamPanels = next.samPanels;
+      bottomTab = next.activeTabId;
+      if (!bottomPanelOpen) bottomPanelOpen = true;
+      status = `下方面板：${label}`;
+      closeAddBottomPanelDialog();
+      persistLayout();
+      await ensureBottomSamPreview(sandboxId);
+    } catch (e) {
+      error =
+        e instanceof BottomDockError || e instanceof Error
+          ? e.message
+          : String(e);
+    }
+  }
+
+  function removeBottomSamPanel(sandboxId: string) {
+    try {
+      blankBottomSamIframe(sandboxId);
+      bottomSamIframeById.delete(sandboxId);
+      const { [sandboxId]: _drop, ...rest } = bottomSamRuntimeById;
+      bottomSamRuntimeById = rest;
+      const next = removeBottomSam(bottomSamPanels, bottomTab, sandboxId);
+      bottomSamPanels = next.samPanels;
+      bottomTab = next.activeTabId;
+      persistLayout();
+    } catch (e) {
+      error =
+        e instanceof BottomDockError || e instanceof Error
+          ? e.message
+          : String(e);
+    }
   }
 
   function selectSidebarTab(
@@ -1962,6 +2212,7 @@
     error = null;
     await flushSave();
     await clearAllMainCanvasTabs();
+    clearAllBottomSamPanels();
     if (multiAgentSession) {
       await closeMultiAgentSession();
     }
@@ -2428,6 +2679,12 @@
     }
     if (opts.sandboxId === activeAgentSandboxId) {
       throw new MainTabsError("bad_grant", "不可將總管掛到主內容區");
+    }
+    if (bottomSamPanels.some(p => p.sandboxId === opts.sandboxId)) {
+      throw new MainTabsError(
+        "bad_grant",
+        "此沙盒已掛在下方面板，請先移除再掛到主內容"
+      );
     }
     if (opts.sandboxId === activeId && !opts.grant) {
       // Plain view of work project is redundant with right preview; still allow?
@@ -4305,11 +4562,11 @@
     }
   }
 
-  /** Open a SAM 小品 entry via DEC-025 (`sampot/pg-*`). */
+  /** Open a SAM 小品 entry via DEC-025 (`?open=` from entry.source). */
   async function handleOpenCatalogEntry(entry: SamEntry) {
     const intent = parseOpenIntent(
       new URLSearchParams({
-        open: samOpenSource(entry.repo),
+        open: samEntryOpenSource(entry),
         name: entry.title,
       })
     );
@@ -4334,7 +4591,7 @@
     }
     const intent = parseOpenIntent(
       new URLSearchParams({
-        open: samOpenSource(entry.repo),
+        open: samEntryOpenSource(entry),
         name: entry.title,
         as: "agent",
         state: "none",
@@ -5319,7 +5576,9 @@
     pendingDomSnapshots.clear();
     void stopAgentController();
     disposeHostPythonRunner();
+    disposeHostJsRunner();
     disposeHostWasiRunner();
+    clearAllBottomSamPanels();
     window.removeEventListener("message", onMessage);
     window.removeEventListener("keydown", onKeydown);
     window.removeEventListener("pointerdown", onToolbarMenusPointerDown);
@@ -6590,7 +6849,7 @@
           <div
             class="border-skin-line flex items-center gap-1 border-b px-1.5 py-0.5"
             role="tablist"
-            aria-label="Console、Python、JavaScript 與 Shell"
+            aria-label="下方面板"
           >
             <button
               type="button"
@@ -6604,41 +6863,66 @@
                 : 'text-skin-base/40 hover:text-skin-base/70'}"
               onclick={() => selectBottomTab("console")}>Console</button
             >
+            {#each enabledBottomBuiltins as bid (bid)}
+              <div
+                class="flex min-w-0 items-center rounded {bottomTab === bid
+                  ? 'bg-skin-fill text-skin-base'
+                  : 'text-skin-base/40 hover:text-skin-base/70'}"
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  id="playgrounds-tab-{bid}"
+                  aria-selected={bottomTab === bid}
+                  aria-controls="playgrounds-panel-{bid}"
+                  class="rounded px-2.5 py-1 text-[10px] font-semibold tracking-wider uppercase"
+                  onclick={() => selectBottomTab(bid)}>{builtinLabel(bid)}</button
+                >
+                <button
+                  type="button"
+                  class="{chromeIconBtn} !size-5 shrink-0"
+                  title="移出下方面板"
+                  aria-label="移出 {builtinLabel(bid)}"
+                  onclick={() => disableBottomBuiltin(bid)}
+                  ><PgIcon name="x" size={11} /></button
+                >
+              </div>
+            {/each}
+            {#each bottomSamPanels as panel (panel.sandboxId)}
+              {@const samTab = bottomSamTabId(panel.sandboxId)}
+              <div
+                class="flex min-w-0 max-w-[9rem] items-center rounded {bottomTab ===
+                samTab
+                  ? 'bg-skin-fill text-skin-base'
+                  : 'text-skin-base/40 hover:text-skin-base/70'}"
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  id="playgrounds-tab-sam-{panel.sandboxId}"
+                  aria-selected={bottomTab === samTab}
+                  aria-controls="playgrounds-panel-sam-{panel.sandboxId}"
+                  class="min-w-0 truncate px-2 py-1 text-left text-[10px] font-semibold"
+                  title={panel.label ?? panel.sandboxId}
+                  onclick={() => selectBottomTab(samTab)}
+                  >{panel.label ?? panel.sandboxId}</button
+                >
+                <button
+                  type="button"
+                  class="{chromeIconBtn} !size-5 shrink-0"
+                  title="移出下方面板"
+                  aria-label="移出 {panel.label ?? panel.sandboxId}"
+                  onclick={() => removeBottomSamPanel(panel.sandboxId)}
+                  ><PgIcon name="x" size={11} /></button
+                >
+              </div>
+            {/each}
             <button
               type="button"
-              role="tab"
-              id="playgrounds-tab-python"
-              aria-selected={bottomTab === "python"}
-              aria-controls="playgrounds-panel-python"
-              class="rounded px-2.5 py-1 text-[10px] font-semibold tracking-wider uppercase {bottomTab ===
-              'python'
-                ? 'bg-skin-fill text-skin-base'
-                : 'text-skin-base/40 hover:text-skin-base/70'}"
-              onclick={() => selectBottomTab("python")}>Python</button
-            >
-            <button
-              type="button"
-              role="tab"
-              id="playgrounds-tab-javascript"
-              aria-selected={bottomTab === "javascript"}
-              aria-controls="playgrounds-panel-javascript"
-              class="rounded px-2.5 py-1 text-[10px] font-semibold tracking-wider uppercase {bottomTab ===
-              'javascript'
-                ? 'bg-skin-fill text-skin-base'
-                : 'text-skin-base/40 hover:text-skin-base/70'}"
-              onclick={() => selectBottomTab("javascript")}>JavaScript</button
-            >
-            <button
-              type="button"
-              role="tab"
-              id="playgrounds-tab-shell"
-              aria-selected={bottomTab === "shell"}
-              aria-controls="playgrounds-panel-shell"
-              class="rounded px-2.5 py-1 text-[10px] font-semibold tracking-wider uppercase {bottomTab ===
-              'shell'
-                ? 'bg-skin-fill text-skin-base'
-                : 'text-skin-base/40 hover:text-skin-base/70'}"
-              onclick={() => selectBottomTab("shell")}>Shell</button
+              class="{chromeIconBtn} shrink-0"
+              title="加入輔助面板…"
+              aria-label="加入輔助面板"
+              onclick={openAddBottomPanelDialog}>+</button
             >
             <div class="ml-auto flex items-center gap-1 px-1">
               {#if bottomTab === "console"}
@@ -6922,6 +7206,42 @@
                 />
               </div>
             {/if}
+            {#each bottomSamPanels as panel (panel.sandboxId)}
+              {@const samTab = bottomSamTabId(panel.sandboxId)}
+              {#if bottomTab === samTab}
+                {@const rt = bottomSamRuntimeById[panel.sandboxId]}
+                <div
+                  id="playgrounds-panel-sam-{panel.sandboxId}"
+                  role="tabpanel"
+                  aria-labelledby="playgrounds-tab-sam-{panel.sandboxId}"
+                  class="flex h-full min-h-0 flex-col"
+                >
+                  {#if rt?.error}
+                    <div
+                      class="text-skin-base/70 flex h-full items-center justify-center px-4 text-center text-sm"
+                      role="alert"
+                    >
+                      {rt.error}
+                    </div>
+                  {/if}
+                  <iframe
+                    title="下方：{panel.label ?? panel.sandboxId}"
+                    class="min-h-0 w-full flex-1 border-0 bg-white dark:bg-black"
+                    class:hidden={Boolean(rt?.error)}
+                    use:bottomSamIframeAction={panel.sandboxId}
+                    onload={() => {
+                      const el = bottomSamIframeById.get(panel.sandboxId);
+                      if (el) {
+                        armCanvasConsoleGate(
+                          el,
+                          shellPrefs.mirrorConsoleToBrowser
+                        );
+                      }
+                    }}
+                  ></iframe>
+                </div>
+              {/if}
+            {/each}
           </div>
         </div>
       {/if}
@@ -7294,6 +7614,119 @@
         </div>
       </div>
     </div>
+  </div>
+</dialog>
+
+<dialog
+  bind:this={addBottomPanelDialogEl}
+  class="playgrounds-dialog border-skin-line bg-skin-fill text-skin-base m-auto w-[min(26rem,calc(100%-2rem))] max-h-[min(32rem,calc(100%-2rem))] rounded-xl border p-0 shadow-2xl backdrop:bg-black/55"
+  onclose={() => {
+    addBottomPanelDialogOpen = false;
+  }}
+>
+  <div class="playgrounds-dialog-head">
+    <div class="playgrounds-dialog-title-row">
+      <span class="playgrounds-dialog-icon" aria-hidden="true">
+        <PgIcon name="panelBottom" size={16} />
+      </span>
+      <div class="min-w-0">
+        <h2 class="text-sm font-semibold">加入輔助面板</h2>
+        <p class="text-skin-base/55 mt-0.5 text-[11px]">
+          下方面板 · 預設不啟動 Worker／畫布
+        </p>
+      </div>
+    </div>
+    <button
+      type="button"
+      class="{btnIcon} text-skin-base/55"
+      onclick={closeAddBottomPanelDialog}
+      aria-label="關閉"
+      title="關閉"
+    >
+      <PgIcon name="x" size={14} />
+    </button>
+  </div>
+  <div class="space-y-3 px-4 py-3 text-sm">
+    {#if addBottomPanelDialogOpen}
+      <fieldset class="m-0 border-0 p-0">
+        <legend class="text-xs">內建</legend>
+        <div class="mt-1 flex flex-wrap gap-1.5">
+          {#each BOTTOM_BUILTINS as bid}
+            {@const on = enabledBottomBuiltins.includes(bid)}
+            <button
+              type="button"
+              class="rounded border px-2.5 py-1 text-[11px] font-semibold {on
+                ? 'border-skin-line bg-skin-card text-skin-base/45'
+                : 'border-skin-line text-skin-base hover:bg-skin-card'}"
+              disabled={busy || on}
+              onclick={() => enableBottomBuiltin(bid)}
+              >{builtinLabel(bid)}{on ? " · 已加入" : ""}</button
+            >
+          {/each}
+        </div>
+      </fieldset>
+      <fieldset class="m-0 border-0 p-0">
+        <legend class="text-xs"
+          >自選 SAM（plain · 最多 {MAX_BOTTOM_SAM}）</legend
+        >
+        {#if true}
+          {@const candidates = bottomDockCandidateProjects()}
+          <ul
+            class="border-skin-line mt-1 max-h-40 space-y-1 overflow-auto rounded-md border p-1.5"
+            role="listbox"
+            aria-label="可掛到下方的沙盒"
+          >
+            {#if !activeId}
+              <p class="text-skin-base/50 px-1 py-2 text-[11px]"
+                >請先開啟工作沙盒。</p
+              >
+            {:else if candidates.length === 0}
+              <p class="text-skin-base/50 px-1 py-2 text-[11px]">
+                {bottomSamPanels.length >= MAX_BOTTOM_SAM
+                  ? `下方已滿 ${MAX_BOTTOM_SAM} 個 SAM。`
+                  : "沒有可加入的沙盒（排除工作沙盒、總管、已掛主內容／下方者）。"}
+              </p>
+            {:else}
+              {#each candidates as p}
+                <li>
+                  <label
+                    class="hover:bg-skin-card flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-xs {addBottomSamPickId ===
+                    p.id
+                      ? 'bg-skin-card'
+                      : ''}"
+                  >
+                    <input
+                      type="radio"
+                      name="add-bottom-sam"
+                      class="mt-0.5"
+                      value={p.id}
+                      checked={addBottomSamPickId === p.id}
+                      onchange={() => {
+                        addBottomSamPickId = p.id;
+                      }}
+                      disabled={busy}
+                    />
+                    <span class="min-w-0 truncate font-medium">{p.name}</span>
+                  </label>
+                </li>
+              {/each}
+            {/if}
+          </ul>
+        {/if}
+        <div class="mt-2 flex justify-end">
+          <button
+            type="button"
+            class="{btnPrimary} gap-1.5"
+            disabled={busy ||
+              !addBottomSamPickId ||
+              bottomSamPanels.length >= MAX_BOTTOM_SAM}
+            onclick={() => void addBottomSamPanel(addBottomSamPickId)}
+          >
+            加入下方
+          </button>
+        </div>
+      </fieldset>
+    {/if}
   </div>
 </dialog>
 

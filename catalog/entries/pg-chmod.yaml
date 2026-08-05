@@ -1,0 +1,7 @@
+title: Unix 權限
+kind: tool
+series: 環境
+blurb: rwx ↔ 八進位、umask 提示。
+source: sampot/pg-chmod
+license: MIT
+status: listed

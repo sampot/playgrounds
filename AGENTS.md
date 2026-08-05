@@ -13,8 +13,9 @@ Reader-facing narrative stays personal／non-product (blog DEC-004).
 ## Commands
 
 - `npm run dev` — local host (standalone paths: `/` + `/sam/` + `/canvas/`)
-- `npm test` — Vitest
-- `npm run build` — `astro check` + static build
+- `npm run catalog:gen` — regenerate catalog typed module from `catalog/**/*.yaml`
+- `npm test` — Vitest（runs `catalog:gen` via pretest）
+- `npm run build` — `catalog:gen` + `astro check` + static build
 - `npm run deploy` — `wrangler deploy` (self-host / Deploy to Cloudflare button; root `wrangler.jsonc`)
 - `npm run deploy:official` — build + official field-net (`wrangler.official.jsonc` → `play.samkuo.me`)
 - `npm run docs:dev` / `docs:build` / `docs:deploy` — Starlight docs (`docs.samkuo.me`)
@@ -22,7 +23,8 @@ Reader-facing narrative stays personal／non-product (blog DEC-004).
 ## Layout
 
 - `src/components/playgrounds/` — shell UI
-- `src/data/samCatalog.ts` — SAM catalog data（`/sam/`）
+- `catalog/` — SAM catalog YAML sources（`/sam/` authority; see `catalog/README.md`）
+- `src/data/samCatalog.ts` — catalog API（imports generated data）
 - `src/pages/sam/` — catalog page
 - `src/sam-runtime/` — portable SAM runtime
 - `src/sam-host/` — Node headless host

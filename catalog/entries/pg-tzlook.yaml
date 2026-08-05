@@ -1,0 +1,7 @@
+title: 時區對照
+kind: tool
+series: 日常
+blurb: Unix epoch／ISO 與多個 IANA 時區。
+source: sampot/pg-tzlook
+license: MIT
+status: listed

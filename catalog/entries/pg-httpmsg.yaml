@@ -1,0 +1,7 @@
+title: HTTP 訊息工坊
+kind: tool
+series: 協定
+blurb: 貼 raw request／response，拆 headers 與 body。
+source: sampot/pg-httpmsg
+license: MIT
+status: listed

@@ -1,0 +1,7 @@
+title: 文字小工
+kind: tool
+series: 前端
+blurb: HTML entity 編解碼、slug。
+source: sampot/pg-textkit
+license: MIT
+status: listed

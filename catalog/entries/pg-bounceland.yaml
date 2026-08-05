@@ -1,0 +1,7 @@
+title: 彈珠沙盒
+kind: toy
+series: 模擬
+blurb: 點按加球，簡易重力與彈跳；不是物理引擎。
+source: sampot/pg-bounceland
+license: MIT
+status: listed

@@ -1,0 +1,7 @@
+title: 邏輯閘沙盒
+kind: toy
+series: 模擬
+blurb: 開關、AND／OR／NOT、LED 接線；半加器範例，看 0／1 沿線流動。
+source: sampot/pg-logigate
+license: MIT
+status: listed

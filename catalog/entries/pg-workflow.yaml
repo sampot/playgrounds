@@ -1,0 +1,7 @@
+title: 工作流程
+kind: agent
+series: 流程
+blurb: 有狀態多步驟 workflow（workflow.v1）；狗糧為內容審核，實例活在 Agent 沙盒。
+source: sampot/pg-workflow
+license: MIT
+status: listed

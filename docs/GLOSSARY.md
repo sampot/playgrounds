@@ -54,7 +54,7 @@
 | Playgrounds（場網：`*.samkuo.me`） | 遊樂場 | 站內導覽／UI 用「遊樂場」；程式識別仍為 `playgrounds`。**預設場**＝[`https://play.samkuo.me/`](https://play.samkuo.me/)；任意 `https://<name>.samkuo.me/`＝同程式、異 origin（DEC-042）。部落格 `https://samkuo.me/playgrounds/`＝**凍結舊場**（提醒匯出；**不再**跟場網同步更新；資料綁 origin）。非站上 `/tools/` 登錄表。主軸：瀏覽器內開發／實驗**單頁小程式（SAM）**；非部署環境。**有防護能力的實驗場**：隔離在瀏覽器 origin／OPFS——見 DEC-040。開源宿主／權威碼 [`sampot/playgrounds`](https://github.com/sampot/playgrounds)；部署＝Cloudflare Workers。**對外敘事勿**產品／品牌／行銷腔（DEC-004）。 |
 | 場網／場（Playgrounds） | 場／場網 | `*.samkuo.me` 上每個一級子域是一個**場**（獨立 origin）；場網＝此 wildcard 部署面。預設場名 **`play`**。保留名（非一般場）：`www`／`blog`／`api`／`docs` 等（`PLAYGROUNDS_FIELD_RESERVED_SUBDOMAINS`）。見 DEC-042。 |
 | Playgrounds 文件站 | 文件／`docs.samkuo.me` | 「我是山姆鍋」底下遊樂場的工程與用法文件站 [`https://docs.samkuo.me/`](https://docs.samkuo.me/)（Astro Starlight；獨立 Worker；站標含山姆鍋 Logo）。**不是**場、不跑遊樂場殼；Playgrounds **不是**品牌名。範例場 URL 仍用 `play.samkuo.me`。見 DEC-043、[PG-DOCS-PLAN.md](./PG-DOCS-PLAN.md)。 |
-| SAM 小品型錄 | 小品／`/sam/` | 開源 SAM 範本清單（遊戲、工具、代理…）；權威頁＝場網 [`https://play.samkuo.me/sam/`](https://play.samkuo.me/sam/)（任意場＝同 origin 的 `/sam/`；與場殼同 Worker）。一鍵開＝同場 `/?open=sampot/…`。資料源 `src/data/samCatalog.ts`。部落格舊 `/sam/` 轉址至此。非 `/tools/`、非文件站。見 DEC-041。 |
+| SAM 小品型錄 | 小品／`/sam/` | 開源 SAM 範本清單（遊戲、工具、代理…）；權威頁＝場網 [`https://play.samkuo.me/sam/`](https://play.samkuo.me/sam/)（任意場＝同 origin 的 `/sam/`；與場殼同 Worker）。一鍵開＝同場 `/?open=<source>`。資料權威＝[`catalog/entries/`](../catalog/entries/)（YAML；建置產 `samCatalog.generated.ts`）。部落格舊 `/sam/` 轉址至此。非 `/tools/`、非文件站。見 DEC-041、[PG-CATALOG-PLAN.md](./PG-CATALOG-PLAN.md)。 |
 | Playgrounds chrome／app shell（舊稱殼頁） | 遊樂場（必要時：**遊樂場介面**） | 場網上根路徑 `/`（過渡舊場仍為 `/playgrounds/`）的外框 UI（工具列、編輯器、側欄、密鑰庫、fleet…），相對沙盒內畫布／總管 iframe。**正式對外預設寫「遊樂場」**；需對照畫布／注入／dialog 時寫 **「遊樂場介面」**。舊稱「殼頁」——**勿**對外再用「殼」。程式識別可續用 `shell*`。 |
 | sandbox（Playgrounds 單位；舊稱 project／專案） | 沙盒 | 遊樂場裡用來管理 **SAM 實例**的容器（OPFS 一份樹＋執行期狀態＋畫布；一沙盒一實例；程式識別為 **`sandboxId`**，舊稱 `projectId`）。**不是**對桌面的第二層安全沙盒敘事——防護邊界在遊樂場（DEC-040）。僅能透過允許的方式（HOST／DELEGATE／SESSION 等）與環境及其他沙盒／SAM 互動。勿與產品名「遊樂場」混用；說明隱喻時可寫「像遊樂場裡的沙坑」，產品單位名固定「沙盒」。 |
 | 整場重置（遊樂場） | 重置遊樂場 | 人類 UI（管理沙盒）清光本機 Playgrounds 持久化後回到該 origin 首次開啟的空場（場網＝`/`；過渡舊場＝`/playgrounds/`）。**不**經 `env.HOST`。見 DEC-040。跨 origin（含換 `<name>`）不共用 OPFS——須匯出／匯入（DEC-041／042）。 |
@@ -95,7 +95,8 @@
 | open-from-URL／一鍵開啟（遊樂場） | 從網址開啟 | deep link：文件預設 `https://play.samkuo.me/?open=<來源>`；任意場 `https://<name>.samkuo.me/?open=`；過渡舊場 `/playgrounds/?open=`（可選 `as`／`state`／`name`／`fresh`）。匯入 `.sam` 或複製 public GitHub／GitLab；同源去重。見 DEC-025／041／042。行銷口語可稱「一鍵開 SAM 小」；**正式文件／UI 主標**用本列用詞；**無** `/sam` 短鏈。 |
 | 執行期狀態（遊樂場） | 執行期狀態／Durable 狀態 | 相對沙盒原始碼樹的 side store：`env.KV`、`env.DB`（checkpoints 另存；舊 per-sandbox Secrets 已廢）。搬動 SAM（export／import／clone／HOST clone）時可顯式選擇是否一併處理；**預設不帶**。密鑰改 **SecretStore**（DEC-029），**永不**進 `.sam`。 |
 | Preview 面板（遊樂場） | 畫布 | 程式在同源 iframe 的**渲染／執行結果**（場網經 `/canvas/` SW 虛擬站台；過渡舊場仍為 `/playgrounds/canvas/`），不是靜態預覽稿，也不是 chat artifact。程式識別可仍含 `preview`。工作沙盒走原畫布。見 DEC-041／042。 |
-| Console 面板（遊樂場） | Console | 下方面板：工作沙盒畫布 `console.*`／runtime 錯誤（經 bridge `postMessage`）。預設**不**鏡像到瀏覽器 DevTools；可在「選項 → 設定」開啟。見 DEC-016。 |
+| Console 面板（遊樂場） | Console | 下方 dock **常駐**面板：工作沙盒畫布 `console.*`／runtime 錯誤（經 bridge `postMessage`）。預設**不**鏡像到瀏覽器 DevTools；可在「選項 → 設定」開啟。見 DEC-016／044。 |
+| 下方面板 dock（遊樂場） | 下方 dock／bottom dock | 編輯器下方的輔助槽：預設僅 Console；Python／JavaScript／Shell 與自選 plain SAM 須**明確加入**。Worker／Pyodide／WASI／下方 iframe **真用才啟動**。與 main content（DEC-030）分工；MVP 下槽**不**核發 Tool grant。見 DEC-044、[PG-BOTTOM-DOCK-PLAN.md](./PG-BOTTOM-DOCK-PLAN.md)。 |
 | 工作沙盒（遊樂場） | 工作沙盒 | 遊樂場介面當前開啟、編輯器與原畫布所對應的 OPFS 沙盒（`activeId`）——即當前編輯的那份 SAM。舊稱「工作專案」。 |
 | Steward／現行 Agent（遊樂場） | 總管 | 產品角色（English：**Steward**）：**取代 UI／產品文案中的「現行 Agent」**。使用者（遊樂場主人）的**唯一對口**（下指示、拿結果）；代為管理遊樂場，持有完整 `env.HOST` 的那一席。Agent 仍是 SAM 種類；多個 Agent 裡只有被設為總管的那位有 HOST。技術槽位 `activeAgentProjectId`（文件／API 可續稱現行 Agent）。**實例顯示名由使用者自訂**；「總管」是角色類名。舊稱「管家」（含「家」與遊樂場隱喻不合）。預設≠ session Participant；若總管要**參與** session，必須以 **Host agent** 身分（主持沙盒＝總管席）。勿與未兼任總管的 Host SAM、一般／參與 Agent 混淆。見 DEC-017／023／033。 |
 | 總管範本（遊樂場） | 總管範本 | 開源總管角色 SAM 種子（[`sampot/pg-steward`](https://github.com/sampot/pg-steward)；含 BYOK 對話與 HOST 工具）。經場網 [`/sam/`](https://play.samkuo.me/sam/) 或 `?open=sampot/pg-steward` 開入後再「設為總管」。遊樂場**不**內嵌；硬核使用者亦可自寫對口骨架。 |
@@ -110,7 +111,7 @@
 | agent.ui（遊樂場艦隊） | agent.ui 標註 | 顯示用註記（roleLabel／health／successorOf 等）；存 runtime `ui-annotations.json`；HOST `setAgentUi`；遊樂場介面只渲染。見 DEC-032。 |
 | SAM 實例（遊樂場） | 實例 | 一沙盒對應一 SAM 實例（Code＋Data＋Configuration；即使未執行）。`clone` 產另一實例，之後程式碼分叉。數量爆炸主因常是實例增殖，而非僅「新建」。見 DEC-028。 |
 | clonedFrom／cloneIntent（沙盒 meta） | 血統／clone 意圖 | `clonedFrom`＝直接來源 `sandboxId`；`cloneIntent` 區分人手保留、總管代建、自迭代、session 分身等，供管理面分區與 GC。見 DEC-028。 |
-| Agent 區（遊樂場） | Agent 區 | 左側側欄與 Files 以 Tab 切換的 iframe；內容為**總管**（現行 Agent 席）的 UI。遊樂場介面 Tab 標籤顯示「總管」；程式／layout 鍵仍可為 `agent`。見 DEC-017。下方面板為 Console／Python／JavaScript REPL／Shell（WASI）。 |
+| Agent 區（遊樂場） | Agent 區 | 左側側欄與 Files 以 Tab 切換的 iframe；內容為**總管**（現行 Agent 席）的 UI。遊樂場介面 Tab 標籤顯示「總管」；程式／layout 鍵仍可為 `agent`。見 DEC-017。下方 dock 預設 Console；REPL／Shell／自選 SAM 為 opt-in（DEC-044）。 |
 | host binding（遊樂場） | host binding／`env.HOST` | 遊樂場介面注入給現行 Agent（總管）`functions.js` 的環境 API；總管經 tools／functions 與 OPFS／畫布互動的完整編排通道。一般 SAM 的窄 compute 見 `env.COMPUTE`／DEC-036。 |
 | sandbox-intrinsic（遊樂場） | 沙盒內建／intrinsic | 該沙盒自己的檔案樹、`env.vars`、自己的 KV／DB、自己的畫布↔functions 等；**預設可開、不必** `sam:capabilities` 宣告。見 DEC-036、[PG-SAM-BINDINGS-SPEC.md](./PG-SAM-BINDINGS-SPEC.md)。 |
 | environment capability（遊樂場） | 環境能力／capability | 共用或跨邊界服務的機器 token（如 `runPython`）；須 `sam:capabilities` 宣告＋使用者同意才準入。見 DEC-036。 |
@@ -129,14 +130,15 @@
 | SecretStore（遊樂場） | SecretStore／密鑰庫 | 遊樂場介面統一持有的密鑰存儲（遊樂場級）。OPFS 為**密文**；password→WebCrypto（`extractable: false`）unlock 後，對允許的沙盒注入**每 key 獨立** binding（`env.secrets.*`）。明確 lock；**頁面刷新＝lock**。**無**遊樂場代打、**無** `env.SECRETS` bag。遊樂場選單 UI 稱「**密鑰庫**」。**勿**稱 Vault。見 DEC-029、[PG-SECRETSTORE-PLAN.md](./PG-SECRETSTORE-PLAN.md)。 |
 | SecretStore unlock／lock（遊樂場） | 解鎖／鎖定 | 遊樂場介面以 **password** 或 **生物識別（WebAuthn PRF）** unlock；lock 或重整丟棄記憶體中的 `CryptoKey`。初始化須有 password 復原；無 PRF 時不提供生物識別入口。HOST 不收 password。見 DEC-029。 |
 | 總管密鑰設定喚起（遊樂場） | 設定喚起遊樂場介面密鑰 dialog | 總管設定以選既有密鑰名為主；僅新增／輪替時用無值訊息喚起遊樂場介面輸入框。明文只在遊樂場介面寫入。見 DEC-029、SECRETSTORE 計劃。 |
-| Python REPL（遊樂場） | Python 面板 | 下方人類用 Pyodide REPL（xterm）；與 `HOST.runPython` 共用 Worker；**不是** Linux shell。見 DEC-016／019。 |
-| JavaScript REPL（遊樂場） | JavaScript 面板 | 下方人類用隔離 Worker REPL（xterm）；`%run` 跑沙盒 `.js`；**無 npm**；與畫布 runtime 分離。 |
-| Shell（遊樂場） | Shell 面板 | 下方人類用仿 Linux **命令列**（xterm＋WASI preview1；瀏覽器內建 Wasm）；FS＝工作沙盒 OPFS，Worker 內 **`FileSystemSyncAccessHandle` fd 直連**（DEC-039；**per-sandbox** 殼閘／`fsHold` 與 Backend Runtime 互斥——scope＝`playgrounds-projects/<sandboxId>/`）；可簡易 `|` 管線；無外網／sockets；**不是** v86／真 Bash。見 DEC-021、[PG-SHELL-PLAN.md](./PG-SHELL-PLAN.md)、[PG-WASI-OPFS-FS-PLAN.md](./PG-WASI-OPFS-FS-PLAN.md)。 |
+| Python REPL（遊樂場） | Python 面板 | 下方 dock **opt-in** 人類用 Pyodide REPL（xterm）；與 `HOST.runPython` 共用 Worker；加入面板 ≠ 載入 Pyodide；**不是** Linux shell。見 DEC-016／019／044。 |
+| JavaScript REPL（遊樂場） | JavaScript 面板 | 下方 dock **opt-in** 人類用隔離 Worker REPL（xterm）；`%run` 跑沙盒 `.js`；**無 npm**；與畫布 runtime 分離。見 DEC-044。 |
+| Shell（遊樂場） | Shell 面板 | 下方 dock **opt-in** 人類用仿 Linux **命令列**（xterm＋WASI preview1；瀏覽器內建 Wasm）；FS＝工作沙盒 OPFS，Worker 內 **`FileSystemSyncAccessHandle` fd 直連**（DEC-039；**per-sandbox** 殼閘／`fsHold` 與 Backend Runtime 互斥——scope＝`playgrounds-projects/<sandboxId>/`）；可簡易 `|` 管線；無外網／sockets；**不是** v86／真 Bash。加入面板 ≠ 起 WASI Worker。見 DEC-021／044、[PG-SHELL-PLAN.md](./PG-SHELL-PLAN.md)、[PG-WASI-OPFS-FS-PLAN.md](./PG-WASI-OPFS-FS-PLAN.md)。 |
 | runCmd（遊樂場 HOST） | `run_cmd`／`HOST.runCmd` | Agent 非互動執行允許清單 WASI CLI；與 Shell 共用 runner／佇列／OPFS fd 語意，不共用字元級 TTY；無管線字串、無 guest 網路。`too_large`≠專案過大。見 DEC-021／039。 |
 | 工具沙盒／Tool SAM（遊樂場） | 工具沙盒／Tool SAM | 以**工具**角色掛進 main content 的單頁小程式——即 canvas tab **附帶**對工作沙盒的委派 grant／目標注入 **`env.DELEGATE`**（歷史名 `env.TOOL`）；與工作沙盒、現行 Agent 角色分離。見 DEC-022、DEC-030、DEC-037、[PG-TOOLS-PLAN.md](./PG-TOOLS-PLAN.md)、[PG-DELEGATE-GRANT-PLAN.md](./PG-DELEGATE-GRANT-PLAN.md)。舊稱「工具專案」。 |
 | 工具模式（遊樂場） | 工具模式 | main content **前景**為帶 grant 的 canvas tab（注入 `env.DELEGATE`；遷移期可仍見 `TOOL`）；可用 tab 切回編輯器；**不**切 `activeId`。掛載畫布不必是工具（見 plain）。見 DEC-030／037。 |
-| main content tab（遊樂場） | main tab | Editor 槽 tab：固定**編輯器**（不可關）＋最多 **4** 個沙盒 **canvas** tab；可切換 Editor 與任一已掛 SAM。見 DEC-030、[PG-MAIN-CONTENT-PLAN.md](./PG-MAIN-CONTENT-PLAN.md)。 |
-| plain 畫布掛載（遊樂場） | plain 畫布／只看畫布 | canvas tab **無** grant、**無** `env.DELEGATE`；不切 `activeId`。與 Tool 相對。見 DEC-030。 |
+| main content tab（遊樂場） | main tab | Editor 槽 tab：固定**編輯器**（不可關）＋最多 **4** 個沙盒 **canvas** tab；可切換 Editor 與任一已掛 SAM。見 DEC-030、[PG-MAIN-CONTENT-PLAN.md](./PG-MAIN-CONTENT-PLAN.md)。下槽輔助掛載見下方 dock／DEC-044。 |
+| plain 畫布掛載（遊樂場） | plain 畫布／只看畫布 | canvas tab **無** grant、**無** `env.DELEGATE`；不切 `activeId`。與 Tool 相對。可出現在 main content 或下方 dock（後者 MVP 僅 plain）。見 DEC-030／044。 |
+| 下方自選 SAM（遊樂場） | 下方 SAM／dock SAM | 使用者明確加入下方 dock 的 plain 沙盒畫布（硬頂 3；重整不還原；不可與 main 雙掛同一 `sandboxId`）。見 DEC-044。 |
 | 授權／grant（遊樂場工具） | 授權／grant／委派 grant | 遊樂場介面核發給 **delegate**（Tool canvas tab 或 session worker）：host／工作沙盒＋paths（OPFS 及／或虛擬 `.bindings/*`）＋`read`｜`readwrite`。Plain 無 grant。Tool 與 worker **同一家族**。見 DEC-022／037、[PG-DELEGATE-GRANT-PLAN.md](./PG-DELEGATE-GRANT-PLAN.md)。 |
 | delegate（遊樂場） | 受委派者／delegate | 接受工作沙盒委派、在最小權限 grant 內執行的角色——**含 Tool SAM 與 session worker Agent**。對委派方負責；無完整 `env.HOST`。見 DEC-037。 |
 | `.bindings`（遊樂場） | `.bindings/` | Files／授權用的**虛擬**共同子目錄：`.bindings/db`→工作沙盒 `env.DB`、`.bindings/kv`→工作沙盒 `env.KV`。樹上只顯示入口、不展開內容；**不**對齊 `.sam` 的 `.playgrounds-state/`。見 DEC-037、DELEGATE-GRANT 計劃。 |

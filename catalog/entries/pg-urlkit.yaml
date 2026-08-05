@@ -1,0 +1,7 @@
+title: URL／Query 工坊
+kind: tool
+series: 協定
+blurb: 解析／組裝 URL、編輯 query、encodeURIComponent。
+source: sampot/pg-urlkit
+license: MIT
+status: listed

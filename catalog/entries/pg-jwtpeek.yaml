@@ -1,0 +1,7 @@
+title: JWT 窺視
+kind: tool
+series: 協定
+blurb: 解碼 header／payload、過期提示；可選本機 HMAC 驗證。
+source: sampot/pg-jwtpeek
+license: MIT
+status: listed

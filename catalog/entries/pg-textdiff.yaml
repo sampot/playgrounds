@@ -1,0 +1,7 @@
+title: 文字對照
+kind: tool
+series: 資料
+blurb: 左右貼上，行級 diff。
+source: sampot/pg-textdiff
+license: MIT
+status: listed

@@ -1,0 +1,7 @@
+title: SQLite 資料庫
+kind: tool
+series: 資料
+blurb: 檢視與修改工作沙盒 env.DB；grant .bindings/db，表列／分頁／SQL 主控台。
+source: sampot/pg-dbtool
+license: MIT
+status: listed

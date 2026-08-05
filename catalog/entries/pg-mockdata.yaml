@@ -1,0 +1,7 @@
+title: 假資料小造
+kind: tool
+series: 資料
+blurb: 依簡易 schema 產 JSON；可選種子重現。
+source: sampot/pg-mockdata
+license: MIT
+status: listed

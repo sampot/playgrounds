@@ -1,0 +1,7 @@
+title: Unicode 檢視
+kind: tool
+series: 環境
+blurb: code point、UTF-8 bytes、BOM／換行偵測。
+source: sampot/pg-unilook
+license: MIT
+status: listed

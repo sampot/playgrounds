@@ -1,0 +1,7 @@
+title: YAML 整形
+kind: tool
+series: 資料
+blurb: 驗證與 pretty；可掛成工具編輯工作沙盒的 .yml／.yaml。
+source: sampot/pg-yamlfmt
+license: MIT
+status: listed

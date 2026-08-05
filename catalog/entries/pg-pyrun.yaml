@@ -1,0 +1,7 @@
+title: 瀏覽器 Python
+kind: tool
+series: 環境
+blurb: Pyodide 執行 Python、micropip 套件、可分享連結。
+source: sampot/pg-pyrun
+license: MIT
+status: listed

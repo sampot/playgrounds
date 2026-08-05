@@ -1,0 +1,7 @@
+title: SQL 整形
+kind: tool
+series: 資料
+blurb: pretty（不執行）；可掛成工具開 .sql。
+source: sampot/pg-sqlfmt
+license: MIT
+status: listed

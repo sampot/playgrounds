@@ -1,0 +1,7 @@
+title: IP／CIDR 小算
+kind: tool
+series: 協定
+blurb: IPv4 網段、廣播、可用主機數。
+source: sampot/pg-netcid
+license: MIT
+status: listed

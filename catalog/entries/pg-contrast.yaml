@@ -1,0 +1,7 @@
+title: 對比度檢查
+kind: tool
+series: 前端
+blurb: 前景／背景色票，WCAG AA／AAA（一般與大字）。
+source: sampot/pg-contrast
+license: MIT
+status: listed

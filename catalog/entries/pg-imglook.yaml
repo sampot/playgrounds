@@ -1,0 +1,7 @@
+title: 圖片／data URL
+kind: tool
+series: 前端
+blurb: 尺寸、MIME、複製 data URL；可掛成工具開工作沙盒圖檔。
+source: sampot/pg-imglook
+license: MIT
+status: listed

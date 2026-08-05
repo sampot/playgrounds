@@ -1,0 +1,7 @@
+title: 波形叮叮
+kind: media
+series: 聲音
+blurb: Web Audio 振盪器與即時波形；點播放才發聲。
+source: sampot/pg-wavepad
+license: MIT
+status: listed

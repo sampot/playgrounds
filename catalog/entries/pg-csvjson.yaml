@@ -1,0 +1,7 @@
+title: CSV ↔ JSON
+kind: tool
+series: 資料
+blurb: 分隔符／標頭互轉；可掛成工具開 .csv。
+source: sampot/pg-csvjson
+license: MIT
+status: listed

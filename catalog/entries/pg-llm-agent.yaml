@@ -1,0 +1,7 @@
+title: Coding Agent
+kind: agent
+series: 子代理
+blurb: BYOK coding agent（編排子代理）。改 .agent/system.md 調人格；密鑰走密鑰庫；可多份 clone。
+source: sampot/pg-llm-agent
+license: MIT
+status: listed

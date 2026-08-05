@@ -1,0 +1,7 @@
+title: 井字遊戲
+kind: game
+series: 桌遊
+blurb: 3×3 雙人、人機與 AI 對 AI（Minimax）。
+source: sampot/pg-tictactoe
+license: MIT
+status: listed

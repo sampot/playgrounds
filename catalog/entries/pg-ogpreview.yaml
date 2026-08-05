@@ -1,0 +1,7 @@
+title: OG／meta 預覽
+kind: tool
+series: 前端
+blurb: 從 HTML head 模擬社群分享卡；可掛工具看 index.html。
+source: sampot/pg-ogpreview
+license: MIT
+status: listed

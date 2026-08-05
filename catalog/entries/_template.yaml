@@ -1,0 +1,11 @@
+# Copy this file to <id>.yaml (filename = stable catalog id, e.g. pg-mytoy.yaml).
+# Required fields: title, kind, series, blurb, source
+# Optional: status (listed|draft; draft omitted from site), license
+
+title: 顯示名稱
+kind: toy # tool | agent | game | toy | media
+series: 生成 # must match a series under that kind in ../series.yaml (or gen appends)
+blurb: 一句話說明這款 SAM 做什麼、怎麼玩。
+source: owner/repo # or https://github.com/owner/repo / https://gitlab.com/owner/repo
+license: MIT
+status: listed # listed | draft

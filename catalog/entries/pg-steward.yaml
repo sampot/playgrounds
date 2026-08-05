@@ -1,0 +1,7 @@
+title: 總管
+kind: agent
+series: 總管
+blurb: 總管遊樂場的專屬 Agent，負責執行你交辦的任務，包括開發單頁小程式。需要自備 LLM API Key。
+source: sampot/pg-steward
+license: MIT
+status: listed

@@ -1,0 +1,7 @@
+title: JSON 結構對照
+kind: tool
+series: 資料
+blurb: 路徑級新增／刪除／變更；可掛成工具對照工作沙盒 .json。
+source: sampot/pg-jsondiff
+license: MIT
+status: listed

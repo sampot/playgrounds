@@ -1,0 +1,7 @@
+title: 暗棋對弈
+kind: game
+series: 懷舊
+blurb: 翻子吃子，簡易人機；華語圈暗棋小品。
+source: sampot/pg-banqi
+license: MIT
+status: listed

@@ -1,0 +1,7 @@
+title: QR Code
+kind: tool
+series: 前端
+blurb: 文字／URL 產碼、下載 PNG。
+source: sampot/pg-qrcode
+license: MIT
+status: listed

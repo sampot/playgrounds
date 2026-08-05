@@ -1,0 +1,7 @@
+title: 五子棋
+kind: game
+series: 桌遊
+blurb: 15×15 雙人／人機／AI 對 AI。
+source: sampot/pg-gomoku
+license: MIT
+status: listed

@@ -7,8 +7,10 @@
   "scripts": {
     "dev": "astro dev",
     "start": "astro dev",
+    "catalog:gen": "node --experimental-strip-types --experimental-transform-types scripts/generate-catalog.ts",
     "check": "astro check",
-    "build": "npm run check && astro build",
+    "build": "npm run catalog:gen && npm run check && astro build",
+    "pretest": "npm run catalog:gen",
     "preview": "astro preview",
     "deploy": "wrangler deploy",
     "deploy:official": "npm run build && wrangler deploy -c wrangler.official.jsonc",
@@ -40,7 +42,8 @@
     "sql.js": "^1.14.1",
     "tailwindcss": "^4.3.3",
     "three": "^0.185.1",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "yaml": "^2.9.0"
   },
   "devDependencies": {
     "@astrojs/svelte": "^9.0.1",

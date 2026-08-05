@@ -1,0 +1,7 @@
+title: TOML 整形
+kind: tool
+series: 資料
+blurb: 驗證與 pretty；可掛成工具編輯工作沙盒的 .toml。
+source: sampot/pg-tomlfmt
+license: MIT
+status: listed

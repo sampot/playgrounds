@@ -1,0 +1,7 @@
+title: 識別碼小造
+kind: tool
+series: 環境
+blurb: UUID v4／NanoID 批量產生。
+source: sampot/pg-idmint
+license: MIT
+status: listed

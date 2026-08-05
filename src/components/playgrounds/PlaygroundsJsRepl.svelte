@@ -273,8 +273,8 @@
       t.writeln("請先開啟工作沙盒，再按「載入」。");
       setDetail("待開啟沙盒");
     } else {
-      t.writeln("啟動中…");
-      void boot();
+      t.writeln("按「載入」啟動 JS Worker（不會自動啟動）。");
+      setDetail("尚未載入");
     }
     return () => {
       document.removeEventListener("theme-change", syncTerminalTheme);
@@ -291,12 +291,6 @@
     }
   });
 
-  // Boot once when a work project becomes available after mount.
-  $effect(() => {
-    if (!disabled && !booted && !bootAttempted && !busy && term) {
-      void boot();
-    }
-  });
   onDestroy(() => {
     document.removeEventListener("theme-change", syncTerminalTheme);
     resizeObserver?.disconnect();

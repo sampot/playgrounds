@@ -1,0 +1,7 @@
+title: .env 工坊
+kind: tool
+series: 環境
+blurb: 解析、遮罩、匯出；非密鑰庫。可掛工具開 .env。
+source: sampot/pg-envkit
+license: MIT
+status: listed

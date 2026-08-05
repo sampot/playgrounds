@@ -1,0 +1,7 @@
+title: 色票互轉
+kind: tool
+series: 日常
+blurb: hex／rgb／oklch 互轉與取色。
+source: sampot/pg-colorcast
+license: MIT
+status: listed

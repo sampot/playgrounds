@@ -1,0 +1,7 @@
+title: gitignore 小造
+kind: tool
+series: 環境
+blurb: 勾選常見堆疊產 .gitignore 片段。
+source: sampot/pg-ignoregen
+license: MIT
+status: listed

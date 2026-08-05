@@ -1,0 +1,7 @@
+title: Semver 對照
+kind: tool
+series: 環境
+blurb: 比較與 ^／~ 範圍；可掛工具讀 package.json。
+source: sampot/pg-semver
+license: MIT
+status: listed

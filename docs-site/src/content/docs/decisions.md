@@ -14,10 +14,12 @@ description: 與場網／文件站相關的 Accepted 決策；全文在 repo。
 | DEC-041 | 獨立子網域與開源抽取 | OSS 宿主；舊場凍結；小品 `/sam/` 在場網 |
 | DEC-042 | Workers 與 `*.samkuo.me` 場網 | 預設場 `play`；保留名 |
 | DEC-043 | 文件站 Starlight＠`docs.samkuo.me` | 本站；獨立 Worker |
+| DEC-044 | 下方面板 dock（opt-in＋自選 SAM） | 預設僅 Console；REPL／Shell／輔助 SAM 明確加入 |
 
 階段計劃：
 
 - [PG-STANDALONE-PLAN.md](https://github.com/sampot/playgrounds/blob/main/docs/PG-STANDALONE-PLAN.md)（場網）
 - [PG-DOCS-PLAN.md](https://github.com/sampot/playgrounds/blob/main/docs/PG-DOCS-PLAN.md)（本文件站）
+- [PG-BOTTOM-DOCK-PLAN.md](https://github.com/sampot/playgrounds/blob/main/docs/PG-BOTTOM-DOCK-PLAN.md)（下方 dock；未落地）
 
 完整 DEC 表與正文以 GitHub 上的 `DECISIONS.md` 為準；本頁不複製全文以免漂移。

@@ -1,0 +1,7 @@
+title: HTTP 速查
+kind: tool
+series: 協定
+blurb: 常見狀態碼與 MIME 速查。
+source: sampot/pg-httpref
+license: MIT
+status: listed

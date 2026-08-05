@@ -1,6 +1,6 @@
 # 我是山姆鍋 — 架構與工程決策
 
-> **最後更新：** 2026-08-05（DEC-041：小品型錄 `/sam/` 遷入場網宿主）  
+> **最後更新：** 2026-08-05（DEC-044：下方面板 dock／opt-in＋自選 SAM）  
 > **對象：** 作者、AI agents；必要時給之後的自己讀
 
 本文件以輕量 **ADR**（Architecture Decision Record）記錄本站**顯著且耐久**的架構／工程選擇：選了什麼、為何不選其他、後續工作不可踩破的後果。細節規格仍以 [AGENTS.md](./AGENTS.md)、[TOOLS-PLAN.md](./TOOLS-PLAN.md) 等為準；此檔是可掃讀的決策索引，避免只活在 PR 與聊天裡。
@@ -83,6 +83,7 @@
 | [DEC-041](#dec-041-playgrounds-獨立子網域與開源抽取) | Playgrounds 獨立子網域與開源抽取 | Accepted |
 | [DEC-042](#dec-042-playgrounds-workers與-wildcard-場網) | Playgrounds：Workers 部署與 `*.samkuo.me` 場網 | Accepted |
 | [DEC-043](#dec-043-playgrounds-文件站-starlight與-docssamkuome) | Playgrounds 文件站：Starlight＠`docs.samkuo.me` | Accepted |
+| [DEC-044](#dec-044-playgrounds-下方面板-dockopt-in與自選-sam) | Playgrounds 下方面板 dock（opt-in＋自選 SAM） | Accepted |
 
 ---
 
@@ -265,7 +266,7 @@
   - **`/playgrounds/canvas/<projectId>/api/*`**：由遊樂場介面執行沙盒根目錄 **`functions.js`** 的 Workers 形 `export default { fetch(request, env, ctx) }`（只讀 OPFS 模組；相對 ESM 經 blob／import map）。畫布 HTML bridge 會把 `fetch("/api/…")` 改寫到沙盒 canvas 路徑下。`env` 預設注入模擬 **`KV`**（**Durable**：OPFS `playgrounds-kv/<projectId>/`，見 DEC-018；無 OPFS 時退回記憶體）；`ctx.waitUntil`／`passThroughOnException` 為 stub。無 `functions.js` 時回 **503**（`playgrounds_functions_unavailable`）。DB／R2／Secrets 等其餘 bindings 見 DEC-020。
   - 沙盒權威儲存為瀏覽器 **OPFS**；檔案內容可為 **UTF-8 文字或二進位**（圖檔、字型、`.apk` 等）；編輯器只開可判為文字者。支援**匯入／匯出沙盒**（**沙盒包裹**副檔名 **`.sam`**：ZIP 容器，僅便於辨識；binary 原樣；**只接受 `.sam` 匯入**）；可自 **GitHub public repo** 拉檔後寫入 OPFS（之後與遠端無關）。沙盒列表在選單／對話框，不常駐側欄。
   - 左側 **檔案側欄**為樹狀檔案總管（非扁平路徑列表）：支援目錄展開／空目錄（OPFS directory handle，**不**用 `.gitkeep` 佔位）、單檔與多檔自 OS 上傳、**一次性目錄上傳**（`<input webkitdirectory>`，含巢狀子目錄檔案；以 `webkitRelativePath` 還原結構；空資料夾通常不會出現在 FileList；側欄寫入目前目錄，**新沙盒對話框**可整夾建成新 OPFS 沙盒）、單檔下載、**多檔／資料夾下載預設打 ZIP**（與沙盒包裹分開）、以及使用者指定 **URL → OPFS**（瀏覽器直連 `fetch`，**僅 CORS 可用**；失敗時說明限制；**不**做站內通用 proxy／Pages Functions 代抓）。**不**用 File System Access API 做持久掛載。
-  - 可選下方 **Python REPL** 與 **JavaScript REPL** 面板（人類用；xterm；懶載入）。Python 與 `HOST.runPython` 同 Worker；JS 為獨立隔離 Worker（`%run` 沙盒腳本；**無 npm**）。**不是** Linux shell；**已移除** v86／Alpine 虛擬機面板與映像資產。
+  - 下方 **Python REPL**／**JavaScript REPL**／**Shell** 為人類輔助面板（xterm）；**預設不顯示**，須明確加入（見 [DEC-044](#dec-044-playgrounds-下方面板-dockopt-in與自選-sam)）。Python 與 `HOST.runPython` 同 Worker；JS 為獨立隔離 Worker（`%run` 沙盒腳本；**無 npm**）。**不是** Linux shell；**已移除** v86／Alpine 虛擬機面板與映像資產。Worker／Pyodide／WASI **真用才啟動**（加入面板 ≠ 啟動）。
   - **遊樂場介面偏好（Settings）：** `localStorage` 鍵 **`playgrounds-prefs-v1`**（與 layout／tool prefs／Agent BYOK 分開）。畫布 `console.*` 預設**不**鏡像到瀏覽器 DevTools：SW bridge（`canvasSwProtocol.ts`／`public/sw.js`）＋遊樂場權威 gate（`canvasConsoleGate.ts`，iframe load／src 後注入，抗 sticky 舊 worker）。隱藏 ESM host（`functions.js`／`controller.js`）走 `consoleMirrorBridge.ts`。使用者可在「選項 → 設定」開啟鏡像。
   - 頁面 **`noindex`**，XML sitemap **排除** `/playgrounds/**`；與工具箱登錄表／「一工具一介紹文」模型無關。現有 `/tools/*` 小工具頁不因 Playgrounds 改動或退場。
 - **Consequences:**
@@ -284,6 +285,7 @@
   - Agent runtime 後續階段（HOST v1、觀察迴圈、Durable KV、session）見 [PG-AGENT-PLAN.md](./PG-AGENT-PLAN.md)；定案時另立／修訂 ADR。
   - **SAM 三層模型／Controller／headless** 見 [DEC-024](#dec-024-sam-三層模型與-headless-runtime)。
 - **Revision（2026-08-05）：** 防護邊界與場內「沙盒」語意釐清、整場重置見 [DEC-040](#dec-040-playgrounds-防護邊界與場內沙盒語意整場重置)。
+- **Revision（2026-08-05）：** 下方面板改 **opt-in dock**（Console 常駐；REPL／Shell／自選 SAM 明確加入；真用才起 Worker）見 [DEC-044](#dec-044-playgrounds-下方面板-dockopt-in與自選-sam)。
 
 ### DEC-017: Playgrounds agent
 
@@ -294,7 +296,7 @@
   - **Agent 用途不限 coding：** 現行 Agent 可以是改檔驗畫布的助手，也可以是其他**特定功能**的 Agent（數據、demo 編排、領域工具等）。人格／工具編排／prompt 留在該 Agent 沙盒裡；遊樂場只提供穩定 `env.HOST`／bindings。內建**範本 Agent**偏向「對工作沙盒觀察—改檔—驗證」以便示範 HOST，可 clone 後改用途。
   - **產品角色「總管（Steward）」：** 持有完整 `env.HOST` 的現行 Agent 席，產品敘事稱**總管**（English：**Steward**；舊稱「管家」）——使用者（遊樂場主人）唯一對口（下指示、拿結果），代為管理遊樂場；沙盒為有邊界的活動空間。實例**顯示名由使用者自訂**；「總管／Steward」是角色類名。技術文件可續用「現行 Agent」指 `activeAgentProjectId` 槽位。勿與 session **Host SAM** 混淆（見 DEC-023）。用語見 [GLOSSARY.md](./GLOSSARY.md)。
   - **範本分流：** **總管範本**為開源小品 [`sampot/pg-steward`](https://github.com/sampot/pg-steward)（BYOK／HOST 對口；經 `?open=`／`/sam/` 取得，**不**內嵌遊樂場）；**LLM Agent 範本**為開源小品 [`sampot/pg-llm-agent`](https://github.com/sampot/pg-llm-agent)（BYOK／**無** HOST；檔案改 system prompt；可多實例入座 coding 編排 `worker`；見 [PG-LLM-AGENT-PLAN.md](./PG-LLM-AGENT-PLAN.md)）；**一般 Agent 範本**仍為遊樂場內建（Controller 背景／主動示範，**不**強制 LLM）。Agent 與工具 SAM 的主差在能否主動／背景運行，不在是否使用 LLM。
-  - **雙執行面：** **工作沙盒**（遊樂場 `activeId`）走既有編輯器 + **原畫布**；**現行 Agent**（遊樂場 `activeAgentProjectId`，`localStorage`）走左側側欄 **Agent 區**（與 Files Tab 切換；Agent UI iframe）＋宿主持有的 **Controller 實例**（DEC-024）。下方面板為 Console／Python／JavaScript REPL。Agent **UI** 是第二條 canvas 管線（同 SW／`index.html`），不是遊樂場介面手寫 chat 元件；**任務執行**在 `controller.js`（有則優先），不依賴 UI 是否已掛載。
+  - **雙執行面：** **工作沙盒**（遊樂場 `activeId`）走既有編輯器 + **原畫布**；**現行 Agent**（遊樂場 `activeAgentProjectId`，`localStorage`）走左側側欄 **Agent 區**（與 Files Tab 切換；Agent UI iframe）＋宿主持有的 **Controller 實例**（DEC-024）。下方 **dock** 預設僅 **Console**；Python／JavaScript REPL／Shell／自選 SAM 須明確加入（[DEC-044](#dec-044-playgrounds-下方面板-dockopt-in與自選-sam)）。Agent **UI** 是第二條 canvas 管線（同 SW／`index.html`），不是遊樂場介面手寫 chat 元件；**任務執行**在 `controller.js`（有則優先），不依賴 UI 是否已掛載。
   - **側欄 Tab 還原：** 記住使用者上次的 Files／Agent tab（layout）；無紀錄時預設 Files。開在 Files 時只還原「現行 Agent」id（徽章／寫入防護），**不**掛載 Agent 畫布；切到 Agent tab、或使用者主動設為／建立現行 Agent 時才載入 UI。已掛載後 Files↔Agent 切換保留 iframe（不重載）；僅在隱藏期間 Agent 檔案有變（stale）或手動重新整理時才重建。有 `controller.js` 時宿主可在 UI 未掛載時仍保持 Controller 運行。
   - **沙盒複製：** OPFS **複製沙盒**（深拷貝檔案與空目錄、新 id）；文案與「自 GitHub 複製」區隔。改 agent 本身：複製 → 當工作沙盒在畫布開發 → UI **設為現行 Agent**（第一版即可從 UI 改設定；可清除）。
   - **BYOK（修訂 DEC-029／035）：** LLM **endpoint／model**／所選 **binding 名**可留在總管設定（可從 SecretStore 既有名稱選，不必重輸 key）；**僅新增／輪替**時經遊樂場介面 dialog 寫入值（訊息不帶 plaintext）。執行時經 `env.secrets.<NAME>.get()` 自行打 endpoint（須 unlock）。本站**不**開帳號後端、**不**代打、HOST **永不**回傳／寫入密鑰值。非密執行期參數見 DEC-035（`.env`→`env.vars`）。
@@ -338,7 +340,7 @@
 - **Context:** Runtime MVP（HOST v1、觀察迴圈、Durable KV、session／checkpoint、範本體驗）已落地。下一步要提高 agent 對使用者的價值（除錯 API、數據驗證、有狀態 demo）。曾列候選的 `HOST.shell` + v86 對「輕量 Web + functions」主軸槓桿低（慢、無網、無編譯鏈、guest `/mnt` 唯讀），對 agent 有用機率低；人類面板亦改以 Pyodide REPL 取代。
 - **Decision:**
   - **增值路線（詳 [PG-AGENT-PLAN.md](./PG-AGENT-PLAN.md) Phase 6+）：** 觀察補強（`getNetworkLog`、`getDomSnapshot`）→ 瀏覽器 compute（優先 **`HOST.runPython`／Pyodide Worker**，CDN＋釘版，對齊 DEC-015 精神）→ 二進位讀寫與畫布截圖 → 仿 D1／SecretStore bindings（DEC-029）→ 高權力可選（`evalInCanvas`、`applyPatch`）按痛點再開。
-  - **Pyodide 例外：** DEC-016 允許遊樂場隔離 Worker + `HOST.runPython`（釘版對齊 DEC-015；套件初版釘清單）。**不**嵌 python-runner UI。人類下方面板為 **Python REPL**（同 Worker；非 Linux）。
+  - **Pyodide 例外：** DEC-016 允許遊樂場隔離 Worker + `HOST.runPython`（釘版對齊 DEC-015；套件初版釘清單）。**不**嵌 python-runner UI。人類下方 **Python REPL**（同 Worker；非 Linux；**opt-in** 見 [DEC-044](#dec-044-playgrounds-下方面板-dockopt-in與自選-sam)）。
   - **否決 agent×v86／Linux shell：** **不**實作 `HOST.shell`。**已移除** v86／Alpine 虛擬機面板、映像與建置腳本；勿再加回除非新 DEC。
   - **工具 vs 技能：** 遊樂場提供可探測 HOST／bindings；推理劇本與 playbook 留在可複製的 Agent 範本。
 - **Consequences:**
@@ -348,6 +350,7 @@
   - Phase 7（`runPython`）已落地；升級 Pyodide 須同步 `pythonRunnerShare.ts` 釘版與 DEC-015／本決策。
   - Phase 9（DB／Secrets）見 [DEC-020](#dec-020-playgrounds-模擬-d1與-secrets)。
   - 階段完成定義與錯誤碼以 [PG-AGENT-PLAN.md](./PG-AGENT-PLAN.md) 為準；契約摘要同步 [playgrounds-host-api.md](./playgrounds-host-api.md)。
+- **Revision（2026-08-05）：** 人類 Python REPL 改為下方 dock opt-in；`runPython` 仍呼叫時 on-demand——見 [DEC-044](#dec-044-playgrounds-下方面板-dockopt-in與自選-sam)。
 
 ### DEC-020: Playgrounds 仿 D1 與 Secrets
 
@@ -368,7 +371,7 @@
 - **Context:** 人類需要仿 Linux **命令列**的沙盒 CLI；Agent 需要非互動 `run_cmd`；FS＝工作沙盒 OPFS。DEC-019 已否決 v86／互動 `HOST.shell`。曾考慮 `@wasmer/sdk`＋WASIX Bash（wasmer.sh），但需 COI、綁定 Wasmer、超出「內建 Wasm」；改採較薄的 WASI preview1 路徑。
 - **Decision:**
   - **執行核：** 瀏覽器 **`WebAssembly`**＋**WASI preview1** JS 宿主（`@bjorn3/browser_wasi_shim`）；釘版 `.wasm` CLI（`jq`；uutils `grep`／`sed`／`find`／`diffutils`；goawk `awk`；`cowsay`；**uutils** `coreutils.wasm` 0.9.0 multicall；見 `wasiPin.ts`／`public/playgrounds/wasi/`）。人類 Shell 的 `xargs` 為 JS host（WASI 無法 spawn）。**不**使用 `@wasmer/sdk`、**不**依賴 WASIX、**不**以 COOP／COEP 為硬性前提。guest **無** sockets／外網。
-  - **人類：** 下方 **Shell** 面板——xterm＋**行調度器**（`cd`／`help`／allowlist → WASI；可簡易 `|`）；preopen＝工作沙盒 OPFS；**不**經 HOST 暴露字元級 TTY；**不**承諾真 Bash／完整 Linux。
+  - **人類：** 下方 **Shell** 面板（opt-in；見 [DEC-044](#dec-044-playgrounds-下方面板-dockopt-in與自選-sam)）——xterm＋**行調度器**（`cd`／`help`／allowlist → WASI；可簡易 `|`）；preopen＝工作沙盒 OPFS；**不**經 HOST 暴露字元級 TTY；**不**承諾真 Bash／完整 Linux。WASI Worker／`.wasm` **第一條命令／`runCmd` 時才啟動**（加入面板 ≠ 啟動）。
   - **Agent：** `HOST.runCmd`／`listCmds`；非互動、允許清單、timeout、輸出／FS 上限、與人類互斥佇列；與人類共用 runner／FS 語意；**無**管線字串。
   - **不是** v86；**不做**互動式 `HOST.shell`；**不**把未審查的 busybox／任意腳本入口當默認。若改回 Wasmer／WASIX 須新 DEC 或修訂本筆。
   - 階段、完成定義、錯誤碼以 [PG-SHELL-PLAN.md](./PG-SHELL-PLAN.md) 為準。
@@ -377,6 +380,7 @@
   - 升級 shim／`.wasm` 釘版時更新 `wasiPin.ts` 與本決策／Shell 計劃。
   - 勿在讀者文章預告未完成階段；對外勿稱虛擬機。
 - **Revision（2026-08-04）：** Phase 0–4 落地時採「OPFS → 記憶體 preopen 全量／cwd 鏡像」＋`HOST_WASI_MAX_FS_BYTES`。大沙盒／大二進位會人為 `too_large`。後續 FS 後端改 **Worker 內 OPFS `FileSystemSyncAccessHandle` fd 直連**，見 [DEC-039](#dec-039-playgrounds-wasi-cli-opfs-fd-直連)／[PG-WASI-OPFS-FS-PLAN.md](./PG-WASI-OPFS-FS-PLAN.md)。DEC-021 的 Wasm＋WASI-only／非互動／允許清單邊界**不變**。
+- **Revision（2026-08-05）：** Shell 面板改為下方面板 dock 的 opt-in 項；真用才起 WASI Worker——見 [DEC-044](#dec-044-playgrounds-下方面板-dockopt-in與自選-sam)。
 
 ### DEC-022: Playgrounds 擴展工具（Tool SAM）與個人工具箱
 
@@ -537,12 +541,12 @@
 
 ### DEC-030: Playgrounds main content tabs（掛載≠Tool）
 
-- **Status:** Accepted（2026-08-02；同日修訂：**Editor↔SAM tabs**；SAM canvas **硬頂 4**；掛載≠Tool）
+- **Status:** Accepted（2026-08-02；同日修訂：**Editor↔SAM tabs**；SAM canvas **硬頂 4**；掛載≠Tool；**2026-08-05：** 下槽改由 [DEC-044](#dec-044-playgrounds-下方面板-dockopt-in與自選-sam) 規範）
 - **Context:** DEC-022 將 Editor 槽定為 Default｜單一 Tool（強制 grant），並把「多工具並行 tab」列為 MVP 非目標。實務上需在不切工作沙盒下於 main content 查看／使用其他沙盒畫布，並用 **tabs 在編輯器與多個 SAM 之間切換**；Tool 授權是可選，不是掛載前提。
 - **Decision:**
-  1. **範圍：** 僅 **main content（Editor 槽）**；左／右／下槽與自由 dashboard／分屏**不做**。
+  1. **範圍：** 本筆僅 **main content（Editor 槽）**。**下槽**（輔助 dock／opt-in 面板與自選 SAM）見 [DEC-044](#dec-044-playgrounds-下方面板-dockopt-in與自選-sam)。左／右槽與自由 dashboard／分屏**仍不做**。
   2. **Tab 模型：** 固定 **編輯器** tab（不可關）＋ **0..4** 個 **canvas** tab。可用 tabs **切換 Editor 與任一已掛 SAM**；同槽僅一個前景可見。
-  3. **掛載 ≠ Tool：** canvas 預設 **plain**（無 grant、無 `env.TOOL`）。**Tool**＝該 tab 另核發 grant，且僅**前景**時注入 `env.TOOL`。MVP **至多一個**帶 grant；`openTool`／`getToolSession`／`closeTool` 語意保留，實作改走 tab 層。
+  3. **掛載 ≠ Tool：** canvas 預設 **plain**（無 grant、無 `env.TOOL`／`env.DELEGATE`）。**Tool**＝該 tab 另核發 grant，且僅**前景**時注入委派 binding。MVP **至多一個**帶 grant；`openTool`／`getToolSession`／`closeTool` 語意保留，實作改走 tab 層。
   4. **工作沙盒不變：** 不以 `openProject` 充當掛載；切換 `activeId` 清除全部 canvas tabs（回到 editor）。
   5. **上限／還原：** SAM canvas **硬頂 4**；重整**不**自動還原；非前景可 keep-alive。
   6. **HOST：** `openMainCanvas`／`listMainTabs`／`setMainTab`／`closeMainTab`（名稱以計劃為準）；capabilities 可探測。
@@ -551,8 +555,9 @@
   - 實作以 MAIN-CONTENT 計劃為準；契約變更同步 host-api、GLOSSARY、總管範本 tools。
   - 勿把 plain 畫布當第二總管或默認注入 TOOL／HOST。
   - 須能 tab 回編輯器；勿超過 4 個 SAM canvas tab。
-  - 勿擴成左／右槽 dashboard，除非另立決策。
+  - 勿擴成左／右槽 dashboard，除非另立決策；下槽擴充以 DEC-044 為準，勿與本筆混為單一「任意槽」dashboard。
   - DEC-022 的 grant／個人工具箱定位仍有效；本筆拆開「顯示」與「授權」。
+- **Revision（2026-08-05）：** 原「下槽不做」改為下方面板 dock 由 [DEC-044](#dec-044-playgrounds-下方面板-dockopt-in與自選-sam) 另定；main content 規則不變。
 
 ### DEC-031: Playgrounds Agent Model
 
@@ -764,12 +769,13 @@
 - **Consequences:**
   - 路徑／origin 須配置化（base path、canvas 前綴、預設 `?open=` origin）；消滅硬編碼 `https://samkuo.me/playgrounds` 作為唯一權威。
   - 場網 SW scope 可為 `/` 且**只**服務遊樂場；部落格 `public/sw.js` 日後可卸下 canvas／遊樂場離線職責（過渡期可雙軌）。
-  - 開源 repo 不含部落格文章、`CONTENT-PLAN`、站台品牌主殼；工程 `AGENTS.md`／DEC 精簡版可進 OSS；**含**小品型錄頁（`src/pages/sam/`＋`src/data/samCatalog.ts`）。
+  - 開源 repo 不含部落格文章、`CONTENT-PLAN`、站台品牌主殼；工程 `AGENTS.md`／DEC 精簡版可進 OSS；**含**小品型錄頁（`src/pages/sam/`；資料權威 `catalog/entries/`）。
   - 同步 [GLOSSARY.md](./GLOSSARY.md)、[AGENTS.md](./AGENTS.md)；舊 DEC-016 路徑敘事加「權威改場網見 DEC-041／042」。
   - 舊場**下線**（刪路由／拆碼）時點另立修訂；在此之前不得默默刪除 `samkuo.me/playgrounds/`。凍結≠下線。
 - **Revision（2026-08-05）：** 部署標的與 wildcard 場網改由 DEC-042 定義；預設展示場改 `play.samkuo.me`。
 - **Revision（2026-08-05）：** 舊場凍結——遷移提示已上後，`/playgrounds/` **不再**與場網同步功能更新；權威碼在 `sampot/playgrounds`。
 - **Revision（2026-08-05）：** SAM 小品型錄 `/sam/` 自部落格遷入場網宿主（同 Worker；部落格轉址）。
+- **Revision（2026-08-05）：** 小品型錄資料權威改 `catalog/entries/*.yaml`（PR 投稿；建置產 typed module）；見 [PG-CATALOG-PLAN.md](./PG-CATALOG-PLAN.md)。
 
 ### DEC-042: Playgrounds Workers 與 `*.samkuo.me` 場網
 
@@ -810,6 +816,25 @@
   - CI 可將文件部署與場殼部署分開。
   - 同步 [GLOSSARY.md](./GLOSSARY.md)、[AGENTS.md](../AGENTS.md)、[PG-DOCS-PLAN.md](./PG-DOCS-PLAN.md)。
 
+### DEC-044: Playgrounds 下方面板 dock（opt-in 與自選 SAM）
+
+- **Status:** Accepted（2026-08-05）
+- **Context:** 下方常駐 Console／Python／JavaScript／Shell tab 會讓多數路徑多付 xterm／掛載成本；點 tab 即 boot Pyodide／Worker 更重。同時使用者希望把**自選 SAM**當輔助面掛在下方（與 DEC-030 main content 主工作面分工），而不開左／右槽 dashboard。需省預設資源、又允許明確擴充。
+- **Decision:**
+  1. **槽位：** 下方面板為 **輔助 dock**（非 main content）。**Console 常駐**（工作沙盒畫布輸出主路徑）。Python REPL／JavaScript REPL／Shell／自選 SAM **預設不顯示**，須使用者（或日後 HOST）**明確加入**後才出現 tab。
+  2. **內建面板：** `python`／`javascript`／`shell` 為 dock 內建項。加入＝顯示 tab 並可掛 UI；**≠** 啟動 Web Worker／載入 Pyodide／WASI `.wasm`。真用才啟動：REPL 使用者載入或送出第一行；Shell 第一條命令；API 路徑（`HOST.runPython`／`env.COMPUTE.runPython`／`HOST.runCmd`）於**呼叫時** `ensure`——與面板是否已加入無關、共用既有 singleton runner。
+  3. **自選 SAM：** 可將本機其他沙盒以 **plain 畫布**掛入 dock（不切 `activeId`）。MVP **不**在下槽核發 Tool／`env.DELEGATE`（授權面仍只在 main content／DEC-030／037）。硬頂 **3** 個下方 SAM（與 main 的 4 **分開計**）。不可掛總管席；同 `sandboxId` **不得**同時出現在 main canvas tab 與下方 dock（拒絕第二掛，避免雙 iframe）。
+  4. **生命週期／資源：** 未加入不掛元件。下方 SAM：非前景**可卸** iframe（預設省資源；不強制 keep-alive）。移除面板＝從 dock 清單刪除並 unmount；JS／Shell runner 可在無進行中工作時 dispose；Python runner 若仍可能被 API 使用則**不**因關面板強制 terminate。
+  5. **還原：** layout 可記住「已加入的內建項」；**不**因舊 `bottomTab === "python"` 等在進場自動 boot Worker。下方自選 SAM：**重整不自動還原**（對齊 DEC-030 main canvas）。切換工作沙盒 `activeId` 時清除下方自選 SAM（內建項可保留）。
+  6. **分工：** Main（DEC-030）＝編輯器 ↔ 大型工具／第二畫布；Bottom＝Console、REPL、Shell、小輔助 SAM。勿擴成左／右槽或自由分屏 dashboard。
+  7. **HOST（可後段）：** 可選 `openBottomPanel`／`closeBottomPanel`／`listBottomPanels`（名稱以計劃為準）；capabilities 可探測；未列前勿假設存在。
+  - 階段見 [PG-BOTTOM-DOCK-PLAN.md](./PG-BOTTOM-DOCK-PLAN.md)。
+- **Consequences:**
+  - 修訂 DEC-016／017／021／030 對下方面板「常駐 tab／懶載入」的敘述；同步 GLOSSARY、host-api「計劃中」段。
+  - 勿進場 preload Pyodide／WASI；勿把加入面板當 boot；勿在下槽默認注入 HOST／DELEGATE。
+  - 勿超過下方 SAM 硬頂；勿與 main 雙掛同一沙盒；勿因此開左／右槽。
+  - 實作以 [PG-BOTTOM-DOCK-PLAN.md](./PG-BOTTOM-DOCK-PLAN.md) 為準。
+
 ---
 
 ## 4. 相關文件
@@ -847,7 +872,9 @@
 | [PG-BACKEND-RUNTIME-SPEC.md](./PG-BACKEND-RUNTIME-SPEC.md) | 後端執行面／可替換通道（DEC-038；WebRTC 遷移路線） |
 | [PG-BACKEND-RUNTIME-PLAN.md](./PG-BACKEND-RUNTIME-PLAN.md) | Backend Runtime 實作階段（DEC-038） |
 | [PG-MAIN-CONTENT-PLAN.md](./PG-MAIN-CONTENT-PLAN.md) | Main content Editor↔SAM tabs／plain 掛載（DEC-030） |
+| [PG-BOTTOM-DOCK-PLAN.md](./PG-BOTTOM-DOCK-PLAN.md) | 下方面板 dock／opt-in／自選 SAM（DEC-044） |
 | [PG-STANDALONE-PLAN.md](./PG-STANDALONE-PLAN.md) | 場網／Workers／開源／舊場暫留（DEC-041／042） |
+| [PG-CATALOG-PLAN.md](./PG-CATALOG-PLAN.md) | 小品型錄 YAML／PR 投稿（`catalog/entries/`） |
 | [PG-DOCS-PLAN.md](./PG-DOCS-PLAN.md) | 文件站 Starlight＠`docs.samkuo.me`（DEC-043） |
 | [playgrounds-host-api.md](./playgrounds-host-api.md) | Host API v1 快速參考 |
 | `astro.config.ts`／`src/config.ts` | 建置與站台設定實作 |

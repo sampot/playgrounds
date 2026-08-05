@@ -1,0 +1,7 @@
+title: 數字透網
+kind: toy
+series: 模擬
+blurb: 手寫數字走小型神經網路：訊號粒子、節點呼吸、機率條與權重熱圖。
+source: sampot/pg-diginet
+license: MIT
+status: listed

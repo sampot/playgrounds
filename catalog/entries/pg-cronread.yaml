@@ -1,0 +1,7 @@
+title: Cron 解讀
+kind: tool
+series: 環境
+blurb: 五／六欄表達式解讀與接下來觸發時間。
+source: sampot/pg-cronread
+license: MIT
+status: listed

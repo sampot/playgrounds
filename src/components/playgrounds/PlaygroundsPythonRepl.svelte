@@ -284,8 +284,13 @@
       t.writeln(line);
     }
     t.writeln("");
-    t.writeln("啟動中…");
-    if (!disabled) void boot();
+    if (disabled) {
+      t.writeln("請先開啟工作沙盒，再按「載入」。");
+      setDetail("待開啟沙盒");
+    } else {
+      t.writeln("按「載入」啟動 Pyodide（不會自動下載）。");
+      setDetail("尚未載入");
+    }
 
     return () => {
       document.removeEventListener("theme-change", syncTerminalTheme);
