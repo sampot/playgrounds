@@ -349,6 +349,11 @@
     type OpenIntent,
   } from "./openFromUrl";
   import {
+    byteToOpenProgress,
+    fileListToOpenProgress,
+    type OpenTransferProgress,
+  } from "./transferProgress";
+  import {
     applyPlaygroundsPathsFromLocation,
     isPlaygroundsLegacyMount,
     playgroundsCanonicalHomeUrl,
@@ -481,6 +486,8 @@
   let openShareSource = $state("");
   /** Boot / dialog: deep-link import in progress (shows banner). */
   let openingFromUrl = $state(false);
+  /** Download／file-fetch progress while `openingFromUrl` (null = hide bar detail). */
+  let openTransferProgress = $state<OpenTransferProgress | null>(null);
   /** True after first boot finished; enables `astro:page-load` open handling. */
   let openFromUrlBootReady = false;
   /** OPFS／boot 完成前不渲染空狀態，避免有沙盒時閃一下「玩玩看」。 */
@@ -4593,10 +4600,18 @@
       return;
     }
     busy = true;
+    openingFromUrl = true;
+    openTransferProgress = { ratio: null };
     error = null;
     status = "自 GitHub 複製中…";
     try {
-      const remoteFiles = await fetchGithubProject(parsed);
+      const remoteFiles = await fetchGithubProject(parsed, {
+        onProgress: p => {
+          openTransferProgress = fileListToOpenProgress(p);
+        },
+      });
+      openTransferProgress = { ratio: 1, detail: "完成" };
+      status = "正在寫入本機 OPFS…";
       const name = parsed.path
         ? parsed.path.split("/").pop() || parsed.repo
         : parsed.repo;
@@ -4613,6 +4628,8 @@
       status = "複製失敗";
     } finally {
       busy = false;
+      openingFromUrl = false;
+      openTransferProgress = null;
     }
   }
 
@@ -4695,6 +4712,7 @@
     const { options } = intent;
     busy = true;
     openingFromUrl = true;
+    openTransferProgress = { ratio: null };
     error = null;
 
     try {
@@ -4702,6 +4720,7 @@
         const existingId = findSandboxIdByOpenSource(projects, intent);
         if (existingId) {
           status = "發現相同來源沙盒，直接開啟…";
+          openTransferProgress = null;
           await applyOpenFromUrlRole(existingId, options.as, true);
           return true;
         }
@@ -4718,13 +4737,19 @@
       let statusExtra = "";
 
       if (intent.kind === "sam") {
-        const packed = await fetchSamPackageBytes(intent.url);
+        const packed = await fetchSamPackageBytes(intent.url, {
+          onProgress: p => {
+            openTransferProgress = byteToOpenProgress(p);
+          },
+        });
+        openTransferProgress = { ratio: 1, detail: "100%" };
         status = "正在匯入沙盒包裹…";
         const imported = zipToFiles(packed.bytes);
         let stateSel: ProjectStateParts = { ...PROJECT_STATE_NONE };
         if (imported.state && options.state === "ask") {
           busy = false;
           openingFromUrl = false;
+          openTransferProgress = null;
           const initial: ProjectStateParts = {
             kv: Boolean(imported.state.kv && imported.state.kv.size > 0),
             db: Boolean(
@@ -4745,6 +4770,7 @@
           stateSel = chosen;
           busy = true;
           openingFromUrl = true;
+          openTransferProgress = { ratio: null };
           status = "正在匯入沙盒包裹…";
         }
         const name =
@@ -4771,7 +4797,12 @@
           statusExtra = `（含 ${summarizeStateParts(applied)}）`;
         }
       } else if (intent.kind === "github") {
-        const remoteFiles = await fetchGithubProject(intent.ref);
+        const remoteFiles = await fetchGithubProject(intent.ref, {
+          onProgress: p => {
+            openTransferProgress = fileListToOpenProgress(p);
+          },
+        });
+        openTransferProgress = { ratio: 1, detail: "完成" };
         status = "正在寫入本機 OPFS…";
         const name =
           options.name ||
@@ -4786,7 +4817,12 @@
         await refreshProjects();
         sandboxId = created.id;
       } else {
-        const remoteFiles = await fetchGitlabProject(intent.ref);
+        const remoteFiles = await fetchGitlabProject(intent.ref, {
+          onProgress: p => {
+            openTransferProgress = fileListToOpenProgress(p);
+          },
+        });
+        openTransferProgress = { ratio: 1, detail: "完成" };
         status = "正在寫入本機 OPFS…";
         const name =
           options.name ||
@@ -4819,6 +4855,7 @@
     } finally {
       busy = false;
       openingFromUrl = false;
+      openTransferProgress = null;
     }
   }
 
@@ -6459,13 +6496,43 @@
   {/if}
 
   {#if openingFromUrl}
-    <p
-      class="border-skin-line text-skin-accent border-b bg-[color-mix(in_oklab,rgb(var(--color-accent))_12%,transparent)] px-3 py-1.5 text-xs"
+    <div
+      class="playgrounds-open-banner border-skin-line text-skin-accent border-b bg-[color-mix(in_oklab,rgb(var(--color-accent))_12%,transparent)] px-3 py-1.5"
       role="status"
       aria-live="polite"
+      aria-busy="true"
     >
-      {status}
-    </p>
+      <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+        <p class="m-0 text-xs">{status}</p>
+        {#if openTransferProgress?.detail}
+          <p class="text-skin-base/55 m-0 font-mono text-[10px]">
+            {openTransferProgress.detail}
+          </p>
+        {/if}
+      </div>
+      <div
+        class="playgrounds-open-progress"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={openTransferProgress?.ratio != null
+          ? Math.round(openTransferProgress.ratio * 100)
+          : undefined}
+        aria-valuetext={openTransferProgress?.detail ?? "下載中"}
+        aria-label="開啟進度"
+      >
+        {#if openTransferProgress?.ratio != null}
+          <div
+            class="playgrounds-open-progress-bar"
+            style="width: {Math.max(2, openTransferProgress.ratio * 100)}%"
+          ></div>
+        {:else}
+          <div
+            class="playgrounds-open-progress-bar playgrounds-open-progress-bar--indeterminate"
+          ></div>
+        {/if}
+      </div>
+    </div>
   {:else if error && !projectDialogOpen}
     <p
       class="border-skin-line border-b bg-red-500/10 px-3 py-1.5 text-xs leading-relaxed text-red-700 dark:text-red-300"

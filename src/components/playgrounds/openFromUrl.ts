@@ -19,6 +19,10 @@ import {
 } from "./workspaceTransfer";
 import { buildCanonicalOpenUrl } from "./playgroundsPaths";
 import { isSamFilename } from "./zipProject";
+import {
+  readResponseBytes,
+  type ByteProgress,
+} from "./transferProgress";
 
 export type OpenRole = "work" | "tool" | "agent";
 
@@ -251,7 +255,10 @@ export interface FetchSamPackageResult {
  */
 export async function fetchSamPackageBytes(
   url: string,
-  options?: { signal?: AbortSignal }
+  options?: {
+    signal?: AbortSignal;
+    onProgress?: (p: ByteProgress) => void;
+  }
 ): Promise<FetchSamPackageResult> {
   const resolved = resolveSamPackageUrl(url.trim());
   let parsed: URL;
@@ -284,12 +291,11 @@ export async function fetchSamPackageBytes(
     throw new Error(`下載沙盒包裹失敗：HTTP ${response.status}`);
   }
 
-  const buf = new Uint8Array(await response.arrayBuffer());
-  if (buf.byteLength > MAX_TRANSFER_BYTES) {
-    throw new Error(
-      `沙盒包裹超過上限（>${Math.round(MAX_TRANSFER_BYTES / (1024 * 1024))}MB）`
-    );
-  }
+  const buf = await readResponseBytes(response, {
+    signal: options?.signal,
+    onProgress: options?.onProgress,
+    maxBytes: MAX_TRANSFER_BYTES,
+  });
 
   const inferred =
     filenameFromContentDisposition(

@@ -5,6 +5,7 @@
 import { repoBlobToProjectPath, shouldIncludeRepoPath } from "./gitRepoPaths";
 import { normalizeProjectPath } from "./pathUtils";
 import { bytesToFileContent, type FileMap } from "./projectTypes";
+import type { FileListProgress } from "./transferProgress";
 
 export interface GitlabRef {
   /** Full project path, e.g. `group/sub/repo`. */
@@ -81,7 +82,11 @@ async function resolveDefaultBranch(projectPath: string): Promise<string> {
  */
 export async function fetchGitlabProject(
   ref: GitlabRef,
-  options?: { signal?: AbortSignal; maxFiles?: number }
+  options?: {
+    signal?: AbortSignal;
+    maxFiles?: number;
+    onProgress?: (p: FileListProgress) => void;
+  }
 ): Promise<FileMap> {
   const maxFiles = options?.maxFiles ?? 200;
   const branch = ref.ref || (await resolveDefaultBranch(ref.projectPath));
@@ -130,8 +135,12 @@ export async function fetchGitlabProject(
     throw new Error(`檔案過多（>${maxFiles}），請指定子目錄或縮小範圍`);
   }
 
+  const total = blobs.length;
+  options?.onProgress?.({ done: 0, total, ratio: 0 });
+
   const files: FileMap = {};
-  for (const item of blobs) {
+  for (let i = 0; i < blobs.length; i++) {
+    const item = blobs[i]!;
     const projectPath = repoBlobToProjectPath(item.path, rootPrefix);
     const filePath = encodeURIComponent(item.path);
     const rawUrl =
@@ -144,6 +153,13 @@ export async function fetchGitlabProject(
     const bytes = new Uint8Array(await fileRes.arrayBuffer());
     if (bytes.byteLength > 2_000_000) continue;
     files[projectPath] = bytesToFileContent(projectPath, bytes);
+    const done = i + 1;
+    options?.onProgress?.({
+      done,
+      total,
+      ratio: done / total,
+      path: item.path,
+    });
   }
 
   if (Object.keys(files).length === 0) {

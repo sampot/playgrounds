@@ -1,6 +1,7 @@
 import { repoBlobToProjectPath, shouldIncludeRepoPath } from "./gitRepoPaths";
 import { normalizeProjectPath } from "./pathUtils";
 import { bytesToFileContent, type FileMap } from "./projectTypes";
+import type { FileListProgress } from "./transferProgress";
 
 export interface GithubRef {
   owner: string;
@@ -86,7 +87,11 @@ async function resolveDefaultBranch(
  */
 export async function fetchGithubProject(
   ref: GithubRef,
-  options?: { signal?: AbortSignal; maxFiles?: number }
+  options?: {
+    signal?: AbortSignal;
+    maxFiles?: number;
+    onProgress?: (p: FileListProgress) => void;
+  }
 ): Promise<FileMap> {
   const maxFiles = options?.maxFiles ?? 200;
   const branch = ref.ref || (await resolveDefaultBranch(ref.owner, ref.repo));
@@ -123,8 +128,12 @@ export async function fetchGithubProject(
     throw new Error(`檔案過多（>${maxFiles}），請指定子目錄或縮小範圍`);
   }
 
+  const total = candidates.length;
+  options?.onProgress?.({ done: 0, total, ratio: 0 });
+
   const files: FileMap = {};
-  for (const item of candidates) {
+  for (let i = 0; i < candidates.length; i++) {
+    const item = candidates[i]!;
     const repoPath = item.path!;
     const projectPath = repoBlobToProjectPath(repoPath, rootPrefix);
     const rawUrl = `https://raw.githubusercontent.com/${ref.owner}/${ref.repo}/${encodeURIComponent(branch)}/${repoPath
@@ -137,6 +146,13 @@ export async function fetchGithubProject(
     }
     const bytes = new Uint8Array(await fileRes.arrayBuffer());
     files[projectPath] = bytesToFileContent(projectPath, bytes);
+    const done = i + 1;
+    options?.onProgress?.({
+      done,
+      total,
+      ratio: done / total,
+      path: repoPath,
+    });
   }
 
   return files;
