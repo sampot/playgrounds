@@ -44,6 +44,8 @@
 | `getSecretStoreStatus()` | `{ state: "absent"\|"locked"\|"unlocked", secretCount?, webauthnRegistered? }` — 無密鑰值；unlock 僅遊樂場「密鑰庫」UI（password 或已登錄之 WebAuthn） |
 | `listSecrets()` | `{ secrets: SecretMeta[] }`（name／kind／allowedHosts／defaultBaseUrl／updatedAt；**無值**） |
 | `listSecretNames()` | （相容別名）`{ names: string[] }`；可選 `sandboxId` 參數忽略。新程式請用 `listSecrets` |
+| `createPlatformInvite({ kind?, intent?, targetField?, ttlMs? })` | **殼代理**鑄場 Invite（DEC-047）：讀 SecretStore `PLAYGROUNDS_API_KEY` 代呼 Platform API；回 `invite_id`／`short_url`／`deep_link`／`secret`／`expires_at`／`kind`。**不**回傳 API key。`targetField` 預設＝目前場 host。密鑰庫未解鎖／無 key → `secret_locked`／`secret_not_found`／`secret_absent` |
+| `revokePlatformInvite({ inviteId })` | 撤銷場 Invite（同殼代理；持同一 API key） |
 | `checkpoint` / `listCheckpoints` / `restore` | target 專案快照 |
 | `listFleetSummary({ includeTraffic?, maxNodes? })` | Agent 艦隊只讀摘要：Leader／計數／壓力／attention／agents（depth／poison／roleLabel／health…）；**無**訊息 body。`includeTraffic` 時附近期 send 配對權重 |
 | `getAgentUi(agentId)` / `setAgentUi(agentId, patch)` | `agent.ui` 顯示標註（roleLabel／groupId／health／healthDetail／successorOf）；存於 runtime `ui-annotations.json`；`null` 欄位清除；須 registry 已有該 agent |

@@ -34,6 +34,8 @@ export const HOST_LOCAL_METHODS = [
   "getSecretStoreStatus",
   "listSecrets",
   "listSecretNames",
+  "createPlatformInvite",
+  "revokePlatformInvite",
   "listFleetSummary",
   "getAgentUi",
   "setAgentUi",

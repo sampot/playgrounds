@@ -12,6 +12,7 @@ import {
 import type { CheckpointMeta } from "./hostCheckpoint";
 import type { ListDirOptions, ListDirResult } from "./hostListDir";
 import type { HostSearchMatch, HostSearchOptions } from "./hostSearch";
+import type { CreateInviteResult } from "./platform/platformClient";
 import type { CloneIntent, ProjectMeta } from "./projectTypes";
 import type { HostPythonRunOptions, HostPythonRunResult } from "./hostPython";
 import type {
@@ -26,6 +27,18 @@ import type {
   WorkConsoleLine,
 } from "./workConsoleBuffer";
 import type { WorkNetworkEntry } from "./workNetworkBuffer";
+
+export type HostCreatePlatformInviteOptions = {
+  kind?: string;
+  intent?: unknown;
+  /** Default: current field host (`location.host`). */
+  targetField?: string;
+  ttlMs?: number;
+};
+
+export type HostRevokePlatformInviteOptions = {
+  inviteId: string;
+};
 
 export interface HostOpenToolOptions {
   toolSandboxId?: string;
@@ -371,6 +384,17 @@ export interface HostBridge {
       updatedAt: number;
     }[];
   }>;
+  /**
+   * Mint a Platform field Invite via shell proxy (DEC-047).
+   * Reads SecretStore `PLAYGROUNDS_API_KEY`; never returns the key.
+   */
+  createPlatformInvite(
+    options?: HostCreatePlatformInviteOptions
+  ): Promise<CreateInviteResult>;
+  /** Revoke a Platform field Invite (shell proxy; same key). */
+  revokePlatformInvite(
+    options: HostRevokePlatformInviteOptions
+  ): Promise<{ ok: true }>;
   search(options: HostSearchOptions): Promise<{ matches: HostSearchMatch[] }>;
   checkpoint(label?: string): Promise<CheckpointMeta>;
   restore(checkpointId: string): Promise<{ ok: true; meta: CheckpointMeta }>;
@@ -518,6 +542,10 @@ export function createHostBinding(): HostBridge {
     getSecretStoreStatus: async (...args) =>
       requireBridge().getSecretStoreStatus(...args),
     listSecrets: async (...args) => requireBridge().listSecrets(...args),
+    createPlatformInvite: async (...args) =>
+      requireBridge().createPlatformInvite(...args),
+    revokePlatformInvite: async (...args) =>
+      requireBridge().revokePlatformInvite(...args),
     search: async (...args) => requireBridge().search(...args),
     checkpoint: async (...args) => requireBridge().checkpoint(...args),
     restore: async (...args) => requireBridge().restore(...args),

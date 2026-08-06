@@ -175,9 +175,12 @@ export async function fetchGithubProfile(
   };
 }
 
-export function oauthCallbackUri(request: Request): string {
+export function oauthCallbackUri(
+  request: Request,
+  provider: "github" | "google" = "github"
+): string {
   const url = new URL(request.url);
-  return `${url.origin}/auth/github/callback`;
+  return `${url.origin}/auth/${provider}/callback`;
 }
 
 export const SESSION_COOKIE = "pg_session";

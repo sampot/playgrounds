@@ -34,6 +34,7 @@ const KEY_BY_PREFIX = (prefix: string) => `key:prefix:${prefix}`;
 const AT_BY_HASH = (hash: string) => `at:hash:${hash}`;
 const USER_REC = (userId: string) => `user:${userId}`;
 const SSO_GITHUB = (subject: string) => `sso:github:${subject}`;
+const SSO_GOOGLE = (subject: string) => `sso:google:${subject}`;
 const SHORT_TO_INVITE = (shortId: string) => `short:${shortId}`;
 
 export type PlatformUser = {
@@ -42,6 +43,7 @@ export type PlatformUser = {
   createdAt: number;
   disabled?: boolean;
   github?: { id: string; login: string; linkedAt: number };
+  google?: { id: string; email: string; linkedAt: number };
 };
 
 export async function getUser(
@@ -104,6 +106,37 @@ export async function linkGithub(
   };
   await putUser(store, user);
   await store.put(SSO_GITHUB(profile.id), userId);
+  return { ok: true };
+}
+
+export async function getUserIdByGoogle(
+  store: EnvStore,
+  googleId: string
+): Promise<string | null> {
+  return store.get(SSO_GOOGLE(googleId));
+}
+
+export async function linkGoogle(
+  store: EnvStore,
+  userId: string,
+  profile: { id: string; email: string }
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const existing = await getUserIdByGoogle(store, profile.id);
+  if (existing && existing !== userId) {
+    return { ok: false, error: "google_already_linked" };
+  }
+  const user = await getUser(store, userId);
+  if (!user) return { ok: false, error: "user_not_found" };
+  if (user.google && user.google.id !== profile.id) {
+    await store.delete(SSO_GOOGLE(user.google.id));
+  }
+  user.google = {
+    id: profile.id,
+    email: profile.email,
+    linkedAt: Date.now(),
+  };
+  await putUser(store, user);
+  await store.put(SSO_GOOGLE(profile.id), userId);
   return { ok: true };
 }
 

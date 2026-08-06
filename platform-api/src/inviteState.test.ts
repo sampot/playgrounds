@@ -12,9 +12,11 @@ import {
   ensureUser,
   getApiKeyForUser,
   getUserIdByGithub,
+  getUserIdByGoogle,
   isBootstrapped,
   issueAccessToken,
   linkGithub,
+  linkGoogle,
   lookupAccessToken,
   lookupApiKey,
   markBootstrapped,
@@ -23,6 +25,7 @@ import {
   type EnvStore,
 } from "./auth.js";
 import { decodeOAuthState, encodeOAuthState } from "./githubOAuth.js";
+import { completeSsoIntent } from "./ssoFlow.js";
 import {
   createInviteRecord,
   enqueueOffer,
@@ -33,14 +36,21 @@ import {
   revokeInvite,
 } from "./inviteState.js";
 
-function memoryStore(): EnvStore & { data: Map<string, string> } {
+function memoryStore(): EnvStore & {
+  data: Map<string, string>;
+  put(
+    key: string,
+    value: string,
+    options?: { expirationTtl?: number }
+  ): Promise<void>;
+} {
   const data = new Map<string, string>();
   return {
     data,
     async get(key: string) {
       return data.get(key) ?? null;
     },
-    async put(key: string, value: string) {
+    async put(key: string, value: string, _options?: { expirationTtl?: number }) {
       data.set(key, value);
     },
     async delete(key: string) {
@@ -139,6 +149,75 @@ describe("github oauth state + link", () => {
     await ensureUser(store, "other", "user");
     const clash = await linkGithub(store, "other", { id: "42", login: "sam" });
     expect(clash.ok).toBe(false);
+  });
+});
+
+describe("google oauth link + sso flow", () => {
+  it("links google to user once and allows dual providers", async () => {
+    const store = memoryStore();
+    await ensureUser(store, "admin", "admin");
+    expect(
+      (
+        await linkGoogle(store, "admin", {
+          id: "g-sub-1",
+          email: "sam@example.com",
+        })
+      ).ok
+    ).toBe(true);
+    expect(await getUserIdByGoogle(store, "g-sub-1")).toBe("admin");
+    expect(
+      (await linkGithub(store, "admin", { id: "42", login: "sam" })).ok
+    ).toBe(true);
+    await ensureUser(store, "other", "user");
+    const clash = await linkGoogle(store, "other", {
+      id: "g-sub-1",
+      email: "sam@example.com",
+    });
+    expect(clash.ok).toBe(false);
+  });
+
+  it("completeSsoIntent login requires prior link", async () => {
+    const store = memoryStore();
+    const fails: string[] = [];
+    const res = await completeSsoIntent({
+      env: { STORE: store },
+      state: {
+        intent: "login",
+        n: "x",
+        exp: Date.now() + 60_000,
+      },
+      subject: { provider: "google", id: "g1", label: "a@b.c" },
+      fail: (c) => {
+        fails.push(c);
+        return new Response(c, { status: 400 });
+      },
+      success: async () => new Response("ok"),
+    });
+    expect(fails).toEqual(["need_invite_or_link"]);
+    expect(await res.text()).toBe("need_invite_or_link");
+  });
+
+  it("completeSsoIntent login after google link", async () => {
+    const store = memoryStore();
+    await ensureUser(store, "u1", "user");
+    await linkGoogle(store, "u1", { id: "g1", email: "a@b.c" });
+    let token = "";
+    const res = await completeSsoIntent({
+      env: { STORE: store },
+      state: {
+        intent: "login",
+        n: "x",
+        exp: Date.now() + 60_000,
+      },
+      subject: { provider: "google", id: "g1", label: "a@b.c" },
+      fail: (c) => new Response(c, { status: 400 }),
+      success: async (accessToken) => {
+        token = accessToken;
+        return new Response("ok");
+      },
+    });
+    expect(await res.text()).toBe("ok");
+    expect(token.startsWith("pg_at_")).toBe(true);
   });
 });
 

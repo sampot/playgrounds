@@ -1,6 +1,6 @@
 # Playgrounds Platform API 計劃（DEC-047）
 
-> **狀態：** Phase 0 **完成**；Phase 1–4 **完成**（Signal／`#pg=`／後台／compose 場殼兌換）；Phase 5（完整 Social SSO／MFA）未開始  
+> **狀態：** Phase 0 **完成**；Phase 1–4 **完成**（Signal／`#pg=`／後台／compose 場殼兌換）；Phase 5 **進行中**（GitHub＋Google SSO／access token／HOST 殼代理已落地；MFA 未）  
 > **權威決策：** [DECISIONS.md](./DECISIONS.md) **DEC-047**  
 > **後台 UI 規格：** [PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md)  
 > **相關：** DEC-023（session 邀請＋完整 protocol）、DEC-025（`?open=`／放大畫布）、DEC-029（SecretStore）、DEC-042（場網／保留名 `api`）、DEC-045（Roster／薄 signaling）、DEC-046（型錄查詢）、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)、[GLOSSARY.md](./GLOSSARY.md)
@@ -322,7 +322,7 @@ Auth：`Authorization: Bearer <access_token|api_key|join_cap|…>`（依端點�
 | **2. 深鏈＋短連結＋場殼** | `#pg=`／`/i/`；QR 短 URL；Roster 接上；**多 peer 並存** | 同一短連結兩人先後加入且雙方名冊可見 | **完成** |
 | **3. 後台** | API key UI；註冊邀請 claim；admin；`dash.samkuo.me`；品牌對齊場殼 | 使用者自助持 key | **完成**（claim；完整 SSO→P5） |
 | **4. invite.compose** | protocol＋開 SAM＋放大畫布＋consent | 掃短鏈可走到詢問入座 | **完成** |
-| **5.（可選）** | 完整 Social SSO（GitHub→Google）、MFA、用量、自架文件 | 見 [PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md) §9.2 | 未開始 |
+| **5.（可選）** | 完整 Social SSO（GitHub→Google）、MFA、用量、自架文件 | 見 [PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md) §9.2 | **進行中**（GitHub＋Google SSO／access token／HOST `createPlatformInvite` 已落地；MFA 未） |
 
 ---
 

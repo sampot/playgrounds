@@ -1,6 +1,7 @@
 # Playgrounds Platform 後台 UI 規格（DEC-047）
 
-> **狀態：** Draft（2026-08-06）— 契約完整；實作：MVP（**暫**以 API key 冒充後台 session，待改 access token）＋claim 已落地；SSO／access token／MFA 未落地  
+> **狀態：** Draft（2026-08-06）— 契約完整；實作：MVP＋GitHub／Google SSO／access token／HOST `createPlatformInvite` 已落地；MFA／停用使用者未落地  
+
 > **權威決策：** [DECISIONS.md](./DECISIONS.md) **DEC-047**  
 > **實作計劃：** [PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)  
 > **相關：** DEC-004（敘事非產品）、DEC-029（SecretStore）、DEC-042（保留名 `api`／`dash`）、[GLOSSARY.md](./GLOSSARY.md)、場殼 `PlaygroundsLayout`／`global.css`
@@ -102,7 +103,7 @@
 | 邊／卡 | 場殼 `--color-border`／card 同源 | 同左深色組 |
 | 無襯線 | 系統／PingFang TC／Noto Sans TC（與場殼 `--font-sans`） | 同左 |
 | 等寬 | IBM Plex Mono（金鑰、URL） | 同左 |
-| Mark | `https://play.samkuo.me/favicon.svg` | 同左 |
+| Mark | 同 origin `/favicon.svg` | 同左 |
 
 ### 4.2 UX 品質（硬）
 
@@ -111,6 +112,7 @@
 - **卡片：** 僅承載互動（表單、密文揭示、邀請輸出）；可去邊框仍可理解則勿卡化。
 - **動效：** 至少進場 rise／焦點環／按鈕回饋；尊重 `prefers-reduced-motion`。
 - **禁止：** 紫系漸層預設、奶油底＋terracotta 預設、報紙密欄、全螢幕 hero 圖蓋文、emoji 當主圖示列。
+- **禁止原生 Dialog：** 不得用 `alert`／`confirm`／`prompt` 做確認或文字輸入；改用頁內確認面／表單／flash。
 - **語系：** UI **`zh-Hant`** 為準；技術識別子（`pg_sk_`、`signal.handshake`、path）可英文。
 - **敘事：** 禁止「控制台／方案／升級／團隊席位」等產品腔（DEC-004）。
 
@@ -161,9 +163,9 @@
 
 ### 5.3 進入路徑
 
-進入：**僅 Social SSO**（GitHub；Google 後段）→ access token／session cookie。
+進入：**僅 Social SSO**（GitHub／Google）→ access token／session cookie。
 
-註冊：`/join/<token>` → **GitHub 綁定** → 顯示一次場用 API key（寫入場）＋後台 session。
+註冊：`/join/<token>` → **GitHub 或 Google 綁定** → 顯示一次場用 API key（寫入場）＋後台 session。
 
 **禁止**以 API key（`pg_sk_…`）登入後台或換取後台 session。API key 僅場殼。
 ### 5.4 角色
@@ -204,7 +206,8 @@
 | 顯示 | `prefix…`＋建立時間；**永不**回顯完整明文（除當次建立） |
 | 揭示盒 | 輪替／建立／claim 後：警告色虛線盒＋「立刻複製 — 不會再顯示」＋複製鈕；文案明示寫入場內密鑰庫 |
 | 輪替 | 確認對話：舊 key 立刻失效（場殼須更新 SecretStore）；成功後揭示新 key；**後台 session（access token）不變** |
-| 撤銷 | 確認：場殼無法再鑄 Invite；**不**因此強制登出後台（除非政策另定） |
+| 撤銷 | **僅在已有金鑰時可操作**（無 key 則按鈕停用）；確認後場殼無法再鑄 Invite；**不**因此強制登出後台 |
+| 尚無金鑰 | 顯示「尚無金鑰」；主按鈕改「建立金鑰」；撤銷不可用 |
 | 場內提示 | 文案指向 SecretStore 保留名 **`PLAYGROUNDS_API_KEY`**；不代寫入場 |
 
 ### 6.3 （刪除）場 Invite 鑄造
@@ -296,12 +299,12 @@ SAM（現行 Agent／會議小品等）
 - [x] Bootstrap 摺疊表單
 - [x] 後台**無**場 Invite 鑄造入口（對齊 §7）
 - [x] **後台 API 僅 access token**（GitHub SSO／session cookie；場 API 拒 access token）
-- [ ] HOST／殼代理 `createPlatformInvite`（或同等）供 SAM 呼叫
+- [x] HOST／殼代理 `createPlatformInvite`（或同等）供 SAM 呼叫
 
 ### 9.2 Phase 5
 
 - [x] GitHub OAuth 登入／綁定（邀請制）→ 核發 access token（程式落地；正式域 secrets／callback 需驗證）
-- [ ] Google OAuth
+- [x] Google OAuth
 - [x] Access token／session cookie 為後台進入；API key 僅場殼
 - [x] 汰除「貼 API key 登入」過渡（改純 SSO）
 - [ ] MFA 政策開關
@@ -343,3 +346,6 @@ SAM（現行 Agent／會議小品等）
 | 2026-08-06 | 實作：`pg_at_` access token、`/v1/auth/token`／logout；帳號面拒 API key；場 API 拒 access token |
 | 2026-08-06 | GitHub OAuth：`/auth/github`＋callback；邀請制 join／link／bootstrap；session cookie |
 | 2026-08-06 | 移除後台 API key 登入過渡（UI＋`/v1/auth/token`） |
+| 2026-08-06 | 禁止原生 `alert`／`confirm`／`prompt`；後台改頁內確認面 |
+| 2026-08-06 | HOST `createPlatformInvite`／`revokePlatformInvite`（SecretStore 殼代理） |
+| 2026-08-06 | Google OAuth：`/auth/google`＋callback；與 GitHub 並存連結同一 `user_id` |

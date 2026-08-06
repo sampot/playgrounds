@@ -120,6 +120,20 @@ a:hover { filter: brightness(1.08); }
   outline: 2px solid rgb(var(--accent));
   outline-offset: 2px;
 }
+.icon-btn svg {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+/* 對齊場殼：淺色顯示月亮、深色顯示太陽 */
+.icon-btn svg.theme-icon-sun,
+html[data-theme="dark"] .icon-btn svg.theme-icon-moon {
+  display: none;
+}
+.icon-btn svg.theme-icon-moon,
+html[data-theme="dark"] .icon-btn svg.theme-icon-sun {
+  display: inline-block;
+}
 .main {
   flex: 1 1 auto;
   width: min(40rem, 100%);
@@ -298,6 +312,38 @@ details.boot summary::before {
   color: rgb(var(--accent));
 }
 details.boot[open] summary::before { content: "▾ "; }
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: color-mix(in oklab, rgb(var(--ink)) 35%, transparent);
+  backdrop-filter: blur(4px);
+  animation: rise 0.2s var(--ease) both;
+}
+.overlay[hidden], .overlay.hidden { display: none !important; }
+.dialog {
+  width: min(22rem, 100%);
+  border-radius: var(--radius);
+  border: 1px solid rgb(var(--line));
+  background: rgb(var(--fill));
+  padding: 1.1rem 1.15rem 1rem;
+  box-shadow: 0 18px 40px color-mix(in oklab, rgb(var(--ink)) 18%, transparent);
+}
+.dialog h3 {
+  margin: 0 0 0.45rem;
+  font-size: 1.05rem;
+  font-weight: 650;
+}
+.dialog p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: color-mix(in oklab, rgb(var(--ink)) 72%, transparent);
+}
+.dialog .row { margin-top: 1rem; justify-content: flex-end; }
 .tabs {
   display: flex;
   gap: 0.2rem;
@@ -453,7 +499,14 @@ function topNav(active: "dash" | "join"): string {
     <a href="https://dash.samkuo.me/" ${active === "dash" ? 'aria-current="page"' : ""}>後台</a>
   </nav>
   <div class="top-actions">
-    <button type="button" class="icon-btn" id="btn-theme" title="切換外觀" aria-label="切換淺色／深色">◐</button>
+    <button type="button" class="icon-btn" id="btn-theme" title="切換明／暗主題" aria-label="切換主題" aria-live="polite">
+      <svg xmlns="http://www.w3.org/2000/svg" class="theme-icon-moon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+        <path fill="currentColor" d="M20.742 13.045a8.088 8.088 0 0 1-2.077.271c-2.135 0-4.14-.83-5.646-2.336a8.025 8.025 0 0 1-2.064-7.723A1 1 0 0 0 9.73 2.034a10.014 10.014 0 0 0-4.489 2.582c-3.898 3.898-3.898 10.243 0 14.143a9.937 9.937 0 0 0 7.072 2.93 9.93 9.93 0 0 0 7.07-2.929 10.007 10.007 0 0 0 2.583-4.491 1.001 1.001 0 0 0-1.224-1.224zm-2.772 4.301a7.947 7.947 0 0 1-5.656 2.343 7.953 7.953 0 0 1-5.658-2.344c-3.118-3.119-3.118-8.195 0-11.314a7.923 7.923 0 0 1 2.06-1.483 10.027 10.027 0 0 0 2.89 7.848 9.972 9.972 0 0 0 7.848 2.891 8.036 8.036 0 0 1-1.484 2.059z"/>
+      </svg>
+      <svg xmlns="http://www.w3.org/2000/svg" class="theme-icon-sun" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+        <path fill="currentColor" d="M6.993 12c0 2.761 2.246 5.007 5.007 5.007s5.007-2.246 5.007-5.007S14.761 6.993 12 6.993 6.993 9.239 6.993 12zM12 8.993c1.658 0 3.007 1.349 3.007 3.007S13.658 15.007 12 15.007 8.993 13.658 8.993 12 10.342 8.993 12 8.993zM10.998 19h2v3h-2zm0-17h2v3h-2zm-9 9h3v2h-3zm17 0h3v2h-3zM4.219 18.363l2.12-2.122 1.415 1.414-2.12 2.122zM16.24 6.344l2.122-2.122 1.414 1.414-2.122 2.122zM6.342 7.759 4.22 5.637l1.415-1.414 2.12 2.122zm13.434 10.605-1.414 1.414-2.122-2.122 1.414-1.414z"/>
+      </svg>
+    </button>
   </div>
 </header>`;
 }
@@ -491,9 +544,10 @@ export function adminHtml(): string {
     <section id="view-gate">
       <div class="panel" id="view-login">
         <h2>進入</h2>
-        <p class="lede">所有帳號由此進入。使用 GitHub 登入；登入後依角色顯示（一般使用者僅金鑰；營運僅 admin）。場用 API key 只給遊樂場殼頁，不能用來登入後台。</p>
+        <p class="lede">所有帳號由此進入。使用 GitHub 或 Google 登入；登入後依角色顯示（一般使用者僅金鑰；營運僅 admin）。場用 API key 只給遊樂場殼頁，不能用來登入後台。</p>
         <div class="row">
           <a class="btn" id="btn-github" href="/auth/github?intent=login">使用 GitHub 進入</a>
+          <a class="btn secondary" id="btn-google" href="/auth/google?intent=login">使用 Google 進入</a>
         </div>
       </div>
     </section>
@@ -505,6 +559,7 @@ export function adminHtml(): string {
           <span aria-hidden="true">·</span>
           <span id="me-role"></span>
           <span id="me-github" class="meta" style="margin-left:0.35rem"></span>
+          <span id="me-google" class="meta" style="margin-left:0.35rem"></span>
         </span>
         <button type="button" class="linkish" id="btn-logout">登出</button>
       </div>
@@ -531,6 +586,7 @@ export function adminHtml(): string {
             <button type="button" id="btn-rotate">輪替金鑰</button>
             <button type="button" class="danger" id="btn-revoke">撤銷</button>
             <a class="btn secondary hidden" id="btn-link-github" href="/auth/github?intent=link">連結 GitHub</a>
+            <a class="btn secondary hidden" id="btn-link-google" href="/auth/google?intent=link">連結 Google</a>
           </div>
         </div>
       </div>
@@ -559,6 +615,16 @@ export function adminHtml(): string {
       · 場 <a href="https://play.samkuo.me/"><span class="mono">play.samkuo.me</span></a>
     </footer>
   </main>
+</div>
+<div id="confirm-overlay" class="overlay hidden" hidden role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+  <div class="dialog">
+    <h3 id="confirm-title">確認</h3>
+    <p id="confirm-msg"></p>
+    <div class="row">
+      <button type="button" class="secondary" id="confirm-cancel">取消</button>
+      <button type="button" class="danger" id="confirm-ok">確認</button>
+    </div>
+  </div>
 </div>
 <script>
 ${THEME_SCRIPT}
@@ -627,20 +693,35 @@ ${THEME_SCRIPT}
     $("me-user").textContent = me.user_id;
     $("me-role").textContent = me.role === "admin" ? "admin" : "user";
     const gh = $("me-github");
-    const linkBtn = $("btn-link-github");
+    const linkGh = $("btn-link-github");
     if (me.github && me.github.login) {
       gh.textContent = "@" + me.github.login;
-      linkBtn.classList.add("hidden");
+      linkGh.classList.add("hidden");
     } else {
       gh.textContent = "";
-      linkBtn.classList.remove("hidden");
+      linkGh.classList.remove("hidden");
+    }
+    const gg = $("me-google");
+    const linkGg = $("btn-link-google");
+    if (me.google && me.google.email) {
+      gg.textContent = me.google.email;
+      linkGg.classList.add("hidden");
+    } else {
+      gg.textContent = "";
+      linkGg.classList.remove("hidden");
     }
     if (me.key) {
       $("key-prefix").textContent = me.key.prefix + "…";
       $("key-created").textContent = "建立於 " + new Date(me.key.created_at).toLocaleString();
+      $("btn-revoke").disabled = false;
+      $("btn-revoke").title = "";
+      $("btn-rotate").textContent = "輪替金鑰";
     } else {
       $("key-prefix").textContent = "（尚無金鑰）";
       $("key-created").textContent = "";
+      $("btn-revoke").disabled = true;
+      $("btn-revoke").title = "尚無金鑰，無法撤銷";
+      $("btn-rotate").textContent = "建立金鑰";
     }
     applyRoleUi(me.role);
   }
@@ -672,16 +753,21 @@ ${THEME_SCRIPT}
   }
 
   const AUTH_ERR = {
-    need_invite_or_link: "此 GitHub 尚未綁定帳號。第一個 admin 請走 /bootstrap/；其他人請持註冊邀請。",
+    need_invite_or_link: "此 Google／GitHub 尚未綁到任何帳號。請先用已綁定的方式進入，再到金鑰頁按「連結 Google／GitHub」；新帳號須持註冊邀請；第一個 admin 請走 /bootstrap/。",
     invite_not_found: "註冊邀請無效",
     invite_gone: "註冊邀請已過期或已使用",
     bootstrap_already_done: "已經 bootstrap 過了",
     unauthorized: "授權失敗（請確認 bootstrap token）",
     invalid_state: "登入狀態無效，請重試",
     github_already_linked: "此 GitHub 已綁到其他帳號",
+    google_already_linked: "此 Google 已綁到其他帳號",
     admin_github_mismatch: "admin 已綁其他 GitHub",
+    admin_google_mismatch: "admin 已綁其他 Google",
     github_oauth_not_configured: "伺服器未設定 GitHub OAuth",
-    token_exchange_failed: "GitHub token 交換失敗（請確認 OAuth callback URL）",
+    google_oauth_not_configured: "伺服器未設定 Google OAuth",
+    github_user_failed: "無法讀取 GitHub 使用者資料",
+    google_user_failed: "無法讀取 Google 使用者資料",
+    token_exchange_failed: "OAuth token 交換失敗（請確認 callback URL）",
   };
 
   async function redeemSession(code) {
@@ -705,7 +791,7 @@ ${THEME_SCRIPT}
     }
   }
 
-  async function refresh() {
+  async function refresh(flags = {}) {
     clearFlash();
     const { res, data } = await api("/v1/me");
     if (!res.ok) {
@@ -714,7 +800,7 @@ ${THEME_SCRIPT}
       if (data?.error && data.error !== "unauthorized") {
         flash(
           data?.error === "wrong_credential"
-            ? "請使用 GitHub 重新登入"
+            ? "請使用 SSO 重新登入"
             : (data?.error || "無法驗證"),
           "err"
         );
@@ -722,12 +808,46 @@ ${THEME_SCRIPT}
       return;
     }
     showApp(data);
-    const params = new URLSearchParams(location.search);
-    if (params.get("bootstrap") === "1" || params.get("claimed") === "1" || params.get("linked") === "1") {
+    if (flags.bootstrap || flags.claimed || flags.linked) {
       await maybeRevealPendingKey();
-      if (params.get("linked") === "1") flash("已連結 GitHub", "ok");
-      if (params.get("bootstrap") === "1") flash("Bootstrap 完成", "ok");
+      if (flags.linked) flash("已連結 SSO 帳號", "ok");
+      if (flags.bootstrap) flash("Bootstrap 完成", "ok");
+      if (flags.claimed) flash("註冊完成 — 請保存場用 API key", "warn");
     }
+  }
+
+  function askConfirm(message, opts = {}) {
+    const overlay = $("confirm-overlay");
+    const titleEl = $("confirm-title");
+    const msgEl = $("confirm-msg");
+    const okBtn = $("confirm-ok");
+    const cancelBtn = $("confirm-cancel");
+    titleEl.textContent = opts.title || "確認";
+    msgEl.textContent = message;
+    okBtn.textContent = opts.okLabel || "確認";
+    okBtn.className = opts.danger === false ? "" : "danger";
+    overlay.hidden = false;
+    overlay.classList.remove("hidden");
+    okBtn.focus();
+    return new Promise((resolve) => {
+      const close = (ok) => {
+        overlay.hidden = true;
+        overlay.classList.add("hidden");
+        okBtn.onclick = null;
+        cancelBtn.onclick = null;
+        overlay.onclick = null;
+        document.removeEventListener("keydown", onKey);
+        resolve(ok);
+      };
+      const onKey = (e) => {
+        if (e.key === "Escape") close(false);
+        if (e.key === "Enter") close(true);
+      };
+      okBtn.onclick = () => close(true);
+      cancelBtn.onclick = () => close(false);
+      overlay.onclick = (e) => { if (e.target === overlay) close(false); };
+      document.addEventListener("keydown", onKey);
+    });
   }
 
   $("tab-keys").onclick = () => selectTab("keys");
@@ -745,18 +865,44 @@ ${THEME_SCRIPT}
   };
 
   $("btn-rotate").onclick = async () => {
-    if (!confirm("輪替場用 API key？舊金鑰會立刻失效（後台工作階段不變）。")) return;
+    const hasKey = !$("btn-revoke").disabled;
+    const ok = await askConfirm(
+      hasKey
+        ? "輪替場用 API key？舊金鑰會立刻失效（後台工作階段不變）。"
+        : "建立一把場用 API key？寫入 SecretStore 後可供遊樂場殼頁使用。",
+      {
+        title: hasKey ? "輪替金鑰" : "建立金鑰",
+        okLabel: hasKey ? "輪替" : "建立",
+        danger: hasKey,
+      }
+    );
+    if (!ok) return;
     const { res, data } = await api("/v1/keys", { method: "POST" });
-    if (!res.ok) return flash(data?.error || "輪替失敗", "err");
+    if (!res.ok) return flash(data?.error || (hasKey ? "輪替失敗" : "建立失敗"), "err");
     revealKey(data.api_key);
-    flash("已輪替 — 請複製新金鑰寫入場內密鑰庫", "warn");
+    flash(hasKey ? "已輪替 — 請複製新金鑰寫入場內密鑰庫" : "已建立 — 請複製金鑰寫入場內密鑰庫", "warn");
     await refresh();
   };
 
   $("btn-revoke").onclick = async () => {
-    if (!confirm("撤銷場用 API key？場殼將無法鑄邀請；後台工作階段仍保留。")) return;
+    if ($("btn-revoke").disabled) {
+      flash("尚無金鑰，無法撤銷", "warn");
+      return;
+    }
+    const ok = await askConfirm("撤銷場用 API key？場殼將無法鑄邀請；後台工作階段仍保留。", {
+      title: "撤銷金鑰",
+      okLabel: "撤銷",
+    });
+    if (!ok) return;
     const { res, data } = await api("/v1/keys", { method: "DELETE" });
-    if (!res.ok) return flash(data?.error || "撤銷失敗", "err");
+    if (!res.ok) {
+      if (data?.error === "no_key") {
+        flash("尚無金鑰，無法撤銷", "warn");
+        await refresh();
+        return;
+      }
+      return flash(data?.error || "撤銷失敗", "err");
+    }
     $("key-reveal").classList.add("hidden");
     flash("場用金鑰已撤銷", "ok");
     await refresh();
@@ -780,16 +926,34 @@ ${THEME_SCRIPT}
     const params = new URLSearchParams(location.search);
     const authErr = params.get("auth_error");
     const sessionCode = params.get("session");
-    const hadFlags = params.has("bootstrap") || params.has("claimed") || params.has("linked") || params.has("session") || params.has("auth_error");
+    const flags = {
+      bootstrap: params.get("bootstrap") === "1",
+      claimed: params.get("claimed") === "1",
+      linked: params.get("linked") === "1",
+    };
+    const hadFlags =
+      flags.bootstrap ||
+      flags.claimed ||
+      flags.linked ||
+      params.has("session") ||
+      params.has("auth_error");
+    let pendingFlash = null;
     if (authErr) {
-      flash(AUTH_ERR[authErr] || authErr, "err");
+      pendingFlash = { msg: AUTH_ERR[authErr] || authErr, kind: "err" };
     }
     if (sessionCode) {
       const ok = await redeemSession(sessionCode);
-      if (!ok) flash("登入交接失敗，請再試一次 GitHub", "err");
+      if (!ok) {
+        pendingFlash = {
+          msg: "登入交接失敗，請再試一次",
+          kind: "err",
+        };
+      }
     }
     if (hadFlags) history.replaceState({}, "", location.pathname);
-    await refresh();
+    await refresh(flags);
+    // refresh() clears flash；OAuth 錯誤須在之後重掛
+    if (pendingFlash) flash(pendingFlash.msg, pendingFlash.kind);
   })();
 })();
 </script>
@@ -813,11 +977,12 @@ export function bootstrapHtml(): string {
     <div id="flash" class="flash hidden" role="status" aria-live="polite"></div>
     <div class="panel">
       <h2>Admin bootstrap</h2>
-      <p class="lede">使用 Cloudflare secret <span class="mono">ADMIN_BOOTSTRAP_TOKEN</span>。第一次建立 admin＋場用 API key；若先前已 bootstrap 但尚未綁 GitHub，可再用同一 token 綁定並進入。</p>
+      <p class="lede">使用 Cloudflare secret <span class="mono">ADMIN_BOOTSTRAP_TOKEN</span>。第一次建立 admin＋場用 API key；若先前已 bootstrap 但尚未綁 SSO，可再用同一 token 綁定並進入。</p>
       <label for="boot-token">Bootstrap token</label>
       <input id="boot-token" class="mono" type="password" autocomplete="off"/>
       <div class="row">
         <button type="button" id="btn-bootstrap-github">以 GitHub 完成 bootstrap</button>
+        <button type="button" class="secondary" id="btn-bootstrap-google">以 Google 完成 bootstrap</button>
         <a class="btn secondary" href="/">回後台登入</a>
       </div>
     </div>
@@ -840,21 +1005,28 @@ ${THEME_SCRIPT}
   const ERR = {
     unauthorized: "token 不正確",
     github_already_linked: "此 GitHub 已綁到其他帳號",
+    google_already_linked: "此 Google 已綁到其他帳號",
     admin_github_mismatch: "admin 已綁其他 GitHub",
-    token_exchange_failed: "GitHub token 交換失敗",
+    admin_google_mismatch: "admin 已綁其他 Google",
+    token_exchange_failed: "OAuth token 交換失敗",
     github_oauth_not_configured: "伺服器未設定 GitHub OAuth",
+    google_oauth_not_configured: "伺服器未設定 Google OAuth",
+    github_user_failed: "無法讀取 GitHub 使用者資料",
+    google_user_failed: "無法讀取 Google 使用者資料",
   };
   if (err) {
     flash(ERR[err] || err, "err");
     history.replaceState({}, "", location.pathname);
   }
-  document.getElementById("btn-bootstrap-github").onclick = () => {
+  function startBootstrap(provider) {
     const token = document.getElementById("boot-token").value.trim();
     if (!token) return flash("需要 bootstrap token", "warn");
-    location.href = "/auth/github?intent=bootstrap&bootstrap_token=" + encodeURIComponent(token);
-  };
+    location.href = "/auth/" + provider + "?intent=bootstrap&bootstrap_token=" + encodeURIComponent(token);
+  }
+  document.getElementById("btn-bootstrap-github").onclick = () => startBootstrap("github");
+  document.getElementById("btn-bootstrap-google").onclick = () => startBootstrap("google");
   document.getElementById("boot-token").addEventListener("keydown", (e) => {
-    if (e.key === "Enter") document.getElementById("btn-bootstrap-github").click();
+    if (e.key === "Enter") startBootstrap("github");
   });
 })();
 </script>
@@ -877,8 +1049,9 @@ export function joinLandingHtml(opts: {
     opts.ok && opts.token
       ? `<div class="row" style="margin-top:1rem">
           <a class="btn" href="/auth/github?intent=join&amp;token=${encodeURIComponent(opts.token)}">使用 GitHub 領取</a>
+          <a class="btn secondary" href="/auth/google?intent=join&amp;token=${encodeURIComponent(opts.token)}">使用 Google 領取</a>
         </div>
-        <p class="meta" style="margin-top:0.75rem">領取後會綁定 GitHub、建立後台 session，並顯示一次場用 API key（寫入場內密鑰庫）。</p>
+        <p class="meta" style="margin-top:0.75rem">領取後會綁定 SSO、建立後台 session，並顯示一次場用 API key（寫入場內密鑰庫）。</p>
         <script>${THEME_SCRIPT}; bindTheme();</script>`
       : `<script>${THEME_SCRIPT}; bindTheme();</script>`;
   return `${shellHead({

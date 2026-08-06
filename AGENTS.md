@@ -11,6 +11,10 @@ This repo is the **authoritative** host codebase. Do not push feature parity bac
 
 Reader-facing narrative stays personal／non-product (blog DEC-004).
 
+## UI／UX（硬）
+
+- **禁止瀏覽器原生 Dialog：** 不得使用 `alert`／`confirm`／`prompt`（或同等）向使用者確認或索取文字；一律用頁內 UI（確認面、表單、flash／toast）。見 `.cursor/rules/no-native-dialogs.mdc`。
+
 ## Commands
 
 - `npm run dev` — local host (standalone paths: `/` + `/sam/` + `/canvas/`)

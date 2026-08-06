@@ -10,6 +10,7 @@ import {
   type HostBridge,
   type HostCanvasStatus,
   type HostCloneProjectOptions,
+  type HostCreatePlatformInviteOptions,
   type HostCreateProjectOptions,
   type HostDomSnapshotResult,
   type HostMainTabSummary,
@@ -17,6 +18,7 @@ import {
   type HostOpenMainCanvasOptions,
   type HostOpenToolOptions,
   type HostProjectSummary,
+  type HostRevokePlatformInviteOptions,
   type HostToolSessionInfo,
   type HostWriteFileOptions,
 } from "./hostBridge";
@@ -54,6 +56,10 @@ import { isInWorkingSet } from "./workingSet";
 import { clearMockKvStore } from "./mockKv";
 import { clearMockDbStore } from "./mockDb";
 import { getSecretStoreStatus, listSecretMetas } from "./secretStore";
+import {
+  hostCreatePlatformInvite,
+  hostRevokePlatformInvite,
+} from "./platform/platformHostProxy";
 import { readSandboxIdField, readToolSandboxId } from "./sandboxIdCompat";
 import { copyProjectState } from "./projectState";
 import { normalizeProjectPath, sortProjectPaths } from "./pathUtils";
@@ -1121,6 +1127,14 @@ export function createShellHostBridge(ctx: ShellHostContext): HostBridge {
 
     async listSecrets() {
       return { secrets: await listSecretMetas() };
+    },
+
+    async createPlatformInvite(options?: HostCreatePlatformInviteOptions) {
+      return hostCreatePlatformInvite(options);
+    },
+
+    async revokePlatformInvite(options: HostRevokePlatformInviteOptions) {
+      return hostRevokePlatformInvite(options);
     },
 
     async search(options: HostSearchOptions) {

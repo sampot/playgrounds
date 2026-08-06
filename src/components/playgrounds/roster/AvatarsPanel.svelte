@@ -64,12 +64,12 @@
   import { registerSessionBridge } from "../sessionBridge";
   import {
     createJoin,
-    createPlatformInvite,
     PLAYGROUNDS_API_KEY_SECRET,
     postOfferAndWaitAnswer,
     previewInvite,
     type InviteMeta,
   } from "../platform/platformClient";
+  import { hostCreatePlatformInvite } from "../platform/platformHostProxy";
   import {
     composeNeedsMaximize,
     composeSamSource,
@@ -769,12 +769,11 @@
     busy = true;
     persistName();
     try {
-      const apiKey = await readPlatformApiKey();
-      const created = await createPlatformInvite({
-        apiKey,
+      const created = await hostCreatePlatformInvite({
         kind: "signal.handshake",
         targetField: window.location.host,
       });
+      const apiKey = await readPlatformApiKey();
       platformInvite = {
         inviteId: created.invite_id,
         secret: created.secret,

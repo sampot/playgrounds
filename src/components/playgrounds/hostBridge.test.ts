@@ -160,6 +160,15 @@ function stubBridge(partial: Partial<HostBridge> = {}): HostBridge {
     listSecretNames: async () => ({ names: [] }),
     getSecretStoreStatus: async () => ({ state: "absent" as const }),
     listSecrets: async () => ({ secrets: [] }),
+    createPlatformInvite: async () => ({
+      invite_id: "",
+      kind: "signal.handshake",
+      expires_at: 0,
+      short_url: "",
+      deep_link: "",
+      secret: "",
+    }),
+    revokePlatformInvite: async () => ({ ok: true as const }),
     search: async () => ({ matches: [] }),
     checkpoint: async () => {
       throw new Error("not implemented");
@@ -272,6 +281,8 @@ describe("createHostBinding", () => {
     expect(caps).toContain("listSecretNames");
     expect(caps).toContain("getSecretStoreStatus");
     expect(caps).toContain("listSecrets");
+    expect(caps).toContain("createPlatformInvite");
+    expect(caps).toContain("revokePlatformInvite");
     expect(caps).toContain("openTool");
     expect(caps).toContain("closeTool");
     expect(caps).toContain("getToolSession");

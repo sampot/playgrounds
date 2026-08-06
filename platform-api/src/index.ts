@@ -7,10 +7,8 @@ import {
   getRegistrationInvite,
   getShortMapping,
   getUser,
-  getUserIdByGithub,
   isBootstrapped,
   issueAccessToken,
-  linkGithub,
   lookupAccessToken,
   lookupApiKey,
   markBootstrapped,
@@ -40,7 +38,15 @@ import {
   oauthCallbackUri,
   readSessionCookie,
   sessionCookieHeader,
+  type OAuthIntent,
 } from "./githubOAuth.js";
+import {
+  exchangeGoogleCode,
+  fetchGoogleProfile,
+  googleAuthorizeUrl,
+  googleOAuthConfigured,
+} from "./googleOAuth.js";
+import { completeSsoIntent } from "./ssoFlow.js";
 import {
   ACCESS_TOKEN_TTL_MS,
   apiKeyPlaintext,
@@ -67,6 +73,8 @@ export type Env = {
   ADMIN_BOOTSTRAP_TOKEN?: string;
   GITHUB_CLIENT_ID?: string;
   GITHUB_CLIENT_SECRET?: string;
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
   OAUTH_STATE_SECRET?: string;
 };
 
@@ -339,7 +347,7 @@ async function route(
       joinLandingHtml({
         ok: true,
         message:
-          "註冊邀請有效。請使用 GitHub 領取：綁定帳號、建立後台 session，並取得一把場用 API key（寫入場內密鑰庫）。",
+          "註冊邀請有效。請使用 GitHub 或 Google 領取：綁定帳號、建立後台 session，並取得一把場用 API key（寫入場內密鑰庫）。",
         expiresAt: inv.expiresAt,
         token,
       })
@@ -351,42 +359,77 @@ async function route(
       ok: true,
       service: "playgrounds-platform-api",
       github_oauth: githubOAuthConfigured(env),
+      google_oauth: googleOAuthConfigured(env),
     });
   }
 
-  // —— GitHub OAuth ——
-  if (request.method === "GET" && pathname === "/auth/github") {
-    if (!githubOAuthConfigured(env)) {
-      return json({ error: "github_oauth_not_configured" }, 503);
-    }
+  // —— Social SSO (GitHub / Google) ——
+  async function parseOAuthIntent(): Promise<
+    { ok: true; intent: OAuthIntent } | { ok: false; res: Response }
+  > {
     const intentParam = url.searchParams.get("intent") || "login";
-    let intent;
     if (intentParam === "join") {
       const inviteToken = url.searchParams.get("token") || "";
-      if (!inviteToken) return json({ error: "bad_request" }, 400);
-      intent = { intent: "join" as const, inviteToken };
-    } else if (intentParam === "link") {
+      if (!inviteToken) {
+        return { ok: false, res: json({ error: "bad_request" }, 400) };
+      }
+      return { ok: true, intent: { intent: "join", inviteToken } };
+    }
+    if (intentParam === "link") {
       const auth = await requireAccessToken(env, request);
-      if (!auth.ok) return auth.res;
-      intent = { intent: "link" as const, userId: auth.userId };
-    } else if (intentParam === "bootstrap") {
+      if (!auth.ok) return { ok: false, res: auth.res };
+      return { ok: true, intent: { intent: "link", userId: auth.userId } };
+    }
+    if (intentParam === "bootstrap") {
       const bootstrapToken =
         url.searchParams.get("bootstrap_token") ||
         url.searchParams.get("token") ||
         "";
-      if (!bootstrapToken) return json({ error: "bad_request" }, 400);
-      intent = { intent: "bootstrap" as const, bootstrapToken };
-    } else {
-      intent = { intent: "login" as const };
+      if (!bootstrapToken) {
+        return { ok: false, res: json({ error: "bad_request" }, 400) };
+      }
+      return {
+        ok: true,
+        intent: { intent: "bootstrap", bootstrapToken },
+      };
     }
-    const state = await encodeOAuthState(env.OAUTH_STATE_SECRET!, intent);
-    const redirectUri = oauthCallbackUri(request);
-    const loc = githubAuthorizeUrl({
-      clientId: env.GITHUB_CLIENT_ID!,
-      redirectUri,
-      state,
-    });
-    return Response.redirect(loc, 302);
+    return { ok: true, intent: { intent: "login" } };
+  }
+
+  if (request.method === "GET" && pathname === "/auth/github") {
+    if (!githubOAuthConfigured(env)) {
+      return json({ error: "github_oauth_not_configured" }, 503);
+    }
+    const parsed = await parseOAuthIntent();
+    if (!parsed.ok) return parsed.res;
+    const state = await encodeOAuthState(env.OAUTH_STATE_SECRET!, parsed.intent);
+    const redirectUri = oauthCallbackUri(request, "github");
+    return Response.redirect(
+      githubAuthorizeUrl({
+        clientId: env.GITHUB_CLIENT_ID!,
+        redirectUri,
+        state,
+      }),
+      302
+    );
+  }
+
+  if (request.method === "GET" && pathname === "/auth/google") {
+    if (!googleOAuthConfigured(env)) {
+      return json({ error: "google_oauth_not_configured" }, 503);
+    }
+    const parsed = await parseOAuthIntent();
+    if (!parsed.ok) return parsed.res;
+    const state = await encodeOAuthState(env.OAUTH_STATE_SECRET!, parsed.intent);
+    const redirectUri = oauthCallbackUri(request, "google");
+    return Response.redirect(
+      googleAuthorizeUrl({
+        clientId: env.GOOGLE_CLIENT_ID!,
+        redirectUri,
+        state,
+      }),
+      302
+    );
   }
 
   if (request.method === "GET" && pathname === "/auth/github/callback") {
@@ -394,8 +437,8 @@ async function route(
     if (!githubOAuthConfigured(env)) {
       return dashErrorRedirect(origin, "github_oauth_not_configured");
     }
-    const err = url.searchParams.get("error");
-    if (err) return dashErrorRedirect(origin, err);
+    const oauthErr = url.searchParams.get("error");
+    if (oauthErr) return dashErrorRedirect(origin, oauthErr);
     const code = url.searchParams.get("code");
     const stateRaw = url.searchParams.get("state");
     if (!code || !stateRaw) return dashErrorRedirect(origin, "missing_code");
@@ -405,143 +448,70 @@ async function route(
     const errPath = state.intent === "bootstrap" ? "/bootstrap/" : "/";
     const fail = (c: string) => dashErrorRedirect(origin, c, errPath);
 
-    const redirectUri = oauthCallbackUri(request);
+    const redirectUri = oauthCallbackUri(request, "github");
     const exchanged = await exchangeGithubCode({
       clientId: env.GITHUB_CLIENT_ID!,
       clientSecret: env.GITHUB_CLIENT_SECRET!,
       code,
       redirectUri,
     });
-    if ("error" in exchanged) {
-      return fail("token_exchange_failed");
-    }
+    if ("error" in exchanged) return fail("token_exchange_failed");
     const profile = await fetchGithubProfile(exchanged.accessToken);
-    if ("error" in profile) {
-      return fail("github_user_failed");
+    if ("error" in profile) return fail("github_user_failed");
+
+    return completeSsoIntent({
+      env,
+      state,
+      subject: {
+        provider: "github",
+        id: profile.id,
+        label: profile.login,
+      },
+      fail,
+      success: (accessToken, expiresAt, extra) =>
+        dashSuccessRedirect(env, request, accessToken, expiresAt, extra),
+    });
+  }
+
+  if (request.method === "GET" && pathname === "/auth/google/callback") {
+    const origin = new URL(request.url).origin;
+    if (!googleOAuthConfigured(env)) {
+      return dashErrorRedirect(origin, "google_oauth_not_configured");
     }
+    const oauthErr = url.searchParams.get("error");
+    if (oauthErr) return dashErrorRedirect(origin, oauthErr);
+    const code = url.searchParams.get("code");
+    const stateRaw = url.searchParams.get("state");
+    if (!code || !stateRaw) return dashErrorRedirect(origin, "missing_code");
+    const state = await decodeOAuthState(env.OAUTH_STATE_SECRET!, stateRaw);
+    if (!state) return dashErrorRedirect(origin, "invalid_state");
 
-    if (state.intent === "login") {
-      const userId = await getUserIdByGithub(env.STORE, profile.id);
-      if (!userId) return fail("need_invite_or_link");
-      const user = await getUser(env.STORE, userId);
-      if (!user || user.disabled) return fail("forbidden");
-      const at = await issueAccessToken(env.STORE, user.userId, user.role);
-      return dashSuccessRedirect(
-        env,
-        request,
-        at.plaintext,
-        at.record.expiresAt
-      );
-    }
+    const errPath = state.intent === "bootstrap" ? "/bootstrap/" : "/";
+    const fail = (c: string) => dashErrorRedirect(origin, c, errPath);
 
-    if (state.intent === "link") {
-      const linked = await linkGithub(env.STORE, state.userId, profile);
-      if (!linked.ok) return fail(linked.error);
-      const user = await getUser(env.STORE, state.userId);
-      if (!user) return fail("user_not_found");
-      const at = await issueAccessToken(env.STORE, user.userId, user.role);
-      return dashSuccessRedirect(
-        env,
-        request,
-        at.plaintext,
-        at.record.expiresAt,
-        "linked=1"
-      );
-    }
+    const redirectUri = oauthCallbackUri(request, "google");
+    const exchanged = await exchangeGoogleCode({
+      clientId: env.GOOGLE_CLIENT_ID!,
+      clientSecret: env.GOOGLE_CLIENT_SECRET!,
+      code,
+      redirectUri,
+    });
+    if ("error" in exchanged) return fail("token_exchange_failed");
+    const profile = await fetchGoogleProfile(exchanged.accessToken);
+    if ("error" in profile) return fail("google_user_failed");
 
-    if (state.intent === "bootstrap") {
-      const expected = env.ADMIN_BOOTSTRAP_TOKEN;
-      if (!expected || state.bootstrapToken !== expected) {
-        return fail("unauthorized");
-      }
-      const userId = "admin";
-      const already = await isBootstrapped(env.STORE);
-
-      if (already) {
-        await ensureUser(env.STORE, userId, "admin");
-        const admin = await getUser(env.STORE, userId);
-        if (!admin) return fail("user_not_found");
-        const ghOwner = await getUserIdByGithub(env.STORE, profile.id);
-        if (ghOwner && ghOwner !== userId) {
-          return fail("github_already_linked");
-        }
-        if (admin.github && admin.github.id !== profile.id) {
-          return fail("admin_github_mismatch");
-        }
-        if (!admin.github) {
-          const linked = await linkGithub(env.STORE, userId, profile);
-          if (!linked.ok) return fail(linked.error);
-        }
-        const at = await issueAccessToken(env.STORE, userId, "admin");
-        return dashSuccessRedirect(
-          env,
-          request,
-          at.plaintext,
-          at.record.expiresAt,
-          "linked=1"
-        );
-      }
-
-      await ensureUser(env.STORE, userId, "admin");
-      const plaintext = apiKeyPlaintext();
-      await putApiKey(env.STORE, plaintext, userId, "admin");
-      const linked = await linkGithub(env.STORE, userId, profile);
-      if (!linked.ok) return fail(linked.error);
-      await markBootstrapped(env.STORE);
-      const at = await issueAccessToken(env.STORE, userId, "admin");
-      await env.STORE.put(`reveal:user:${userId}`, plaintext, {
-        expirationTtl: 600,
-      });
-      return dashSuccessRedirect(
-        env,
-        request,
-        at.plaintext,
-        at.record.expiresAt,
-        "bootstrap=1"
-      );
-    }
-
-    if (state.intent === "join") {
-      const inv = await getRegistrationInvite(env.STORE, state.inviteToken);
-      if (!inv) return fail("invite_not_found");
-      if (Date.now() >= inv.expiresAt || inv.usedAt) {
-        return fail("invite_gone");
-      }
-      const existingId = await getUserIdByGithub(env.STORE, profile.id);
-      if (existingId) {
-        const user = await getUser(env.STORE, existingId);
-        if (!user || user.disabled) return fail("forbidden");
-        const at = await issueAccessToken(env.STORE, user.userId, user.role);
-        return dashSuccessRedirect(
-          env,
-          request,
-          at.plaintext,
-          at.record.expiresAt
-        );
-      }
-      const claimed = await claimRegistrationInvite(
-        env.STORE,
-        state.inviteToken,
-        "user"
-      );
-      if (!claimed.ok) {
-        return fail(claimed.error);
-      }
-      const linked = await linkGithub(env.STORE, claimed.userId, profile);
-      if (!linked.ok) return fail(linked.error);
-      await env.STORE.put(`reveal:user:${claimed.userId}`, claimed.apiKey, {
-        expirationTtl: 600,
-      });
-      return dashSuccessRedirect(
-        env,
-        request,
-        claimed.accessToken,
-        claimed.accessTokenExpiresAt,
-        "claimed=1"
-      );
-    }
-
-    return fail("unknown_intent");
+    return completeSsoIntent({
+      env,
+      state,
+      subject: {
+        provider: "google",
+        id: profile.id,
+        label: profile.email,
+      },
+      fail,
+      success: (accessToken, expiresAt, extra) =>
+        dashSuccessRedirect(env, request, accessToken, expiresAt, extra),
+    });
   }
 
   // OAuth / cookie handoff → establish Bearer in browser
@@ -654,6 +624,9 @@ async function route(
       role: auth.role,
       github: user?.github
         ? { id: user.github.id, login: user.github.login }
+        : null,
+      google: user?.google
+        ? { id: user.google.id, email: user.google.email }
         : null,
       key: key
         ? { prefix: key.prefix, created_at: key.createdAt }

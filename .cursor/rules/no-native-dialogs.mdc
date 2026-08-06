@@ -1,0 +1,14 @@
+---
+description: Forbid browser native dialogs (alert/confirm/prompt) in all UI/UX
+alwaysApply: true
+---
+
+# No native browser dialogs
+
+**Hard rule for all Playgrounds UI/UX** (field shell, Platform dash, docs chrome, SAM surfaces, any in-app UI):
+
+- **Do not** use `window.alert`, `window.confirm`, or `window.prompt` (or equivalents) to confirm actions or collect text from the user.
+- **Do** use in-app UI: custom confirm panels／modals, inline forms, toast／flash status, dedicated pages.
+- Destructive actions still need an explicit confirm step — implement it in the page chrome, with keyboard focus and cancel.
+
+Exceptions: none for product UI. Devtools-only scripts outside the shipped UI are out of scope.

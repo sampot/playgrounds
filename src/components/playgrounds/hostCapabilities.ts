@@ -62,6 +62,8 @@ export const HOST_CAPABILITIES = [
   "listSecretNames",
   "getSecretStoreStatus",
   "listSecrets",
+  "createPlatformInvite",
+  "revokePlatformInvite",
   "search",
   "expectedHash",
   "checkpoint",
