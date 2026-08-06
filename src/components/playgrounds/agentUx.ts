@@ -37,7 +37,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     id: "local",
     label: "本機",
     baseUrl: "http://127.0.0.1:1234/v1",
-    model: "local-model",
+    model: "qwen/qwen3-coder-next",
     hint: "LM Studio／Ollama 等需開 CORS；本機 endpoint 可不選密鑰。",
   },
 ];
