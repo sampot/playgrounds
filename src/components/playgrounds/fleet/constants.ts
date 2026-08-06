@@ -22,6 +22,3 @@ export const FLEET_ATTENTION_CAP = 50;
 
 /** L2 default message header count. */
 export const FLEET_RECENT_MSG_HEADERS = 20;
-
-/** Comfortable visible nodes for 3D (Phase 4 guidance). */
-export const FLEET_3D_COMFORT_NODES = 80;

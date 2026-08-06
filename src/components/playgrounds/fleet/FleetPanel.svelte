@@ -2,7 +2,6 @@
   import type { MailboxMessageHeader } from "../../../sam-runtime/index.ts";
   import { getAgentRuntimeHub } from "../agentRuntimeHub";
   import PgIcon from "../PgIcon.svelte";
-  import FleetGraph3D from "./FleetGraph3D.svelte";
   import {
     FLEET_RECENT_MSG_HEADERS,
     buildSessionGroups,
@@ -42,12 +41,7 @@
     onDelete,
   }: Props = $props();
 
-  type RelationView =
-    | "list"
-    | "lineage"
-    | "session"
-    | "supervisor"
-    | "graph3d";
+  type RelationView = "list" | "lineage" | "session" | "supervisor";
 
   const btn =
     "inline-flex items-center justify-center rounded-md border border-skin-line bg-skin-card px-2 py-1 text-xs font-medium text-skin-base transition hover:bg-skin-card disabled:opacity-40";
@@ -393,7 +387,6 @@
           { id: "lineage" as const, label: "血統" },
           { id: "session" as const, label: "Session" },
           { id: "supervisor" as const, label: "編排" },
-          { id: "graph3d" as const, label: "3D" },
         ] as tab (tab.id)}
           <button
             type="button"
@@ -414,22 +407,7 @@
         role="listbox"
         aria-label="Agent 關係視圖"
       >
-        {#if relationView === "graph3d"}
-          {#if !snapshot || filteredNodes.length === 0}
-            <p class="text-skin-base/45 px-2 py-3 text-center text-xs">
-              {loading ? "載入中…" : "沒有節點可繪製"}
-            </p>
-          {:else}
-            <div class="p-1">
-              <FleetGraph3D
-                nodes={filteredNodes}
-                edges={snapshot.edges}
-                {selectedId}
-                onSelect={id => void selectAgent(id)}
-              />
-            </div>
-          {/if}
-        {:else if !snapshot || filteredNodes.length === 0}
+        {#if !snapshot || filteredNodes.length === 0}
           <p class="text-skin-base/45 px-2 py-3 text-center text-xs">
             {loading ? "載入中…" : "沒有符合的 Agent（registry 為空或被篩掉）"}
           </p>

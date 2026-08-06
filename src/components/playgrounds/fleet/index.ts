@@ -1,5 +1,4 @@
 export {
-  FLEET_3D_COMFORT_NODES,
   FLEET_ATTENTION_CAP,
   FLEET_EGO_HOPS_DEFAULT,
   FLEET_MAILBOX_WARN_DEPTH,
@@ -42,15 +41,6 @@ export {
   type SessionGroup,
   type SupervisorFanout,
 } from "./relations.ts";
-export {
-  linkColorForKind,
-  nodeColorForStatus,
-  prefersReducedMotion,
-  toFleetGraphData,
-  type FleetGraphData,
-  type FleetGraphLink,
-  type FleetGraphNode,
-} from "./graphData.ts";
 export type {
   AgentUiAnnotation,
   FleetAgentNode,

@@ -3,7 +3,6 @@ import { buildAttention, countByStatus, sumPressure } from "./attention.ts";
 import { buildFleetSnapshot } from "./buildSnapshot.ts";
 import { FLEET_MAILBOX_WARN_DEPTH } from "./constants.ts";
 import { trimToEgo, trimToMaxNodes } from "./graph.ts";
-import { toFleetGraphData } from "./graphData.ts";
 import { toFleetSummary } from "./loadFleetSnapshot.ts";
 import type { FleetAgentNode, FleetEdge, FleetSnapshot } from "./types.ts";
 
@@ -195,21 +194,6 @@ describe("toFleetSummary", () => {
     expect(base.traffic).toBeUndefined();
     const withT = toFleetSummary(snap, { includeTraffic: true });
     expect(withT.traffic).toEqual([{ from: "a", to: "a", weight: 3 }]);
-  });
-});
-
-describe("toFleetGraphData", () => {
-  it("filters edge kinds and drops dangling links", () => {
-    const nodes = [node({ agentId: "a" }), node({ agentId: "b" })];
-    const edges: FleetEdge[] = [
-      { from: "a", to: "b", kind: "lineage" },
-      { from: "a", to: "b", kind: "session" },
-      { from: "a", to: "missing", kind: "lineage" },
-    ];
-    const data = toFleetGraphData(nodes, edges, ["lineage"]);
-    expect(data.nodes).toHaveLength(2);
-    expect(data.links).toHaveLength(1);
-    expect(data.links[0]?.kind).toBe("lineage");
   });
 });
 
