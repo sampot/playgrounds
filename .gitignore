@@ -4,6 +4,10 @@ dist/
 .wrangler/
 .DS_Store
 .env
+.dev.vars
 .env.local
 *.log
 worker-configuration.d.ts
+
+# platform-api local secrets (wrangler)
+platform-api/.dev.vars

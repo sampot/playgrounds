@@ -924,10 +924,11 @@
   3. **Ticket 路徑 signaling（僅 Platform）：** 鑄 Invite 時**不**帶 offer。**加入者**提交 offer，**同一邏輯回合** long-poll 等 answer；**邀請者（session host）**排隊串行作答。同時僅一筆 WebRTC handshake；忙線＝**排隊**。Host 離線 → 需新連線者超時（預期）。**若雙方已有可用 PeerConnection → 重用該連線，不跑 signaling**（signaling **僅**尚未連線或既有 peer 不可用時）。OOB `#roster=`／QR／文字 **不變**（仍發起者 offer）。Wire／非 trickle／每輪 1× O／A 不變；禁止對已連線 peer 經 Platform renegotiation。
   4. **與 Roster：** Platform **串行發握手**（僅未連線）；連上後 Roster **並行持多 peer**（見 DEC-045）。
   5. **深鏈與短連結：** `#pg=<invite>`（hash）；**`/i/<short_id>`** → 302（canonical 在 `api`）；**QR 預設短連結**。
-  6. **身分：** 註冊邀請制；Social SSO；不存密碼；可 MFA。Bootstrap：一次性 **`ADMIN_BOOTSTRAP_TOKEN`**。後台暫以 API key session（SSO 後續）。
-  7. **API key：** 每帳號最多 1 把；僅建立時顯示。持 key 者可鑄會議／遊戲 Invite。場內 SecretStore 保留名 **`PLAYGROUNDS_API_KEY`**。
+  6. **身分：** 註冊邀請制；Social SSO（**GitHub 必做、Google 次做**；見 [PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md)）；不存密碼；可 MFA。SSO → **access token**（後台 session）。Bootstrap：一次性 **`ADMIN_BOOTSTRAP_TOKEN`**。
+  7. **API key：** 每帳號最多 1 把；僅建立時顯示；**專供遊樂場殼頁**（SecretStore **`PLAYGROUNDS_API_KEY`**）鑄 Invite／signal。**後台 UI 登入後呼叫 API 使用 access token，不用 API key。**
   8. **呈現：** 放大＝**`maximizePreview`（放大畫布）**，非瀏覽器全螢幕。
-  9. **非目標：** 資料面中繼、trickle、預設 TURN、公開自助註冊、平行多 handshake、通用縮址。
+  9. **後台 UI：** 權威規格 [PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md)（品牌對齊場殼；`dash.samkuo.me`）。**統一進入介面**；登入後依角色顯示（user＝金鑰管理；admin＝金鑰＋營運）；一般使用者不可見管理者專用 UI。**場邀請短網址由 SAM 經場殼代理呼叫 API 取得；後台不鑄場 Invite。**
+  10. **非目標：** 資料面中繼、trickle、預設 TURN、公開自助註冊、平行多 handshake、通用縮址。
   - 階段見 [PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)。
 - **Consequences:**
   - 勿把 Platform 做成聊天室或 ICE trickle 匯流排；勿為每個場 name 建租戶。
@@ -937,7 +938,10 @@
   - 勿把「同時僅一 handshake」誤寫成「Roster 只能一 peer」。
   - 勿把完整深鏈當 QR 預設；勿用 Fullscreen API 冒充放大畫布。
   - `dash`／`api` 為場網保留名；短連結 canonical 在 api，後台在 dash。
-  - 同步 GLOSSARY、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)。
+  - 後台勿用產品／SaaS 控制台腔（DEC-004）；SSO 供應商以 DASH-SPEC 為準，勿默認任意 IdP。
+  - **勿**把使用者場邀請入口做在 `dash`；勿讓 SAM 繞過殼代理直接暴露 API key。
+  - **勿**以後台 access token 當場殼憑證；**勿**以 API key 當後台常態 session（過渡債務須汰除）。
+  - 同步 GLOSSARY、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)、[PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md)。
 - **Revision（2026-08-06）：** 初版 Draft。
 - **Revision（2026-08-06）：** 短連結 `/i/`；QR 預設短 URL。
 - **Revision（2026-08-06）：** Invite 一連結多人；加入者 offer＋排隊；多 peer 對齊 DEC-045。
@@ -945,6 +949,11 @@
 - **Revision（2026-08-06）：** Invite 預設 TTL **5m**（session 開始後初始動作，非預約）；Phase 1 實作於 `platform-api/`。
 - **Revision（2026-08-06）：** **`dash.samkuo.me`** 後台別名；Phase 3 dashboard（API key session）。
 - **Revision（2026-08-06）：** Phase 1–4 落地（`#pg=`／多 peer／compose／註冊 claim）；完整 Social SSO 留 Phase 5。
+- **Revision（2026-08-06）：** 後台 UI 規格文件化；SSO＝GitHub 必做、Google 次做。
+- **Revision（2026-08-06）：** 場邀請 URL＝SAM→殼代理→API；後台不鑄場 Invite。
+- **Revision（2026-08-06）：** 後台統一進入；依角色顯示；user 不見營運 UI。
+- **Revision（2026-08-06）：** 後台＝access token；API key＝僅場殼。
+- **Revision（2026-08-06）：** 移除後台 API key 登入過渡；進入僅 GitHub SSO。
 
 
 ---
@@ -987,6 +996,7 @@
 | [PG-BOTTOM-DOCK-PLAN.md](./PG-BOTTOM-DOCK-PLAN.md) | 下方面板 dock／opt-in／自選 SAM（DEC-044） |
 | [PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md) | 跨場 Roster／Avatar／薄 signaling（DEC-045） |
 | [PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md) | Platform API／Ticket／signal／後台（DEC-047 Draft） |
+| [PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md) | Platform 後台 UI 規格（`dash.samkuo.me`；DEC-047） |
 | [PG-STANDALONE-PLAN.md](./PG-STANDALONE-PLAN.md) | 場網／Workers／開源／舊場暫留（DEC-041／042） |
 | [PG-CATALOG-PLAN.md](./PG-CATALOG-PLAN.md) | 小品型錄 YAML／PR 投稿（`catalog/entries/`） |
 | [PG-CATALOG-QUERY-PLAN.md](./PG-CATALOG-QUERY-PLAN.md) | 型錄結構化 JSON＋Playgrounds 查詢／lazy install（DEC-046 Draft） |

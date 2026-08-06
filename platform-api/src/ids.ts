@@ -50,9 +50,17 @@ export function apiKeyPlaintext(): string {
   return `pg_sk_${randomId(24)}`;
 }
 
+/** Dashboard session Bearer — not for field shell. */
+export function accessTokenPlaintext(): string {
+  return `pg_at_${randomId(24)}`;
+}
+
 export function joinCapPlaintext(): string {
   return `pg_jc_${randomId(20)}`;
 }
+
+/** Default dashboard access token TTL (7d). */
+export const ACCESS_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 export function shortId(): string {
   return randomId(10);

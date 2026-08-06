@@ -9,13 +9,20 @@ import {
 } from "./ids.js";
 import {
   deleteApiKey,
+  ensureUser,
   getApiKeyForUser,
+  getUserIdByGithub,
   isBootstrapped,
+  issueAccessToken,
+  linkGithub,
+  lookupAccessToken,
   lookupApiKey,
   markBootstrapped,
   putApiKey,
+  revokeAccessToken,
   type EnvStore,
 } from "./auth.js";
+import { decodeOAuthState, encodeOAuthState } from "./githubOAuth.js";
 import {
   createInviteRecord,
   enqueueOffer,
@@ -91,6 +98,47 @@ describe("auth bootstrap + api key", () => {
     expect(await deleteApiKey(store, "admin")).toBe(true);
     expect(await lookupApiKey(store, k)).toBeNull();
     expect(await getApiKeyForUser(store, "admin")).toBeNull();
+  });
+});
+
+describe("access token", () => {
+  it("issues and looks up; API key lookup rejects at prefix", async () => {
+    const store = memoryStore();
+    const { plaintext, record } = await issueAccessToken(store, "u1", "user");
+    expect(plaintext.startsWith("pg_at_")).toBe(true);
+    const found = await lookupAccessToken(store, plaintext);
+    expect(found?.userId).toBe("u1");
+    expect(found?.role).toBe("user");
+    expect(found?.expiresAt).toBe(record.expiresAt);
+    expect(await lookupApiKey(store, plaintext)).toBeNull();
+  });
+
+  it("revokes access token", async () => {
+    const store = memoryStore();
+    const { plaintext } = await issueAccessToken(store, "u1", "admin");
+    expect(await revokeAccessToken(store, plaintext)).toBe(true);
+    expect(await lookupAccessToken(store, plaintext)).toBeNull();
+  });
+});
+
+describe("github oauth state + link", () => {
+  it("round-trips signed state", async () => {
+    const secret = "test-state-secret";
+    const encoded = await encodeOAuthState(secret, { intent: "login" });
+    const decoded = await decodeOAuthState(secret, encoded);
+    expect(decoded?.intent).toBe("login");
+    expect(await decodeOAuthState("wrong", encoded)).toBeNull();
+  });
+
+  it("links github to user once", async () => {
+    const store = memoryStore();
+    await ensureUser(store, "admin", "admin");
+    const ok = await linkGithub(store, "admin", { id: "42", login: "sam" });
+    expect(ok.ok).toBe(true);
+    expect(await getUserIdByGithub(store, "42")).toBe("admin");
+    await ensureUser(store, "other", "user");
+    const clash = await linkGithub(store, "other", { id: "42", login: "sam" });
+    expect(clash.ok).toBe(false);
   });
 });
 

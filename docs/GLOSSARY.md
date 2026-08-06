@@ -92,13 +92,14 @@
 | 薄 signaling（遊樂場 Roster） | signaling | **每握手槽**只完成一次 WebRTC offer／answer（非 trickle；1× offer＋1× answer；用完銷槽）。≠ 全場只能一 peer。載荷經**剪裁＋固定樣板**；QR／文字／可選 Platform rendezvous。不中繼資料／心跳／重談。見 DEC-045／047。 |
 | Roster 樣板 SDP（遊樂場） | 樣板壓縮／交換 payload | 自完整 SDP 抽取必要欄位，依固定樣板編解碼還原；**QR 與文字**（及可選 Platform rendezvous）共用同一字串。可選**同區網**旗標以進一步剪裁 candidates。見 DEC-045、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)。 |
 | 同區網 Roster（遊樂場） | LAN／同區網模式 | 使用者宣告 peers 同一區網時，offer／answer 可更小；誤選須新邀請改模式，不經同房補 candidates。見 DEC-045。 |
-| Playgrounds Platform API | Platform API | 獨立於場殼的 Cloudflare Workers 服務：**`api.samkuo.me`**（API／短連結）、**`dash.samkuo.me`**（後台 UI，同 Worker）：Invite、薄 signal、帳號／API key。不中繼 session／DataChannel。見 DEC-047、[PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)。 |
-| Platform Invite（遊樂場） | Invite／`#pg=` | 一條邀請（短連結或深鏈）；**多人可經同一連結加入**。內嵌 intent；**不**預帶 WebRTC offer。每次加入＝短命 join。kind 含 `signal.handshake`、`invite.compose`。**不是** Platform 註冊邀請、**不是** `#roster=`。見 DEC-047。 |
+| Playgrounds Platform API | Platform API | 獨立於場殼的 Cloudflare Workers 服務：**`api.samkuo.me`**（API／短連結）、**`dash.samkuo.me`**（後台 UI，同 Worker）：Invite、薄 signal、帳號。後台持 **access token**；場殼持 **API key**。不中繼 session／DataChannel。後台 UI 規格見 [PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md)。見 DEC-047、[PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)。 |
+| Platform Invite（遊樂場） | Invite／`#pg=` | 一條邀請（短連結或深鏈）；**多人可經同一連結加入**。內嵌 intent；**不**預帶 WebRTC offer。每次加入＝短命 join。kind 含 `signal.handshake`、`invite.compose`。**鑄造：** SAM 經場殼代理呼叫 Platform API（持 `PLAYGROUNDS_API_KEY`）；**非**後台 UI。**不是** Platform 註冊邀請、**不是** `#roster=`。見 DEC-047、[PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md) §7。 |
 | Platform Ticket／join | join capability | 單次加入用的短命 capability（由 Invite 核發）。若雙方**已有** PeerConnection → **重用**，不跑 signaling。僅尚未連線時：加入者出 offer，同回合等邀請者 answer；握手排隊串行。見 DEC-047。 |
 | Platform 短連結 | `/i/<short_id>` | 對 **Invite** 穩定的短 URL → 302 到場 `#pg=`。**邀請 QR 預設**。與 Invite 同壽命；非通用縮址。見 DEC-047。 |
-| invite.compose（Platform） | 複合邀請 | Invite intent：開指定 SAM → **放大畫布** → 詢問入座（完整 protocol）；可選 Roster signal。持 API key 者可鑄。見 DEC-047。 |
+| invite.compose（Platform） | 複合邀請 | Invite intent：開指定 SAM → **放大畫布** → 詢問入座（完整 protocol）；可選 Roster signal。場殼持 API key 可鑄。見 DEC-047。 |
 | 放大畫布（遊樂場） | 放大畫布／`maximizePreview` | 場殼把 SAM 畫布放到主工作面（`previewMaximized`）；`?open=`／型錄開啟成功後常用。**不是**瀏覽器全螢幕。見 DEC-025／047。 |
-| PLAYGROUNDS_API_KEY | Playgrounds API key（SecretStore） | SecretStore **保留 binding 名**：場內持有 Platform API key；`env.secrets.PLAYGROUNDS_API_KEY.get()`。明文由 Platform 後台建立時顯示一次，再由使用者寫入密鑰庫。永不進 `.sam`。見 DEC-029／047。 |
+| Platform access token | access token／後台 session | 後台 UI（`dash`）登入後呼叫帳號／金鑰／admin API 的憑證（SSO 換發）。**≠** API key；**不**給場殼。見 DEC-047、[PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md) §5。 |
+| PLAYGROUNDS_API_KEY | Playgrounds API key（SecretStore） | SecretStore **保留 binding 名**：場內持有 Platform **API key**（`pg_sk_…`）；`env.secrets.PLAYGROUNDS_API_KEY.get()`。**僅遊樂場殼頁**用於 Invite／signal 等場 API。明文由 Platform 後台建立時顯示一次，再由使用者寫入密鑰庫。永不進 `.sam`。**不是**後台登入憑證。見 DEC-029／047。 |
 | Host 本地面／殼面（遊樂場後端） | HOST local｜shell | 本地面＝Runtime 內儲存／純資料；殼面＝終端 UI 指令（執行期不得再打 Runtime 權威儲存完成該指令）。見 DEC-038、SPEC §6。 |
 | Host Proxy／RPC（遊樂場後端） | 殼面終端通道 | Runtime→殼的殼面方法通道。**不是**整包 HOST 一律 RPC；**禁止**矛盾迴路（後端→殼→後端權威）。見 DEC-038。 |
 | UI←網路→後端（遊樂場 SAM） | UI 只經網路打後端 | 模擬 UI←網路→（`functions.js`∥`controller.js`）↔resources。畫布只打 `/api`→`functions.js`；不直連 Controller／bindings。見 AGENT-MODEL 規格、DEC-031。 |

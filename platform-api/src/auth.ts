@@ -1,4 +1,10 @@
-import { apiKeyPlaintext, keyPrefix, sha256Hex } from "./ids.js";
+import {
+  ACCESS_TOKEN_TTL_MS,
+  accessTokenPlaintext,
+  apiKeyPlaintext,
+  keyPrefix,
+  sha256Hex,
+} from "./ids.js";
 
 export type StoredApiKey = {
   userId: string;
@@ -6,6 +12,14 @@ export type StoredApiKey = {
   hash: string;
   prefix: string;
   createdAt: number;
+};
+
+export type StoredAccessToken = {
+  userId: string;
+  role: "admin" | "user";
+  hash: string;
+  createdAt: number;
+  expiresAt: number;
 };
 
 export type EnvStore = {
@@ -17,7 +31,81 @@ export type EnvStore = {
 const BOOTSTRAP_FLAG = "meta:bootstrap_done";
 const KEY_BY_USER = (userId: string) => `key:user:${userId}`;
 const KEY_BY_PREFIX = (prefix: string) => `key:prefix:${prefix}`;
+const AT_BY_HASH = (hash: string) => `at:hash:${hash}`;
+const USER_REC = (userId: string) => `user:${userId}`;
+const SSO_GITHUB = (subject: string) => `sso:github:${subject}`;
 const SHORT_TO_INVITE = (shortId: string) => `short:${shortId}`;
+
+export type PlatformUser = {
+  userId: string;
+  role: "admin" | "user";
+  createdAt: number;
+  disabled?: boolean;
+  github?: { id: string; login: string; linkedAt: number };
+};
+
+export async function getUser(
+  store: EnvStore,
+  userId: string
+): Promise<PlatformUser | null> {
+  const raw = await store.get(USER_REC(userId));
+  if (!raw) return null;
+  return JSON.parse(raw) as PlatformUser;
+}
+
+export async function putUser(
+  store: EnvStore,
+  user: PlatformUser
+): Promise<void> {
+  await store.put(USER_REC(user.userId), JSON.stringify(user));
+}
+
+export async function ensureUser(
+  store: EnvStore,
+  userId: string,
+  role: "admin" | "user"
+): Promise<PlatformUser> {
+  const existing = await getUser(store, userId);
+  if (existing) return existing;
+  const user: PlatformUser = {
+    userId,
+    role,
+    createdAt: Date.now(),
+  };
+  await putUser(store, user);
+  return user;
+}
+
+export async function getUserIdByGithub(
+  store: EnvStore,
+  githubId: string
+): Promise<string | null> {
+  return store.get(SSO_GITHUB(githubId));
+}
+
+export async function linkGithub(
+  store: EnvStore,
+  userId: string,
+  profile: { id: string; login: string }
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const existing = await getUserIdByGithub(store, profile.id);
+  if (existing && existing !== userId) {
+    return { ok: false, error: "github_already_linked" };
+  }
+  const user = await getUser(store, userId);
+  if (!user) return { ok: false, error: "user_not_found" };
+  if (user.github && user.github.id !== profile.id) {
+    await store.delete(SSO_GITHUB(user.github.id));
+  }
+  user.github = {
+    id: profile.id,
+    login: profile.login,
+    linkedAt: Date.now(),
+  };
+  await putUser(store, user);
+  await store.put(SSO_GITHUB(profile.id), userId);
+  return { ok: true };
+}
 
 export async function isBootstrapped(store: EnvStore): Promise<boolean> {
   return (await store.get(BOOTSTRAP_FLAG)) === "1";
@@ -74,6 +162,54 @@ export async function deleteApiKey(
   return true;
 }
 
+export async function issueAccessToken(
+  store: EnvStore,
+  userId: string,
+  role: "admin" | "user",
+  ttlMs: number = ACCESS_TOKEN_TTL_MS
+): Promise<{ plaintext: string; record: StoredAccessToken }> {
+  const plaintext = accessTokenPlaintext();
+  const hash = await sha256Hex(plaintext);
+  const createdAt = Date.now();
+  const record: StoredAccessToken = {
+    userId,
+    role,
+    hash,
+    createdAt,
+    expiresAt: createdAt + ttlMs,
+  };
+  await store.put(AT_BY_HASH(hash), JSON.stringify(record));
+  return { plaintext, record };
+}
+
+export async function lookupAccessToken(
+  store: EnvStore,
+  bearer: string
+): Promise<StoredAccessToken | null> {
+  if (!bearer.startsWith("pg_at_")) return null;
+  const hash = await sha256Hex(bearer);
+  const raw = await store.get(AT_BY_HASH(hash));
+  if (!raw) return null;
+  const record = JSON.parse(raw) as StoredAccessToken;
+  if (Date.now() >= record.expiresAt) {
+    await store.delete(AT_BY_HASH(hash));
+    return null;
+  }
+  return record;
+}
+
+export async function revokeAccessToken(
+  store: EnvStore,
+  bearer: string
+): Promise<boolean> {
+  if (!bearer.startsWith("pg_at_")) return false;
+  const hash = await sha256Hex(bearer);
+  const raw = await store.get(AT_BY_HASH(hash));
+  if (!raw) return false;
+  await store.delete(AT_BY_HASH(hash));
+  return true;
+}
+
 const REG_INVITE = (token: string) => `reginv:${token}`;
 
 export type RegistrationInvite = {
@@ -106,7 +242,14 @@ export async function claimRegistrationInvite(
   token: string,
   role: "user" | "admin" = "user"
 ): Promise<
-  | { ok: true; userId: string; role: "user" | "admin"; apiKey: string }
+  | {
+      ok: true;
+      userId: string;
+      role: "user" | "admin";
+      apiKey: string;
+      accessToken: string;
+      accessTokenExpiresAt: number;
+    }
   | { ok: false; error: string; status: number }
 > {
   const inv = await getRegistrationInvite(store, token);
@@ -117,10 +260,19 @@ export async function claimRegistrationInvite(
   if (inv.usedAt) return { ok: false, error: "already_used", status: 410 };
   const userId = `user_${token.slice(0, 12)}`;
   const apiKey = apiKeyPlaintext();
+  await ensureUser(store, userId, role);
   await putApiKey(store, apiKey, userId, role);
+  const at = await issueAccessToken(store, userId, role);
   inv.usedAt = Date.now();
   await putRegistrationInvite(store, inv);
-  return { ok: true, userId, role, apiKey };
+  return {
+    ok: true,
+    userId,
+    role,
+    apiKey,
+    accessToken: at.plaintext,
+    accessTokenExpiresAt: at.record.expiresAt,
+  };
 }
 
 export async function lookupApiKey(

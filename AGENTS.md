@@ -5,7 +5,7 @@ This repo is the **Playgrounds** browser host ([sampot/playgrounds](https://gith
 - **DEC-041:** extract from blog; legacy `samkuo.me/playgrounds/` is a **frozen** snapshot (migrate tip; no further feature sync from this repo); **SAM catalog** at field **`/sam/`** (same Worker as the shell)
 - **DEC-042:** deploy on **Cloudflare Workers**; field net **`*.samkuo.me`** (same code, per-origin storage); default field **`play.samkuo.me`**
 - **DEC-043:** docs site **Starlight** at **`docs.samkuo.me`** (separate Worker; not a field) — see `docs/PG-DOCS-PLAN.md`
-- **DEC-047:** Platform API（Invite／薄 signaling）at **`api.samkuo.me`**；dashboard **`dash.samkuo.me`**（same Worker；`platform-api/`）— see `docs/PG-PLATFORM-API-PLAN.md`
+- **DEC-047:** Platform API（Invite／薄 signaling）at **`api.samkuo.me`**；dashboard **`dash.samkuo.me`**（same Worker；`platform-api/`）— see `docs/PG-PLATFORM-API-PLAN.md`、`docs/PG-PLATFORM-DASH-SPEC.md`
 
 This repo is the **authoritative** host codebase. Do not push feature parity back into the blog mount.
 

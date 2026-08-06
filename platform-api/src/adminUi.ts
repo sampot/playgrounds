@@ -3,8 +3,7 @@
  * Visual language aligned with field shell (PlaygroundsLayout / global.css).
  */
 
-const MARK =
-  "https://play.samkuo.me/favicon.svg";
+const MARK = "/favicon.svg";
 
 const SHARED_CSS = /* css */ `
 :root {
@@ -213,6 +212,9 @@ button, .btn {
   cursor: pointer;
   background: rgb(var(--accent));
   color: #f8faf9;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
   transition: transform 0.15s var(--ease), filter 0.15s var(--ease);
 }
 html[data-theme="light"] button:not(.secondary):not(.danger):not(.icon-btn):not(.tab):not(.linkish),
@@ -473,7 +475,7 @@ function bindTheme() {
 export function adminHtml(): string {
   return `${shellHead({
     title: "遊樂場後台 · 我是山姆鍋",
-    description: "Playgrounds Platform 後台：API key、邀請與註冊連結。",
+    description: "Playgrounds Platform 後台：API key 與註冊邀請。",
   })}
 <body>
 <div class="site">
@@ -481,7 +483,7 @@ export function adminHtml(): string {
   <main class="main">
     <div class="hero">
       <h1>遊樂場</h1>
-      <p>Platform 後台。管理 API key、鑄邀請短連結；註冊邀請制、Social SSO 接續。</p>
+      <p>Platform 後台。統一進入；登入後依角色顯示。後台 API 應持 access token；API key 專供遊樂場殼頁。場邀請短網址由小品經場殼代理向 API 取得。</p>
     </div>
 
     <div id="flash" class="flash hidden" role="status" aria-live="polite"></div>
@@ -489,21 +491,10 @@ export function adminHtml(): string {
     <section id="view-gate">
       <div class="panel" id="view-login">
         <h2>進入</h2>
-        <p class="lede">貼上你的 API key。金鑰只存在此分頁的 sessionStorage；之後會改 Social SSO。</p>
-        <label for="key-input">API key</label>
-        <input id="key-input" class="mono" type="password" autocomplete="off" spellcheck="false" placeholder="pg_sk_…"/>
+        <p class="lede">所有帳號由此進入。使用 GitHub 登入；登入後依角色顯示（一般使用者僅金鑰；營運僅 admin）。場用 API key 只給遊樂場殼頁，不能用來登入後台。</p>
         <div class="row">
-          <button type="button" id="btn-login">進入後台</button>
+          <a class="btn" id="btn-github" href="/auth/github?intent=login">使用 GitHub 進入</a>
         </div>
-        <details class="boot" id="view-bootstrap">
-          <summary>第一次？一次性 bootstrap</summary>
-          <p class="meta" style="margin:0.65rem 0 0.5rem">使用 Cloudflare secret <span class="mono">ADMIN_BOOTSTRAP_TOKEN</span>，只成功一次。</p>
-          <label for="boot-token">Bootstrap token</label>
-          <input id="boot-token" class="mono" type="password" autocomplete="off"/>
-          <div class="row">
-            <button type="button" class="secondary" id="btn-bootstrap">建立第一把 admin key</button>
-          </div>
-        </details>
       </div>
     </section>
 
@@ -513,20 +504,20 @@ export function adminHtml(): string {
           <span id="me-user" class="mono"></span>
           <span aria-hidden="true">·</span>
           <span id="me-role"></span>
+          <span id="me-github" class="meta" style="margin-left:0.35rem"></span>
         </span>
         <button type="button" class="linkish" id="btn-logout">登出</button>
       </div>
 
       <div class="tabs" role="tablist" aria-label="後台區塊">
         <button type="button" class="tab" role="tab" id="tab-keys" aria-selected="true" aria-controls="panel-keys">金鑰</button>
-        <button type="button" class="tab" role="tab" id="tab-invites" aria-selected="false" aria-controls="panel-invites">邀請</button>
         <button type="button" class="tab hidden" role="tab" id="tab-admin" aria-selected="false" aria-controls="panel-admin">營運</button>
       </div>
 
       <div id="panel-keys" role="tabpanel" aria-labelledby="tab-keys">
         <div class="panel">
           <h2>API key</h2>
-          <p class="lede">每帳號硬頂一把。明文只在建立／輪替時顯示一次；場內請寫入 SecretStore 保留名 <span class="mono">PLAYGROUNDS_API_KEY</span>。</p>
+          <p class="lede">每帳號硬頂一把，<strong>專供遊樂場殼頁</strong>（寫入 SecretStore <span class="mono">PLAYGROUNDS_API_KEY</span>）。明文只在建立／輪替時顯示一次。後台本身應以 access token 呼叫 API，不以金鑰當登入憑證。</p>
           <p class="mono" id="key-prefix">—</p>
           <p class="meta" id="key-created"></p>
           <div id="key-reveal" class="secret hidden">
@@ -539,36 +530,7 @@ export function adminHtml(): string {
           <div class="row">
             <button type="button" id="btn-rotate">輪替金鑰</button>
             <button type="button" class="danger" id="btn-revoke">撤銷</button>
-          </div>
-        </div>
-      </div>
-
-      <div id="panel-invites" role="tabpanel" class="hidden" aria-labelledby="tab-invites">
-        <div class="panel">
-          <h2>場邀請</h2>
-          <p class="lede">鑄一條短連結（預設 TTL 5 分鐘）。多人可經同一連結加入；QR 請用短網址。</p>
-          <label for="invite-kind">Kind</label>
-          <select id="invite-kind">
-            <option value="signal.handshake" selected>signal.handshake</option>
-            <option value="invite.compose">invite.compose</option>
-          </select>
-          <label for="invite-field">目標場</label>
-          <input id="invite-field" class="mono" value="play.samkuo.me"/>
-          <label for="invite-intent">Intent（JSON，invite.compose 用）</label>
-          <textarea id="invite-intent" class="mono" rows="5" placeholder='{"sam":{"source":"…","presentation":"maximize_preview"},"session":{"protocol":{…},"consent":"always_ask"},"transport":{"roster":{"signal":true}}}'></textarea>
-          <div class="row">
-            <button type="button" id="btn-invite">建立邀請</button>
-          </div>
-          <div id="invite-out" class="secret hidden">
-            <strong>邀請已就緒（TTL 5m）</strong>
-            <p class="meta">短網址（QR 預設）</p>
-            <code class="mono" id="invite-short"></code>
-            <div class="row">
-              <button type="button" class="secondary" id="btn-copy-short">複製短網址</button>
-              <a class="btn secondary" id="invite-open" href="#" target="_blank" rel="noopener">開啟深鏈</a>
-            </div>
-            <p class="meta" style="margin-top:0.65rem">深鏈</p>
-            <code class="mono" id="invite-deep"></code>
+            <a class="btn secondary hidden" id="btn-link-github" href="/auth/github?intent=link">連結 GitHub</a>
           </div>
         </div>
       </div>
@@ -576,7 +538,7 @@ export function adminHtml(): string {
       <div id="panel-admin" role="tabpanel" class="hidden" aria-labelledby="tab-admin">
         <div class="panel">
           <h2>註冊邀請</h2>
-          <p class="lede">核發 Platform 註冊用 <span class="mono">/join/&lt;token&gt;</span>。與場邀請 <span class="mono">#pg=</span> 不同；SSO 兌換稍後接上。</p>
+          <p class="lede">核發 Platform 註冊用 <span class="mono">/join/&lt;token&gt;</span>。與場邀請 <span class="mono">#pg=</span> 不同（場邀請由小品經殼代理鑄造）。</p>
           <div class="row">
             <button type="button" id="btn-reginv">核發註冊邀請</button>
           </div>
@@ -601,7 +563,7 @@ export function adminHtml(): string {
 <script>
 ${THEME_SCRIPT}
 (() => {
-  const KEY = "pg_dash_api_key";
+  const AT = "pg_dash_access_token";
   const $ = (id) => document.getElementById(id);
   const flashEl = $("flash");
   bindTheme();
@@ -614,10 +576,11 @@ ${THEME_SCRIPT}
     flashEl.className = "flash hidden";
     flashEl.textContent = "";
   }
-  function getKey() { return sessionStorage.getItem(KEY) || ""; }
-  function setKey(k) {
-    if (k) sessionStorage.setItem(KEY, k);
-    else sessionStorage.removeItem(KEY);
+  function getAccessToken() { return sessionStorage.getItem(AT) || ""; }
+  function setAccessToken(t) {
+    if (t) sessionStorage.setItem(AT, t);
+    else sessionStorage.removeItem(AT);
+    try { sessionStorage.removeItem("pg_dash_api_key"); } catch (_) {}
   }
   async function copyText(t) {
     try {
@@ -629,24 +592,49 @@ ${THEME_SCRIPT}
   }
   async function api(path, opts = {}) {
     const headers = Object.assign({ "Content-Type": "application/json" }, opts.headers || {});
-    const k = getKey();
-    if (k) headers.Authorization = "Bearer " + k;
-    const res = await fetch(path, Object.assign({}, opts, { headers }));
+    const t = getAccessToken();
+    if (t) headers.Authorization = "Bearer " + t;
+    const res = await fetch(path, Object.assign({}, opts, { headers, credentials: "include" }));
     const text = await res.text();
     let data = null;
     try { data = text ? JSON.parse(text) : null; } catch { data = { raw: text }; }
     return { res, data };
   }
 
+  let currentRole = "user";
+
   function showGate() {
     $("view-gate").classList.remove("hidden");
     $("view-app").classList.add("hidden");
+    currentRole = "user";
+  }
+  function applyRoleUi(role) {
+    currentRole = role === "admin" ? "admin" : "user";
+    const adminTab = $("tab-admin");
+    const adminPanel = $("panel-admin");
+    const isAdmin = currentRole === "admin";
+    adminTab.classList.toggle("hidden", !isAdmin);
+    adminTab.hidden = !isAdmin;
+    adminPanel.hidden = !isAdmin;
+    if (!isAdmin) {
+      adminPanel.classList.add("hidden");
+      if (adminTab.getAttribute("aria-selected") === "true") selectTab("keys");
+    }
   }
   function showApp(me) {
     $("view-gate").classList.add("hidden");
     $("view-app").classList.remove("hidden");
     $("me-user").textContent = me.user_id;
     $("me-role").textContent = me.role === "admin" ? "admin" : "user";
+    const gh = $("me-github");
+    const linkBtn = $("btn-link-github");
+    if (me.github && me.github.login) {
+      gh.textContent = "@" + me.github.login;
+      linkBtn.classList.add("hidden");
+    } else {
+      gh.textContent = "";
+      linkBtn.classList.remove("hidden");
+    }
     if (me.key) {
       $("key-prefix").textContent = me.key.prefix + "…";
       $("key-created").textContent = "建立於 " + new Date(me.key.created_at).toLocaleString();
@@ -654,12 +642,7 @@ ${THEME_SCRIPT}
       $("key-prefix").textContent = "（尚無金鑰）";
       $("key-created").textContent = "";
     }
-    const adminTab = $("tab-admin");
-    if (me.role === "admin") adminTab.classList.remove("hidden");
-    else {
-      adminTab.classList.add("hidden");
-      if (adminTab.getAttribute("aria-selected") === "true") selectTab("keys");
-    }
+    applyRoleUi(me.role);
   }
   function revealKey(plain) {
     $("key-reveal").classList.remove("hidden");
@@ -667,7 +650,8 @@ ${THEME_SCRIPT}
     selectTab("keys");
   }
   function selectTab(name) {
-    const map = { keys: "panel-keys", invites: "panel-invites", admin: "panel-admin" };
+    if (name === "admin" && currentRole !== "admin") name = "keys";
+    const map = { keys: "panel-keys", admin: "panel-admin" };
     for (const [k, panelId] of Object.entries(map)) {
       const tab = $("tab-" + k);
       const panel = $(panelId);
@@ -675,115 +659,110 @@ ${THEME_SCRIPT}
       if (tab) {
         tab.setAttribute("aria-selected", on ? "true" : "false");
       }
-      if (panel) panel.classList.toggle("hidden", !on);
+      if (panel) {
+        if (k === "admin" && currentRole !== "admin") {
+          panel.classList.add("hidden");
+          panel.hidden = true;
+        } else {
+          panel.classList.toggle("hidden", !on);
+          if (k === "admin") panel.hidden = !on;
+        }
+      }
+    }
+  }
+
+  const AUTH_ERR = {
+    need_invite_or_link: "此 GitHub 尚未綁定帳號。第一個 admin 請走 /bootstrap/；其他人請持註冊邀請。",
+    invite_not_found: "註冊邀請無效",
+    invite_gone: "註冊邀請已過期或已使用",
+    bootstrap_already_done: "已經 bootstrap 過了",
+    unauthorized: "授權失敗（請確認 bootstrap token）",
+    invalid_state: "登入狀態無效，請重試",
+    github_already_linked: "此 GitHub 已綁到其他帳號",
+    admin_github_mismatch: "admin 已綁其他 GitHub",
+    github_oauth_not_configured: "伺服器未設定 GitHub OAuth",
+    token_exchange_failed: "GitHub token 交換失敗（請確認 OAuth callback URL）",
+  };
+
+  async function redeemSession(code) {
+    const res = await fetch("/v1/auth/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ session: code }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return false;
+    if (data.access_token) setAccessToken(data.access_token);
+    return true;
+  }
+
+  async function maybeRevealPendingKey() {
+    const { res, data } = await api("/v1/auth/reveal-key", { method: "POST", body: "{}" });
+    if (res.ok && data?.api_key) {
+      revealKey(data.api_key);
+      flash("請立刻保存場用 API key", "warn");
     }
   }
 
   async function refresh() {
     clearFlash();
-    if (!getKey()) { showGate(); return; }
     const { res, data } = await api("/v1/me");
     if (!res.ok) {
-      setKey("");
+      setAccessToken("");
       showGate();
-      flash(data?.error === "unauthorized" ? "金鑰無效或已撤銷" : (data?.error || "無法驗證"), "err");
+      if (data?.error && data.error !== "unauthorized") {
+        flash(
+          data?.error === "wrong_credential"
+            ? "請使用 GitHub 重新登入"
+            : (data?.error || "無法驗證"),
+          "err"
+        );
+      }
       return;
     }
     showApp(data);
+    const params = new URLSearchParams(location.search);
+    if (params.get("bootstrap") === "1" || params.get("claimed") === "1" || params.get("linked") === "1") {
+      await maybeRevealPendingKey();
+      if (params.get("linked") === "1") flash("已連結 GitHub", "ok");
+      if (params.get("bootstrap") === "1") flash("Bootstrap 完成", "ok");
+    }
   }
 
   $("tab-keys").onclick = () => selectTab("keys");
-  $("tab-invites").onclick = () => selectTab("invites");
-  $("tab-admin").onclick = () => selectTab("admin");
-
-  $("btn-login").onclick = async () => {
-    const k = $("key-input").value.trim();
-    if (!k) return flash("請貼上 API key", "warn");
-    setKey(k);
-    $("btn-login").disabled = true;
-    try { await refresh(); }
-    finally { $("btn-login").disabled = false; }
+  $("tab-admin").onclick = () => {
+    if (currentRole !== "admin") return;
+    selectTab("admin");
   };
-  $("key-input").addEventListener("keydown", (e) => {
-    if (e.key === "Enter") $("btn-login").click();
-  });
 
-  $("btn-logout").onclick = () => {
-    setKey("");
+  $("btn-logout").onclick = async () => {
+    try { await api("/v1/auth/logout", { method: "POST", body: "{}" }); } catch (_) {}
+    setAccessToken("");
     $("key-reveal").classList.add("hidden");
     showGate();
     flash("已登出", "ok");
   };
 
-  $("btn-bootstrap").onclick = async () => {
-    const token = $("boot-token").value.trim();
-    if (!token) return flash("需要 bootstrap token", "warn");
-    const { res, data } = await api("/v1/admin/bootstrap", {
-      method: "POST",
-      body: JSON.stringify({ token }),
-    });
-    if (!res.ok) {
-      const map = {
-        bootstrap_already_done: "已經 bootstrap 過了",
-        unauthorized: "token 不正確",
-        bootstrap_not_configured: "伺服器未設定 ADMIN_BOOTSTRAP_TOKEN",
-      };
-      return flash(map[data?.error] || data?.error || "Bootstrap 失敗", "err");
-    }
-    setKey(data.api_key);
-    revealKey(data.api_key);
-    flash("Bootstrap 完成 — 請立刻保存 API key", "warn");
-    await refresh();
-  };
-
   $("btn-rotate").onclick = async () => {
-    if (!confirm("輪替金鑰？舊金鑰會立刻失效。")) return;
+    if (!confirm("輪替場用 API key？舊金鑰會立刻失效（後台工作階段不變）。")) return;
     const { res, data } = await api("/v1/keys", { method: "POST" });
     if (!res.ok) return flash(data?.error || "輪替失敗", "err");
-    setKey(data.api_key);
     revealKey(data.api_key);
-    flash("已輪替 — 請複製新金鑰", "warn");
+    flash("已輪替 — 請複製新金鑰寫入場內密鑰庫", "warn");
     await refresh();
   };
 
   $("btn-revoke").onclick = async () => {
-    if (!confirm("撤銷唯一的 API key？你會被登出，且在 SSO 上線前可能無法再進入。")) return;
+    if (!confirm("撤銷場用 API key？場殼將無法鑄邀請；後台工作階段仍保留。")) return;
     const { res, data } = await api("/v1/keys", { method: "DELETE" });
     if (!res.ok) return flash(data?.error || "撤銷失敗", "err");
-    setKey("");
     $("key-reveal").classList.add("hidden");
-    showGate();
-    flash("金鑰已撤銷", "ok");
+    flash("場用金鑰已撤銷", "ok");
+    await refresh();
   };
 
   $("btn-copy-key").onclick = () => copyText($("key-plain").textContent);
-
-  $("btn-invite").onclick = async () => {
-    const kind = $("invite-kind").value || "signal.handshake";
-    const targetField = $("invite-field").value.trim() || "play.samkuo.me";
-    let intent = {};
-    const rawIntent = ($("invite-intent")?.value || "").trim();
-    if (rawIntent) {
-      try { intent = JSON.parse(rawIntent); }
-      catch { return flash("Intent 不是合法 JSON", "err"); }
-    }
-    $("btn-invite").disabled = true;
-    try {
-      const { res, data } = await api("/v1/invites", {
-        method: "POST",
-        body: JSON.stringify({ kind, targetField, intent }),
-      });
-      if (!res.ok) return flash(data?.error || "建立邀請失敗", "err");
-      $("invite-out").classList.remove("hidden");
-      $("invite-short").textContent = data.short_url;
-      $("invite-deep").textContent = data.deep_link;
-      $("invite-open").href = data.deep_link;
-      flash("邀請已建立", "ok");
-    } finally {
-      $("btn-invite").disabled = false;
-    }
-  };
-  $("btn-copy-short").onclick = () => copyText($("invite-short").textContent);
 
   $("btn-reginv").onclick = async () => {
     const { res, data } = await api("/v1/admin/registration-invites", {
@@ -797,7 +776,86 @@ ${THEME_SCRIPT}
   };
   $("btn-copy-reginv").onclick = () => copyText($("reginv-url").textContent);
 
-  refresh();
+  (async () => {
+    const params = new URLSearchParams(location.search);
+    const authErr = params.get("auth_error");
+    const sessionCode = params.get("session");
+    const hadFlags = params.has("bootstrap") || params.has("claimed") || params.has("linked") || params.has("session") || params.has("auth_error");
+    if (authErr) {
+      flash(AUTH_ERR[authErr] || authErr, "err");
+    }
+    if (sessionCode) {
+      const ok = await redeemSession(sessionCode);
+      if (!ok) flash("登入交接失敗，請再試一次 GitHub", "err");
+    }
+    if (hadFlags) history.replaceState({}, "", location.pathname);
+    await refresh();
+  })();
+})();
+</script>
+</body>
+</html>`;
+}
+
+export function bootstrapHtml(): string {
+  return `${shellHead({
+    title: "遊樂場 Bootstrap · 我是山姆鍋",
+    description: "Playgrounds Platform 一次性 admin bootstrap。",
+  })}
+<body>
+<div class="site">
+  ${topNav("dash")}
+  <main class="main">
+    <div class="hero">
+      <h1>Bootstrap</h1>
+      <p>建立或綁定第一個 admin（不在一般登入頁顯示）。</p>
+    </div>
+    <div id="flash" class="flash hidden" role="status" aria-live="polite"></div>
+    <div class="panel">
+      <h2>Admin bootstrap</h2>
+      <p class="lede">使用 Cloudflare secret <span class="mono">ADMIN_BOOTSTRAP_TOKEN</span>。第一次建立 admin＋場用 API key；若先前已 bootstrap 但尚未綁 GitHub，可再用同一 token 綁定並進入。</p>
+      <label for="boot-token">Bootstrap token</label>
+      <input id="boot-token" class="mono" type="password" autocomplete="off"/>
+      <div class="row">
+        <button type="button" id="btn-bootstrap-github">以 GitHub 完成 bootstrap</button>
+        <a class="btn secondary" href="/">回後台登入</a>
+      </div>
+    </div>
+    <footer class="foot">
+      <span class="mono">dash.samkuo.me/bootstrap/</span>
+    </footer>
+  </main>
+</div>
+<script>
+${THEME_SCRIPT}
+(() => {
+  bindTheme();
+  const flashEl = document.getElementById("flash");
+  function flash(msg, kind) {
+    flashEl.textContent = msg;
+    flashEl.className = "flash " + (kind || "ok");
+  }
+  const params = new URLSearchParams(location.search);
+  const err = params.get("auth_error");
+  const ERR = {
+    unauthorized: "token 不正確",
+    github_already_linked: "此 GitHub 已綁到其他帳號",
+    admin_github_mismatch: "admin 已綁其他 GitHub",
+    token_exchange_failed: "GitHub token 交換失敗",
+    github_oauth_not_configured: "伺服器未設定 GitHub OAuth",
+  };
+  if (err) {
+    flash(ERR[err] || err, "err");
+    history.replaceState({}, "", location.pathname);
+  }
+  document.getElementById("btn-bootstrap-github").onclick = () => {
+    const token = document.getElementById("boot-token").value.trim();
+    if (!token) return flash("需要 bootstrap token", "warn");
+    location.href = "/auth/github?intent=bootstrap&bootstrap_token=" + encodeURIComponent(token);
+  };
+  document.getElementById("boot-token").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") document.getElementById("btn-bootstrap-github").click();
+  });
 })();
 </script>
 </body>
@@ -818,46 +876,10 @@ export function joinLandingHtml(opts: {
   const claim =
     opts.ok && opts.token
       ? `<div class="row" style="margin-top:1rem">
-          <button type="button" id="btn-claim">領取帳號與 API key</button>
+          <a class="btn" href="/auth/github?intent=join&amp;token=${encodeURIComponent(opts.token)}">使用 GitHub 領取</a>
         </div>
-        <div id="claim-out" class="secret hidden">
-          <strong>立刻複製 — 不會再顯示</strong>
-          <code class="mono" id="claim-key"></code>
-          <div class="row">
-            <button type="button" class="secondary" id="btn-copy-claim">複製金鑰</button>
-            <a class="btn" href="https://dash.samkuo.me/">前往後台</a>
-          </div>
-        </div>
-        <p class="meta" id="claim-err"></p>
-        <script>
-        ${THEME_SCRIPT}; bindTheme();
-        (() => {
-          const token = ${JSON.stringify(opts.token)};
-          const btn = document.getElementById("btn-claim");
-          const out = document.getElementById("claim-out");
-          const keyEl = document.getElementById("claim-key");
-          const err = document.getElementById("claim-err");
-          btn?.addEventListener("click", async () => {
-            btn.disabled = true;
-            err.textContent = "";
-            try {
-              const res = await fetch("/v1/join/" + encodeURIComponent(token) + "/claim", { method: "POST" });
-              const data = await res.json();
-              if (!res.ok) throw new Error(data.error || "claim_failed");
-              out.classList.remove("hidden");
-              keyEl.textContent = data.api_key;
-              try { sessionStorage.setItem("pg_dash_api_key", data.api_key); } catch (_) {}
-              btn.classList.add("hidden");
-            } catch (e) {
-              err.textContent = e instanceof Error ? e.message : String(e);
-              btn.disabled = false;
-            }
-          });
-          document.getElementById("btn-copy-claim")?.addEventListener("click", async () => {
-            try { await navigator.clipboard.writeText(keyEl.textContent || ""); } catch (_) {}
-          });
-        })();
-        </script>`
+        <p class="meta" style="margin-top:0.75rem">領取後會綁定 GitHub、建立後台 session，並顯示一次場用 API key（寫入場內密鑰庫）。</p>
+        <script>${THEME_SCRIPT}; bindTheme();</script>`
       : `<script>${THEME_SCRIPT}; bindTheme();</script>`;
   return `${shellHead({
     title: "遊樂場註冊邀請 · 我是山姆鍋",
