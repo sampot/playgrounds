@@ -30,6 +30,10 @@
     {
       "pattern": "api.samkuo.me",
       "custom_domain": true
+    },
+    {
+      "pattern": "dash.samkuo.me",
+      "custom_domain": true
     }
   ]
 }

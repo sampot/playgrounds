@@ -52,7 +52,7 @@
 | deterministic | 確定性 | 如「確定性測試」「確定性劇本」；勿整句留英文 deterministic。 |
 | digital avatar / digital twin（本站語境） | 數位化身／數位分身 | 指部落格等可公開重播的自我呈現，非產品功能名；可與「影分身」典故並用，勿寫成永生／不死行銷口吻。 |
 | Playgrounds（場網：`*.samkuo.me`） | 遊樂場 | 站內導覽／UI 用「遊樂場」；程式識別仍為 `playgrounds`。**預設場**＝[`https://play.samkuo.me/`](https://play.samkuo.me/)；任意 `https://<name>.samkuo.me/`＝同程式、異 origin（DEC-042）。部落格 `https://samkuo.me/playgrounds/`＝**凍結舊場**（提醒匯出；**不再**跟場網同步更新；資料綁 origin）。非站上 `/tools/` 登錄表。主軸：瀏覽器內開發／實驗**單頁小程式（SAM）**；非部署環境。**有防護能力的實驗場**：隔離在瀏覽器 origin／OPFS——見 DEC-040。開源宿主／權威碼 [`sampot/playgrounds`](https://github.com/sampot/playgrounds)；部署＝Cloudflare Workers。**對外敘事勿**產品／品牌／行銷腔（DEC-004）。 |
-| 場網／場（Playgrounds） | 場／場網 | `*.samkuo.me` 上每個一級子域是一個**場**（獨立 origin）；場網＝此 wildcard 部署面。預設場名 **`play`**。保留名（非一般場）：`www`／`blog`／`api`／`docs` 等（`PLAYGROUNDS_FIELD_RESERVED_SUBDOMAINS`）。見 DEC-042。 |
+| 場網／場（Playgrounds） | 場／場網 | `*.samkuo.me` 上每個一級子域是一個**場**（獨立 origin）；場網＝此 wildcard 部署面。預設場名 **`play`**。保留名（非一般場）：`www`／`blog`／`api`／`docs`／`dash` 等（`PLAYGROUNDS_FIELD_RESERVED_SUBDOMAINS`）。見 DEC-042。 |
 | Playgrounds 文件站 | 文件／`docs.samkuo.me` | 「我是山姆鍋」底下遊樂場的工程與用法文件站 [`https://docs.samkuo.me/`](https://docs.samkuo.me/)（Astro Starlight；獨立 Worker；站標含山姆鍋 Logo）。**不是**場、不跑遊樂場殼；Playgrounds **不是**品牌名。範例場 URL 仍用 `play.samkuo.me`。見 DEC-043、[PG-DOCS-PLAN.md](./PG-DOCS-PLAN.md)。 |
 | SAM 小品型錄 | 小品／`/sam/` | 開源 SAM 範本清單（遊戲、工具、代理…）；權威頁＝場網 [`https://play.samkuo.me/sam/`](https://play.samkuo.me/sam/)（任意場＝同 origin 的 `/sam/`；與場殼同 Worker）。一鍵開＝同場 `/?open=<source>`。資料權威＝[`catalog/entries/`](../catalog/entries/)（YAML；建置產 `samCatalog.generated.ts`；Draft 另產 `/catalog/v1.json` 供 Playgrounds 查詢）。部落格舊 `/sam/` 轉址至此。非 `/tools/`、非文件站。見 DEC-041／046、[PG-CATALOG-PLAN.md](./PG-CATALOG-PLAN.md)、[PG-CATALOG-QUERY-PLAN.md](./PG-CATALOG-QUERY-PLAN.md)。 |
 | Playgrounds chrome／app shell（舊稱殼頁） | 遊樂場（必要時：**遊樂場介面**） | 場網上根路徑 `/`（過渡舊場仍為 `/playgrounds/`）的外框 UI（工具列、編輯器、側欄、密鑰庫、fleet…），相對沙盒內畫布／總管 iframe。**正式對外預設寫「遊樂場」**；需對照畫布／注入／dialog 時寫 **「遊樂場介面」**。舊稱「殼頁」——**勿**對外再用「殼」。程式識別可續用 `shell*`。 |
@@ -92,7 +92,7 @@
 | 薄 signaling（遊樂場 Roster） | signaling | **每握手槽**只完成一次 WebRTC offer／answer（非 trickle；1× offer＋1× answer；用完銷槽）。≠ 全場只能一 peer。載荷經**剪裁＋固定樣板**；QR／文字／可選 Platform rendezvous。不中繼資料／心跳／重談。見 DEC-045／047。 |
 | Roster 樣板 SDP（遊樂場） | 樣板壓縮／交換 payload | 自完整 SDP 抽取必要欄位，依固定樣板編解碼還原；**QR 與文字**（及可選 Platform rendezvous）共用同一字串。可選**同區網**旗標以進一步剪裁 candidates。見 DEC-045、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)。 |
 | 同區網 Roster（遊樂場） | LAN／同區網模式 | 使用者宣告 peers 同一區網時，offer／answer 可更小；誤選須新邀請改模式，不經同房補 candidates。見 DEC-045。 |
-| Playgrounds Platform API | Platform API | 獨立於場殼的 Cloudflare Workers 服務（建議 `api.samkuo.me`）：Invite、薄 signal、後台帳號／API key。不中繼 session／DataChannel。見 DEC-047、[PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)。 |
+| Playgrounds Platform API | Platform API | 獨立於場殼的 Cloudflare Workers 服務：**`api.samkuo.me`**（API／短連結）、**`dash.samkuo.me`**（後台 UI，同 Worker）：Invite、薄 signal、帳號／API key。不中繼 session／DataChannel。見 DEC-047、[PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)。 |
 | Platform Invite（遊樂場） | Invite／`#pg=` | 一條邀請（短連結或深鏈）；**多人可經同一連結加入**。內嵌 intent；**不**預帶 WebRTC offer。每次加入＝短命 join。kind 含 `signal.handshake`、`invite.compose`。**不是** Platform 註冊邀請、**不是** `#roster=`。見 DEC-047。 |
 | Platform Ticket／join | join capability | 單次加入用的短命 capability（由 Invite 核發）。若雙方**已有** PeerConnection → **重用**，不跑 signaling。僅尚未連線時：加入者出 offer，同回合等邀請者 answer；握手排隊串行。見 DEC-047。 |
 | Platform 短連結 | `/i/<short_id>` | 對 **Invite** 穩定的短 URL → 302 到場 `#pg=`。**邀請 QR 預設**。與 Invite 同壽命；非通用縮址。見 DEC-047。 |

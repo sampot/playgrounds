@@ -1,21 +1,38 @@
 import {
+  claimRegistrationInvite,
+  deleteApiKey,
+  deleteSecretMapping,
+  getApiKeyForUser,
+  getRegistrationInvite,
   getShortMapping,
   isBootstrapped,
   lookupApiKey,
   markBootstrapped,
+  markShortRevoked,
   parseBearer,
   putApiKey,
+  putRegistrationInvite,
   putShortMapping,
 } from "./auth.js";
+import {
+  adminHtml,
+  htmlResponse,
+  joinLandingHtml,
+} from "./adminUi.js";
 import { withCors } from "./cors.js";
 import {
   apiKeyPlaintext,
+  DASH_ORIGIN,
   DEFAULT_TARGET_FIELD,
   fieldDeepLink,
   inviteSecret,
   INVITE_TTL_MS,
+  isApiHost,
+  isDashHost,
   randomId,
+  requestHostname,
   shortId,
+  shortLinkOrigin,
   shortUrl,
 } from "./ids.js";
 import { InviteDurableObject } from "./inviteDo.js";
@@ -40,11 +57,6 @@ function inviteStub(env: Env, inviteId: string): DurableObjectStub {
   return env.INVITES.get(id);
 }
 
-function publicOrigin(req: Request): string {
-  const url = new URL(req.url);
-  return url.origin;
-}
-
 async function requireApiKey(
   env: Env,
   req: Request
@@ -63,6 +75,30 @@ async function requireApiKey(
   return { ok: true, userId: key.userId, role: key.role };
 }
 
+function serveDashboard(request: Request, url: URL): Response | null {
+  const host = requestHostname(request);
+  const path = url.pathname;
+  const isDash = isDashHost(host);
+  const isApi = isApiHost(host);
+  const isLocal =
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host.endsWith(".workers.dev");
+
+  if (isApi && (path === "/" || path === "/admin" || path === "/admin/")) {
+    return Response.redirect(`${DASH_ORIGIN}/`, 302);
+  }
+
+  if (
+    (isDash || isLocal) &&
+    (path === "/" || path === "/admin" || path === "/admin/")
+  ) {
+    return htmlResponse(adminHtml());
+  }
+
+  return null;
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     if (request.method === "OPTIONS") {
@@ -70,6 +106,11 @@ export default {
     }
 
     const url = new URL(request.url);
+    if (request.method === "GET") {
+      const dash = serveDashboard(request, url);
+      if (dash) return dash;
+    }
+
     let res: Response;
     try {
       res = await route(request, env, url);
@@ -94,7 +135,7 @@ async function route(
     const id = shortMatch[1]!;
     const map = await getShortMapping(env.STORE, id);
     if (!map) return json({ error: "not_found" }, 404);
-    if (Date.now() >= map.expiresAt) {
+    if (map.revoked || Date.now() >= map.expiresAt) {
       return json({ error: "gone" }, 410);
     }
     const loc = fieldDeepLink(map.targetField, map.secret);
@@ -102,6 +143,50 @@ async function route(
       status: 302,
       headers: { Location: loc },
     });
+  }
+
+  // Platform registration invite landing
+  const joinMatchPath = /^\/join\/([A-Za-z0-9_-]+)$/.exec(pathname);
+  if (request.method === "GET" && joinMatchPath) {
+    const token = joinMatchPath[1]!;
+    const inv = await getRegistrationInvite(env.STORE, token);
+    if (!inv) {
+      return htmlResponse(
+        joinLandingHtml({
+          ok: false,
+          message: "這份註冊邀請不存在或無效。",
+        }),
+        404
+      );
+    }
+    if (Date.now() >= inv.expiresAt) {
+      return htmlResponse(
+        joinLandingHtml({
+          ok: false,
+          message: "這份註冊邀請已過期。",
+          expiresAt: inv.expiresAt,
+        }),
+        410
+      );
+    }
+    if (inv.usedAt) {
+      return htmlResponse(
+        joinLandingHtml({
+          ok: false,
+          message: "這份註冊邀請已經使用過了。",
+        }),
+        410
+      );
+    }
+    return htmlResponse(
+      joinLandingHtml({
+        ok: true,
+        message:
+          "註冊邀請有效。領取後會建立 Platform 帳號並發給一把 API key（不存密碼；Social SSO 為後續加強）。",
+        expiresAt: inv.expiresAt,
+        token,
+      })
+    );
   }
 
   if (request.method === "GET" && pathname === "/health") {
@@ -139,7 +224,21 @@ async function route(
     });
   }
 
-  // Rotate API key (hard cap 1)
+  // Session / me
+  if (request.method === "GET" && pathname === "/v1/me") {
+    const auth = await requireApiKey(env, request);
+    if (!auth.ok) return auth.res;
+    const key = await getApiKeyForUser(env.STORE, auth.userId);
+    return json({
+      user_id: auth.userId,
+      role: auth.role,
+      key: key
+        ? { prefix: key.prefix, created_at: key.createdAt }
+        : null,
+    });
+  }
+
+  // Rotate / create API key (hard cap 1)
   if (request.method === "POST" && pathname === "/v1/keys") {
     const auth = await requireApiKey(env, request);
     if (!auth.ok) return auth.res;
@@ -155,6 +254,67 @@ async function route(
       prefix: record.prefix,
       created_at: record.createdAt,
       note: "Previous key revoked. Store this key now.",
+    });
+  }
+
+  // Revoke API key
+  if (request.method === "DELETE" && pathname === "/v1/keys") {
+    const auth = await requireApiKey(env, request);
+    if (!auth.ok) return auth.res;
+    const ok = await deleteApiKey(env.STORE, auth.userId);
+    if (!ok) return json({ error: "no_key" }, 404);
+    return json({ ok: true });
+  }
+
+  // Admin: registration invites
+  if (
+    request.method === "POST" &&
+    pathname === "/v1/admin/registration-invites"
+  ) {
+    const auth = await requireApiKey(env, request);
+    if (!auth.ok) return auth.res;
+    if (auth.role !== "admin") {
+      return json({ error: "forbidden" }, 403);
+    }
+    const body = (await request.json().catch(() => ({}))) as {
+      ttlMs?: number;
+    };
+    const ttlMs =
+      body.ttlMs && body.ttlMs > 0 ? body.ttlMs : 7 * 24 * 60 * 60 * 1000;
+    const token = randomId(18);
+    const createdAt = Date.now();
+    const expiresAt = createdAt + ttlMs;
+    await putRegistrationInvite(env.STORE, {
+      token,
+      createdBy: auth.userId,
+      createdAt,
+      expiresAt,
+      usedAt: null,
+    });
+    const origin = isDashHost(requestHostname(request)) ||
+      isApiHost(requestHostname(request))
+      ? DASH_ORIGIN
+      : url.origin;
+    return json({
+      token,
+      join_url: `${origin}/join/${token}`,
+      expires_at: expiresAt,
+    });
+  }
+
+  // Claim registration invite → user + API key (no password; SSO later)
+  const claimMatch = /^\/v1\/join\/([^/]+)\/claim$/.exec(pathname);
+  if (request.method === "POST" && claimMatch) {
+    const token = claimMatch[1]!;
+    const claimed = await claimRegistrationInvite(env.STORE, token, "user");
+    if (!claimed.ok) {
+      return json({ error: claimed.error }, claimed.status);
+    }
+    return json({
+      user_id: claimed.userId,
+      role: claimed.role,
+      api_key: claimed.apiKey,
+      note: "Store this key now; it will not be shown again.",
     });
   }
 
@@ -203,7 +363,7 @@ async function route(
       created.expiresAt
     );
     await env.STORE.put(`secret:${secret}`, inviteId);
-    const origin = publicOrigin(request);
+    const origin = shortLinkOrigin(request);
     return json({
       invite_id: inviteId,
       kind,
@@ -309,6 +469,19 @@ async function route(
     if (!auth.ok) return auth.res;
     const inviteId = decodeURIComponent(delMatch[1]!);
     const stub = inviteStub(env, inviteId);
+    const metaRes = await stub.fetch("https://invite/meta");
+    if (metaRes.ok) {
+      const meta = (await metaRes.json()) as {
+        shortId?: string;
+        secret?: string;
+        ownerUserId?: string;
+      };
+      if (meta.ownerUserId && meta.ownerUserId !== auth.userId) {
+        return json({ error: "forbidden" }, 403);
+      }
+      if (meta.shortId) await markShortRevoked(env.STORE, meta.shortId);
+      if (meta.secret) await deleteSecretMapping(env.STORE, meta.secret);
+    }
     return stub.fetch(
       `https://invite/?ownerUserId=${encodeURIComponent(auth.userId)}`,
       { method: "DELETE" }

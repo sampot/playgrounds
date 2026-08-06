@@ -6,6 +6,32 @@ export const HANDSHAKE_WAIT_MS = 25_000;
 
 export const DEFAULT_TARGET_FIELD = "play.samkuo.me";
 
+/** Canonical API host for short links (dash is UI-only alias). */
+export const CANONICAL_API_ORIGIN = "https://api.samkuo.me";
+
+export const DASH_ORIGIN = "https://dash.samkuo.me";
+
+export function requestHostname(request: Request): string {
+  return new URL(request.url).hostname.toLowerCase();
+}
+
+export function isDashHost(hostname: string): boolean {
+  return hostname.toLowerCase() === "dash.samkuo.me";
+}
+
+export function isApiHost(hostname: string): boolean {
+  return hostname.toLowerCase() === "api.samkuo.me";
+}
+
+/** Prefer api.samkuo.me for short URLs in production; else request origin. */
+export function shortLinkOrigin(request: Request): string {
+  const host = requestHostname(request);
+  if (host === "api.samkuo.me" || host === "dash.samkuo.me") {
+    return CANONICAL_API_ORIGIN;
+  }
+  return new URL(request.url).origin;
+}
+
 const B64URL =
   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 

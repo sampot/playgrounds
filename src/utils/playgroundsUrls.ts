@@ -18,6 +18,7 @@ export const PLAYGROUNDS_FIELD_RESERVED_SUBDOMAINS = [
   "blog",
   "api",
   "docs",
+  "dash",
   "old-blog",
 ] as const;
 

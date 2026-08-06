@@ -1,4 +1,4 @@
-import { keyPrefix, sha256Hex } from "./ids.js";
+import { apiKeyPlaintext, keyPrefix, sha256Hex } from "./ids.js";
 
 export type StoredApiKey = {
   userId: string;
@@ -27,6 +27,15 @@ export async function markBootstrapped(store: EnvStore): Promise<void> {
   await store.put(BOOTSTRAP_FLAG, "1");
 }
 
+export async function getApiKeyForUser(
+  store: EnvStore,
+  userId: string
+): Promise<StoredApiKey | null> {
+  const raw = await store.get(KEY_BY_USER(userId));
+  if (!raw) return null;
+  return JSON.parse(raw) as StoredApiKey;
+}
+
 export async function putApiKey(
   store: EnvStore,
   plaintext: string,
@@ -50,6 +59,68 @@ export async function putApiKey(
   await store.put(KEY_BY_USER(userId), JSON.stringify(record));
   await store.put(KEY_BY_PREFIX(prefix), JSON.stringify(record));
   return record;
+}
+
+/** Revoke the account's only API key (hard cap remains 1). */
+export async function deleteApiKey(
+  store: EnvStore,
+  userId: string
+): Promise<boolean> {
+  const existing = await store.get(KEY_BY_USER(userId));
+  if (!existing) return false;
+  const prev = JSON.parse(existing) as StoredApiKey;
+  await store.delete(KEY_BY_PREFIX(prev.prefix));
+  await store.delete(KEY_BY_USER(userId));
+  return true;
+}
+
+const REG_INVITE = (token: string) => `reginv:${token}`;
+
+export type RegistrationInvite = {
+  token: string;
+  createdBy: string;
+  createdAt: number;
+  expiresAt: number;
+  usedAt: number | null;
+};
+
+export async function putRegistrationInvite(
+  store: EnvStore,
+  invite: RegistrationInvite
+): Promise<void> {
+  await store.put(REG_INVITE(invite.token), JSON.stringify(invite));
+}
+
+export async function getRegistrationInvite(
+  store: EnvStore,
+  token: string
+): Promise<RegistrationInvite | null> {
+  const raw = await store.get(REG_INVITE(token));
+  if (!raw) return null;
+  return JSON.parse(raw) as RegistrationInvite;
+}
+
+/** Invite-only registration without Social SSO (Phase 3 MVP claim). */
+export async function claimRegistrationInvite(
+  store: EnvStore,
+  token: string,
+  role: "user" | "admin" = "user"
+): Promise<
+  | { ok: true; userId: string; role: "user" | "admin"; apiKey: string }
+  | { ok: false; error: string; status: number }
+> {
+  const inv = await getRegistrationInvite(store, token);
+  if (!inv) return { ok: false, error: "not_found", status: 404 };
+  if (Date.now() >= inv.expiresAt) {
+    return { ok: false, error: "gone", status: 410 };
+  }
+  if (inv.usedAt) return { ok: false, error: "already_used", status: 410 };
+  const userId = `user_${token.slice(0, 12)}`;
+  const apiKey = apiKeyPlaintext();
+  await putApiKey(store, apiKey, userId, role);
+  inv.usedAt = Date.now();
+  await putRegistrationInvite(store, inv);
+  return { ok: true, userId, role, apiKey };
 }
 
 export async function lookupApiKey(
@@ -88,6 +159,7 @@ export async function getShortMapping(
   secret: string;
   targetField: string;
   expiresAt: number;
+  revoked?: boolean;
 } | null> {
   const raw = await store.get(SHORT_TO_INVITE(shortId));
   if (!raw) return null;
@@ -96,7 +168,27 @@ export async function getShortMapping(
     secret: string;
     targetField: string;
     expiresAt: number;
+    revoked?: boolean;
   };
+}
+
+export async function markShortRevoked(
+  store: EnvStore,
+  shortId: string
+): Promise<void> {
+  const map = await getShortMapping(store, shortId);
+  if (!map) return;
+  await store.put(
+    SHORT_TO_INVITE(shortId),
+    JSON.stringify({ ...map, revoked: true, expiresAt: 0 })
+  );
+}
+
+export async function deleteSecretMapping(
+  store: EnvStore,
+  secret: string
+): Promise<void> {
+  await store.delete(`secret:${secret}`);
 }
 
 export function parseBearer(req: Request): string | null {

@@ -919,12 +919,12 @@
 - **Status:** Draft（2026-08-06；契約；見 [PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)）
 - **Context:** Roster 需要可選薄 rendezvous，且近程要支援「一條邀請連結 → 開 SAM → 放大畫布 → 詢問入座」、**多人共用同一連結**。邀請者預產 offer 無法優雅服務多人；須對齊 DEC-045（每輪 1× O／A、無資料面中繼；**Roster 可同時多 peer**）、DEC-042、DEC-023／025／029，且避免做成協作 SaaS（DEC-004）。
 - **Decision:**
-  1. **獨立服務：** Cloudflare Workers 上的 **Playgrounds Platform API**＋後台；**不**併進場殼 Worker。建議 **`api.samkuo.me`**。
+  1. **獨立服務：** Cloudflare Workers 上的 **Playgrounds Platform API**＋後台；**不**併進場殼 Worker。**`api.samkuo.me`**＝API；**`dash.samkuo.me`**＝後台 UI（同 Worker custom domain 別名）。
   2. **設計中心＝Invite：** 一條短連結／深鏈；**多人可經同一連結加入**。每次加入＝短命 join＋可選 handshake 槽。近程 kind＝`invite.compose`（開 SAM、放大畫布、完整 protocol、consent；可選 signal）。
   3. **Ticket 路徑 signaling（僅 Platform）：** 鑄 Invite 時**不**帶 offer。**加入者**提交 offer，**同一邏輯回合** long-poll 等 answer；**邀請者（session host）**排隊串行作答。同時僅一筆 WebRTC handshake；忙線＝**排隊**。Host 離線 → 需新連線者超時（預期）。**若雙方已有可用 PeerConnection → 重用該連線，不跑 signaling**（signaling **僅**尚未連線或既有 peer 不可用時）。OOB `#roster=`／QR／文字 **不變**（仍發起者 offer）。Wire／非 trickle／每輪 1× O／A 不變；禁止對已連線 peer 經 Platform renegotiation。
   4. **與 Roster：** Platform **串行發握手**（僅未連線）；連上後 Roster **並行持多 peer**（見 DEC-045）。
-  5. **深鏈與短連結：** `#pg=<invite>`（hash）；**`/i/<short_id>`** → 302；**QR 預設短連結**。
-  6. **身分：** 註冊邀請制；Social SSO；不存密碼；可 MFA。Bootstrap：一次性 **`ADMIN_BOOTSTRAP_TOKEN`**。
+  5. **深鏈與短連結：** `#pg=<invite>`（hash）；**`/i/<short_id>`** → 302（canonical 在 `api`）；**QR 預設短連結**。
+  6. **身分：** 註冊邀請制；Social SSO；不存密碼；可 MFA。Bootstrap：一次性 **`ADMIN_BOOTSTRAP_TOKEN`**。後台暫以 API key session（SSO 後續）。
   7. **API key：** 每帳號最多 1 把；僅建立時顯示。持 key 者可鑄會議／遊戲 Invite。場內 SecretStore 保留名 **`PLAYGROUNDS_API_KEY`**。
   8. **呈現：** 放大＝**`maximizePreview`（放大畫布）**，非瀏覽器全螢幕。
   9. **非目標：** 資料面中繼、trickle、預設 TURN、公開自助註冊、平行多 handshake、通用縮址。
@@ -936,12 +936,15 @@
   - 勿對已連線的 peer 再走 Platform O／A／renegotiation；已連線則重用。
   - 勿把「同時僅一 handshake」誤寫成「Roster 只能一 peer」。
   - 勿把完整深鏈當 QR 預設；勿用 Fullscreen API 冒充放大畫布。
+  - `dash`／`api` 為場網保留名；短連結 canonical 在 api，後台在 dash。
   - 同步 GLOSSARY、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)。
 - **Revision（2026-08-06）：** 初版 Draft。
 - **Revision（2026-08-06）：** 短連結 `/i/`；QR 預設短 URL。
 - **Revision（2026-08-06）：** Invite 一連結多人；加入者 offer＋排隊；多 peer 對齊 DEC-045。
 - **Revision（2026-08-06）：** 已有 PeerConnection 則重用；signaling 僅尚未連線。
 - **Revision（2026-08-06）：** Invite 預設 TTL **5m**（session 開始後初始動作，非預約）；Phase 1 實作於 `platform-api/`。
+- **Revision（2026-08-06）：** **`dash.samkuo.me`** 後台別名；Phase 3 dashboard（API key session）。
+- **Revision（2026-08-06）：** Phase 1–4 落地（`#pg=`／多 peer／compose／註冊 claim）；完整 Social SSO 留 Phase 5。
 
 
 ---

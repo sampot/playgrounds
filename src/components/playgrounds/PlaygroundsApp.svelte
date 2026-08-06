@@ -22,6 +22,8 @@
     hasRosterInviteInLocation,
     type SessionActPayload,
   } from "./roster";
+  import { hasPgInviteInLocation } from "./platform/platformInviteUrl";
+  import { registerPlatformComposeShell } from "./platform/platformComposeShell";
   import {
     assertCanvasEntryServed,
     buildCanvasEntryUrl,
@@ -570,6 +572,7 @@
   let unregRosterInviteAccepted: (() => void) | null = null;
   let unregRosterRemoteAct: (() => void) | null = null;
   let unregRosterHomeSeatReady: (() => void) | null = null;
+  let unregPlatformCompose: (() => void) | null = null;
   let agentIframeEl = $state<HTMLIFrameElement | null>(null);
   /** Agent canvas loaded for this project id; cold while Files tab on boot. */
   let agentUiMountedId: string | null = null;
@@ -5384,11 +5387,35 @@
       hasRosterInviteInLocation({
         hash: window.location.hash,
         search: window.location.search,
+      }) ||
+      hasPgInviteInLocation({
+        hash: window.location.hash,
+        search: window.location.search,
       })
     ) {
       filesSidebarOpen = true;
       selectSidebarTab("avatars");
     }
+    const unregCompose = registerPlatformComposeShell({
+      openSamSource: async source => {
+        const intent = parseOpenIntent(
+          new URLSearchParams({ open: source.trim() })
+        );
+        if (!intent || intent.kind === "invalid") {
+          throw new Error(
+            intent?.kind === "invalid"
+              ? intent.reason
+              : "無法辨識開啟來源"
+          );
+        }
+        const ok = await runOpenFromUrl(intent);
+        if (!ok) throw new Error("開啟小品失敗");
+      },
+      maximizePreview: () => {
+        maximizePreview();
+      },
+    });
+    unregPlatformCompose = unregCompose;
     const unregRosterInvite = registerRosterInviteAcceptedHandler(ev =>
       onRosterInviteAccepted(ev)
     );
@@ -5874,6 +5901,8 @@
   });
 
   onDestroy(() => {
+    unregPlatformCompose?.();
+    unregPlatformCompose = null;
     unregRosterInviteAccepted?.();
     unregRosterInviteAccepted = null;
     unregRosterRemoteAct?.();

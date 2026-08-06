@@ -21,6 +21,6 @@
     }
     // Zone route `*.samkuo.me/*` → this Worker is set in the dashboard
     // (manual; do not re-add here — deploy token lacks workers_routes:edit).
-    // docs／api：各自 Worker 的 custom domain（playgrounds-docs／platform-api）。
+    // docs／api／dash：各自 Worker 的 custom domain（playgrounds-docs／platform-api）。
   ]
 }

@@ -62,6 +62,30 @@
     type RosterCameraScanStop,
   } from "./index";
   import { registerSessionBridge } from "../sessionBridge";
+  import {
+    createJoin,
+    createPlatformInvite,
+    PLAYGROUNDS_API_KEY_SECRET,
+    postOfferAndWaitAnswer,
+    previewInvite,
+    type InviteMeta,
+  } from "../platform/platformClient";
+  import {
+    composeNeedsMaximize,
+    composeSamSource,
+    composeSessionProtocol,
+    wantsRosterSignal,
+  } from "../platform/platformCompose";
+  import { getPlatformComposeShell } from "../platform/platformComposeShell";
+  import { startPlatformHostAnswerLoop } from "../platform/platformHostLoop";
+  import {
+    clearPgInviteHashFromLocation,
+    parsePgInviteFromLocation,
+  } from "../platform/platformInviteUrl";
+  import {
+    getSecretPlaintext,
+    isSecretStoreUnlocked,
+  } from "../secretStore";
 
   const btn =
     "inline-flex items-center justify-center rounded-md border border-skin-line bg-skin-card px-2 py-1 text-xs font-medium text-skin-base transition hover:bg-skin-card disabled:opacity-40";
@@ -82,6 +106,22 @@
   let pasteReply = $state("");
 
   let session = $state<RosterPeerSession | null>(null);
+  /** Platform Ticket peers (DEC-047); OOB still uses `session`. */
+  let platformByPeer = $state(new Map<string, RosterPeerSession>());
+  let platformHostLoop = $state<{ stop: () => void; inviteId: string } | null>(
+    null
+  );
+  let platformInvite = $state<{
+    inviteId: string;
+    secret: string;
+    shortUrl: string;
+    deepLink: string;
+  } | null>(null);
+  let platformShortQr = $state<string | null>(null);
+  let pendingPgSecret = $state<string | null>(null);
+  let pendingPgMeta = $state<InviteMeta | null>(null);
+  let pendingComposeProtocol = $state<unknown | null>(null);
+  let pendingComposeConsent = $state(false);
   let avatars = $state<RosterAvatarStub[]>([]);
   let localName = $state("我");
   let peerAgentId = $state<string | null>(null);
@@ -165,7 +205,12 @@
     unsubHub = subscribeRosterSessionHub(refreshCanInvite);
     unregTransport = registerRosterRelayTransport({
       send: (payload, to) => sendAvatarRelay(payload, to),
-      getPeerAgentId: () => peerAgentId,
+      getPeerAgentId: () => {
+        const connected = listRosterAvatars().find(
+          a => a.connectionState === "connected"
+        );
+        return connected?.agentId ?? peerAgentId;
+      },
       getProjectionSandboxId: id =>
         listRosterAvatars().find(a => a.agentId === id)?.sandboxId,
     });
@@ -179,6 +224,7 @@
     window.addEventListener("message", onWindowMessage);
     cameraSupported = rosterCameraScanSupported();
     consumeRosterInviteHash();
+    consumePgInviteHash();
   });
 
   function consumeRosterInviteHash(): void {
@@ -202,8 +248,43 @@
     }
   }
 
+  function consumePgInviteHash(): void {
+    const parsed = parsePgInviteFromLocation({
+      hash: window.location.hash,
+      search: window.location.search,
+    });
+    if (!parsed) return;
+    clearPgInviteHashFromLocation();
+    pendingPgSecret = parsed.secret;
+    void loadPendingPgMeta();
+  }
+
+  async function loadPendingPgMeta(): Promise<void> {
+    if (!pendingPgSecret) return;
+    try {
+      pendingPgMeta = await previewInvite(pendingPgSecret);
+      status = "收到 Platform 邀請 — 確認後加入";
+    } catch (e) {
+      error =
+        e instanceof Error
+          ? `無法讀取邀請：${e.message}`
+          : `無法讀取邀請：${String(e)}`;
+      pendingPgSecret = null;
+    }
+  }
+
   onDestroy(() => {
     stopLiveCameraScan();
+    platformHostLoop?.stop();
+    platformHostLoop = null;
+    for (const s of platformByPeer.values()) {
+      try {
+        s.close();
+      } catch {
+        /* ignore */
+      }
+    }
+    platformByPeer = new Map();
     unsub?.();
     unsubHub?.();
     unregTransport?.();
@@ -285,17 +366,27 @@
     payload: RosterAvatarRelayMsg["payload"],
     to?: string
   ): void {
-    if (!session) return;
     const msg: RosterAvatarRelayMsg = {
       type: "avatar_relay",
       from: localAgentId,
       ...(to ? { to } : {}),
       payload,
     };
-    try {
-      session.send(msg);
-    } catch (e) {
-      error = friendlyError(e instanceof Error ? e.message : String(e));
+    const targets: RosterPeerSession[] = [];
+    if (to) {
+      const plat = platformByPeer.get(to);
+      if (plat) targets.push(plat);
+      else if (session && peerAgentId === to) targets.push(session);
+    } else {
+      if (session) targets.push(session);
+      for (const s of platformByPeer.values()) targets.push(s);
+    }
+    for (const s of targets) {
+      try {
+        s.send(msg);
+      } catch (e) {
+        error = friendlyError(e instanceof Error ? e.message : String(e));
+      }
     }
   }
 
@@ -439,14 +530,14 @@
     }
     if (isSessionSeatBoundPayload(payload)) {
       const homeSandboxId = homeSandboxByInvite.get(payload.inviteId);
-      if (!homeSandboxId || !peerAgentId) {
+      if (!homeSandboxId) {
         status = "收到 seat_bound，但本機參與者沙盒遺失";
         return;
       }
       const binding = bindingFromSeatBound(
         payload,
         homeSandboxId,
-        peerAgentId
+        msg.from
       );
       const bridge = createRosterSessionTunnelBridge({
         binding,
@@ -594,20 +685,64 @@
     status = "連線已結束";
   }
 
-  function peerHandlers(): RosterPeerHandlers {
+  async function onPlatformPeerDisconnected(
+    sess: RosterPeerSession
+  ): Promise<void> {
+    let peerId: string | null = null;
+    for (const [id, s] of platformByPeer) {
+      if (s === sess) {
+        peerId = id;
+        break;
+      }
+    }
+    if (peerId) {
+      const next = new Map(platformByPeer);
+      next.delete(peerId);
+      platformByPeer = next;
+      const sandboxId = removeRosterAvatar(peerId);
+      filesByAgent.delete(peerId);
+      generationByAgent.delete(peerId);
+      iframeByAgent.delete(peerId);
+      if (sandboxId) await teardownRosterAvatarProjection(sandboxId);
+      if (peerAgentId === peerId) {
+        peerAgentId =
+          listRosterAvatars().find(a => a.connectionState === "connected")
+            ?.agentId ?? null;
+      }
+    }
+    try {
+      sess.close();
+    } catch {
+      /* ignore */
+    }
+    refreshCanInvite();
+    status = peerId ? "一位連線已結束（其他人仍在）" : "連線已結束";
+  }
+
+  function peerHandlers(bindSession?: RosterPeerSession): RosterPeerHandlers {
     return {
       onMessage: data => {
-        if (isPresenceMessage(data)) void onRemotePresence(data);
-        else if (isAvatarRelayMessage(data)) onAvatarRelay(data);
+        if (isPresenceMessage(data)) {
+          if (bindSession) {
+            const next = new Map(platformByPeer);
+            next.set(data.agentId, bindSession);
+            platformByPeer = next;
+          }
+          void onRemotePresence(data);
+        } else if (isAvatarRelayMessage(data)) onAvatarRelay(data);
       },
-      onChannelClose: () => void onPeerDisconnected(),
+      onChannelClose: () => {
+        if (bindSession) void onPlatformPeerDisconnected(bindSession);
+        else void onPeerDisconnected();
+      },
       onConnectionState: state => {
         if (
           state === "failed" ||
           state === "disconnected" ||
           state === "closed"
         ) {
-          void onPeerDisconnected();
+          if (bindSession) void onPlatformPeerDisconnected(bindSession);
+          else void onPeerDisconnected();
         }
       },
       onError: err => {
@@ -616,7 +751,199 @@
     };
   }
 
+  async function readPlatformApiKey(): Promise<string> {
+    if (!isSecretStoreUnlocked()) {
+      throw new Error("請先解鎖密鑰庫（SecretStore）");
+    }
+    try {
+      return await getSecretPlaintext(PLAYGROUNDS_API_KEY_SECRET);
+    } catch {
+      throw new Error(
+        `密鑰庫沒有 ${PLAYGROUNDS_API_KEY_SECRET} — 請在後台建立 API key 後寫入密鑰庫`
+      );
+    }
+  }
+
+  async function handlePlatformMint(): Promise<void> {
+    error = null;
+    busy = true;
+    persistName();
+    try {
+      const apiKey = await readPlatformApiKey();
+      const created = await createPlatformInvite({
+        apiKey,
+        kind: "signal.handshake",
+        targetField: window.location.host,
+      });
+      platformInvite = {
+        inviteId: created.invite_id,
+        secret: created.secret,
+        shortUrl: created.short_url,
+        deepLink: created.deep_link,
+      };
+      platformHostLoop?.stop();
+      platformHostLoop = startPlatformHostAnswerLoop({
+        inviteId: created.invite_id,
+        apiKey,
+        lan,
+        localPresence: localPresence(),
+        prepareHandlers: () => {
+          const slot: { s: RosterPeerSession | null } = { s: null };
+          return {
+            handlers: peerHandlersSlot(slot),
+            attachSession: sess => {
+              slot.s = sess;
+            },
+          };
+        },
+        onStatus: msg => {
+          status = msg;
+        },
+        onError: msg => {
+          error = friendlyError(msg);
+        },
+      });
+      status = "已建立 Platform 邀請 — 分享短網址；本機正在作答循環";
+      try {
+        platformShortQr = await encodeRosterQrPngDataUrl(created.short_url);
+      } catch {
+        platformShortQr = null;
+      }
+    } catch (e) {
+      error = friendlyError(e instanceof Error ? e.message : String(e));
+    } finally {
+      busy = false;
+    }
+  }
+
+  function peerHandlersSlot(slot: {
+    s: RosterPeerSession | null;
+  }): RosterPeerHandlers {
+    return {
+      onMessage: data => {
+        if (isPresenceMessage(data)) {
+          if (slot.s) {
+            const next = new Map(platformByPeer);
+            next.set(data.agentId, slot.s);
+            platformByPeer = next;
+          }
+          void onRemotePresence(data);
+        } else if (isAvatarRelayMessage(data)) onAvatarRelay(data);
+      },
+      onChannelClose: () => {
+        if (slot.s) void onPlatformPeerDisconnected(slot.s);
+      },
+      onConnectionState: state => {
+        if (
+          state === "failed" ||
+          state === "disconnected" ||
+          state === "closed"
+        ) {
+          if (slot.s) void onPlatformPeerDisconnected(slot.s);
+        }
+      },
+      onError: err => {
+        error = friendlyError(err.message);
+      },
+    };
+  }
+
+  function dismissPendingPg(): void {
+    pendingPgSecret = null;
+    pendingPgMeta = null;
+    pendingComposeProtocol = null;
+    pendingComposeConsent = false;
+  }
+
+  async function confirmPendingPgJoin(): Promise<void> {
+    if (!pendingPgSecret || !pendingPgMeta) return;
+    const meta = pendingPgMeta;
+    const secret = pendingPgSecret;
+    error = null;
+    busy = true;
+    persistName();
+    try {
+      if (meta.kind === "invite.compose") {
+        const proto = composeSessionProtocol(meta.intent);
+        pendingComposeProtocol = proto;
+        const sam = composeSamSource(meta.intent);
+        const shell = getPlatformComposeShell();
+        if (sam && shell) {
+          await shell.openSamSource(sam);
+          if (composeNeedsMaximize(meta.intent)) shell.maximizePreview();
+        }
+        if (proto) {
+          pendingComposeConsent = true;
+          status = "已開啟小品 — 請確認是否加入 session";
+          busy = false;
+          return;
+        }
+      }
+      await runPlatformTicketJoin(secret, meta);
+      dismissPendingPg();
+    } catch (e) {
+      error = friendlyError(e instanceof Error ? e.message : String(e));
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function confirmComposeAndJoin(): Promise<void> {
+    if (!pendingPgSecret || !pendingPgMeta) return;
+    pendingComposeConsent = false;
+    busy = true;
+    try {
+      await runPlatformTicketJoin(pendingPgSecret, pendingPgMeta);
+      dismissPendingPg();
+    } catch (e) {
+      error = friendlyError(e instanceof Error ? e.message : String(e));
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function runPlatformTicketJoin(
+    secret: string,
+    meta: InviteMeta
+  ): Promise<void> {
+    if (!wantsRosterSignal(meta.kind, meta.intent)) {
+      status = "邀請不含 Roster signal — 已處理 intent";
+      return;
+    }
+    // Reuse if already connected to someone? Spec: reuse if already have PC with host.
+    // Without stable host peer id we always signal for new joiners.
+    const join = await createJoin(secret);
+    const slot: { s: RosterPeerSession | null } = { s: null };
+    const result = await createRosterOffer({
+      lan,
+      localPresence: localPresence(),
+      handlers: peerHandlersSlot(slot),
+    });
+    slot.s = result.session;
+    const answered = await postOfferAndWaitAnswer({
+      inviteId: meta.inviteId,
+      joinCap: join.join_cap,
+      offerWire: result.wire,
+    });
+    await applyRosterAnswer(result.session, answered.answer);
+    status = "Platform 握手完成，正在連線…";
+  }
+
+  function stopPlatformHost(): void {
+    platformHostLoop?.stop();
+    platformHostLoop = null;
+    platformInvite = null;
+    platformShortQr = null;
+    status = "已停止 Platform 作答循環";
+  }
+
   function friendlyError(msg: string): string {
+    if (/secret_locked|解鎖密鑰庫/.test(msg)) {
+      return msg;
+    }
+    if (/PLAYGROUNDS_API_KEY/.test(msg)) {
+      return msg;
+    }
     if (/offer/i.test(msg) && /貼上|空|缺少/.test(msg)) {
       return "請先貼上對方的邀請";
     }
@@ -628,6 +955,9 @@
     }
     if (/ICE/i.test(msg)) {
       return "連線準備逾時，請重試";
+    }
+    if (/timeout/i.test(msg)) {
+      return "等待對方回覆逾時（邀請者須在線）";
     }
     return msg
       .replace(/\boffer\b/gi, "邀請")
@@ -945,10 +1275,115 @@
       </div>
       {#if avatars.length > 0}
         <p class="text-skin-base/40 m-0 text-[10px]">
-          目前同時只能連一人；發起或加入另一人會先結束現有連線
+          Platform 邀請可同時多人；OOB 發起／加入仍會重置現有 OOB 連線
         </p>
       {/if}
     </section>
+
+    <section
+      class="border-skin-line bg-skin-card space-y-2 rounded border px-2 py-2"
+    >
+      <h3 class="text-skin-base m-0 text-[11px] font-semibold">
+        Platform 邀請
+      </h3>
+      <p class="text-skin-base/55 m-0 text-[10px]">
+        短連結多人加入（Ticket：加入者出邀請）。需密鑰庫
+        <code class="font-mono">PLAYGROUNDS_API_KEY</code>
+      </p>
+      <div class="flex flex-wrap gap-1">
+        <button
+          type="button"
+          class={btn}
+          disabled={busy}
+          onclick={() => void handlePlatformMint()}>建立短連結邀請</button
+        >
+        {#if platformHostLoop}
+          <button
+            type="button"
+            class={btn}
+            disabled={busy}
+            onclick={stopPlatformHost}>停止作答</button
+          >
+        {/if}
+      </div>
+      {#if platformInvite}
+        <div class="space-y-1">
+          <p class="text-skin-base/70 m-0 break-all font-mono text-[10px]">
+            {platformInvite.shortUrl}
+          </p>
+          <div class="flex flex-wrap gap-1">
+            <button
+              type="button"
+              class={btn}
+              onclick={() =>
+                void navigator.clipboard.writeText(platformInvite!.shortUrl)
+              }>複製短網址</button
+            >
+          </div>
+          {#if platformShortQr}
+            <img
+              src={platformShortQr}
+              alt="邀請 QR"
+              class="border-skin-line max-w-[10rem] rounded border bg-white p-1"
+            />
+          {/if}
+        </div>
+      {/if}
+    </section>
+
+    {#if pendingPgSecret && pendingPgMeta}
+      <section
+        class="border-skin-line bg-skin-card space-y-2 rounded border px-2 py-2"
+      >
+        <h3 class="text-skin-base m-0 text-[11px] font-semibold">
+          Platform 邀請連結
+        </h3>
+        <p class="text-skin-base/70 m-0 text-[11px]">
+          {pendingPgMeta.kind}
+          {#if pendingPgMeta.expiresAt}
+            · 到期 {new Date(pendingPgMeta.expiresAt).toLocaleTimeString()}
+          {/if}
+        </p>
+        {#if pendingComposeConsent}
+          <p class="text-skin-base/70 m-0 text-[11px]">
+            將加入 session
+            {#if pendingComposeProtocol && typeof pendingComposeProtocol === "object" && pendingComposeProtocol && "protocolId" in pendingComposeProtocol}
+              （{(pendingComposeProtocol as { protocolId: string }).protocolId}）
+            {/if}
+            。同意後開始連線。
+          </p>
+          <div class="flex flex-wrap gap-1">
+            <button
+              type="button"
+              class={btn}
+              disabled={busy}
+              onclick={() => void confirmComposeAndJoin()}>同意入座並連線</button
+            >
+            <button
+              type="button"
+              class={btn}
+              disabled={busy}
+              onclick={dismissPendingPg}>拒絕</button
+            >
+          </div>
+        {:else}
+          <div class="flex flex-wrap gap-1">
+            <button
+              type="button"
+              class={btn}
+              disabled={busy}
+              onclick={() => void confirmPendingPgJoin()}>加入</button
+            >
+            <button
+              type="button"
+              class={btn}
+              disabled={busy}
+              onclick={dismissPendingPg}>忽略</button
+            >
+          </div>
+        {/if}
+      </section>
+    {/if}
 
     {#if pendingLinkOffer}
       <section

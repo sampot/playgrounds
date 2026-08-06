@@ -8,6 +8,8 @@ import {
   shortUrl,
 } from "./ids.js";
 import {
+  deleteApiKey,
+  getApiKeyForUser,
   isBootstrapped,
   lookupApiKey,
   markBootstrapped,
@@ -79,6 +81,16 @@ describe("auth bootstrap + api key", () => {
     await putApiKey(store, k2, "admin", "admin");
     expect(await lookupApiKey(store, k1)).toBeNull();
     expect((await lookupApiKey(store, k2))?.userId).toBe("admin");
+  });
+
+  it("revokes the only key", async () => {
+    const store = memoryStore();
+    const k = apiKeyPlaintext();
+    await putApiKey(store, k, "admin", "admin");
+    expect(await getApiKeyForUser(store, "admin")).not.toBeNull();
+    expect(await deleteApiKey(store, "admin")).toBe(true);
+    expect(await lookupApiKey(store, k)).toBeNull();
+    expect(await getApiKeyForUser(store, "admin")).toBeNull();
   });
 });
 

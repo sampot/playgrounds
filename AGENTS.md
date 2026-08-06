@@ -5,7 +5,7 @@ This repo is the **Playgrounds** browser host ([sampot/playgrounds](https://gith
 - **DEC-041:** extract from blog; legacy `samkuo.me/playgrounds/` is a **frozen** snapshot (migrate tip; no further feature sync from this repo); **SAM catalog** at field **`/sam/`** (same Worker as the shell)
 - **DEC-042:** deploy on **Cloudflare Workers**; field net **`*.samkuo.me`** (same code, per-origin storage); default field **`play.samkuo.me`**
 - **DEC-043:** docs site **Starlight** at **`docs.samkuo.me`** (separate Worker; not a field) — see `docs/PG-DOCS-PLAN.md`
-- **DEC-047:** Platform API（Invite／薄 signaling）at **`api.samkuo.me`**（separate Worker；`platform-api/`）— see `docs/PG-PLATFORM-API-PLAN.md`
+- **DEC-047:** Platform API（Invite／薄 signaling）at **`api.samkuo.me`**；dashboard **`dash.samkuo.me`**（same Worker；`platform-api/`）— see `docs/PG-PLATFORM-API-PLAN.md`
 
 This repo is the **authoritative** host codebase. Do not push feature parity back into the blog mount.
 
@@ -20,7 +20,7 @@ Reader-facing narrative stays personal／non-product (blog DEC-004).
 - `npm run deploy` — `wrangler deploy` (self-host / Deploy to Cloudflare button; root `wrangler.jsonc`)
 - `npm run deploy:official` — build + official field-net (`wrangler.official.jsonc` → `play.samkuo.me`)
 - `npm run docs:dev` / `docs:build` / `docs:deploy` — Starlight docs (`docs.samkuo.me`)
-- `npm run platform:dev` / `platform:test` / `platform:deploy` — Platform API (`api.samkuo.me`；`platform-api/`)
+- `npm run platform:dev` / `platform:test` / `platform:deploy` — Platform API／dashboard (`api.samkuo.me`／`dash.samkuo.me`；`platform-api/`)
 
 ## Layout
 
@@ -44,9 +44,21 @@ Reader-facing narrative stays personal／non-product (blog DEC-004).
 - Default field host: `https://play.samkuo.me`
 - SAM catalog: `https://play.samkuo.me/sam/` (same Worker; per-field opens use same origin)
 - Docs (Starlight): `https://docs.samkuo.me` (reserved; separate Worker — DEC-043)
-- Platform API: `https://api.samkuo.me` (reserved; separate Worker — DEC-047；Invite TTL 預設 5m)
-- Any field: `https://<name>.samkuo.me` (reserved names e.g. `www`, `blog`, `api`, `docs`, `old-blog`; `play` = official default)
+- Platform API: `https://api.samkuo.me`；dashboard: `https://dash.samkuo.me` (same Worker — DEC-047；Invite TTL 預設 5m)
+- Any field: `https://<name>.samkuo.me` (reserved names e.g. `www`, `blog`, `api`, `docs`, `dash`, `old-blog`; `play` = official default)
 - One-click self-host: single origin on Cloudflare Workers Static Assets / Vercel / Netlify (not wildcard)
 - In-app share links: prefer `location.origin`; docs examples use `play`
 
 Do not auto-migrate OPFS across origins. Do not provision per-name server tenants.
+
+## Commits
+
+Commit messages follow **[Conventional Commits](https://www.conventionalcommits.org/)**（DEC-013）:
+
+```
+<type>(optional-scope): <description>
+```
+
+- Common `type`: `feat`、`fix`、`docs`、`chore`、`refactor`、`test`、`ci`、`perf`、`style`
+- Subject：imperative、簡潔；勿用純敘述句（例如 `Add floating TOC` → `feat: add floating TOC`）
+- Agents 代寫 commit 時亦須遵守；勿用 `--no-verify` 繞過 hook（除非作者明確指示）

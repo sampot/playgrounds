@@ -1,6 +1,6 @@
 # Playgrounds Platform API 計劃（DEC-047）
 
-> **狀態：** Phase 0 **完成**；Phase 1 **進行中**（`platform-api/` Worker）  
+> **狀態：** Phase 0 **完成**；Phase 1–4 **完成**（Signal／`#pg=`／後台／compose 場殼兌換）；Phase 5（完整 Social SSO／MFA）未開始  
 > **權威決策：** [DECISIONS.md](./DECISIONS.md) **DEC-047**  
 > **相關：** DEC-023（session 邀請＋完整 protocol）、DEC-025（`?open=`／放大畫布）、DEC-029（SecretStore）、DEC-042（場網／保留名 `api`）、DEC-045（Roster／薄 signaling）、DEC-046（型錄查詢）、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)、[GLOSSARY.md](./GLOSSARY.md)
 
@@ -42,8 +42,8 @@
 | 項 | 決定 |
 | --- | --- |
 | Host | **獨立** Worker（勿併進場殼 `dist`） |
-| 公開 URL | 建議 **`https://api.samkuo.me`**（DEC-042 保留名 `api`） |
-| 路徑 | `/v1/...`、`/admin/...`、**`/i/<id>` 短連結** |
+| 公開 URL | **`https://api.samkuo.me`**（API）；**`https://dash.samkuo.me`**（後台 UI，同 Worker 別名；DEC-042 保留名 `api`／`dash`） |
+| 路徑 | `/v1/...`、後台 `/`（dash）、**`/i/<id>` 短連結**（canonical 在 api） |
 | 場殼設定 | 可選 `PUBLIC_PLATFORM_API_URL` |
 | 資料面 | **永不**經 Platform；連上後只走 WebRTC／本機 session |
 
@@ -269,10 +269,13 @@ Admin 路徑與上表信任域分離（SSO cookie ≠ API key）。
 
 ## 後台 UI（MVP）
 
-1. Social SSO；（政策）MFA。
-2. **我的 API key：** 建立（一次顯示）／輪替／撤銷；硬頂 1。
-3. **Admin：** Platform 註冊邀請；可選停用使用者。
-4. （後段）Invite／隊列除錯、用量。
+**Host：** `https://dash.samkuo.me`（與 `api.samkuo.me` 同 Worker；`api` 根路徑 302→dash）。
+
+1. Social SSO；（政策）MFA。（**MVP：** API key session＋註冊邀請 **claim** 發 key；完整 SSO → Phase 5）
+2. **我的 API key：** 輪替／撤銷；硬頂 1；明文僅建立／輪替時顯示。
+3. **Admin：** Platform 註冊邀請（`/join/<token>` landing＋claim）。
+4. Mint Invite（短 URL／深鏈／compose intent）。
+5. （後段）Invite／隊列除錯、用量。
 
 ---
 
@@ -302,11 +305,11 @@ Admin 路徑與上表信任域分離（SSO cookie ≠ API key）。
 | Phase | 內容 | 完成定義 | 狀態 |
 | --- | --- | --- | --- |
 | **0. 契約** | DEC-047、本計劃、GLOSSARY；Roster 多 peer＋交叉引用 | 語意無歧義 | **完成** |
-| **1. Signal MVP** | Invite＋排隊 O／A（加入者 offer）；API key；bootstrap／SSO 最小；**TTL 5m** | 一人加入可跑通；二人排隊可串行 | **進行中**（`platform-api/`） |
-| **2. 深鏈＋短連結＋場殼** | `#pg=`／`/i/`；QR 短 URL；Roster 接上；**多 peer 並存** | 同一短連結兩人先後加入且雙方名冊可見 | 未開始 |
-| **3. 後台** | API key UI；註冊邀請；admin | 使用者自助持 key | 未開始 |
-| **4. invite.compose** | protocol＋開 SAM＋放大畫布＋consent | 掃短鏈可走到詢問入座 | 未開始 |
-| **5.（可選）** | MFA、用量、自架文件 | 另檢 | 未開始 |
+| **1. Signal MVP** | Invite＋排隊 O／A（加入者 offer）；API key；bootstrap；**TTL 5m** | 一人加入可跑通；二人排隊可串行 | **完成** |
+| **2. 深鏈＋短連結＋場殼** | `#pg=`／`/i/`；QR 短 URL；Roster 接上；**多 peer 並存** | 同一短連結兩人先後加入且雙方名冊可見 | **完成** |
+| **3. 後台** | API key UI；註冊邀請 claim；admin；`dash.samkuo.me`；品牌對齊場殼 | 使用者自助持 key | **完成**（claim；完整 SSO→P5） |
+| **4. invite.compose** | protocol＋開 SAM＋放大畫布＋consent | 掃短鏈可走到詢問入座 | **完成** |
+| **5.（可選）** | 完整 Social SSO、MFA、用量、自架文件 | 另檢 | 未開始 |
 
 ---
 
@@ -319,3 +322,5 @@ Admin 路徑與上表信任域分離（SSO cookie ≠ API key）。
 | 2026-08-06 | **Invite 一連結多人**；Ticket 路徑改加入者 offer＋long-poll 等 answer；握手**排隊**串行；Host 離線＝超時；OOB 不變；對齊 Roster **多 peer** |
 | 2026-08-06 | **已有 PeerConnection 則重用**；WebRTC signaling **僅**尚未連線時 |
 | 2026-08-06 | Invite 預設 TTL **5m**（session 開始後初始動作，非預約）；Phase 1 `platform-api/` 開工 |
+| 2026-08-06 | **`dash.samkuo.me`** 後台別名；Phase 3 API key dashboard／註冊邀請 landing |
+| 2026-08-06 | Phase 1–4 場殼打通：`#pg=`、host 作答循環、多 peer、compose、註冊 claim；完整 SSO 改 Phase 5 |
