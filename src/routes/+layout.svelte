@@ -4,6 +4,11 @@
 
   let { children } = $props();
 
+  /** Field-family chrome: 遊樂場 · 小品 · 文件 · 後台（文件＝閱讀入口，非 splash）。 */
+  const DOCS_READING =
+    "https://docs.samkuo.me/guides/opening-a-field/";
+  const DASH_ORIGIN = "https://dash.samkuo.me/";
+
   let activeNav = $derived(
     page.url.pathname.startsWith("/sam") ? ("sam" as const) : ("field" as const)
   );
@@ -18,7 +23,10 @@
   <header
     class="playgrounds-host-header border-skin-line text-skin-base/70 flex shrink-0 items-center gap-3 border-b px-3 py-1.5 text-xs"
   >
-    <div class="playgrounds-host-brand flex min-w-0 items-center gap-2">
+    <nav
+      class="playgrounds-host-brand flex min-w-0 flex-wrap items-center gap-2"
+      aria-label="站點導覽"
+    >
       <a
         class="text-skin-base/80 flex min-w-0 items-center gap-2 no-underline"
         href="https://samkuo.me/"
@@ -61,10 +69,16 @@
       <span class="text-skin-base/40" aria-hidden="true">·</span>
       <a
         class="text-skin-base/80 no-underline"
-        href="https://docs.samkuo.me/"
+        href={DOCS_READING}
         rel="noopener noreferrer">文件</a
       >
-    </div>
+      <span class="text-skin-base/40" aria-hidden="true">·</span>
+      <a
+        class="text-skin-base/80 no-underline"
+        href={DASH_ORIGIN}
+        rel="noopener noreferrer">後台</a
+      >
+    </nav>
   </header>
   <main
     id="main-content"

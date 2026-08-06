@@ -494,7 +494,7 @@ function topNav(active: "dash" | "join"): string {
     <span class="sep" aria-hidden="true">·</span>
     <a href="https://play.samkuo.me/sam/">小品</a>
     <span class="sep" aria-hidden="true">·</span>
-    <a href="https://docs.samkuo.me/" rel="noopener noreferrer">文件</a>
+    <a href="https://docs.samkuo.me/guides/opening-a-field/" rel="noopener noreferrer">文件</a>
     <span class="sep" aria-hidden="true">·</span>
     <a href="https://dash.samkuo.me/" ${active === "dash" ? 'aria-current="page"' : ""}>後台</a>
   </nav>

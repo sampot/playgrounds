@@ -62,9 +62,10 @@
 
 所有後台 HTML 頁共用：
 
-1. **頂欄（sticky）** — 與場殼同族：
+1. **頂欄（sticky）** — 與場殼／文件站同族（場相關對外面共用）：
    - 標記（favicon／山姆鍋 mark）→ `https://samkuo.me/`
    - 導覽：`我是山姆鍋` · `遊樂場` · `小品` · `文件` · **`後台`**（`aria-current` 於後台）
+   - **`文件` href：** `https://docs.samkuo.me/guides/opening-a-field/`（閱讀入口；**不是** splash 首頁 `/`。封面 `/` 留給行銷／對外分享。）
    - 外觀切換：淺／深（`localStorage`；預設跟隨 `prefers-color-scheme`，預設語意對齊場殼淺色）
 2. **主區** — 單欄，`max-width ≈ 40rem`；首屏品牌級「遊樂場」標題。
 3. **頁尾** — `api.samkuo.me`／`dash.samkuo.me`／`play.samkuo.me` 輕量鏈接；非行銷 footer。

@@ -59,6 +59,10 @@ export default defineConfig({
         },
       ],
       customCss: ["./src/styles/custom.css"],
+      components: {
+        // Field-family chrome: 遊樂場 · 小品 · 文件 · 後台（文件＝閱讀入口）
+        SiteTitle: "./src/components/SiteTitle.astro",
+      },
       sidebar: [
         {
           label: "指南",

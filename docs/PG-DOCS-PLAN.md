@@ -147,7 +147,8 @@ CI：path filter——僅 `docs-site/**`（及約定之內容來源路徑）變�
 
 - 可寫：文件在 `docs.samkuo.me`、場在 `play.samkuo.me`、程式開源、可自架。
 - **勿**賣點清單、版本發佈流水帳腔、多租戶／「平台」行銷語。
-- Starlight 預設主題可輕改；勿做成行銷 landing（首屏＝標題＋一句話＋去場／GitHub，其餘進側欄）。
+- Starlight 預設主題可輕改；splash `/` 可作行銷／對外介紹入口。
+- **場相關頂列（與 play／sam／dash 同族）：** `我是山姆鍋` · `遊樂場` · `小品` · `文件` · `後台`。頂列「文件」→ **`/guides/opening-a-field/`**（閱讀 chrome），**不要**鏈 splash `/`。
 - **站台身分：** 標題／Logo 對齊「我是山姆鍋」（山姆鍋標誌）；對外稱「遊樂場文件」。Playgrounds 僅程式／repo 識別，勿當品牌名呈現。
 
 ---
@@ -183,3 +184,4 @@ CI：path filter——僅 `docs-site/**`（及約定之內容來源路徑）變�
 | --- | --- |
 | 2026-08-05 | 初版：Starlight、`docs.samkuo.me`、獨立 Worker、`docs-site/`、IA 與 Phase 0–5 |
 | 2026-08-05 | 實作：`docs-site` Starlight 內容、wrangler、根腳本、`deploy-docs.yml`、場網 `docs`→302 |
+| 2026-08-06 | 場相關頂列同族（含後台）；頂列「文件」→開場指南；splash `/` 保留行銷入口 |

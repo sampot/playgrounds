@@ -1,10 +1,9 @@
-/* Personal mark + title in the nav (DEC-004). */
-.site-title img {
-  height: 1.65rem;
-  width: auto;
-}
-
-/* Soften splash so it reads as notes, not a product landing. */
+/* Soften splash so it reads as notes／marketing entry, not a product landing. */
 .hero > .sl-flex {
   max-width: 40rem;
+}
+
+/* Field-family SiteTitle override: keep header row from clipping the nav. */
+.header .title-wrapper {
+  overflow: visible;
 }

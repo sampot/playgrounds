@@ -1,0 +1,95 @@
+---
+/**
+ * Field-family site chrome (aligned with play `/` + `/sam/` + dash).
+ * Logo／「我是山姆鍋」→ personal site; 「文件」→ reading entry (not splash `/`).
+ * Splash at `/` remains the marketing entry for external links.
+ */
+import { logos } from "virtual:starlight/user-images";
+import config from "virtual:starlight/user-config";
+
+const DOCS_READING = "/guides/opening-a-field/";
+const PLAY = "https://play.samkuo.me/";
+const SAM = "https://play.samkuo.me/sam/";
+const DASH = "https://dash.samkuo.me/";
+const BLOG = "https://samkuo.me/";
+
+const logoSrc =
+  config.logo && logos.dark ? logos.dark.src : "/favicon.svg";
+---
+
+<nav class="pg-site-nav" aria-label="站點導覽">
+  <a class="pg-site-nav__brand" href={BLOG} rel="noopener noreferrer">
+    <img
+      class="pg-site-nav__mark"
+      src={logoSrc}
+      alt=""
+      width="20"
+      height="20"
+      decoding="async"
+    />
+    <span class="pg-site-nav__label">我是山姆鍋</span>
+  </a>
+  <span class="pg-site-nav__sep" aria-hidden="true">·</span>
+  <a class="pg-site-nav__link" href={PLAY} rel="noopener noreferrer">遊樂場</a>
+  <span class="pg-site-nav__sep" aria-hidden="true">·</span>
+  <a class="pg-site-nav__link" href={SAM} rel="noopener noreferrer">小品</a>
+  <span class="pg-site-nav__sep" aria-hidden="true">·</span>
+  <a
+    class="pg-site-nav__link pg-site-nav__link--current"
+    href={DOCS_READING}
+    aria-current="page">文件</a
+  >
+  <span class="pg-site-nav__sep" aria-hidden="true">·</span>
+  <a class="pg-site-nav__link" href={DASH} rel="noopener noreferrer">後台</a>
+</nav>
+
+<style>
+  .pg-site-nav {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+    font-size: 0.8125rem;
+    font-weight: 400;
+    line-height: 1.25;
+    color: var(--sl-color-gray-2);
+  }
+  .pg-site-nav__brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+    color: inherit;
+    text-decoration: none;
+  }
+  .pg-site-nav__brand:hover {
+    color: var(--sl-color-white);
+  }
+  .pg-site-nav__mark {
+    display: block;
+    width: 1.25rem;
+    height: 1.25rem;
+    flex-shrink: 0;
+    object-fit: contain;
+  }
+  .pg-site-nav__label {
+    white-space: nowrap;
+  }
+  .pg-site-nav__sep {
+    opacity: 0.45;
+    user-select: none;
+  }
+  .pg-site-nav__link {
+    color: inherit;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .pg-site-nav__link:hover {
+    color: var(--sl-color-white);
+  }
+  .pg-site-nav__link--current {
+    color: var(--sl-color-white);
+    font-weight: 600;
+  }
+</style>
