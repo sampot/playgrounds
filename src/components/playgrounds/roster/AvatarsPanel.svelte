@@ -887,7 +887,7 @@
 
     <section class="space-y-2">
       <h3 class="text-skin-base m-0 text-[11px] font-semibold tracking-wide">
-        已連線
+        線上名冊
       </h3>
       {#if avatars.length === 0}
         <p class="text-skin-base/45 m-0 text-[11px]">還沒有連上任何人</p>
@@ -934,20 +934,18 @@
           type="button"
           class={btn}
           disabled={busy}
-          onclick={openStartPanel}
-          >{avatars.length ? "再發起連線" : "發起連線"}</button
+          onclick={openStartPanel}>發起連線</button
         >
         <button
           type="button"
           class={btn}
           disabled={busy}
-          onclick={openJoinPanel}
-          >{avatars.length ? "再加入連線" : "加入連線"}</button
+          onclick={openJoinPanel}>加入連線</button
         >
       </div>
       {#if avatars.length > 0}
         <p class="text-skin-base/40 m-0 text-[10px]">
-          再發起／加入會結束目前連線並換成新的對方
+          目前同時只能連一人；發起或加入另一人會先結束現有連線
         </p>
       {/if}
     </section>
