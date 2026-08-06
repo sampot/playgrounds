@@ -5,6 +5,7 @@ This repo is the **Playgrounds** browser host ([sampot/playgrounds](https://gith
 - **DEC-041:** extract from blog; legacy `samkuo.me/playgrounds/` is a **frozen** snapshot (migrate tip; no further feature sync from this repo); **SAM catalog** at field **`/sam/`** (same Worker as the shell)
 - **DEC-042:** deploy on **Cloudflare Workers**; field net **`*.samkuo.me`** (same code, per-origin storage); default field **`play.samkuo.me`**
 - **DEC-043:** docs site **Starlight** at **`docs.samkuo.me`** (separate Worker; not a field) — see `docs/PG-DOCS-PLAN.md`
+- **DEC-047:** Platform API（Invite／薄 signaling）at **`api.samkuo.me`**（separate Worker；`platform-api/`）— see `docs/PG-PLATFORM-API-PLAN.md`
 
 This repo is the **authoritative** host codebase. Do not push feature parity back into the blog mount.
 
@@ -19,6 +20,7 @@ Reader-facing narrative stays personal／non-product (blog DEC-004).
 - `npm run deploy` — `wrangler deploy` (self-host / Deploy to Cloudflare button; root `wrangler.jsonc`)
 - `npm run deploy:official` — build + official field-net (`wrangler.official.jsonc` → `play.samkuo.me`)
 - `npm run docs:dev` / `docs:build` / `docs:deploy` — Starlight docs (`docs.samkuo.me`)
+- `npm run platform:dev` / `platform:test` / `platform:deploy` — Platform API (`api.samkuo.me`；`platform-api/`)
 
 ## Layout
 
@@ -31,6 +33,7 @@ Reader-facing narrative stays personal／non-product (blog DEC-004).
 - `src/sam-host/` — Node headless host
 - `public/sw.js` — canvas SW + offline shell
 - `docs-site/` — Starlight docs (DEC-043; separate Worker)
+- `platform-api/` — Platform API Invite／signaling (DEC-047; separate Worker)
 - `wrangler.jsonc` — single-site self-host (README Deploy to Cloudflare)
 - `wrangler.official.jsonc` — author field-net
 - `vercel.json` / `netlify.toml` — README one-click Vercel / Netlify
@@ -41,6 +44,7 @@ Reader-facing narrative stays personal／non-product (blog DEC-004).
 - Default field host: `https://play.samkuo.me`
 - SAM catalog: `https://play.samkuo.me/sam/` (same Worker; per-field opens use same origin)
 - Docs (Starlight): `https://docs.samkuo.me` (reserved; separate Worker — DEC-043)
+- Platform API: `https://api.samkuo.me` (reserved; separate Worker — DEC-047；Invite TTL 預設 5m)
 - Any field: `https://<name>.samkuo.me` (reserved names e.g. `www`, `blog`, `api`, `docs`, `old-blog`; `play` = official default)
 - One-click self-host: single origin on Cloudflare Workers Static Assets / Vercel / Netlify (not wildcard)
 - In-app share links: prefer `location.origin`; docs examples use `play`

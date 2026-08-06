@@ -1,10 +1,10 @@
 # Playgrounds 跨場 Roster／Avatar 計劃（DEC-045）
 
-> **狀態：** Phase 0–3 **已落地**；Phase 4.1–4.2 **已落地**（邀請連結＋相機掃 QR；薄 CF room／TURN 未做）  
+> **狀態：** Phase 0–3 **已落地**；Phase 4.1–4.2 **已落地**（邀請連結＋相機掃 QR）；薄 CF rendezvous → [PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)／DEC-047；TURN 未做  
 > **權威決策：** [DECISIONS.md](./DECISIONS.md) **DEC-045**  
-> **相關：** DEC-017（側欄 Files／總管）、DEC-023（本地 session；邀請＋protocol 規格＋型錄 lazy install）、DEC-031（peer／homePeer／virtual actor）、DEC-038（WebRTC 通道路線）、DEC-042（場網／無租戶）、DEC-046（型錄查詢）、[GLOSSARY.md](./GLOSSARY.md)
+> **相關：** DEC-017（側欄 Files／總管）、DEC-023（本地 session；邀請＋protocol 規格＋型錄 lazy install）、DEC-031（peer／homePeer／virtual actor）、DEC-038（WebRTC 通道路線）、DEC-042（場網／無租戶）、DEC-046（型錄查詢）、DEC-047（Platform Invite／signal）、[GLOSSARY.md](./GLOSSARY.md)
 
-一句話：**薄 signaling 只完成一次經樣板壓縮的 offer／answer；連上後只走 WebRTC；Roster＝本場連線使用者名冊；每位連線者在本場自動出現一個 Avatar（薄投影 SAM／User agent），權威與執行仍在對方 `homePeer`，經 Roster DataChannel 轉。Session 入座不為 Avatar 特規——邀請附完整 protocol 規格，遊樂場以型錄為虛擬可用集合、lazy install 兌現相容 SAM。**
+一句話：**薄 signaling 只完成每握手槽一次經樣板壓縮的 offer／answer；連上後只走 WebRTC；Roster＝本場連線使用者名冊（可同時多 peer）；每位連線者在本場自動出現一個 Avatar（薄投影 SAM／User agent），權威與執行仍在對方 `homePeer`，經 Roster DataChannel 轉。Session 入座不為 Avatar 特規——邀請附完整 protocol 規格，遊樂場以型錄為虛擬可用集合、lazy install 兌現相容 SAM。**
 
 ---
 
@@ -12,7 +12,7 @@
 
 | 概念 | 意思 |
 | --- | --- |
-| **Roster** | 跟**當前這場**連上的使用者列表（連線名冊）＋ peer／DataChannel 管線。舊稱 Visit。 |
+| **Roster** | 跟**當前這場**連上的使用者列表（連線名冊）＋ peer／DataChannel 管線。**可同時多 peer**。舊稱 Visit。 |
 | **Avatar／化身** | 每位連線使用者在**本場**自動建立的 **User agent 投影**：薄 SAM／proxy；可 agent 模式執行；有 UI。**線上** tab 卡片＝該投影 SAM 的呈現面（不是場殼手畫的終態列表項）。 |
 | **homePeer 真身** | 對方場裡的實際 agent／執行與沙盒權威；mailbox／狀態真相在彼。 |
 | **為什麼叫化身** | Avatar 代替真實使用者，在本場裡當虛擬代理／投影——不是對方本機的 clone。 |
@@ -60,11 +60,11 @@
 | 項 | 決定 |
 | --- | --- |
 | **位置** | 左側側欄 **線上** tab（label＝`線上`；鍵 `avatars`），與 **Files／總管** 並列（三 tab）。內容＝連線中的 Avatar／化身投影列表（概念名仍可稱化身；tab 用語對一般使用者用「線上」） |
-| **內容** | 預設＝**線上名冊**（Roster 列表）；**發起／加入** 為 CTA，表單按需展開（名冊有人時仍可邀請另一人；目前實作同時僅一 peer，新連線會結束現有）。角色＝initiator／responder（UI 不說場主／訪客；亦不暴露 offer／answer 等術語） |
+| **內容** | 預設＝**線上名冊**（Roster 列表）；**發起／加入** 為 CTA，表單按需展開（名冊有人時仍可邀請另一人）。**規格需求：可同時多 peer**（多名冊／多 Avatar）；握手可串行。**現況實作缺口：** 同時僅一 peer，新連線會結束現有——應對齊多 peer 後消除。角色＝initiator／responder（UI 不說場主／訪客；亦不暴露 offer／answer 等術語）。Platform Invite 路徑誰出 offer 見 [PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md) |
 | **空態** | 無連線時列表為空 |
 | **頭像** | 每個 Avatar **預設 identicon**（本機由穩定 id 衍生；不預設外站圖） |
 | **自訂圖** | 可後段；不擋 MVP |
-| **白話對照** | 邀請＝offer；回覆＝answer；QR＝QR code；同一區網＝lan |
+| **白話對照** | OOB：邀請≈發起方 offer、回覆≈answer；Platform Invite：加入者出 offer、邀請者回 answer（使用者仍說邀請／加入）。QR＝QR code；同一區網＝lan |
 
 layout 還原：側欄 tab 鍵 `avatars`（與 `files`／`agent` 一併 persist）。
 
@@ -76,22 +76,25 @@ layout 還原：側欄 tab 鍵 `avatars`（與 `files`／`agent` 一併 persist�
 
 | 規則 | 說明 |
 | --- | --- |
-| **每房一次 handshake** | 恰好 **1× offer**＋**1× answer** |
+| **每握手槽一次** | 恰好 **1× offer**＋**1× answer**（≠ 全場只能一 peer） |
 | **非 trickle** | ICE 收齊後再發布；**無** candidate 訊息類型 |
 | **樣板壓縮** | 剪裁必要欄位 → 固定樣板編碼／解碼還原 SDP；**不**傳完整原始 SDP |
 | **同區網（可選）** | 宣告 peers 同一 LAN 時，offer／answer **進一步剪裁**（載荷標明模式；雙方一致） |
-| **交換方式** | **QR** 或 **文字**（複製／貼上）同等；同一壓縮字串 |
-| **QR 尺寸** | 載荷須小到**單張 QR 易掃**；過大則失敗提示，勿默認多碼拼圖 |
-| **用完即銷** | answer 被取走、連線成功、失敗或 TTL → 銷房；拒再寫 |
-| **無重談** | 需重連或改模式 → **新邀請／新房**；舊碼作廢 |
+| **交換方式** | **QR** 或 **文字**（複製／貼上）同等；同一壓縮字串；可選 Platform 短連結 rendezvous |
+| **QR 尺寸** | 載荷須小到**單張 QR 易掃**；Platform 邀請 QR **預設短連結**（見 DEC-047） |
+| **用完即銷** | 該握手槽：answer 完成、失敗或 TTL → 銷槽；拒再寫 |
+| **無重談** | 需重連該 peer → **新握手**；舊槽作廢。**已連線 peer 重用**，不經 Platform／OOB 再跑 O／A（見 DEC-047） |
 | **無資料面** | 伺服器永不轉發 session／mailbox／FS／Avatar 投影流量 |
 | **格式統一** | QR／文字／薄 rendezvous **同一壓縮格式**（含同區網旗標） |
+| **多 peer** | **需求**可同時多條已連線 peer；Platform 路徑握手可**排隊串行**（DEC-047） |
 
 建議 wire 形狀：`{ v, role: "offer"|"answer", tpl, lan?, fields… }`（樣板版號＋可選同區網＋變動欄；細節以實作為準）。
 
+**OOB vs Platform：** OOB（`#roster=`／QR／文字）＝發起者 offer。Platform Invite＝加入者 offer、邀請者 answer、一連結多人、排隊——見 [PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)。
+
 **同區網剪裁（建議方向，非鎖死實作）：** 優先 host candidates；略過需公網 STUN／relay 的候選；fingerprint／ufrag／pwd 仍必備。誤選 → 連線失敗時提示改「一般／跨網」並發**新** offer／answer。
 
-**Rate limit（建議）：** 每 IP 開房／join 上限；每碼僅允許一次 answer；錯碼計入；可疊 CF Free zone 一條 path 規則。
+**Rate limit（建議）：** 每 IP 開槽／join 上限；每槽僅允許一次 answer；錯碼計入；可疊 CF Free zone 一條 path 規則。
 
 ---
 
@@ -104,7 +107,7 @@ layout 還原：側欄 tab 鍵 `avatars`（與 `files`／`agent` 一併 persist�
 | **2. Presence stub＋側欄** | 連入後雙方列表＋identicon；斷線清除 | 雙方互見對方 stub（投影 SAM 前身） | **完成** |
 | **2.5. 投影 Avatar SAM** | 連上即在本場 spawn 薄投影 Avatar；卡片掛其 UI；DataChannel 轉發 | 斷線撕投影；權威仍在 homePeer | **完成** |
 | **3. Session bridge** | 遠端 invite／`act`／事件經投影轉 homePeer；**邀請附完整 protocol 規格**；型錄匹配／**lazy install**；修訂 DEC-023 遠端範圍 | 狗糧可邀遠端 Avatar 入座；與本機 Participant 同一協定閘 | **完成**（3.1 邀請＋proxy；3.2 act／事件；3.3 型錄／lazy install） |
-| **4. UX** | 開放連入／邀請連結／權限 | 非工程使用者可走完 | **進行中**（4.1 連結；**4.2 相機掃 QR**；薄 room／TURN 另段） |
+| **4. UX** | 開放連入／邀請連結／權限 | 非工程使用者可走完 | **進行中**（4.1 連結；**4.2** 相機掃 QR；**4.3** Platform Invite＝[計劃](./PG-PLATFORM-API-PLAN.md)；**4.4 多 peer 並存**（消除單 peer 實作缺口）；TURN 另段） |
 | **5.（可選）** | 自備 TURN；mailbox 跨 peer；自訂頭像 | 另規 | 未開始 |
 
 ---
@@ -133,3 +136,5 @@ layout 還原：側欄 tab 鍵 `avatars`（與 `files`／`agent` 一併 persist�
 | 2026-08-05 | Phase 3 第三刀：接受路徑 `resolveInviteCandidatesWithInstalled`＋clone／GitHub lazy install；brainstorm 內建後備；coding-orch 預填 `pg-llm-agent` |
 | 2026-08-05 | Phase 4.1：`#roster=<wire>` 邀請連結；複製邀請／回覆連結；開啟連結確認後加入；貼上可剝 URL |
 | 2026-08-05 | Phase 4.2：相機即時掃邀請／回覆 QR（BarcodeDetector 或 canvas＋`qr/decode`）；檔案上傳掃碼保留 |
+| 2026-08-06 | Phase 4.3 指向 DEC-047／`PG-PLATFORM-API-PLAN.md`（Invite＋薄 signal；非本計劃內自建 CF room） |
+| 2026-08-06 | **多 peer** 升為規格需求（現單 peer＝實作缺口）；Platform：一連結多人、加入者 offer、握手排隊 |

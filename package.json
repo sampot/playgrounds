@@ -20,6 +20,9 @@
     "docs:build": "npm run build --prefix docs-site",
     "docs:deploy": "npm run deploy --prefix docs-site",
     "docs:deploy:dry": "npm run deploy:dry --prefix docs-site",
+    "platform:dev": "npm run dev --prefix platform-api",
+    "platform:test": "npm test --prefix platform-api",
+    "platform:deploy": "npm run deploy --prefix platform-api",
     "test": "vitest run",
     "test:watch": "vitest",
     "sam-host": "node --experimental-strip-types --experimental-transform-types src/sam-host/node/cli.ts"
