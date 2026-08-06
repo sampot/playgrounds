@@ -1,6 +1,6 @@
 # SAM 小品型錄人機 UX（Draft）
 
-> **狀態：** Draft（契約；未開始實作）  
+> **狀態：** Phase 2–5 **已落地**（2026-08-06）；Phase 0 契約仍適用  
 > **相關：** DEC-041（`/sam/` 入場網）、DEC-004（敘事）、DEC-025（`?open=`）、DEC-046／[PG-CATALOG-QUERY-PLAN.md](./PG-CATALOG-QUERY-PLAN.md)（機器查詢）、[PG-CATALOG-PLAN.md](./PG-CATALOG-PLAN.md)（YAML 權威）、[PG-SVELTEKIT-PLAN.md](./PG-SVELTEKIT-PLAN.md)（宿主改 SvelteKit；載體）
 
 一句話：**`/sam/` 是場網 PWA 的「找 SAM、一鍵開進本場」面——脫離部落格散文 layout 與「必用 Astro 靜態頁」假設；規模成長靠搜尋／filter／密度，資料權威仍 YAML＋gen。**
@@ -25,19 +25,17 @@
 
 ---
 
-## 問題（現況）
+## 問題（現況 → 已對）
 
-現行 `src/pages/sam/index.astro`（遷移自部落格）大致為：
-
-| 層 | 現狀 | 痛點 |
+| 層 | 舊痛點 | 現況 |
 | --- | --- | --- |
-| 版面 | 內容 `max-width ≈ 64rem`；hero／footnote ≈ `42rem` | 散文欄寬，非貨架／索引 |
-| 導覽 | kind tab → series jump → card grid | 無搜尋；系列變多時 jump 噪訊 |
-| 卡片 | 固定高度＋blurb；「一鍵開」多靠 hover | 密度低；觸控不友善 |
-| 架構 | 獨立 document；殼「玩玩看」再鏈出 `/sam/` | 跳出 PWA 主路徑；開場多一 hop |
-| 資料 | ~60+ 筆且持續增；`picks.yaml` 殼有用、全庫頁幾乎未當貨架 | 精選／全庫未在人機面統一 |
+| 版面 | 散文欄寬 | 近全寬；寬螢幕左 filter、右結果 |
+| 導覽 | kind tab、無搜尋 | 即時搜尋＋kind／series chips（可多選） |
+| 卡片 | hover 才露 CTA、密度低 | compact 預設；「一鍵開」常駐 |
+| 架構 | 跳出殼 hop | `/sam/` Kit route＋殼內型錄 dialog（同元件） |
+| 資料 | picks 未當貨架 | 精選貨架＋全庫同一流 |
 
-機器查詢面（DEC-046）已夠用；缺的是**人機產品面**。
+機器查詢面（DEC-046）已夠用；人機產品面見下。
 
 ---
 
@@ -71,14 +69,14 @@
 | **不綁 Astro** | 見 DEC-048／[PG-SVELTEKIT-PLAN.md](./PG-SVELTEKIT-PLAN.md) |
 | **薄深鏈** | `/sam/` 可 prerender shell＋meta；互動在 client |
 
-殼內已有 picks「玩玩看」與「看全部小品」外鏈——目標是**收成同一流**，避免「推薦在殼、全庫在另一站」。
+殼內已有 picks「玩玩看」與「看全部小品」——目標是**收成同一流**，避免「推薦在殼、全庫在另一站」。
 
 ---
 
-## 資訊架構（建議）
+## 資訊架構
 
 ```text
-/sam/ （或殼 catalog mode）
+/sam/ （或殼 catalog panel）
   ├─ 精選貨架 ← picks.yaml（顯示順序）
   ├─ 搜尋框 + kind／series filters
   └─ 結果列表（compact；可切 density）
@@ -87,18 +85,20 @@
 
 系列仍是策展軸（`series.yaml`），但是「逛」的輔助，不是唯一導覽。
 
+**實作：** `src/components/sam-catalog/SamCatalogBrowser.svelte`（頁＋殼共用）；查詢 helpers 在 `samCatalog.ts`（`filterCatalogEntries`／`parseCatalogUrlSearch`）。
+
 ---
 
 ## 階段
 
 | Phase | 內容 | 完成定義 | 狀態 |
 | --- | --- | --- | --- |
-| **0. 契約** | 本計劃；與 CATALOG／QUERY／SVELTEKIT 交叉引用 | 定位／非目標無歧義 | **進行中**（本文件） |
-| **1. 載體** | `/sam/` 落在 Kit route 或殼內面（對等功能可先） | 不再依賴 Astro 大頁為唯一實作 | **完成**（Kit `src/routes/sam/`；UX 大改仍開） |
-| **2. 找得到** | 搜尋＋kind／series filter；URL query 可還原 | 60+ 筆可鍵入命中；分享 `?q=` 可用 | 未開始 |
-| **3. 雙速＋密度** | picks 貨架＋compact 預設；CTA 常駐 | 首屏非長文；觸控可一鍵開 | 未開始 |
-| **4. 殼合流** | 「玩玩看」↔ 全庫同一元件／狀態；減少整頁跳出 | 空場／工具列進型錄不丟殼情境（合理範圍內） | 未開始 |
-| **5. 打磨** | 鍵盤、a11y、空結果、footnote／投稿鏈 | 基本無障礙與行動可用 | 未開始 |
+| **0. 契約** | 本計劃；與 CATALOG／QUERY／SVELTEKIT 交叉引用 | 定位／非目標無歧義 | **完成** |
+| **1. 載體** | `/sam/` 落在 Kit route 或殼內面（對等功能可先） | 不再依賴 Astro 大頁為唯一實作 | **完成**（Kit `src/routes/sam/`） |
+| **2. 找得到** | 搜尋＋kind／series filter；URL query 可還原 | 60+ 筆可鍵入命中；分享 `?q=` 可用 | **完成** |
+| **3. 雙速＋密度** | picks 貨架＋compact 預設；CTA 常駐 | 首屏非長文；觸控可一鍵開 | **完成** |
+| **4. 殼合流** | 「玩玩看」↔ 全庫同一元件／狀態；減少整頁跳出 | 空場／工具列進型錄不丟殼情境（合理範圍內） | **完成**（殼內 catalog dialog） |
+| **5. 打磨** | 鍵盤、a11y、空結果、footnote／投稿鏈 | 基本無障礙與行動可用 | **完成** |
 
 ---
 
@@ -110,6 +110,8 @@
 
 `page.yaml` 文案可縮短 lede；結構欄位可保留供 footnote／title／description。
 
+可分享 query：`?q=`、`?kind=`（逗號多選）、`?series=`（逗號多選）。舊 `#tool`／`#series-…` hash 進頁時會還原為 filter。
+
 ---
 
 ## 修訂紀錄
@@ -117,3 +119,5 @@
 | 日期 | 變更 |
 | --- | --- |
 | 2026-08-06 | 初稿：脫部落格 layout；PWA／殼載體；搜尋／密度／picks；與 SvelteKit 計劃分冊 |
+| 2026-08-06 | Phase 2–5 落地：`SamCatalogBrowser`、URL filter、殼內 dialog、compact CTA |
+| 2026-08-06 | 分享：Web Share API（支援時）＋剪貼簿 fallback；列／篩選／殼開啟連結 |

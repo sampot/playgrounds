@@ -366,6 +366,15 @@ html[data-theme="dark"] .playgrounds-menu-danger:focus-visible:not(:disabled) {
   text-decoration: underline;
   text-decoration-style: dashed;
   text-underline-offset: 3px;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+.playgrounds-play-link:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 .playgrounds-play-picks {
   display: grid;

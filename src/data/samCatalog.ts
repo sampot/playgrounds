@@ -3,7 +3,7 @@
  * Authority: `catalog/entries/*.yaml` (see `npm run catalog:gen`).
  */
 
-import { buildCanonicalOpenUrl } from "../utils/playgroundsUrls";
+import { buildCanonicalOpenUrl, fieldShareOrigin } from "../utils/playgroundsUrls";
 import {
   GENERATED_SAM_CATALOG,
   GENERATED_SAM_KIND_LABEL,
@@ -417,6 +417,29 @@ export function samOpenCanonicalHref(
   });
 }
 
+/**
+ * Absolute open URL for sharing (DEC-042: this field's origin by default).
+ */
+export function samOpenShareHref(
+  entry: Pick<SamEntry, "title" | "source">,
+  origin: string = fieldShareOrigin()
+): string {
+  return buildCanonicalOpenUrl(samEntryOpenSource(entry), {
+    origin,
+    name: entry.title,
+  });
+}
+
+/** Absolute `/sam/` browse URL for the current filter (shareable). */
+export function catalogBrowseShareHref(
+  filter: CatalogHumanFilter,
+  origin: string = fieldShareOrigin()
+): string {
+  const base = origin.replace(/\/$/, "");
+  const qs = catalogUrlSearchParams(filter).toString();
+  return `${base}/sam/${qs ? `?${qs}` : ""}`;
+}
+
 /** Public repo page for an entry (GitHub or GitLab). */
 export function samSourceHref(source: string): string {
   const s = source.trim();
@@ -520,4 +543,131 @@ export function samCatalogByKind(): SamKindBlock[] {
       seriesBlocks,
     };
   }).filter(block => block.seriesBlocks.length > 0);
+}
+
+/** Human-facing filter state for `/sam/`（DEC-046 機器查詢之外的人機面）. */
+export type CatalogHumanFilter = {
+  q: string;
+  kinds: SamKind[];
+  series: string[];
+};
+
+export type CatalogDensity = "compact" | "comfortable";
+
+const KIND_SET = new Set<string>(SAM_KIND_ORDER);
+
+function parseCsvParam(raw: string | null): string[] {
+  if (!raw?.trim()) return [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const part of raw.split(",")) {
+    const t = part.trim();
+    if (!t || seen.has(t)) continue;
+    seen.add(t);
+    out.push(t);
+  }
+  return out;
+}
+
+/** Parse `?q=`／`?kind=`／`?series=` from a search string or URLSearchParams. */
+export function parseCatalogUrlSearch(
+  search: string | URLSearchParams
+): CatalogHumanFilter {
+  const params =
+    typeof search === "string"
+      ? new URLSearchParams(
+          search.startsWith("?") ? search.slice(1) : search
+        )
+      : search;
+  const kinds = parseCsvParam(params.get("kind")).filter((k): k is SamKind =>
+    KIND_SET.has(k)
+  );
+  return {
+    q: (params.get("q") ?? "").trim(),
+    kinds,
+    series: parseCsvParam(params.get("series")),
+  };
+}
+
+/** Build shareable query params（omit empty）. */
+export function catalogUrlSearchParams(
+  filter: CatalogHumanFilter
+): URLSearchParams {
+  const params = new URLSearchParams();
+  const q = filter.q.trim();
+  if (q) params.set("q", q);
+  if (filter.kinds.length) params.set("kind", filter.kinds.join(","));
+  if (filter.series.length) params.set("series", filter.series.join(","));
+  return params;
+}
+
+/** Case-insensitive match against title／id／blurb／series／kind（+ label）. */
+export function entryMatchesCatalogQuery(
+  entry: SamEntry,
+  q: string
+): boolean {
+  const needle = q.trim().toLowerCase();
+  if (!needle) return true;
+  const hay = [
+    entry.title,
+    entry.id,
+    entry.blurb,
+    entry.series,
+    entry.kind,
+    SAM_KIND_LABEL[entry.kind],
+    entry.source,
+  ]
+    .join("\n")
+    .toLowerCase();
+  return hay.includes(needle);
+}
+
+/**
+ * Filter listed catalog for human browse（AND across dimensions）.
+ * Empty `kinds`／`series` = no restriction on that axis.
+ */
+export function filterCatalogEntries(
+  catalog: readonly SamEntry[] = samCatalog,
+  filter: CatalogHumanFilter = { q: "", kinds: [], series: [] }
+): SamEntry[] {
+  const kinds =
+    filter.kinds.length > 0 ? new Set<SamKind>(filter.kinds) : null;
+  const series =
+    filter.series.length > 0
+      ? new Set(filter.series.map(s => s.trim()).filter(Boolean))
+      : null;
+  return catalog.filter(e => {
+    if (kinds && !kinds.has(e.kind)) return false;
+    if (series && !series.has(e.series)) return false;
+    return entryMatchesCatalogQuery(e, filter.q);
+  });
+}
+
+/** Series labels present in catalog（optionally scoped to selected kinds）. */
+export function catalogSeriesOptions(
+  catalog: readonly SamEntry[] = samCatalog,
+  kinds?: readonly SamKind[]
+): string[] {
+  const kindSet = kinds?.length ? new Set(kinds) : null;
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const preferOrder = new Map<string, number>();
+  let ord = 0;
+  for (const kind of SAM_KIND_ORDER) {
+    if (kindSet && !kindSet.has(kind)) continue;
+    for (const s of seriesOrderFor(kind)) {
+      if (!preferOrder.has(s)) preferOrder.set(s, ord++);
+    }
+  }
+  for (const e of catalog) {
+    if (kindSet && !kindSet.has(e.kind)) continue;
+    if (seen.has(e.series)) continue;
+    seen.add(e.series);
+    out.push(e.series);
+  }
+  return out.sort((a, b) => {
+    const ia = preferOrder.has(a) ? preferOrder.get(a)! : 10_000;
+    const ib = preferOrder.has(b) ? preferOrder.get(b)! : 10_000;
+    return ia - ib || a.localeCompare(b, "zh-Hant");
+  });
 }

@@ -33,6 +33,7 @@ Reader-facing narrative stays personal／non-product (blog DEC-004).
 
 - `src/routes/` — SvelteKit routes（`/` 場殼、`/sam/` 型錄）
 - `src/components/playgrounds/` — shell UI
+- `src/components/sam-catalog/` — 型錄人機面（`SamCatalogBrowser`；頁＋殼共用）
 - `catalog/` — SAM catalog YAML sources（`/sam/` authority; see `catalog/README.md`）
 - `src/data/samCatalog.ts` — catalog API／query（imports generated data；`/catalog/v1.json`）
 - `public/catalog/v1.json` — machine-readable catalog（same gen as typed module）
@@ -42,7 +43,7 @@ Reader-facing narrative stays personal／non-product (blog DEC-004).
 - `docs-site/` — Starlight docs (DEC-043; separate Worker; **not** SvelteKit)
 - `platform-api/` — Platform API Invite／signaling (DEC-047; separate Worker)
 - `docs/PG-SVELTEKIT-PLAN.md` — 宿主 Astro→SvelteKit（Phase 1–6 landed）
-- `docs/PG-CATALOG-UX-PLAN.md` — 型錄人機 UX
+- `docs/PG-CATALOG-UX-PLAN.md` — 型錄人機 UX（Phase 2–5 landed）
 - `wrangler.jsonc` — single-site self-host (README Deploy to Cloudflare)
 - `wrangler.official.jsonc` — author field-net
 - `vercel.json` / `netlify.toml` — README one-click Vercel / Netlify

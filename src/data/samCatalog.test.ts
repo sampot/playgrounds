@@ -4,8 +4,13 @@ import { join } from "node:path";
 import {
   SAM_CATALOG_JSON_PATH,
   SAM_PLAYGROUNDS_PICK_REPOS,
+  catalogBrowseShareHref,
   catalogProtocolMatches,
+  catalogSeriesOptions,
+  catalogUrlSearchParams,
+  entryMatchesCatalogQuery,
   entrySupportsProtocol,
+  filterCatalogEntries,
   findCatalogBySource,
   getCatalogEntry,
   isSampotCatalogSource,
@@ -13,16 +18,19 @@ import {
   matchCatalogForProtocol,
   matchInstalledForProtocol,
   normalizeCatalogSource,
+  parseCatalogUrlSearch,
   resolveCatalogInviteCandidates,
   resolveInviteCandidates,
   samCatalog,
   samEntryOpenSource,
   samOpenHref,
+  samOpenShareHref,
   samPlaygroundsPicks,
   samSourceHref,
   type SamEntry,
   type SessionProtocolSpec,
 } from "./samCatalog";
+import { PLAYGROUNDS_CANONICAL_ORIGIN } from "../utils/playgroundsUrls";
 
 describe("samPlaygroundsPicks", () => {
   it("resolves curated ids in order from the live catalog", () => {
@@ -306,5 +314,82 @@ describe("generated catalog smoke", () => {
     expect(new Set(ids).size).toBe(ids.length);
     const steward = samCatalog.find(e => e.id === "pg-steward");
     expect(steward?.source).toBe("sampot/pg-steward");
+  });
+});
+
+describe("catalog human filter (UX)", () => {
+  it("matches query against title／id／blurb／series／kind", () => {
+    const entry = getCatalogEntry("pg-breakout")!;
+    expect(entryMatchesCatalogQuery(entry, "磚")).toBe(true);
+    expect(entryMatchesCatalogQuery(entry, "pg-breakout")).toBe(true);
+    expect(entryMatchesCatalogQuery(entry, "遊戲")).toBe(true);
+    expect(entryMatchesCatalogQuery(entry, "nope-xyz")).toBe(false);
+    expect(entryMatchesCatalogQuery(entry, "  ")).toBe(true);
+  });
+
+  it("filters by q＋kind＋series (AND)", () => {
+    const byKind = filterCatalogEntries(samCatalog, {
+      q: "",
+      kinds: ["game"],
+      series: [],
+    });
+    expect(byKind.length).toBeGreaterThan(0);
+    expect(byKind.every(e => e.kind === "game")).toBe(true);
+
+    const bySeries = filterCatalogEntries(samCatalog, {
+      q: "",
+      kinds: [],
+      series: ["街機"],
+    });
+    expect(bySeries.every(e => e.series === "街機")).toBe(true);
+
+    const hit = filterCatalogEntries(samCatalog, {
+      q: "breakout",
+      kinds: ["game"],
+      series: [],
+    });
+    expect(hit.map(e => e.id)).toContain("pg-breakout");
+  });
+
+  it("round-trips URL search params", () => {
+    const parsed = parseCatalogUrlSearch("?q=hash&kind=tool,game&series=日常");
+    expect(parsed).toEqual({
+      q: "hash",
+      kinds: ["tool", "game"],
+      series: ["日常"],
+    });
+    expect(catalogUrlSearchParams(parsed).toString()).toBe(
+      "q=hash&kind=tool%2Cgame&series=%E6%97%A5%E5%B8%B8"
+    );
+    expect(parseCatalogUrlSearch("").q).toBe("");
+    expect(parseCatalogUrlSearch("kind=nope").kinds).toEqual([]);
+  });
+
+  it("lists series options scoped by kind", () => {
+    const all = catalogSeriesOptions();
+    expect(all.length).toBeGreaterThan(5);
+    const tools = catalogSeriesOptions(samCatalog, ["tool"]);
+    expect(tools.every(s => samCatalog.some(e => e.kind === "tool" && e.series === s))).toBe(
+      true
+    );
+  });
+
+  it("builds absolute share hrefs for open and browse", () => {
+    const entry = getCatalogEntry("pg-breakout")!;
+    expect(samOpenShareHref(entry, PLAYGROUNDS_CANONICAL_ORIGIN)).toBe(
+      "https://play.samkuo.me/?open=sampot%2Fpg-breakout&name=%E6%89%93%E7%A3%9A%E5%A1%8A"
+    );
+    expect(
+      catalogBrowseShareHref(
+        { q: "hash", kinds: ["tool"], series: [] },
+        PLAYGROUNDS_CANONICAL_ORIGIN
+      )
+    ).toBe("https://play.samkuo.me/sam/?q=hash&kind=tool");
+    expect(
+      catalogBrowseShareHref(
+        { q: "", kinds: [], series: [] },
+        PLAYGROUNDS_CANONICAL_ORIGIN
+      )
+    ).toBe("https://play.samkuo.me/sam/");
   });
 });

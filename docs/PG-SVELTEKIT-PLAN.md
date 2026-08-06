@@ -1,6 +1,6 @@
 # Playgrounds 宿主：Astro → SvelteKit（DEC-048）
 
-> **狀態：** Phase 1–6 **完成**（2026-08-06）；Phase 7 型錄 UX 另追  
+> **狀態：** Phase 1–6 **完成**（2026-08-06）；Phase 7 型錄 UX 見 [PG-CATALOG-UX-PLAN.md](./PG-CATALOG-UX-PLAN.md)（Phase 2–5 已落地）  
 > **權威決策：** [DECISIONS.md](./DECISIONS.md) **DEC-048**  
 > **相關：** DEC-005（Svelte 5 **runes**）、DEC-009（SW／離線）、DEC-041／042（場網／Workers）、DEC-043（文件站仍 Starlight）、[PG-CATALOG-UX-PLAN.md](./PG-CATALOG-UX-PLAN.md)（型錄人機面）、[PG-STANDALONE-PLAN.md](./PG-STANDALONE-PLAN.md)、[PG-DOCS-PLAN.md](./PG-DOCS-PLAN.md)
 

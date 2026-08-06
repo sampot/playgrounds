@@ -354,6 +354,8 @@
     playgroundsCanonicalHomeUrl,
     playgroundsHomePath,
   } from "./playgroundsPaths";
+  import SamCatalogBrowser from "@components/sam-catalog/SamCatalogBrowser.svelte";
+  import SamCatalogPicksShelf from "@components/sam-catalog/SamCatalogPicksShelf.svelte";
   import {
     SAM_KIND_LABEL,
     samCatalog,
@@ -361,6 +363,12 @@
     samPlaygroundsPicks,
     type SamEntry,
   } from "../../data/samCatalog";
+  import {
+    canUseWebShare,
+    isShareAbort,
+    shareOrCopy,
+  } from "../../utils/shareOrCopy";
+  import { fieldShareOrigin } from "../../utils/playgroundsUrls";
 
   const MIGRATE_BANNER_SESSION_KEY = "playgrounds-migrate-banner-v1";
 
@@ -526,6 +534,9 @@
   let newProjectTemplate = $state<ProjectTemplateId>("general");
   let busy = $state(false);
   let projectDialogOpen = $state(false);
+  let catalogBrowserOpen = $state(false);
+  let catalogBrowserEl = $state<HTMLDialogElement | null>(null);
+  let canWebShare = $state(false);
   let projectPickerOpen = $state(false);
   /** Prefix filter while the dropdown is open (empty = show all). */
   let projectPickerFilter = $state("");
@@ -1956,6 +1967,22 @@
   function closeProjectDialog() {
     projectDialogOpen = false;
     dialogEl?.close();
+  }
+
+  function openCatalogBrowser() {
+    error = null;
+    closeProjectDialog();
+    catalogBrowserOpen = true;
+    queueMicrotask(() => catalogBrowserEl?.showModal());
+  }
+
+  function closeCatalogBrowser() {
+    catalogBrowserOpen = false;
+    catalogBrowserEl?.close();
+  }
+
+  function onCatalogBrowserClose() {
+    catalogBrowserOpen = false;
   }
 
   function selectNewProjectTemplate(id: ProjectTemplateId) {
@@ -4804,13 +4831,29 @@
   }
 
   async function handleCopyOpenLink(source?: string | null) {
+    const fromActive = source == null;
     const raw = (source ?? meta?.source ?? "").trim();
     error = null;
     try {
-      const url = buildPlaygroundsOpenUrl(raw);
-      await copyTextToClipboard(url);
-      status = "已複製開啟連結（對方開啟後會自動匯入）";
+      const url = buildPlaygroundsOpenUrl(raw, {
+        origin: fieldShareOrigin(),
+        ...(fromActive && meta?.name?.trim()
+          ? { name: meta.name.trim() }
+          : {}),
+      });
+      const title =
+        fromActive && meta?.name?.trim() ? meta.name.trim() : "遊樂場小品";
+      const result = await shareOrCopy({
+        title,
+        text: "一鍵開進遊樂場",
+        url,
+      });
+      status =
+        result === "shared"
+          ? "已分享開啟連結"
+          : "已複製開啟連結（對方開啟後會自動匯入）";
     } catch (e) {
+      if (isShareAbort(e)) return;
       error = e instanceof Error ? e.message : String(e);
     }
   }
@@ -4872,6 +4915,7 @@
       return;
     }
     closeProjectDialog();
+    closeCatalogBrowser();
     const ok = await runOpenFromUrl(intent);
     if (ok) maximizePreview();
   }
@@ -5385,6 +5429,7 @@
   }
 
   onMount(() => {
+    canWebShare = canUseWebShare();
     applyPlaygroundsPathsFromLocation({
       pathname: window.location.pathname,
       hostname: window.location.hostname,
@@ -6222,16 +6267,18 @@
               class={menuItem}
               disabled={busy || !canCopyOpenLink}
               onclick={() =>
-                runActionsMenu(() => void handleCopyOpenLink(meta?.source))
+                runActionsMenu(() => void handleCopyOpenLink())
               }
               title={canCopyOpenLink
-                ? "複製 play.samkuo.me/?open=… 連結，對方開啟後會自動匯入"
+                ? canWebShare
+                  ? "分享開啟連結（對方開啟後會自動匯入）"
+                  : "複製開啟連結，對方開啟後會自動匯入"
                 : "需有可分享來源（GitHub 或 .sam 網址）。本機範本／匯入檔無法直接產生連結"}
             >
               <span class={menuIcon} aria-hidden="true"
                 ><PgIcon name="link" size={13} /></span
               >
-              複製開啟連結
+              {canWebShare ? "分享開啟連結" : "複製開啟連結"}
             </button>
             <div
               class="border-skin-line my-1 border-t"
@@ -6441,9 +6488,11 @@
           </p>
           <p class="text-skin-base/55 m-0 mt-0.5 text-[11px] leading-snug">
             精選在下面；完整型錄見
-            <a class="text-skin-accent underline decoration-dashed underline-offset-2" href="/sam/"
-              >小品</a
-            >
+            <button
+              type="button"
+              class="text-skin-accent underline decoration-dashed underline-offset-2"
+              onclick={openCatalogBrowser}
+            >小品</button>
             。關掉此提示後，工具列按鈕還在。
           </p>
         </div>
@@ -6476,7 +6525,7 @@
           type="button"
           class="playgrounds-play-chip playgrounds-play-chip--more"
           disabled={busy}
-          onclick={() => openProjectDialog()}
+          onclick={openCatalogBrowser}
         >
           更多…
         </button>
@@ -7151,30 +7200,21 @@
                   <p class="playgrounds-empty-state-desc playgrounds-play-empty-desc">
                     點一款就會載入到這個瀏覽器——先玩玩，再改程式也行。
                   </p>
-                  <ul class="playgrounds-play-picks" aria-label="推薦小品">
-                    {#each playPicks as entry (entry.repo)}
-                      <li>
-                        <button
-                          type="button"
-                          class="playgrounds-play-pick"
-                          disabled={busy}
-                          onclick={() => void handleOpenCatalogEntry(entry)}
-                        >
-                          <span class="playgrounds-play-pick-kind"
-                            >{SAM_KIND_LABEL[entry.kind]}</span
-                          >
-                          <span class="playgrounds-play-pick-title"
-                            >{entry.title}</span
-                          >
-                          <span class="playgrounds-play-pick-blurb"
-                            >{entry.blurb}</span
-                          >
-                        </button>
-                      </li>
-                    {/each}
-                  </ul>
+                  <SamCatalogPicksShelf
+                    picks={playPicks}
+                    disabled={busy}
+                    showHeading={false}
+                    onOpen={entry => void handleOpenCatalogEntry(entry)}
+                  />
                   <div class="playgrounds-play-empty-actions">
-                    <a class="playgrounds-play-link" href="/sam/">看全部小品</a>
+                    <button
+                      type="button"
+                      class="playgrounds-play-link"
+                      disabled={busy}
+                      onclick={openCatalogBrowser}
+                    >
+                      看全部小品
+                    </button>
                     <button
                       type="button"
                       class="{btn} gap-1.5"
@@ -7804,32 +7844,26 @@
           玩玩看（小品）
         </p>
         <p class="text-skin-base/50 m-0 text-[11px] leading-relaxed">
-          站上
+          精選一鍵開進沙盒；或
+          <button
+            type="button"
+            class="text-skin-accent underline decoration-dashed underline-offset-2"
+            onclick={openCatalogBrowser}
+          >搜尋全庫</button>
+          （同型錄元件，不離開本場）。可分享頁見
           <a
             class="text-skin-accent underline decoration-dashed underline-offset-2"
             href="/sam/"
-            onclick={closeProjectDialog}>小品</a
-          >
-          型錄的精選；一鍵從 GitHub 開進沙盒，可直接玩也可再改。
+            onclick={closeProjectDialog}>/sam/</a
+          >。
         </p>
-        <ul class="playgrounds-play-picks playgrounds-play-picks--dialog" aria-label="推薦小品">
-          {#each playPicks as entry (entry.repo)}
-            <li>
-              <button
-                type="button"
-                class="playgrounds-play-pick"
-                disabled={busy}
-                onclick={() => void handleOpenCatalogEntry(entry)}
-              >
-                <span class="playgrounds-play-pick-kind"
-                  >{SAM_KIND_LABEL[entry.kind]}</span
-                >
-                <span class="playgrounds-play-pick-title">{entry.title}</span>
-                <span class="playgrounds-play-pick-blurb">{entry.blurb}</span>
-              </button>
-            </li>
-          {/each}
-        </ul>
+        <SamCatalogPicksShelf
+          picks={playPicks}
+          dense
+          showHeading={false}
+          disabled={busy}
+          onOpen={entry => void handleOpenCatalogEntry(entry)}
+        />
       </div>
 
       <div class="space-y-2">
@@ -7986,13 +8020,65 @@
             class="{btn} gap-1.5"
             disabled={busy || !canOpenShareSource}
             onclick={() => void handleCopyOpenLink(openShareSource)}
-            title="複製 play.samkuo.me/?open=… 到剪貼簿"
+            title={canWebShare
+              ? "分享開啟連結"
+              : "複製開啟連結到剪貼簿"}
           >
             <PgIcon name="link" size={13} />
-            複製開啟連結
+            {canWebShare ? "分享開啟連結" : "複製開啟連結"}
           </button>
         </div>
       </div>
+    </div>
+  </div>
+</dialog>
+
+<dialog
+  bind:this={catalogBrowserEl}
+  class="playgrounds-catalog-dialog playgrounds-dialog border-skin-line bg-skin-fill text-skin-base m-auto w-[min(72rem,calc(100%-1.25rem))] max-h-[min(52rem,calc(100%-1.25rem))] rounded-xl border p-0 shadow-2xl backdrop:bg-black/55"
+  onclose={onCatalogBrowserClose}
+>
+  <div class="flex max-h-[min(52rem,calc(100dvh-1.25rem))] flex-col">
+    <div class="playgrounds-dialog-head">
+      <div class="playgrounds-dialog-title-row">
+        <span class="playgrounds-dialog-icon" aria-hidden="true">
+          <PgIcon name="sparkles" size={16} />
+        </span>
+        <div class="min-w-0">
+          <h2 class="text-sm font-semibold">小品型錄</h2>
+          <p class="text-skin-base/55 mt-0.5 text-[11px]">
+            搜尋／篩選全庫，一鍵開進本場 · 可分享頁
+            <a
+              class="text-skin-accent underline decoration-dashed underline-offset-2"
+              href="/sam/"
+              onclick={closeCatalogBrowser}>/sam/</a
+            >
+          </p>
+        </div>
+      </div>
+      <button
+        type="button"
+        class="{btnIcon} text-skin-base/55"
+        onclick={closeCatalogBrowser}
+        aria-label="關閉"
+        title="關閉"
+      >
+        <PgIcon name="x" size={14} />
+      </button>
+    </div>
+    <div class="min-h-0 flex-1 overflow-auto">
+      {#if catalogBrowserOpen}
+        <SamCatalogBrowser
+          variant="panel"
+          syncUrl={false}
+          showHero={false}
+          showFootnote={false}
+          showPicks={true}
+          autofocusSearch={true}
+          disabled={busy}
+          onOpen={entry => void handleOpenCatalogEntry(entry)}
+        />
+      {/if}
     </div>
   </div>
 </dialog>

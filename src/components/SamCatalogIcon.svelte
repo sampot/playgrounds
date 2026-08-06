@@ -3,8 +3,14 @@
   let {
     repo,
     title,
-    class: className = '',
-  }: { repo: string; title: string; class?: string } = $props();
+    size = "md",
+    class: className = "",
+  }: {
+    repo: string;
+    title: string;
+    size?: "sm" | "md";
+    class?: string;
+  } = $props();
 
 const glyphs: Record<string, string> = {
   "pg-hashlab":
@@ -81,7 +87,13 @@ const fallback =
   let inner = $derived(glyphs[repo] ?? fallback);
 </script>
 
-<span class={["sam-icon", className].filter(Boolean).join(' ')} aria-hidden="true" {title}>
+<span
+  class={["sam-icon", size === "sm" && "sam-icon--sm", className]
+    .filter(Boolean)
+    .join(" ")}
+  aria-hidden="true"
+  {title}
+>
   <svg
     xmlns="http://www.w3.org/2000/svg"
     viewBox="0 0 24 24"
@@ -105,13 +117,25 @@ const fallback =
     border-radius: 0.65rem;
     color: rgb(var(--color-accent));
     background: color-mix(in oklab, rgb(var(--color-accent)) 14%, transparent);
-    border: 1px solid color-mix(in oklab, rgb(var(--color-accent)) 28%, rgb(var(--color-border)));
+    border: 1px solid
+      color-mix(in oklab, rgb(var(--color-accent)) 28%, rgb(var(--color-border)));
     flex-shrink: 0;
+  }
+
+  .sam-icon--sm {
+    width: 2.15rem;
+    height: 2.15rem;
+    border-radius: 0.45rem;
   }
 
   .sam-icon svg {
     width: 1.85rem;
     height: 1.85rem;
     display: block;
+  }
+
+  .sam-icon--sm svg {
+    width: 1.2rem;
+    height: 1.2rem;
   }
 </style>

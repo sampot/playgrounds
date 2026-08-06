@@ -10,6 +10,17 @@ export const PLAYGROUNDS_DEFAULT_FIELD_HOST = "play.samkuo.me";
 export const PLAYGROUNDS_CANONICAL_ORIGIN = `https://${PLAYGROUNDS_DEFAULT_FIELD_HOST}`;
 
 /**
+ * Origin for in-field share links (DEC-042): `location.origin` when in a
+ * browser; otherwise the canonical default field.
+ */
+export function fieldShareOrigin(): string {
+  if (typeof location !== "undefined" && location.origin) {
+    return location.origin;
+  }
+  return PLAYGROUNDS_CANONICAL_ORIGIN;
+}
+
+/**
  * Subdomains that must not run as a Playgrounds field (DEC-042 reserved).
  * `play` is the official default field — not listed here (it *is* a field).
  */

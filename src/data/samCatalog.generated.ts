@@ -58,7 +58,7 @@ export const GENERATED_SAM_PLAYGROUNDS_PICK_IDS: readonly string[] = [
 export const GENERATED_SAM_PAGE = {
   title: "SAM 小品",
   description: "開源純前端 SAM 型錄（僅供作為 Playgrounds 範本）：工具、代理、遊戲、玩具與影音繪圖——一鍵開進遊樂場。",
-  lede: "純前端單頁小程式（SAM），開源授權見各 repo。<strong>僅供作為 Playgrounds 範本</strong>——點「一鍵開」會在本場遊樂場載入；想改功能或手感，開進來再叫 AI 改一版。不是獨立產品或正式服務。",
+  lede: "在本場找到並開啟 SAM。<strong>僅供作為 Playgrounds 範本</strong>——不是獨立產品或正式服務。",
   footnote: "本頁所列皆<strong>僅供作為 Playgrounds 範本</strong>，方便一鍵開進沙盒試玩或改寫。歡迎以 PR 投稿（見 catalog/README.md）。遊戲類名稱與造型多為原創，並註明致敬的玩法類型；非正式商業機台或作品復刻。文件見 <a href=\"https://docs.samkuo.me/\" rel=\"noopener noreferrer\">docs.samkuo.me</a>；過程分享仍在 <a href=\"https://samkuo.me/\" rel=\"noopener noreferrer\">samkuo.me</a>。",
 } as const;
 
