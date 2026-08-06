@@ -2,6 +2,9 @@
 
 Independent Cloudflare Worker for Invite / thin WebRTC signaling (DEC-047).
 
+- **Production:** `https://api.samkuo.me`（custom domain → `playgrounds-platform-api`）
+- **workers.dev:** `https://playgrounds-platform-api.eavatar.workers.dev`
+
 ## Develop
 
 ```bash

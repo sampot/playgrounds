@@ -822,10 +822,11 @@
   7. **敘事：** 讀者向文案依 DEC-004（非產品／品牌／行銷腔）。
   8. **階段**以 [PG-DOCS-PLAN.md](./PG-DOCS-PLAN.md) 為準。
 - **Consequences:**
-  - 場網 Worker 繼續拒絕 `docs` 當場；wildcard 下 `docs` 流量以 **service binding** 轉發 `playgrounds-docs`（**禁止** 302→自身 URL，避免重導迴圈）。較具體 Route `docs.samkuo.me/*` 優先於 `*.samkuo.me/*`。
+  - 場網 Worker 繼續拒絕 `docs` 當場（保留名 → 302 apex）；**`docs.samkuo.me` 由 `playgrounds-docs` Custom Domain 服務**（與 `api.samkuo.me` 相同模式；**不**經場殼 service binding）。
   - ADR／計劃原文可續留 `docs/`；Starlight 為呈現層，須約定單一更新路徑，避免雙份漂移。
   - CI 可將文件部署與場殼部署分開。
   - 同步 [GLOSSARY.md](./GLOSSARY.md)、[AGENTS.md](../AGENTS.md)、[PG-DOCS-PLAN.md](./PG-DOCS-PLAN.md)。
+- **Revision（2026-08-06）：** 場殼不再以 service binding 轉發 docs；僅靠 docs Worker custom domain。
 
 ### DEC-044: Playgrounds 下方面板 dock（opt-in 與自選 SAM）
 

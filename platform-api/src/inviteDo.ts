@@ -1,3 +1,4 @@
+import { DurableObject } from "cloudflare:workers";
 import {
   HANDSHAKE_WAIT_MS,
   INVITE_TTL_MS,
@@ -40,13 +41,7 @@ async function sleep(ms: number): Promise<void> {
 }
 
 /** Invite mailbox + FIFO handshake queue (DEC-047 Phase 1). */
-export class InviteDurableObject {
-  private readonly ctx: DurableObjectState;
-
-  constructor(ctx: DurableObjectState, _env: unknown) {
-    this.ctx = ctx;
-  }
-
+export class InviteDurableObject extends DurableObject {
   private async load(): Promise<InviteRecord | null> {
     const raw = await this.ctx.storage.get<string>("record");
     if (!raw) return null;

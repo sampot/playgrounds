@@ -8,8 +8,8 @@
   "kv_namespaces": [
     {
       "binding": "STORE",
-      "id": "00000000000000000000000000000000",
-      "preview_id": "00000000000000000000000000000000"
+      "id": "8376c6427d3b4e1da440ed4960facbe1",
+      "preview_id": "c4ecea2b245c439ea9eafa738169e0aa"
     }
   ],
   "durable_objects": {
@@ -23,7 +23,13 @@
   "migrations": [
     {
       "tag": "v1",
-      "new_classes": ["InviteDurableObject"]
+      "new_sqlite_classes": ["InviteDurableObject"]
+    }
+  ],
+  "routes": [
+    {
+      "pattern": "api.samkuo.me",
+      "custom_domain": true
     }
   ]
 }
