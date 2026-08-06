@@ -14,11 +14,10 @@
     {
       "pattern": "docs.samkuo.me",
       "custom_domain": true
-    },
-    // More specific than field-net `*.samkuo.me/*` so docs is not swallowed.
-    {
-      "pattern": "docs.samkuo.me/*",
-      "zone_name": "samkuo.me"
     }
+    // Zone route `docs.samkuo.me/*` → this Worker is set in the dashboard
+    // (manual; do not re-add here — deploy token lacks workers_routes:edit).
+    // Needed so field-net `*.samkuo.me/*` → playgrounds does not swallow docs
+    // (Worker Routes take precedence over Custom Domains).
   ]
 }
