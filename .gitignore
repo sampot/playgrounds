@@ -1,6 +1,7 @@
 node_modules/
 dist/
 .astro/
+.svelte-kit/
 .wrangler/
 .DS_Store
 .env

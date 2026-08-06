@@ -6,6 +6,7 @@ This repo is the **Playgrounds** browser host ([sampot/playgrounds](https://gith
 - **DEC-042:** deploy on **Cloudflare Workers**; field net **`*.samkuo.me`** (same code, per-origin storage); default field **`play.samkuo.me`**
 - **DEC-043:** docs site **Starlight** at **`docs.samkuo.me`** (separate Worker; not a field) — see `docs/PG-DOCS-PLAN.md`
 - **DEC-047:** Platform API（Invite／薄 signaling）at **`api.samkuo.me`**；dashboard **`dash.samkuo.me`**（same Worker；`platform-api/`）— see `docs/PG-PLATFORM-API-PLAN.md`、`docs/PG-PLATFORM-DASH-SPEC.md`
+- **DEC-048：** 場網宿主＝**SvelteKit** 靜態 PWA（`adapter-static`；Workers ASSETS）— see `docs/PG-SVELTEKIT-PLAN.md`；型錄人機 UX Draft — `docs/PG-CATALOG-UX-PLAN.md`
 
 This repo is the **authoritative** host codebase. Do not push feature parity back into the blog mount.
 
@@ -14,13 +15,15 @@ Reader-facing narrative stays personal／non-product (blog DEC-004).
 ## UI／UX（硬）
 
 - **禁止瀏覽器原生 Dialog：** 不得使用 `alert`／`confirm`／`prompt`（或同等）向使用者確認或索取文字；一律用頁內 UI（確認面、表單、flash／toast）。見 `.cursor/rules/no-native-dialogs.mdc`。
+- **Svelte 5 runes（DEC-005）：** 本 repo 的 Svelte／SvelteKit 元件**必須**用 runes（`$state`／`$derived`／`$effect`／`$props` 等）。**禁止** legacy `export let`、`$:`、隱式 `let` 反應性。維持 `compilerOptions.runes: true`。
 
 ## Commands
 
 - `npm run dev` — local host (standalone paths: `/` + `/sam/` + `/canvas/`)
 - `npm run catalog:gen` — regenerate catalog typed module + `public/catalog/v1.json` from `catalog/**/*.yaml`
-- `npm test` — Vitest（runs `catalog:gen` via pretest）
-- `npm run build` — `catalog:gen` + `astro check` + static build
+- `npm test` — Vitest（runs `svelte-kit sync` + `catalog:gen` via pretest）
+- `npm run check` — `svelte-kit sync` + `svelte-check`
+- `npm run build` — `catalog:gen` + `check` + SvelteKit static build → `dist/`
 - `npm run deploy` — `wrangler deploy` (self-host / Deploy to Cloudflare button; root `wrangler.jsonc`)
 - `npm run deploy:official` — build + official field-net (`wrangler.official.jsonc` → `play.samkuo.me`)
 - `npm run docs:dev` / `docs:build` / `docs:deploy` — Starlight docs (`docs.samkuo.me`)
@@ -28,16 +31,18 @@ Reader-facing narrative stays personal／non-product (blog DEC-004).
 
 ## Layout
 
+- `src/routes/` — SvelteKit routes（`/` 場殼、`/sam/` 型錄）
 - `src/components/playgrounds/` — shell UI
 - `catalog/` — SAM catalog YAML sources（`/sam/` authority; see `catalog/README.md`）
 - `src/data/samCatalog.ts` — catalog API／query（imports generated data；`/catalog/v1.json`）
 - `public/catalog/v1.json` — machine-readable catalog（same gen as typed module）
-- `src/pages/sam/` — catalog page
 - `src/sam-runtime/` — portable SAM runtime
 - `src/sam-host/` — Node headless host
 - `public/sw.js` — canvas SW + offline shell
-- `docs-site/` — Starlight docs (DEC-043; separate Worker)
+- `docs-site/` — Starlight docs (DEC-043; separate Worker; **not** SvelteKit)
 - `platform-api/` — Platform API Invite／signaling (DEC-047; separate Worker)
+- `docs/PG-SVELTEKIT-PLAN.md` — 宿主 Astro→SvelteKit（Phase 1–6 landed）
+- `docs/PG-CATALOG-UX-PLAN.md` — 型錄人機 UX
 - `wrangler.jsonc` — single-site self-host (README Deploy to Cloudflare)
 - `wrangler.official.jsonc` — author field-net
 - `vercel.json` / `netlify.toml` — README one-click Vercel / Netlify

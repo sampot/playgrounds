@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f8faf9" />
+    %sveltekit.head%
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <!-- Same contract as blog Layout: localStorage theme / font-size → html data-* -->
+    <script src="/toggle-theme.js?v=4"></script>
+    <script src="/toggle-font-size.js?v=3"></script>
+  </head>
+  <body data-sveltekit-preload-data="hover">
+    <div style="display: contents">%sveltekit.body%</div>
+  </body>
+</html>

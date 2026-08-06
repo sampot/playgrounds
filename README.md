@@ -8,7 +8,7 @@ Browser host for **SAM** (Single-page Application Module) sandboxes: OPFS worksp
 - **Author notes:** [samkuo.me](https://samkuo.me/) (personal blog; not a product site)
 - **Legacy (frozen):** `https://samkuo.me/playgrounds/` still opens with a migrate tip but is **not** updated with this repo; export `.sam` then import on the field you want (data is origin-bound)
 
-Decisions: DEC-041 (extract / legacy mount), DEC-042 (Workers / wildcard / `play`), DEC-043 (docs / Starlight) — see `docs/`.
+Decisions: DEC-041 (extract / legacy mount), DEC-042 (Workers / wildcard / `play`), DEC-043 (docs / Starlight), DEC-048 (SvelteKit host) — see `docs/`.
 
 ## One-click deploy (your account, single site)
 
@@ -55,6 +55,7 @@ On another field (including your one-click deploy), the same query works with th
 
 | Path | Role |
 | --- | --- |
+| `src/routes/` | SvelteKit routes (`/` shell, `/sam/` catalog) |
 | `src/components/playgrounds/` | Host UI |
 | `src/sam-runtime/` | Portable SAM instance runtime |
 | `src/sam-host/` | Headless Node host |

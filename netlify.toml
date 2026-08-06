@@ -12,7 +12,7 @@
 [template.environment]
   PUBLIC_PLAYGROUNDS_BASE_PATH = "Leave empty for root mount (/ + /canvas/ + /sam/)."
 
-# SPA fallback after real static files (Astro pages, `/_astro/*`, SW assets).
+# SPA fallback after real static files (SvelteKit pages, `/_app/*`, SW assets).
 [[redirects]]
   from = "/*"
   to = "/index.html"

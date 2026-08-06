@@ -22,7 +22,7 @@
 - 把部落格文章、CONTENT-PLAN 搬進文件站（小品型錄在場網 `/sam/`，亦不進文件站）。
 - 帳號、留言、後端搜尋、CMS、多租戶「產品文件中心」。
 - 文件站離線 PWA／註冊 Service Worker（場網 SW 職責不變）。
-- 把 Starlight 嵌進場殼 Astro app（同 `astro.config`／同 `dist`）。
+- 把 Starlight 嵌進場殼 app（同 config／同 `dist`）。場網宿主建置工具見 DEC-048（SvelteKit）；文件站仍獨立 Astro。
 - 為每個計劃草稿（未落地 Phase 規格）建完整公開站——公開以**已 Accepted DEC＋已落地 API**為準。
 - 完整多語 i18n（可先中文為主；Starlight UI 字串對齊即可）。
 - 改場網保留表拿掉 `docs`，或讓場網 Worker 的 ASSETS 直接服務文件 HTML。

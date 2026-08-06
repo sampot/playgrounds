@@ -9,7 +9,7 @@
 /* eslint-disable no-restricted-globals */
 
 // Bump when offline strategy or canvas bridge changes (clears sticky Cache API entries).
-const CACHE_NAME = "samkuo-offline-v13";
+const CACHE_NAME = "samkuo-offline-v14";
 /** Embedded in BRIDGE string — change when console mirror behaviour changes. */
 const CANVAS_BRIDGE_REV = 9;
 const OFFLINE_URL = "/offline/";
@@ -106,8 +106,10 @@ function isDevOnlyPath(pathname) {
   );
 }
 
-function isHashedAstroAsset(pathname) {
-  return pathname.startsWith("/_astro/");
+function isHashedShellAsset(pathname) {
+  return (
+    pathname.startsWith("/_app/") || pathname.startsWith("/_astro/")
+  );
 }
 
 function shouldNetworkFirstAsset(url) {
@@ -115,7 +117,7 @@ function shouldNetworkFirstAsset(url) {
   if (isDevOnlyPath(pathname)) return false;
   if (isCanvasVirtualPath(pathname)) return false;
   if (isSwEntryScript(pathname)) return false;
-  // /_astro/* included: network-first online; Cache API only offline fallback.
+  // /_app/* (and legacy /_astro/*): network-first online; Cache API only offline fallback.
   if (pathname.startsWith("/icons/")) return true;
   if (pathname === "/favicon.svg") return true;
   if (pathname === "/manifest.webmanifest") return true;
@@ -123,16 +125,16 @@ function shouldNetworkFirstAsset(url) {
   if (pathname === "/toggle-theme.js" || pathname === "/toggle-font-size.js") {
     return true;
   }
-  if (isHashedAstroAsset(pathname)) return true;
+  if (isHashedShellAsset(pathname)) return true;
   return /\.(?:js|css|woff2?|ttf|otf|png|svg|webp|ico|wasm)$/i.test(pathname);
 }
 
-/** Stable Cache API key: drop query (e.g. ?astro-retry=, ?v=) for hashed / shell assets. */
+/** Stable Cache API key: drop query (e.g. ?v=) for hashed / shell assets. */
 function cacheRequestFor(request) {
   try {
     const url = new URL(request.url);
     if (
-      isHashedAstroAsset(url.pathname) ||
+      isHashedShellAsset(url.pathname) ||
       url.pathname === "/register-sw.js" ||
       url.pathname === "/toggle-theme.js" ||
       url.pathname === "/toggle-font-size.js"
@@ -150,16 +152,16 @@ async function matchFromCache(cache, request) {
   const key = cacheRequestFor(request);
   const exact = await cache.match(key);
   if (exact) return exact;
-  // Ignore search for /_astro retries that used a different key historically.
-  if (isHashedAstroAsset(new URL(request.url).pathname)) {
+  // Ignore search for hashed retries that used a different key historically.
+  if (isHashedShellAsset(new URL(request.url).pathname)) {
     return cache.match(request, { ignoreSearch: true });
   }
   return undefined;
 }
 
 /**
- * Pull /_astro + shell asset URLs out of HTML so offline has modules even when
- * the first paint raced ahead of SW control.
+ * Pull /_app (and legacy /_astro) + shell asset URLs out of HTML so offline has
+ * modules even when the first paint raced ahead of SW control.
  * @param {string} html
  * @param {string} origin
  * @returns {string[]}
@@ -175,10 +177,9 @@ function extractShellAssetUrls(html, origin) {
       /* ignore */
     }
   };
-  // Astro islands use component-url / renderer-url, not only src/href.
-  const astroRe = /\/_astro\/[A-Za-z0-9_.-]+/g;
+  const hashedRe = /\/_(?:app|astro)\/[A-Za-z0-9_./-]+/g;
   let m;
-  while ((m = astroRe.exec(html))) {
+  while ((m = hashedRe.exec(html))) {
     add(m[0]);
   }
   const attrRe =

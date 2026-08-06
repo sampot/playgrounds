@@ -1,13 +1,26 @@
 {
-  "extends": "astro/tsconfigs/strict",
+  "extends": "./.svelte-kit/tsconfig.json",
   "compilerOptions": {
-    "paths": {
-      "@components/*": ["./src/components/*"],
-      "@layouts/*": ["./src/layouts/*"],
-      "@pages/*": ["./src/pages/*"],
-      "@styles/*": ["./src/styles/*"],
-      "@utils/*": ["./src/utils/*"]
-    }
+    "allowJs": true,
+    "checkJs": false,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "sourceMap": true,
+    "strict": true,
+    "moduleResolution": "bundler",
+    "verbatimModuleSyntax": false,
+    "allowImportingTsExtensions": true,
+    "noEmit": true
   },
-  "exclude": ["dist", "docs-site", "platform-api", "node_modules", "worker-configuration.d.ts"]
+  "exclude": [
+    "dist",
+    "docs-site",
+    "platform-api",
+    "node_modules",
+    "worker-configuration.d.ts",
+    "src/**/*.test.ts",
+    "src/sam-host/fixtures/**"
+  ]
 }

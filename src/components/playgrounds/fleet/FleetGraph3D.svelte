@@ -116,23 +116,27 @@
         .backgroundColor("rgba(0,0,0,0)")
         .showNavInfo(false)
         .nodeId("id")
-        .nodeLabel((n: FleetGraphNode) => {
-          const parts = [n.name, n.status, `深度 ${n.mailboxDepth}`];
-          if (n.poisonCount > 0) parts.push(`毒訊 ${n.poisonCount}`);
+        .nodeLabel((n: any) => {
+          const node = n as FleetGraphNode;
+          const parts = [node.name, node.status, `深度 ${node.mailboxDepth}`];
+          if (node.poisonCount > 0) parts.push(`毒訊 ${node.poisonCount}`);
           return parts.join(" · ");
         })
         .nodeVal("val")
-        .nodeColor((n: FleetGraphNode) =>
-          n.poisonCount > 0
+        .nodeColor((n: any) => {
+          const node = n as FleetGraphNode;
+          return node.poisonCount > 0
             ? "#c45c26"
-            : nodeColorForStatus(n.status)
+            : nodeColorForStatus(node.status);
+        })
+        .linkColor((l: any) =>
+          linkColorForKind((l as { kind: FleetEdgeKind }).kind)
         )
-        .linkColor((l: { kind: FleetEdgeKind }) => linkColorForKind(l.kind))
         .linkOpacity(0.6)
         .linkDirectionalArrowLength(2.5)
         .linkDirectionalArrowRelPos(1)
-        .onNodeClick((n: FleetGraphNode) => {
-          onSelect?.(n.id);
+        .onNodeClick((n: any) => {
+          onSelect?.((n as FleetGraphNode).id);
         });
       graph = g;
       ready = true;

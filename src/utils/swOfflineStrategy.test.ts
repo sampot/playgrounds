@@ -27,13 +27,22 @@ describe("selectOfflineFetchStrategy", () => {
     ).toBe("network-first-document");
   });
 
-  it("does not cache-first /_astro — network-first so online deploys win", () => {
+  it("does not cache-first /_app — network-first so online deploys win", () => {
     const strategy = selectOfflineFetchStrategy({
-      pathname: "/_astro/PlaygroundsApp.abc123.js",
+      pathname: "/_app/immutable/entry/app.abc123.js",
       requestMode: "cors",
     });
     expect(strategy).toBe("network-first-asset");
     expect(strategyPrefersNetworkWhileOnline(strategy)).toBe(true);
+  });
+
+  it("still network-first legacy /_astro for sticky caches", () => {
+    expect(
+      selectOfflineFetchStrategy({
+        pathname: "/_astro/PlaygroundsApp.abc123.js",
+        requestMode: "cors",
+      })
+    ).toBe("network-first-asset");
   });
 
   it("does not treat /tools as offline documents", () => {
@@ -102,28 +111,25 @@ describe("selectOfflineFetchStrategy", () => {
     ).toBe("network-first-asset");
   });
 
-  it("extracts /_astro from Astro island attrs and module tags", () => {
+  it("extracts /_app from Kit module tags (and legacy /_astro)", () => {
     const html = `
-      <astro-island
-        component-url="/_astro/PlaygroundsApp.DZrbwJDl.js"
-        renderer-url="/_astro/client.svelte.Bod-1i0s.js"
-      ></astro-island>
+      <script type="module" src="/_app/immutable/entry/start.DZrbwJDl.js"></script>
+      <link rel="modulepreload" href="/_app/immutable/chunks/page.uaEQKTED.js">
       <script src="/register-sw.js?v=12"></script>
-      <link rel="modulepreload" href="/_astro/page.uaEQKTED.js">
+      <link rel="modulepreload" href="/_astro/legacy.uaEQKTED.js">
     `;
-    const urls = extractShellAssetUrls(html, "http://localhost:4321");
+    const urls = extractShellAssetUrls(html, "http://localhost:5173");
     expect(urls).toContain(
-      "http://localhost:4321/_astro/client.svelte.Bod-1i0s.js"
+      "http://localhost:5173/_app/immutable/entry/start.DZrbwJDl.js"
     );
     expect(urls).toContain(
-      "http://localhost:4321/_astro/PlaygroundsApp.DZrbwJDl.js"
+      "http://localhost:5173/_app/immutable/chunks/page.uaEQKTED.js"
     );
-    expect(urls).toContain("http://localhost:4321/_astro/page.uaEQKTED.js");
-    expect(urls).toContain("http://localhost:4321/register-sw.js");
+    expect(urls).toContain("http://localhost:5173/_astro/legacy.uaEQKTED.js");
+    expect(urls).toContain("http://localhost:5173/register-sw.js");
   });
 
   it("allows Playgrounds offline caching on localhost-style paths (not host-gated)", () => {
-    // Host is not part of strategy selection; preview on localhost can cache shell.
     expect(
       selectOfflineFetchStrategy({
         pathname: "/playgrounds/",
@@ -132,7 +138,7 @@ describe("selectOfflineFetchStrategy", () => {
     ).toBe("network-first-document");
     expect(
       selectOfflineFetchStrategy({
-        pathname: "/_astro/PlaygroundsApp.x.js",
+        pathname: "/_app/immutable/x.js",
         requestMode: "cors",
       })
     ).toBe("network-first-asset");
@@ -141,6 +147,7 @@ describe("selectOfflineFetchStrategy", () => {
   it("never selects a cache-first strategy", () => {
     const samples = [
       "/playgrounds/",
+      "/_app/x.js",
       "/_astro/x.js",
       "/toggle-theme.js",
       "/icons/icon.png",

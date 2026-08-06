@@ -2,7 +2,7 @@
 
 > **狀態：** Phase 0–4 **已落地**  
 > **權威決策：** [DECISIONS.md](./DECISIONS.md) **DEC-046**（Draft→實作中）  
-> **相關：** [PG-CATALOG-PLAN.md](./PG-CATALOG-PLAN.md)（YAML 權威／`/sam/` 頁）、DEC-023（session 邀請＋型錄 lazy install）、DEC-025（`?open=`）、DEC-041／045、[GLOSSARY.md](./GLOSSARY.md)
+> **相關：** [PG-CATALOG-PLAN.md](./PG-CATALOG-PLAN.md)（YAML 權威／`/sam/`）、[PG-CATALOG-UX-PLAN.md](./PG-CATALOG-UX-PLAN.md)（人機 UX）、DEC-023（session 邀請＋型錄 lazy install）、DEC-025（`?open=`）、DEC-041／045、[GLOSSARY.md](./GLOSSARY.md)
 
 一句話：**`catalog:gen` 在產生 `/sam/` 所用 typed module 之外，同步產出版本化 JSON；Playgrounds 以同一權威查詢型錄（含 lazy install 解析），不刮網頁、不另開 CMS。**
 
@@ -119,11 +119,11 @@
 
 ## 與 `/sam/` 的關係
 
-| | `/sam/` 頁 | `/catalog/v1.json`＋查詢 API |
+| | `/sam/` 人機面 | `/catalog/v1.json`＋查詢 API |
 | --- | --- | --- |
 | 讀者 | 人類 | Playgrounds／機器 |
 | 資料 | 同 gen | 同 gen |
-| UX | 一鍵開、分類陳列 | 解析、匹配、lazy install |
+| UX | 一鍵開、搜尋／陳列（見 [PG-CATALOG-UX-PLAN.md](./PG-CATALOG-UX-PLAN.md)） | 解析、匹配、lazy install |
 
 頁面 **不**再當機器權威（勿 scrape HTML）。
 
@@ -149,3 +149,4 @@
 | 2026-08-05 | Phase 1–2 落地：`catalog:gen`→`public/catalog/v1.json`；query API＋CI 雙產物；省略 committed `generatedAt` |
 | 2026-08-05 | Phase 3：YAML `protocols`；`matchCatalogForProtocol`；`pg-llm-agent` 宣告 `coding-orchestration.v1` |
 | 2026-08-05 | Phase 4：`sam:protocol` 結構化解析；`resolveInviteCandidates`＋OPFS probe |
+| 2026-08-06 | 交叉引用 [PG-CATALOG-UX-PLAN.md](./PG-CATALOG-UX-PLAN.md)；人機／機器分工表更新 |

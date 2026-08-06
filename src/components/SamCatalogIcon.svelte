@@ -1,16 +1,11 @@
----
-/**
- * Per-SAM catalog glyph (24×24 stroke icons). Fallback: generic mark.
- */
-interface Props {
-  repo: string;
-  title: string;
-  class?: string;
-}
+<script lang="ts">
+  /** Per-SAM catalog glyph (24×24 stroke icons). Fallback: generic mark. */
+  let {
+    repo,
+    title,
+    class: className = '',
+  }: { repo: string; title: string; class?: string } = $props();
 
-const { repo, title, class: className = "" } = Astro.props;
-
-/** Inner SVG markup (paths/shapes only), viewBox 0 0 24 24 assumed. */
 const glyphs: Record<string, string> = {
   "pg-hashlab":
     '<path d="M5 8h14M5 16h14M9 4v16M15 4v16"/><circle cx="9" cy="8" r="1.2" fill="currentColor" stroke="none"/><circle cx="15" cy="16" r="1.2" fill="currentColor" stroke="none"/>',
@@ -83,10 +78,10 @@ const glyphs: Record<string, string> = {
 const fallback =
   '<rect x="5" y="5" width="14" height="14" rx="3"/><path d="M9 12h6M12 9v6"/>';
 
-const inner = glyphs[repo] ?? fallback;
----
+  let inner = $derived(glyphs[repo] ?? fallback);
+</script>
 
-<span class:list={["sam-icon", className]} aria-hidden="true" title={title}>
+<span class={["sam-icon", className].filter(Boolean).join(' ')} aria-hidden="true" {title}>
   <svg
     xmlns="http://www.w3.org/2000/svg"
     viewBox="0 0 24 24"
@@ -95,8 +90,9 @@ const inner = glyphs[repo] ?? fallback;
     stroke-width="1.75"
     stroke-linecap="round"
     stroke-linejoin="round"
-    set:html={inner}
-  />
+  >
+    {@html inner}
+  </svg>
 </span>
 
 <style>

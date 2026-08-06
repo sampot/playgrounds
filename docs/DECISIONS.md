@@ -1,6 +1,6 @@
 # 我是山姆鍋 — 架構與工程決策
 
-> **最後更新：** 2026-08-06（DEC-047：Invite 一連結多人／加入者 offer；DEC-045 多 peer）
+> **最後更新：** 2026-08-06（DEC-048 Accepted：場網宿主 SvelteKit Phase 1–6）
 > **對象：** 作者、AI agents；必要時給之後的自己讀
 
 本文件以輕量 **ADR**（Architecture Decision Record）記錄本站**顯著且耐久**的架構／工程選擇：選了什麼、為何不選其他、後續工作不可踩破的後果。細節規格仍以 [AGENTS.md](./AGENTS.md)、[TOOLS-PLAN.md](./TOOLS-PLAN.md) 等為準；此檔是可掃讀的決策索引，避免只活在 PR 與聊天裡。
@@ -44,7 +44,7 @@
 | [DEC-002](#dec-002-樣式-tailwind-css) | 樣式：Tailwind CSS | Accepted |
 | [DEC-003](#dec-003-內容-markdown--content-collections) | 內容：Markdown + Content Collections | Accepted |
 | [DEC-004](#dec-004-站台語系與品牌邊界) | 站台語系與品牌／產品邊界 | Accepted |
-| [DEC-005](#dec-005-互動-ui-用-svelte-islands) | 互動 UI 用 Svelte islands（不用 React） | Accepted |
+| [DEC-005](#dec-005-互動-ui-用-svelte-islands) | 互動 UI：Svelte 5＋**runes**（不用 React） | Accepted |
 | [DEC-006](#dec-006-og-圖-satori--satori-html) | OG 圖：Satori + satori-html | Accepted |
 | [DEC-007](#dec-007-留言系統-giscus) | 留言系統：Giscus | Accepted |
 | [DEC-008](#dec-008-站上小工具箱定位與技術邊界) | 站上小工具箱定位與技術邊界 | Accepted |
@@ -87,6 +87,7 @@
 | [DEC-045](#dec-045-playgrounds-跨場-rosteravatar與薄-signaling) | Playgrounds 跨場 Roster／Avatar 與薄 signaling | Accepted |
 | [DEC-046](#dec-046-playgrounds-型錄結構化資料與查詢面) | Playgrounds 型錄結構化資料與查詢面 | Draft |
 | [DEC-047](#dec-047-playgrounds-platform-api) | Playgrounds Platform API（Invite／薄 signaling／後台） | Draft |
+| [DEC-048](#dec-048-playgrounds-宿主-sveltekit-靜態-pwa) | Playgrounds 宿主：SvelteKit 靜態 PWA（卸根 Astro） | Accepted |
 
 ---
 
@@ -141,13 +142,18 @@
 ### DEC-005: 互動 UI 用 Svelte islands（不用 React）
 
 - **Status:** Accepted（2026-07-25；取代先前 React islands）
-- **Context:** 站上僅少數互動面（搜尋、日期、文章摘要、小工具 UI）。Astro 支援多框架 islands；同時維護 React 與作者其他專案（Svelte）的心智與依賴成本偏高。OG 產生若綁 React JSX，也會把 React 鎖進建置鏈。
-- **Decision:** 客戶端互動元件使用 **Svelte 5**（`@astrojs/svelte`）。**不再**依賴 React／`@astrojs/react`。新 island 預設寫 `.svelte`。
+- **Context:** 站上僅少數互動面（搜尋、日期、文章摘要、小工具 UI）。Astro 支援多框架 islands；同時維護 React 與作者其他專案（Svelte）的心智與依賴成本偏高。OG 產生若綁 React JSX，也會把 React 鎖進建置鏈。場網宿主後續以 Svelte／SvelteKit 為主（DEC-048）；若允許 Svelte 4 風格（`export let`／`$:`／隱式 let 反應性）與 runes 混用，長期會有兩套心智與遷移債。
+- **Decision:**
+  1. 客戶端互動元件使用 **Svelte 5**。**不再**依賴 React／`@astrojs/react`。新元件預設寫 `.svelte`。
+  2. **Runes 硬約束（場網宿主＋其 Svelte／SvelteKit 程式）：** 反應性與元件 API **必須**用 Svelte 5 **runes**（`$state`／`$derived`／`$effect`／`$props`／`$bindable` 等）。**禁止**新寫或回退到 legacy：`export let` props、`$:` 反應陳述、以及依賴隱式 `let` 反應性的寫法。編譯設定應啟用／維持 **`compilerOptions.runes: true`**（檔案級或專案級），使違規在建置期失敗。
+  3. 場網宿主建置目標見 [DEC-048](#dec-048-playgrounds-宿主-sveltekit-靜態-pwa)（SvelteKit）；本筆之 runes 規則在 Kit 落地前後皆適用於本 repo 的 `.svelte`。
 - **Consequences:**
-  - `src/components/` 互動件為 Astro／Svelte；工具 UI 見 `components/tools/*.svelte`。
+  - `src/components/` 互動件為 Svelte（過渡期可仍由 Astro 掛載）；完成 DEC-048 後以 Kit 為主。
   - 不要為了「比較熟 React」再加回 React 依賴，除非本決策被正式 supersede。
-  - 與作者其他 Svelte 專案技能可複用；bundle 與依賴面更薄。
-
+  - 勿在 PR／範例中引入 legacy Svelte 語法「順便能跑」；既有若仍有殘留須遷 runes，勿關 `runes` 開關迴避。
+  - 與作者其他 Svelte 5／runes 專案技能可複用；bundle 與依賴面更薄。
+- **Revision（2026-08-06）：** 場網宿主根專案改 **SvelteKit** 為建置標的（DEC-048 Draft）；本筆對部落格 islands 仍成立（部落格 repo）。場網完成遷移後不以 `@astrojs/svelte` 為宿主主路徑。
+- **Revision（2026-08-06）：** **Runes 硬約束**：Svelte／SvelteKit 皆須 Svelte 5 runes；`compilerOptions.runes: true`；禁止 legacy 反應性語法。
 ### DEC-006: OG 圖 Satori + satori-html
 
 - **Status:** Accepted（隨 DEC-005 調整實作）
@@ -780,20 +786,21 @@
 - **Consequences:**
   - 路徑／origin 須配置化（base path、canvas 前綴、預設 `?open=` origin）；消滅硬編碼 `https://samkuo.me/playgrounds` 作為唯一權威。
   - 場網 SW scope 可為 `/` 且**只**服務遊樂場；部落格 `public/sw.js` 日後可卸下 canvas／遊樂場離線職責（過渡期可雙軌）。
-  - 開源 repo 不含部落格文章、`CONTENT-PLAN`、站台品牌主殼；工程 `AGENTS.md`／DEC 精簡版可進 OSS；**含**小品型錄頁（`src/pages/sam/`；資料權威 `catalog/entries/`）。
+  - 開源 repo 不含部落格文章、`CONTENT-PLAN`、站台品牌主殼；工程 `AGENTS.md`／DEC 精簡版可進 OSS；**含**小品型錄（URL `/sam/`；資料權威 `catalog/entries/`；人機面見 [PG-CATALOG-UX-PLAN.md](./PG-CATALOG-UX-PLAN.md)）。
   - 同步 [GLOSSARY.md](./GLOSSARY.md)、[AGENTS.md](./AGENTS.md)；舊 DEC-016 路徑敘事加「權威改場網見 DEC-041／042」。
   - 舊場**下線**（刪路由／拆碼）時點另立修訂；在此之前不得默默刪除 `samkuo.me/playgrounds/`。凍結≠下線。
 - **Revision（2026-08-05）：** 部署標的與 wildcard 場網改由 DEC-042 定義；預設展示場改 `play.samkuo.me`。
 - **Revision（2026-08-05）：** 舊場凍結——遷移提示已上後，`/playgrounds/` **不再**與場網同步功能更新；權威碼在 `sampot/playgrounds`。
 - **Revision（2026-08-05）：** SAM 小品型錄 `/sam/` 自部落格遷入場網宿主（同 Worker；部落格轉址）。
 - **Revision（2026-08-05）：** 小品型錄資料權威改 `catalog/entries/*.yaml`（PR 投稿；建置產 typed module）；見 [PG-CATALOG-PLAN.md](./PG-CATALOG-PLAN.md)。
+- **Revision（2026-08-06）：** 型錄人機 UX 改以 PWA／殼為載體（[PG-CATALOG-UX-PLAN.md](./PG-CATALOG-UX-PLAN.md)）；宿主建置目標 SvelteKit（DEC-048）——`/sam/` URL 不變，不綁 Astro page。
 
 ### DEC-042: Playgrounds Workers 與 `*.samkuo.me` 場網
 
 - **Status:** Accepted（2026-08-05）
 - **Context:** DEC-041 已抽出開源宿主 [`sampot/playgrounds`](https://github.com/sampot/playgrounds)。需要：（1）以 **Cloudflare Workers**（靜態資產／ASSETS）為部署標的，便於 wildcard 自訂網域；（2）用 **子網域切割瀏覽器 origin**，讓多個「場」各自擁有 OPFS／SecretStore／SW，但**程式同一份**——無伺服器端租戶庫。預設展示／文件場名選定 **`play`**（`play.samkuo.me`）。
 - **Decision:**
-  1. **部署標的：** Playgrounds 宿主正式部署＝**Cloudflare Workers**（Astro 靜態產出＋Workers Static Assets 或等價；`wrangler deploy`）。**不以** Cloudflare Pages 為場網主路徑（部落格 `myblog` 仍可 Pages，見 DEC-001）。
+  1. **部署標的：** Playgrounds 宿主正式部署＝**Cloudflare Workers**（靜態產出＋Workers Static Assets 或等價；`wrangler deploy`）。建置工具：**現行 Astro**；目標改 **SvelteKit adapter-static**（[DEC-048](#dec-048-playgrounds-宿主-sveltekit-靜態-pwa)）。**不以** Cloudflare Pages 為場網主路徑（部落格 `myblog` 仍可 Pages，見 DEC-001）。
   2. **場網：** DNS／route **`*.samkuo.me`** → 同一 Worker；任意一級子域（通過命名規則者）提供**同一** `dist`。Worker **不**為每個 name 建後端實例；訪即用。
   3. **預設場：** 文件、部落格深鏈、遷移提醒的預設 host＝**`https://play.samkuo.me`**（根路徑 `/`；畫布 `/canvas/<sandboxId>/…`）。
   4. **獨立場：** `https://<name>.samkuo.me/`＝獨立 origin＝獨立本機狀態。`<name>` 只是 origin 標籤，不是雲端專案 ID。
@@ -807,6 +814,7 @@
   - 同步 GLOSSARY／AGENTS／DEC-025／OPEN-FROM-URL；DEC-041 權威 host 敘事以本決策為準。
   - **勿**在邊緣為每個 name 做 OPFS／狀態代管；**勿**把 wildcard 做成需註冊帳號的多租戶產品。
   - 二級以上子域（`a.b.samkuo.me`）非本決策範圍。
+- **Revision（2026-08-06）：** 宿主建置工具目標改 SvelteKit（DEC-048 Draft）；Workers／ASSETS／wildcard 契約不變。
 
 ### DEC-043: Playgrounds 文件站 Starlight 與 `docs.samkuo.me`
 
@@ -827,6 +835,7 @@
   - CI 可將文件部署與場殼部署分開。
   - 同步 [GLOSSARY.md](./GLOSSARY.md)、[AGENTS.md](../AGENTS.md)、[PG-DOCS-PLAN.md](./PG-DOCS-PLAN.md)。
 - **Revision（2026-08-06）：** 場殼不再以 service binding 轉發 docs；僅靠 docs Worker custom domain。
+- **Revision（2026-08-06）：** 場網宿主改 SvelteKit（DEC-048）**不**牽連本筆；`docs-site/` 維持 Astro Starlight。
 
 ### DEC-044: Playgrounds 下方面板 dock（opt-in 與自選 SAM）
 
@@ -956,6 +965,28 @@
 - **Revision（2026-08-06）：** 移除後台 API key 登入過渡；進入僅 GitHub SSO。
 
 
+### DEC-048: Playgrounds 宿主 SvelteKit 靜態 PWA
+
+- **Status:** Accepted（2026-08-06；Phase 1–6 落地；見 [PG-SVELTEKIT-PLAN.md](./PG-SVELTEKIT-PLAN.md)）
+- **Context:** 場網宿主 [`sampot/playgrounds`](https://github.com/sampot/playgrounds) 自部落格抽出後仍用 **Astro** 建置（DEC-041／042 敘事沿用部落格 DEC-001 技術），但實際只有 `/`（掛 Svelte `PlaygroundsApp`）與 `/sam/` 兩個 page；產品是 **Svelte 5 + SW／OPFS 的 PWA**。Astro islands 增加依賴與心智（`/_astro/*` SW 假設、`astro check`），並暗示型錄必須是獨立靜態文章頁。文件站（DEC-043 Starlight）與 Platform（DEC-047）已是獨立套件，不應被根專案卸 Astro 牽連。
+- **Decision:**
+  1. **場網宿主根專案**建置標的為 **SvelteKit**（Svelte 5 **runes**，見 [DEC-005](#dec-005-互動-ui-用-svelte-islands)）＋ **`@sveltejs/adapter-static`**，產出靜態 `dist/`，部署仍＝**Cloudflare Workers Static Assets**（對齊 DEC-042；`not_found_handling`／SPA fallback 行為保留）。
+  2. **已卸除**根目錄 Astro／`@astrojs/svelte`／`@astrojs/check`。**不**把宿主改成 SSR 應用或 `adapter-cloudflare` 預設 Worker（除非另修訂並合併 `src/worker.ts` 保留名邏輯）。
+  3. **URL 契約不變：** `/`、`/sam/`、`/canvas/…`、`/catalog/v1.json`；`trailingSlash: always`。
+  4. **型錄人機面**不以 Astro 為約束：見 [PG-CATALOG-UX-PLAN.md](./PG-CATALOG-UX-PLAN.md)（PWA／殼內搜尋與密度；資料權威仍 DEC-046／YAML）。
+  5. **明確排除：** `docs-site/`（DEC-043 Astro Starlight）、`platform-api/`、部落格 DEC-001。
+  - 階段見 [PG-SVELTEKIT-PLAN.md](./PG-SVELTEKIT-PLAN.md)。
+- **Consequences:**
+  - SW／`swOfflineStrategy` 對 **`/_app/*`**（legacy `/_astro/*` 仍辨識）；`CACHE_NAME` 已 bump。
+  - `npm run check`／`build`／AGENTS／一鍵自架設定改指 Kit；勿在文件中繼續寫「場網＝Astro app」。
+  - DEC-005 對**場網宿主**為「SvelteKit 一等公民」＋**runes 硬約束**；部落格互動仍可以是 Astro islands（DEC-001／005 部落格範圍）。
+  - 維持 **`compilerOptions.runes: true`**；勿為 legacy 語法關閉。
+  - 勿為遷框架改 `?open=`／OPFS／canvas／YAML 權威；勿把 Starlight 併進宿主 `dist`。
+  - 同步 GLOSSARY、[PG-STANDALONE-PLAN.md](./PG-STANDALONE-PLAN.md)、[PG-CATALOG-UX-PLAN.md](./PG-CATALOG-UX-PLAN.md)。
+- **Revision（2026-08-06）：** 初版 Draft。
+- **Revision（2026-08-06）：** 明示 Svelte 5 runes（DEC-005）；Kit 必須 `runes: true`。
+- **Revision（2026-08-06）：** Phase 1–6 落地；Status → Accepted。
+
 ---
 
 ## 4. 相關文件
@@ -1000,6 +1031,8 @@
 | [PG-STANDALONE-PLAN.md](./PG-STANDALONE-PLAN.md) | 場網／Workers／開源／舊場暫留（DEC-041／042） |
 | [PG-CATALOG-PLAN.md](./PG-CATALOG-PLAN.md) | 小品型錄 YAML／PR 投稿（`catalog/entries/`） |
 | [PG-CATALOG-QUERY-PLAN.md](./PG-CATALOG-QUERY-PLAN.md) | 型錄結構化 JSON＋Playgrounds 查詢／lazy install（DEC-046 Draft） |
+| [PG-CATALOG-UX-PLAN.md](./PG-CATALOG-UX-PLAN.md) | 小品型錄人機 UX／PWA 載體（Draft） |
+| [PG-SVELTEKIT-PLAN.md](./PG-SVELTEKIT-PLAN.md) | 場網宿主 Astro→SvelteKit（DEC-048 Draft） |
 | [PG-DOCS-PLAN.md](./PG-DOCS-PLAN.md) | 文件站 Starlight＠`docs.samkuo.me`（DEC-043） |
 | [playgrounds-host-api.md](./playgrounds-host-api.md) | Host API v1 快速參考 |
-| `astro.config.ts`／`src/config.ts` | 建置與站台設定實作 |
+| `svelte.config.js`／`vite.config.ts` | 場網宿主建置設定（SvelteKit；DEC-048） |

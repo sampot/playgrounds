@@ -1734,7 +1734,12 @@
   $effect(() => {
     const path = openPath;
     const content = path ? files[path] : undefined;
-    if (!path || !isMediaPreviewPath(path) || !isBinaryContent(content)) {
+    if (
+      !path ||
+      !isMediaPreviewPath(path) ||
+      content === undefined ||
+      !isBinaryContent(content)
+    ) {
       mediaPreviewUrl = null;
       return;
     }
@@ -3022,7 +3027,8 @@
         next = { ...next, [w.path]: w.content };
         meta = await saveFile(activeId, w.path, w.content);
         if (openPath === w.path && isTextContent(next[w.path])) {
-          draft = typeof next[w.path] === "string" ? next[w.path] : draft;
+          const text = next[w.path];
+          draft = typeof text === "string" ? text : draft;
         }
         if (writeShouldReloadCanvas(w.path)) reload = true;
       }
@@ -5559,9 +5565,9 @@
       shellSessionHttp: {
         getStatus: () => {
           const s = sessionRuntime.getSession();
-          if (!s) return { active: false, seats: [] };
+          if (!s) return { active: false as const, seats: [] };
           return {
-            active: true,
+            active: true as const,
             status: s.status,
             sessionId: s.sessionId,
             channelName: s.channelName,
@@ -5580,11 +5586,11 @@
               seatId: seat.seatId,
               role: seat.role,
               kind: seat.kind,
-              sandboxId: seat.sandboxId,
+              sandboxId: seat.sandboxId ?? "",
               paused: seat.paused,
               ...(seat.remote ? { remote: { ...seat.remote } } : {}),
             })),
-          };
+          } satisfies import("./shellSessionHttp").ShellSessionHttpStatus;
         },
         open: async () => {
           const opened = await openMultiAgentSession();
@@ -5598,12 +5604,14 @@
             },
           };
         },
-        close: () => closeMultiAgentSession(),
-        pause: () => {
+        close: async () => {
+          await closeMultiAgentSession();
+        },
+        pause: async () => {
           sessionRuntime.pause();
           syncMultiAgentSessionView();
         },
-        resume: () => {
+        resume: async () => {
           sessionRuntime.resume();
           syncMultiAgentSessionView();
         },
@@ -5641,10 +5649,7 @@
       getHostFiles: () => files,
       getFilesForHost: hostId => {
         if (hostId === activeId) return files;
-        const canvasTab = findCanvasBySandboxId(mainTabs, hostId);
-        if (canvasTab && Object.keys(canvasTab.files).length > 0) {
-          return canvasTab.files;
-        }
+        // Canvas tabs do not cache FileMap; callers use resolveFilesForProject / OPFS.
         return null;
       },
       patchHostFile: async (path, content) => {
@@ -5652,7 +5657,8 @@
         files = { ...files, [path]: content };
         meta = await saveFile(activeId, path, content);
         if (openPath === path && isTextContent(files[path])) {
-          draft = typeof files[path] === "string" ? files[path] : draft;
+          const text = files[path];
+          draft = typeof text === "string" ? text : draft;
         }
         const reload = writeShouldReloadCanvas(path);
         if (reload) schedulePreview(true);
@@ -5810,10 +5816,8 @@
             openPath = null;
             draft = "";
           } else if (openPath && isTextContent(nextFiles[openPath])) {
-            draft =
-              typeof nextFiles[openPath] === "string"
-                ? nextFiles[openPath]
-                : draft;
+            const text = nextFiles[openPath];
+            draft = typeof text === "string" ? text : draft;
           }
           if (activeId) {
             meta = await readMeta(activeId);
@@ -5997,7 +6001,7 @@
           class="{btnPrimary} h-8 gap-1.5"
           disabled={busy}
           title="玩玩看小品，或建立沙盒"
-          onclick={openProjectDialog}
+          onclick={() => openProjectDialog()}
         >
           <PgIcon name="sparkles" size={13} />
           玩玩看
@@ -6137,7 +6141,7 @@
         class="{btn} h-8 shrink-0 gap-1.5"
         disabled={busy}
         title="從小品精選一鍵開進沙盒"
-        onclick={openProjectDialog}
+        onclick={() => openProjectDialog()}
       >
         <PgIcon name="sparkles" size={13} />
         玩玩看
@@ -6472,7 +6476,7 @@
           type="button"
           class="playgrounds-play-chip playgrounds-play-chip--more"
           disabled={busy}
-          onclick={openProjectDialog}
+          onclick={() => openProjectDialog()}
         >
           更多…
         </button>
@@ -7175,7 +7179,7 @@
                       type="button"
                       class="{btn} gap-1.5"
                       disabled={busy}
-                      onclick={openProjectDialog}
+                      onclick={() => openProjectDialog()}
                     >
                       <PgIcon name="folderPlus" size={13} />
                       自己從範本建
@@ -7499,10 +7503,8 @@
                     }
                     files = next;
                     if (openPath && openPath in next && isTextContent(next[openPath]!)) {
-                      draft =
-                        typeof next[openPath] === "string"
-                          ? next[openPath]
-                          : draft;
+                      const text = next[openPath];
+                      draft = typeof text === "string" ? text : draft;
                     }
                     meta = await readMeta(activeId);
                     schedulePreview(true);
@@ -7571,10 +7573,8 @@
                       openPath = null;
                       draft = "";
                     } else if (openPath && isTextContent(files[openPath])) {
-                      draft =
-                        typeof files[openPath] === "string"
-                          ? files[openPath]
-                          : draft;
+                      const text = files[openPath];
+                      draft = typeof text === "string" ? text : draft;
                     }
                     meta = await readMeta(activeId);
                     schedulePreview(true);

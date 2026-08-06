@@ -1,11 +1,11 @@
 /**
- * Offline SW fetch strategy selection (DEC-009 + DEC-041).
+ * Offline SW fetch strategy selection (DEC-009 + DEC-041 + DEC-048).
  * Keep decision rules aligned with `public/sw.js` (`respondWithOfflineCache`).
  *
  * Online safety: every cacheable path uses network-first (or network-only for
- * non-Playgrounds navigations). There is no cache-first path — hashed `/_astro/*`
- * still revalidates while online so a sticky SW Cache entry cannot pin a broken
- * bundle after deploy.
+ * non-Playgrounds navigations). There is no cache-first path — hashed `/_app/*`
+ * (and legacy `/_astro/*`) still revalidates while online so a sticky SW Cache
+ * entry cannot pin a broken bundle after deploy.
  */
 
 import { isPlaygroundsCanvasPathname } from "../components/playgrounds/playgroundsPaths";
@@ -59,8 +59,16 @@ export function isDevOnlyPath(pathname: string): boolean {
   );
 }
 
+/** Hashed shell bundles: SvelteKit `/_app/*`; legacy Astro `/_astro/*`. */
+export function isHashedShellAsset(pathname: string): boolean {
+  return (
+    pathname.startsWith("/_app/") || pathname.startsWith("/_astro/")
+  );
+}
+
+/** @deprecated use isHashedShellAsset */
 export function isHashedAstroAsset(pathname: string): boolean {
-  return pathname.startsWith("/_astro/");
+  return isHashedShellAsset(pathname);
 }
 
 export function shouldNetworkFirstAsset(pathname: string): boolean {
@@ -74,8 +82,8 @@ export function shouldNetworkFirstAsset(pathname: string): boolean {
   if (pathname === "/toggle-theme.js" || pathname === "/toggle-font-size.js") {
     return true;
   }
-  // Include /_astro/* — network-first while online; cache only as offline fallback.
-  if (isHashedAstroAsset(pathname)) return true;
+  // Include /_app/* (and legacy /_astro/*) — network-first while online.
+  if (isHashedShellAsset(pathname)) return true;
   return /\.(?:js|css|woff2?|ttf|otf|png|svg|webp|ico|wasm)$/i.test(pathname);
 }
 
@@ -93,10 +101,10 @@ export function extractShellAssetUrls(html: string, origin: string): string[] {
       /* ignore */
     }
   };
-  // Astro islands use component-url / renderer-url, not only src/href.
-  const astroRe = /\/_astro\/[A-Za-z0-9_.-]+/g;
+  // SvelteKit `/_app/...` and legacy Astro `/_astro/...` from src/href/modulepreload.
+  const hashedRe = /\/_(?:app|astro)\/[A-Za-z0-9_./-]+/g;
   let m: RegExpExecArray | null;
-  while ((m = astroRe.exec(html))) {
+  while ((m = hashedRe.exec(html))) {
     add(m[0]);
   }
   const attrRe =
@@ -120,7 +128,7 @@ export function selectOfflineFetchStrategy(options: {
   if (method !== "GET") return "passthrough";
   if (isSwEntryScript(options.pathname)) return "passthrough";
   if (isCanvasVirtualPath(options.pathname)) return "passthrough";
-  // Vite / Astro-dev — never SW-cache (localhost `astro dev` safe).
+  // Vite / Kit-dev — never SW-cache.
   if (isDevOnlyPath(options.pathname)) return "passthrough";
 
   if (isPlaygroundsOfflinePath(options.pathname)) {
