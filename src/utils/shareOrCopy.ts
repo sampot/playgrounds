@@ -1,10 +1,18 @@
 /**
  * Web Share API when available; clipboard fallback (DEC-042 field share).
  * Must be called from a user gesture for `navigator.share`.
+ *
+ * When `url` is set, Web Share omits `text`: many share targets concatenate
+ * `url`+`text` (often with no separator), which breaks open／deep links.
+ * Put a short label in `title` instead; clipboard fallback still copies `url` only.
  */
 
 export type SharePayload = {
   title: string;
+  /**
+   * Optional note for callers／docs. Ignored by Web Share when `url` is set
+   * (see module note). Not copied to clipboard.
+   */
   text?: string;
   /** Absolute URL required for system share sheets. */
   url: string;
@@ -41,11 +49,11 @@ export async function shareOrCopy(
   const url = payload.url.trim();
   if (!url) throw new Error("分享網址為空");
 
+  // title + url only — never pair text with url (broken concatenation on many UAs).
   const data: ShareData = {
-    title: payload.title,
+    title: payload.title.trim() || url,
     url,
   };
-  if (payload.text?.trim()) data.text = payload.text.trim();
 
   if (canUseWebShare()) {
     const okToShare =

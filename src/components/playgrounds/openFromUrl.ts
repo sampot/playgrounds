@@ -26,6 +26,9 @@ import {
 
 export type OpenRole = "work" | "tool" | "agent";
 
+/** Presentation after open. `canvas` = maximize preview (試玩／分享). */
+export type OpenView = "default" | "canvas";
+
 export type OpenQueryOptions = {
   /** Post-import role. Default work. */
   as: OpenRole;
@@ -35,12 +38,18 @@ export type OpenQueryOptions = {
   state: "ask" | "none";
   /** When true, always create a new project (skip same-source reuse). */
   fresh: boolean;
+  /**
+   * `canvas` → maximize canvas after open (catalog share / casual try).
+   * Default = shell chrome for developers (一鍵開).
+   */
+  view: OpenView;
 };
 
 export const DEFAULT_OPEN_OPTIONS: OpenQueryOptions = {
   as: "work",
   state: "ask",
   fresh: false,
+  view: "default",
 };
 
 export type OpenIntent =
@@ -66,7 +75,14 @@ export type OpenIntent =
 
 const OPEN_PARAM = "open";
 /** Cleared together with `open` after boot handling. */
-const OPEN_RELATED_PARAMS = ["open", "as", "name", "state", "fresh"] as const;
+const OPEN_RELATED_PARAMS = [
+  "open",
+  "as",
+  "name",
+  "state",
+  "fresh",
+  "view",
+] as const;
 
 /** True when a URL pathname (decoded) ends with `.sam`. */
 export function pathnameLooksLikeSam(pathname: string): boolean {
@@ -132,11 +148,19 @@ export function parseOpenQueryOptions(
   const state: "ask" | "none" = stateRaw === "none" ? "none" : "ask";
   const freshRaw = (params.get("fresh") || "").trim().toLowerCase();
   const fresh = freshRaw === "1" || freshRaw === "true" || freshRaw === "yes";
+  const viewRaw = (params.get("view") || "").trim().toLowerCase();
+  const view: OpenView =
+    viewRaw === "canvas" ||
+    viewRaw === "maximize_preview" ||
+    viewRaw === "preview"
+      ? "canvas"
+      : "default";
   return {
     as,
     name: nameRaw || undefined,
     state,
     fresh,
+    view,
   };
 }
 
@@ -413,6 +437,7 @@ export function buildPlaygroundsOpenUrl(
     state?: "ask" | "none";
     name?: string;
     fresh?: boolean;
+    view?: OpenView;
   }
 ): string {
   const trimmed = source.trim();

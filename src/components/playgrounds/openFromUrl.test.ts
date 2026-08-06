@@ -68,13 +68,13 @@ describe("parseOpenIntent", () => {
       kind: "sam",
       url: "https://cdn.example.com/tools/demo.sam",
       displayUrl: "https://cdn.example.com/tools/demo.sam",
-      options: { as: "work", state: "ask", fresh: false },
+      options: { as: "work", state: "ask", fresh: false, view: "default" },
     });
   });
 
-  it("parses as / state / name / fresh", () => {
+  it("parses as / state / name / fresh / view", () => {
     const intent = parseOpenIntent(
-      "?open=acme/demo&as=agent&state=none&name=My+SAM&fresh=1"
+      "?open=acme/demo&as=agent&state=none&name=My+SAM&fresh=1&view=canvas"
     );
     expect(intent).toMatchObject({
       kind: "github",
@@ -83,7 +83,16 @@ describe("parseOpenIntent", () => {
         state: "none",
         name: "My SAM",
         fresh: true,
+        view: "canvas",
       },
+    });
+  });
+
+  it("treats view=maximize_preview as canvas", () => {
+    expect(
+      parseOpenIntent("?open=acme/demo&view=maximize_preview")
+    ).toMatchObject({
+      options: { view: "canvas" },
     });
   });
 
@@ -150,7 +159,7 @@ describe("clearOpenQueryParam", () => {
     clearOpenQueryParam(
       {
         pathname: "/playgrounds/",
-        search: "?open=acme/demo&as=agent&fresh=1&x=1",
+        search: "?open=acme/demo&as=agent&fresh=1&view=canvas&x=1",
         hash: "",
       },
       { replaceState }

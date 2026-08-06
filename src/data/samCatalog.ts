@@ -397,6 +397,7 @@ export function samOpenSource(repoOrSource: string): string {
 /**
  * One-click open into the **current field** (same origin).
  * Catalog lives on the field host (`/sam/`); opens land on `/?open=…`.
+ * Developer／edit chrome（no `view=canvas`）.
  */
 export function samOpenHref(
   entry: Pick<SamEntry, "title" | "source">
@@ -418,7 +419,8 @@ export function samOpenCanonicalHref(
 }
 
 /**
- * Absolute open URL for sharing (DEC-042: this field's origin by default).
+ * Absolute open URL for sharing to casual recipients (DEC-042 origin).
+ * Includes `view=canvas` so the peer lands in maximized canvas (試玩).
  */
 export function samOpenShareHref(
   entry: Pick<SamEntry, "title" | "source">,
@@ -427,6 +429,7 @@ export function samOpenShareHref(
   return buildCanonicalOpenUrl(samEntryOpenSource(entry), {
     origin,
     name: entry.title,
+    view: "canvas",
   });
 }
 
@@ -484,6 +487,48 @@ export function samPlaygroundsPicks(
     if (entry) out.push(entry);
   }
   return out;
+}
+
+export type PickRandomCatalogOptions = {
+  catalog?: readonly SamEntry[];
+  /** Prefer curated picks; fall back to full catalog when pool empty. Default true. */
+  preferPicks?: boolean;
+  excludeId?: string | null;
+  excludeIds?: readonly string[] | null;
+  /** Exclude the catalog entry matching this sandbox `meta.source`. */
+  excludeSource?: string | null;
+  /** Inject for tests. */
+  random?: () => number;
+};
+
+/**
+ * Random catalog entry for try-play「換一個」.
+ * Prefers picks; excludes current id／source when possible.
+ */
+export function pickRandomCatalogEntry(
+  options: PickRandomCatalogOptions = {}
+): SamEntry | undefined {
+  const catalog = options.catalog ?? samCatalog;
+  const preferPicks = options.preferPicks !== false;
+  const random = options.random ?? Math.random;
+  const excludeIds = new Set<string>();
+  if (options.excludeId?.trim()) excludeIds.add(options.excludeId.trim());
+  for (const id of options.excludeIds ?? []) {
+    if (id.trim()) excludeIds.add(id.trim());
+  }
+  if (options.excludeSource?.trim()) {
+    const hit = findCatalogBySource(options.excludeSource, catalog);
+    if (hit) excludeIds.add(hit.id);
+  }
+  const filterPool = (pool: readonly SamEntry[]) =>
+    pool.filter(e => !excludeIds.has(e.id));
+  let pool = filterPool(preferPicks ? samPlaygroundsPicks(catalog) : catalog);
+  if (pool.length === 0 && preferPicks) {
+    pool = filterPool(catalog);
+  }
+  if (pool.length === 0) return undefined;
+  const i = Math.floor(random() * pool.length);
+  return pool[Math.min(Math.max(i, 0), pool.length - 1)];
 }
 
 /** True when sandbox `meta.source` looks like a sampot catalog open. */

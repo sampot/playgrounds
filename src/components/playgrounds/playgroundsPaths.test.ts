@@ -127,6 +127,11 @@ describe("canonical open URL", () => {
     ).toBe(
       `${PLAYGROUNDS_CANONICAL_ORIGIN}/?open=acme%2Fdemo&as=agent&fresh=1`
     );
+    expect(
+      buildCanonicalOpenUrl("acme/demo", { name: "Demo", view: "canvas" })
+    ).toBe(
+      `${PLAYGROUNDS_CANONICAL_ORIGIN}/?open=acme%2Fdemo&name=Demo&view=canvas`
+    );
   });
 });
 

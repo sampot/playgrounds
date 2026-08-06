@@ -74,6 +74,8 @@ export function buildCanonicalOpenUrl(
     state?: "ask" | "none";
     name?: string;
     fresh?: boolean;
+    /** Catalog share / try-play: maximize canvas after open. */
+    view?: "canvas" | "default";
   }
 ): string {
   const origin = (options?.origin ?? PLAYGROUNDS_CANONICAL_ORIGIN).replace(
@@ -87,5 +89,6 @@ export function buildCanonicalOpenUrl(
   if (options?.state === "none") params.set("state", "none");
   if (options?.name?.trim()) params.set("name", options.name.trim());
   if (options?.fresh) params.set("fresh", "1");
+  if (options?.view === "canvas") params.set("view", "canvas");
   return `${origin}${normalized}?${params.toString()}`;
 }

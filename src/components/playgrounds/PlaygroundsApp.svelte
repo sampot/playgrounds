@@ -363,6 +363,7 @@
   import SamCatalogPicksShelf from "@components/sam-catalog/SamCatalogPicksShelf.svelte";
   import {
     SAM_KIND_LABEL,
+    pickRandomCatalogEntry,
     samCatalog,
     samEntryOpenSource,
     samPlaygroundsPicks,
@@ -421,6 +422,10 @@
     "playgrounds-btn inline-flex size-7 shrink-0 items-center justify-center rounded border border-skin-line bg-transparent p-0 text-skin-base transition-colors hover:border-skin-accent hover:text-skin-accent disabled:cursor-not-allowed disabled:opacity-45";
   const chromeIconBtn =
     "inline-flex size-6 shrink-0 items-center justify-center rounded p-0 text-skin-base/45 hover:bg-skin-card hover:text-skin-base disabled:cursor-not-allowed disabled:opacity-40";
+  const chromeTextBtn =
+    "inline-flex h-6 shrink-0 items-center rounded px-1.5 text-[10px] font-medium text-skin-base/55 hover:bg-skin-card hover:text-skin-base disabled:cursor-not-allowed disabled:opacity-40";
+  const chromeTextBtnAccent =
+    "inline-flex h-6 shrink-0 items-center rounded px-1.5 text-[10px] font-semibold text-skin-accent hover:bg-skin-accent/10 disabled:cursor-not-allowed disabled:opacity-40";
   const btnPrimary =
     "playgrounds-btn inline-flex items-center rounded border border-skin-accent bg-skin-accent px-2.5 py-1 text-xs font-semibold text-skin-inverted transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45";
   const field =
@@ -565,6 +570,11 @@
   let sidebarTab = $state<"files" | "agent" | "avatars">("files");
   let previewOpen = $state(true);
   let previewMaximized = $state(false);
+  /**
+   * Share／試玩進場（`view=canvas`）：畫布可常駐最大化；型錄／隨機不還原工作區。
+   * 唯「看原始碼」清除並 restorePreview。
+   */
+  let tryPlaySession = $state(false);
   /** Main content (Editor 槽) fills the viewport; mutually exclusive with previewMaximized. */
   let editorMaximized = $state(false);
   /** Hide site header so the sandbox fills the viewport. */
@@ -936,6 +946,7 @@
   function restorePreview() {
     if (!previewMaximized) return;
     previewMaximized = false;
+    tryPlaySession = false;
     syncPageChrome();
     previewOpen = true;
     persistLayout();
@@ -944,6 +955,17 @@
   function togglePreviewMaximize() {
     if (previewMaximized) restorePreview();
     else maximizePreview();
+  }
+
+  /** Try-play: reveal IDE (only intentional exit that exposes the shell). */
+  function exitTryPlayToWorkspace() {
+    tryPlaySession = false;
+    restorePreview();
+  }
+
+  function enterTryPlayCanvas() {
+    tryPlaySession = true;
+    maximizePreview();
   }
 
   function maximizeEditor() {
@@ -4882,7 +4904,6 @@
         fromActive && meta?.name?.trim() ? meta.name.trim() : "遊樂場小品";
       const result = await shareOrCopy({
         title,
-        text: "一鍵開進遊樂場",
         url,
       });
       status =
@@ -4909,7 +4930,7 @@
     closeProjectDialog();
     const ok = await runOpenFromUrl(intent);
     if (ok) {
-      maximizePreview();
+      enterTryPlayCanvas();
       return;
     }
     if (!ok && !activeId) {
@@ -4951,10 +4972,26 @@
         intent?.kind === "invalid" ? intent.reason : "無法開啟此小品";
       return;
     }
+    const keepTryPlay = tryPlaySession;
     closeProjectDialog();
     closeCatalogBrowser();
     const ok = await runOpenFromUrl(intent);
-    if (ok) maximizePreview();
+    if (ok && keepTryPlay) {
+      enterTryPlayCanvas();
+    }
+  }
+
+  /** Try-play chrome: random another小品, stay maximized. */
+  async function handleTryPlayRandom() {
+    const entry = pickRandomCatalogEntry({
+      excludeSource: meta?.source,
+    });
+    if (!entry) {
+      error = "型錄暫時沒有其他小品可換";
+      return;
+    }
+    status = `換一個：${entry.title}`;
+    await handleOpenCatalogEntry(entry);
   }
 
   /**
@@ -5441,7 +5478,11 @@
         return false;
       }
       try {
-        return await runOpenFromUrl(intent);
+        const ok = await runOpenFromUrl(intent);
+        if (ok && intent.options.view === "canvas") {
+          enterTryPlayCanvas();
+        }
+        return ok;
       } finally {
         clearOpenQueryParam();
       }
@@ -6020,6 +6061,7 @@
     sandboxMaximized = false;
     previewMaximized = false;
     editorMaximized = false;
+    tryPlaySession = false;
     syncPageChrome();
     unregisterCanvasApi?.();
     unregisterCanvasApi = null;
@@ -7774,29 +7816,59 @@
               aria-label="重新整理畫布"
               ><PgIcon name="refresh" size={13} /></button
             >
-            <button
-              type="button"
-              class={chromeIconBtn}
-              onclick={togglePreviewMaximize}
-              title={previewMaximized
-                ? "還原分割版面"
-                : "全展開畫布，佔據整個視窗"}
-              aria-label={previewMaximized ? "還原畫布" : "放大畫布"}
-              aria-pressed={previewMaximized}
-              ><PgIcon
-                name={previewMaximized ? "minimize" : "maximize"}
-                size={13}
-              /></button
-            >
-            {#if !previewMaximized}
+            {#if tryPlaySession && previewMaximized}
+              <button
+                type="button"
+                class={chromeTextBtnAccent}
+                disabled={busy || openingFromUrl}
+                onclick={() => void handleTryPlayRandom()}
+                title="隨機換一款小品，維持畫布最大化"
+                aria-label="換一個小品"
+                >換一個</button
+              >
+              <button
+                type="button"
+                class={chromeTextBtnAccent}
+                disabled={busy || openingFromUrl}
+                onclick={openCatalogBrowser}
+                title="開啟型錄（畫布維持最大化）"
+                aria-label="開啟小品型錄"
+                >型錄</button
+              >
+              <button
+                type="button"
+                class={chromeTextBtn}
+                disabled={busy}
+                onclick={exitTryPlayToWorkspace}
+                title="顯示編輯器與檔案（離開試玩畫布）"
+                aria-label="看原始碼"
+                >看原始碼</button
+              >
+            {:else}
               <button
                 type="button"
                 class={chromeIconBtn}
-                onclick={togglePreviewPanel}
-                title="隱藏畫布"
-                aria-label="隱藏畫布"
-                ><PgIcon name="panelClose" size={13} /></button
+                onclick={togglePreviewMaximize}
+                title={previewMaximized
+                  ? "還原分割版面"
+                  : "全展開畫布，佔據整個視窗"}
+                aria-label={previewMaximized ? "還原畫布" : "放大畫布"}
+                aria-pressed={previewMaximized}
+                ><PgIcon
+                  name={previewMaximized ? "minimize" : "maximize"}
+                  size={13}
+                /></button
               >
+              {#if !previewMaximized}
+                <button
+                  type="button"
+                  class={chromeIconBtn}
+                  onclick={togglePreviewPanel}
+                  title="隱藏畫布"
+                  aria-label="隱藏畫布"
+                  ><PgIcon name="panelClose" size={13} /></button
+                >
+              {/if}
             {/if}
           </div>
         </div>

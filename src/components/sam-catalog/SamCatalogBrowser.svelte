@@ -190,10 +190,9 @@
     try {
       const url = catalogBrowseShareHref(filter);
       const result = await shareOrCopy({
-        title: samCatalogPage.title,
-        text: hasActiveFilter
-          ? `型錄篩選（${results.length} 筆）`
-          : samCatalogPage.description,
+        title: hasActiveFilter
+          ? `${samCatalogPage.title}（篩選 ${results.length} 筆）`
+          : samCatalogPage.title,
         url,
       });
       setFlash(

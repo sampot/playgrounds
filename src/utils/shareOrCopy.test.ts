@@ -48,9 +48,9 @@ describe("shareOrCopy", () => {
         url: "https://play.samkuo.me/?open=acme%2Fdemo",
       })
     ).resolves.toBe("shared");
+    // text must not be passed — UAs often append it after url and break deep links.
     expect(share).toHaveBeenCalledWith({
       title: "Demo",
-      text: "hi",
       url: "https://play.samkuo.me/?open=acme%2Fdemo",
     });
   });

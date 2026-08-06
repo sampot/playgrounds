@@ -25,6 +25,7 @@ import {
   samEntryOpenSource,
   samOpenHref,
   samOpenShareHref,
+  pickRandomCatalogEntry,
   samPlaygroundsPicks,
   samSourceHref,
   type SamEntry,
@@ -50,6 +51,48 @@ describe("samPlaygroundsPicks", () => {
         "pg-hashlab",
       ]).map(p => p.id)
     ).toEqual(["pg-breakout", "pg-hashlab"]);
+  });
+});
+
+describe("pickRandomCatalogEntry", () => {
+  it("prefers picks and can exclude current source", () => {
+    const picks = samPlaygroundsPicks();
+    expect(picks.length).toBeGreaterThan(1);
+    const current = picks[0]!;
+    const next = pickRandomCatalogEntry({
+      excludeSource: current.source,
+      random: () => 0,
+    });
+    expect(next).toBeTruthy();
+    expect(next!.id).not.toBe(current.id);
+    expect(picks.some(p => p.id === next!.id)).toBe(true);
+  });
+
+  it("falls back to full catalog when prefer pool is empty", () => {
+    const base = samCatalog[0]!;
+    const a: SamEntry = {
+      ...base,
+      id: "try-a",
+      repo: "try-a",
+      title: "A",
+      source: "sampot/try-a",
+    };
+    const b: SamEntry = {
+      ...base,
+      id: "try-b",
+      repo: "try-b",
+      title: "B",
+      source: "sampot/try-b",
+    };
+    // Neither id is in curated picks → prefer pool empty → full catalog.
+    expect(
+      pickRandomCatalogEntry({
+        catalog: [a, b],
+        preferPicks: true,
+        excludeId: "try-a",
+        random: () => 0,
+      })?.id
+    ).toBe("try-b");
   });
 });
 
@@ -377,7 +420,7 @@ describe("catalog human filter (UX)", () => {
   it("builds absolute share hrefs for open and browse", () => {
     const entry = getCatalogEntry("pg-breakout")!;
     expect(samOpenShareHref(entry, PLAYGROUNDS_CANONICAL_ORIGIN)).toBe(
-      "https://play.samkuo.me/?open=sampot%2Fpg-breakout&name=%E6%89%93%E7%A3%9A%E5%A1%8A"
+      "https://play.samkuo.me/?open=sampot%2Fpg-breakout&name=%E6%89%93%E7%A3%9A%E5%A1%8A&view=canvas"
     );
     expect(
       catalogBrowseShareHref(

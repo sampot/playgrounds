@@ -465,9 +465,9 @@
 - **Status:** Accepted（2026-08-01；同日 Phase 3：`as=`／去重／GitLab；**不做** `/sam` 短鏈；**2026-08-05：** 正式主機見 DEC-041）
 - **Context:** 匯入 `.sam` 與自 GitHub 複製已落地，但須手動操作；分享單頁小程式時希望「點一個 URL → 開沙盒 → 自動匯入」。需固定可分享的 deep link 形狀，且不引入站內 proxy 或雲端市集。
 - **Decision:**
-  - **方案 A：** query 契約固定 **`?open=<url-encoded 來源>`**（**不**另設 `/sam` 短鏈）；遊樂場 boot 時解析一次，成功後清除 `open`／`as`／`name`／`state`／`fresh`。**文件預設絕對 URL**＝`https://play.samkuo.me/?open=…`（根路徑；DEC-042）；任意場為 `https://<name>.samkuo.me/?open=…`；過渡舊場仍為 `/playgrounds/?open=…`。
+  - **方案 A：** query 契約固定 **`?open=<url-encoded 來源>`**（**不**另設 `/sam` 短鏈）；遊樂場 boot 時解析一次，成功後清除 `open`／`as`／`name`／`state`／`fresh`／`view`。**文件預設絕對 URL**＝`https://play.samkuo.me/?open=…`（根路徑；DEC-042）；任意場為 `https://<name>.samkuo.me/?open=…`；過渡舊場仍為 `/playgrounds/?open=…`。
   - **辨型：** 路徑以 **`.sam`** 結尾的 http(s) URL → 沙盒包裹 `fetch`（GitHub／GitLab blob／raw 改寫為 raw）；GitHub URL 或 `owner/repo` → GitHub 複製；**GitLab.com** URL → GitLab 複製；無法辨型則錯誤提示。
-  - **選用參數：** `as=work|tool|agent`（預設 work）；`state=ask|none`；`name=`；`fresh=1` 強制新建。
+  - **選用參數：** `as=work|tool|agent`（預設 work）；`state=ask|none`；`name=`；`fresh=1` 強制新建；**`view=canvas`**＝開啟後放大畫布（`maximizePreview`；型錄「分享」連結用；一鍵開不加此參數）。
   - **同源去重：** 正規化 `meta.source` 與本次來源；命中則重用本機專案並套用 `as=`（除非 `fresh=1`）。
   - **角色：** `agent` 需 `controller.js`，否則降級為工作沙盒並提示；`tool` 另確保 host 工作沙盒後掛 Editor 槽（不把 toolId 當 `openProject`）。
   - **網路：** 瀏覽器直連；**.sam 宿主須開放 CORS**；**不**做站內通用 proxy（對齊 DEC-016）。
@@ -479,6 +479,7 @@
   - 介紹文應說明 CORS／Git API rate limit；本機範本無遠端 `source` 時不可產生開啟連結；勿新增 `/sam` 短路由除非另立決策。
 - **Revision（2026-08-05）：** 正式絕對 URL 初訂 `playgrounds.samkuo.me/?open=`（DEC-041）。
 - **Revision（2026-08-05）：** 文件預設改 `play.samkuo.me/?open=`；場網 `*.samkuo.me`（DEC-042）；query 契約不變。
+- **Revision（2026-08-06）：** 選用 `view=canvas`：分享給一般接收者時放大畫布；型錄「一鍵開」仍為預設殼面。
 
 ### DEC-026: Playgrounds Agent context hygiene
 

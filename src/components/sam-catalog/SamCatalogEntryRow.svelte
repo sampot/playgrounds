@@ -46,7 +46,6 @@
     try {
       const result = await shareOrCopy({
         title: entry.title,
-        text: entry.blurb,
         url: samOpenShareHref(entry),
       });
       onShareResult?.(

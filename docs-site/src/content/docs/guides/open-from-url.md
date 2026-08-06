@@ -24,6 +24,7 @@ https://play.samkuo.me/?open=sampot/pg-steward&name=總管
 | `name` | 可選。顯示名 |
 | `state` | 可選。`ask`／`none` 等狀態策略 |
 | `fresh` | 可選。帶 `1` 時偏向新開 |
+| `view` | 可選。`canvas`＝開啟後放大畫布（型錄「分享」連結會帶；「一鍵開」不加） |
 
 Boot 成功後宿主會清掉這些 query，避免重整重複匯入。
 

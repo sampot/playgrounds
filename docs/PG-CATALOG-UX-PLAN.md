@@ -57,8 +57,8 @@
 2. **找得到 > 分得細** — 即時搜尋（`title`／`id`／`blurb`／`series`／`kind`）；kind／series 作 filter chips（可多選），tab 互斥面板可降級或移除。  
 3. **版面脫離散文欄** — 寬欄或近全寬；寬螢幕可左 filter／系列、右結果。  
 4. **密度預設 compact** — icon＋名＋常駐「一鍵開」；blurb 次級／展開。禁止僅靠 hover 露出主 CTA。  
-5. **一鍵開走本場路徑** — 優先殼內直接 open／install；外鏈 `/?open=` 僅相容／深鏈。  
-6. **可分享 URL** — 至少 `/sam/`；建議 `?q=`／`?kind=`（及既有 series hash 若保留）。  
+5. **一鍵開走本場路徑** — 優先殼內直接 open／install；外鏈 `/?open=` 僅相容／深鏈。開發／編輯預設（不加 `view=`）。  
+6. **可分享 URL** — 至少 `/sam/`；建議 `?q=`／`?kind=`（及既有 series hash 若保留）。列上「分享」仍 Web Share API（否則拷貝）；**分享出去的開啟連結**加 `view=canvas`，接收者進場後放大畫布（試玩）。試玩頂列＝「換一個／型錄／看原始碼」；型錄與隨機**不**還原工作區，唯「看原始碼」揭露完整殼。  
 7. **原生 dialog 禁止** — 確認／輸入一律頁內 UI（repo 硬規則）。
 
 ### 載體（與 SvelteKit）
@@ -121,3 +121,5 @@
 | 2026-08-06 | 初稿：脫部落格 layout；PWA／殼載體；搜尋／密度／picks；與 SvelteKit 計劃分冊 |
 | 2026-08-06 | Phase 2–5 落地：`SamCatalogBrowser`、URL filter、殼內 dialog、compact CTA |
 | 2026-08-06 | 分享：Web Share API（支援時）＋剪貼簿 fallback；列／篩選／殼開啟連結 |
+| 2026-08-06 | 列「分享」開啟連結加 `view=canvas`（接收者畫布最大化）；「一鍵開」維持預設殼面 |
+| 2026-08-06 | 試玩 session：`view=canvas` 進場後畫布可常駐最大化；頂列「換一個／型錄／看原始碼」；型錄 dialog 與隨機換片不 `restorePreview`；唯「看原始碼」揭露工作區 |
