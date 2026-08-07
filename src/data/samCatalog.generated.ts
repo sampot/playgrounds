@@ -221,7 +221,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     title: "節奏踏墊",
     kind: "game",
     series: "街機",
-    blurb: "四軌箭頭下落、踩拍判定連擊；致敬跳舞機類型，適配手機踏墊。",
+    blurb: "四軌箭頭下落、踩拍判定連擊、合成 BGM；致敬跳舞機類型，適配手機踏墊。",
     source: "sampot/pg-dancepad",
     license: "MIT",
   },
