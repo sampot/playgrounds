@@ -19,6 +19,7 @@ export const HOST_CAPABILITIES = [
   "setActiveAgent",
   "getTargetProject",
   "setTargetProject",
+  "grantSandboxAccess",
   "listFiles",
   "listDir",
   "readFile",

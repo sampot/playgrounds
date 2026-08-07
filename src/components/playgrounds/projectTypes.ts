@@ -94,6 +94,16 @@ export interface ProjectMeta {
    * Default omitted on `.sam` export; import／clone re-admit.
    */
   admittedCapabilities?: string[];
+  /**
+   * Grants on this target sandbox for scoped HOST callers (DEC-051 §6.5).
+   * Shell Config only; omitted on `.sam` export.
+   */
+  scopeGrants?: Array<{
+    granteeSandboxId: string;
+    paths: string[];
+    mode: "read" | "readwrite";
+    source: "explicit" | "auto";
+  }>;
 }
 
 /** True when HOST.deleteProject is allowed for this project. */

@@ -25,6 +25,7 @@ import {
   clearAdmittedCapabilities,
   setAdmittedCapabilities,
 } from "./admittedCapabilities";
+import { omitGitFromDirList, omitGitFromFileMap } from "./gitPathUtils";
 import {
   applySamHeadToolFields,
   projectToolFieldsFromFiles,
@@ -397,11 +398,12 @@ export async function createProject(
   const entry = pickEntry(fileMap, partialMeta?.entry);
   // Head is sole authority for tool discovery when index.html is in the map.
   // Ignore any toolKinds／toolGlobs on partialMeta (may be stale side-ledger).
-  // Never inherit admittedCapabilities on create (DEC-036 — re-admit after import／clone).
+  // Never inherit admittedCapabilities／scopeGrants on create (DEC-036／051).
   const partialRest: Partial<ProjectMeta> = { ...(partialMeta ?? {}) };
   delete partialRest.toolKinds;
   delete partialRest.toolGlobs;
   delete partialRest.admittedCapabilities;
+  delete partialRest.scopeGrants;
   const headToolFields =
     fromHead === null
       ? {}
@@ -446,16 +448,19 @@ export async function cloneProject(
   const files = await loadProjectFiles(sourceId);
   const dirs = await listProjectDirs(sourceId);
   const name = (newName?.trim() || defaultCloneProjectName(src.name)).trim();
+  // §8.4: UI／HOST clone defaults to no `.git` (fork ≠ remote linkage).
+  const cloneFiles = omitGitFromFileMap(files);
+  const cloneDirs = omitGitFromDirList(dirs);
   // Lineage: clonedFrom defaults to source; caller may override.
   // Do not inherit source inWorkingSet / cloneIntent / agentManaged.
   // toolKinds／toolGlobs re-derived from cloned index.html head inside createProject.
-  const meta = await createProject(name, files, {
+  const meta = await createProject(name, cloneFiles, {
     source: src.source,
     entry: src.entry,
     clonedFrom: sourceId,
     ...partialMeta,
   });
-  for (const dirPath of dirs) {
+  for (const dirPath of cloneDirs) {
     try {
       await createDir(meta.id, dirPath);
     } catch {

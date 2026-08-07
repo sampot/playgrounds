@@ -2,6 +2,7 @@
  * Text search over a project FileMap for HOST.search.
  */
 
+import { isGitPath } from "./gitPathUtils";
 import {
   isBinaryContent,
   type FileContent,
@@ -20,6 +21,8 @@ export interface HostSearchOptions {
   query: string;
   glob?: string;
   maxResults?: number;
+  /** When true, include `.git` tree (default excludes — DEC-051 §8.4). */
+  includeGit?: boolean;
 }
 
 const DEFAULT_MAX = 50;
@@ -73,6 +76,7 @@ export function searchFileMap(
   const paths = Object.keys(files).sort((a, b) => a.localeCompare(b, "en"));
 
   for (const path of paths) {
+    if (!options.includeGit && isGitPath(path)) continue;
     if (!pathMatchesGlob(path, options.glob)) continue;
     const content: FileContent | undefined = files[path];
     if (content === undefined || isBinaryContent(content)) continue;

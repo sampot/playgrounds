@@ -44,10 +44,12 @@ export type BackendRuntimeIn =
       requestId: string;
       sandboxId: string;
       files: FileMap;
-      /** Steward seat gets env.HOST. */
+      /** Steward seat gets full env.HOST; scoped HOST also uses admittedCapabilities. */
       withHost: boolean;
-      /** For fleet: active steward id (HOST only when sandboxId matches). */
+      /** For fleet: active steward id (full HOST when sandboxId matches). */
       activeAgentSandboxId: string | null;
+      /** Admitted scopes for non-steward HOST subset / COMPUTE / secrets (DEC-051). */
+      admittedCapabilities?: string[] | null;
       injectSession?: boolean;
     }
   | {

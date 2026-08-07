@@ -56,7 +56,15 @@ import {
   createRpcSessionBinding,
   createSplitHostBinding,
 } from "./backendRuntimeRpc";
+import { createComputeBinding } from "./computeBridge";
+import { admitsHostBinding } from "./hostScopeMap";
 import type { FsChangedEvent } from "./runtimeLocalHostFs";
+import {
+  admitsCompute,
+  admitsSecretsGet,
+  effectiveCapabilities,
+} from "./samCapabilities";
+import { createScopedHostBinding } from "./scopedHostBinding";
 import { grantAllowsBinding } from "./toolGrant";
 
 declare const self: DedicatedWorkerGlobalScope;
@@ -73,6 +81,7 @@ const controllerOpts = new Map<
     withHost: boolean;
     activeAgentSandboxId: string | null;
     injectSession: boolean;
+    admittedCapabilities: string[] | null;
   }
 >();
 
@@ -307,6 +316,25 @@ function wrapKvForReadMode(kv: MockKvNamespace): MockKvNamespace {
   };
 }
 
+function buildHostForEnv(
+  sandboxId: string,
+  files: FileMap,
+  activeAgentSandboxId: string | null,
+  admitted: readonly string[] | null | undefined,
+  forceFullHost: boolean
+): Record<string, unknown> | null {
+  const isSteward = Boolean(
+    activeAgentSandboxId && sandboxId === activeAgentSandboxId
+  );
+  const effective = effectiveCapabilities({ admitted, isSteward });
+  if (!forceFullHost && !isSteward && !admitsHostBinding(effective)) {
+    return null;
+  }
+  const full = hostBindingOptions(sandboxId, files, activeAgentSandboxId);
+  if (isSteward || forceFullHost) return full;
+  return createScopedHostBinding(full, { effectiveScopes: effective });
+}
+
 function buildEnv(
   sandboxId: string,
   msg: Extract<BackendRuntimeIn, { type: "functionsFetch" }>
@@ -324,6 +352,14 @@ function buildEnv(
     secrets: Object.freeze({}) as Readonly<Record<string, unknown>>,
   };
 
+  const isSteward = Boolean(
+    msg.activeAgentSandboxId && sandboxId === msg.activeAgentSandboxId
+  );
+  const effective = effectiveCapabilities({
+    admitted: msg.admittedCapabilities,
+    isSteward,
+  });
+
   if (msg.injectDelegate) {
     const grant = msg.delegateGrant;
     const durable: { DB?: unknown; KV?: unknown } = {};
@@ -340,16 +376,22 @@ function buildEnv(
     env.DELEGATE = delegate;
     env.TOOL = delegate;
   } else if (msg.injectHost) {
-    env.HOST = hostBindingOptions(
+    const host = buildHostForEnv(
       sandboxId,
       msg.files,
-      msg.activeAgentSandboxId
+      msg.activeAgentSandboxId,
+      msg.admittedCapabilities,
+      isSteward
     );
+    if (host) env.HOST = host;
   }
   if (msg.injectSession) {
     env.SESSION = createRpcSessionBinding(call);
   }
-  if (!msg.injectDelegate) {
+  if (admitsCompute(effective)) {
+    env.COMPUTE = createComputeBinding(sandboxId, effective);
+  }
+  if (!msg.injectDelegate && admitsSecretsGet(effective)) {
     env.secrets = Object.freeze(
       createCachedSecretsNamespace(() => secretMaterial)
     );
@@ -362,7 +404,8 @@ function buildControllerEnv(
   files: FileMap,
   withHost: boolean,
   activeAgentSandboxId: string | null,
-  injectSession: boolean
+  injectSession: boolean,
+  admittedCapabilities: string[] | null
 ): Record<string, unknown> {
   const call = (
     binding: "HOST" | "DELEGATE" | "SESSION",
@@ -371,21 +414,40 @@ function buildControllerEnv(
   ) => rpc(binding, sandboxId, method, args);
 
   const dotenvText = readDotEnvTextFromFiles(files);
+  const isSteward = Boolean(
+    activeAgentSandboxId && sandboxId === activeAgentSandboxId
+  );
+  const effective = effectiveCapabilities({
+    admitted: admittedCapabilities,
+    isSteward,
+  });
   const env: Record<string, unknown> = {
     KV: createMockKvNamespace(sandboxId),
     DB: createMockDb(sandboxId),
     vars: createEnvVarsNamespace(dotenvText),
-    secrets: Object.freeze(createCachedSecretsNamespace(() => secretMaterial)),
+    secrets: Object.freeze({}) as Readonly<Record<string, unknown>>,
   };
 
-  const injectHost = Boolean(
-    withHost && activeAgentSandboxId && sandboxId === activeAgentSandboxId
-  );
-  if (injectHost) {
-    env.HOST = hostBindingOptions(sandboxId, files, activeAgentSandboxId);
+  if (withHost || admitsHostBinding(effective)) {
+    const host = buildHostForEnv(
+      sandboxId,
+      files,
+      activeAgentSandboxId,
+      admittedCapabilities,
+      isSteward
+    );
+    if (host) env.HOST = host;
   }
   if (injectSession) {
     env.SESSION = createRpcSessionBinding(call);
+  }
+  if (admitsCompute(effective)) {
+    env.COMPUTE = createComputeBinding(sandboxId, effective);
+  }
+  if (admitsSecretsGet(effective)) {
+    env.secrets = Object.freeze(
+      createCachedSecretsNamespace(() => secretMaterial)
+    );
   }
   return env;
 }
@@ -460,13 +522,15 @@ async function handleControllerAttach(
     }
     const samFiles = fileMapToSamFiles(msg.files);
     const activeAgentSandboxId = msg.withHost
-      ? msg.sandboxId
+      ? msg.activeAgentSandboxId ?? msg.sandboxId
       : msg.activeAgentSandboxId;
     const injectSession = Boolean(msg.injectSession);
+    const admittedCapabilities = msg.admittedCapabilities ?? null;
     const opts = {
       withHost: msg.withHost,
       activeAgentSandboxId,
       injectSession,
+      admittedCapabilities,
     };
     const inst = new SamInstance({
       id: msg.sandboxId,
@@ -478,7 +542,8 @@ async function handleControllerAttach(
           msg.files,
           opts.withHost,
           opts.activeAgentSandboxId,
-          opts.injectSession
+          opts.injectSession,
+          opts.admittedCapabilities
         ),
     });
     await inst.start();
@@ -576,6 +641,7 @@ async function handleControllerSyncFiles(
       withHost: false,
       activeAgentSandboxId: null,
       injectSession: false,
+      admittedCapabilities: null,
     };
     const prev = controllers.get(msg.sandboxId);
     if (prev) {
@@ -599,6 +665,7 @@ async function handleControllerSyncFiles(
       files: msg.files,
       withHost: prevOpts.withHost,
       activeAgentSandboxId: prevOpts.activeAgentSandboxId,
+      admittedCapabilities: prevOpts.admittedCapabilities,
       injectSession: prevOpts.injectSession,
     });
   } catch (e) {

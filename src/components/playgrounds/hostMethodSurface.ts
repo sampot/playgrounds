@@ -19,6 +19,7 @@ export const HOST_LOCAL_METHODS = [
   "setActiveAgent",
   "getTargetProject",
   "setTargetProject",
+  "grantSandboxAccess",
   "listFiles",
   "listDir",
   "readFile",

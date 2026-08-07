@@ -140,7 +140,7 @@
 | environment capability（遊樂場） | 環境能力／capability／scope | 共用或跨邊界 API 的授權標籤（OAuth-style scope，如 `compute:python`、`sandbox:create`）；須 `sam:capabilities` 宣告＋使用者同意才準入。MVP 別名仍認 `runPython`／`runCmd`。見 DEC-036／**051**、[PG-API-SCOPES-SPEC.md](./PG-API-SCOPES-SPEC.md)。 |
 | API scope（遊樂場） | scope／`resource:action` | 中粒度授權單位（非角色、非逐 HOST 方法）；慢變目錄；獲准後投影為 `env.*` 方法子集。見 DEC-051、[PG-API-SCOPES-SPEC.md](./PG-API-SCOPES-SPEC.md)。 |
 | 準入（遊樂場 binding） | 準入／admit | 使用者同意後，將 scope／capability 記入沙盒已核發集合並允許注入對應 binding。已核發集合預設不進 `.sam`。見 DEC-036／051。 |
-| compute binding（遊樂場） | `env.COMPUTE` | MVP：已準入 `compute:*`（或舊名 `runPython`／`runCmd`）後注入的窄 binding。目標收進 **HOST 形子集**（DEC-051）；遷移期可雙掛。≠ 對口全量 `env.HOST`。見 DEC-036／051、[PG-API-SCOPES-SPEC.md](./PG-API-SCOPES-SPEC.md)。 |
+| compute binding（遊樂場） | `env.COMPUTE` | 已準入 `compute:*`（或舊名 `runPython`／`runCmd`）後注入的窄 binding；方法亦投影進 **HOST 形子集**（DEC-051）；遷移期雙掛。≠ 對口全量 `env.HOST`。見 DEC-036／051、[PG-API-SCOPES-SPEC.md](./PG-API-SCOPES-SPEC.md)。 |
 | Durable KV（遊樂場） | Durable KV | 對齊 Cloudflare KV 形的模擬 binding；OPFS 後端（`playgrounds-kv/<sandboxId>/`；目錄前綴歷史名可保留），跨重整存活；export／clone **預設**不複製（可選）。見 DEC-018。Agent 對話 session 以 **工作沙盒 id** 為 scope（`agent:sessions:<workSandboxId>:…`），切換工作沙盒即換對話 history。 |
 | context hygiene（遊樂場 Agent） | context hygiene／脈絡衛生 | 送 LLM 前的字元預算、舊 tool stub、舊輪次 digest，外加 `.agent/plan.md`／`.agent/memory.md`；**不是** Embedding RAG。見 DEC-026、PG-AGENT-PLAN Phase 12。 |
 | working memory（遊樂場 Agent） | 工作記憶／`.agent/memory.md` | Agent 應維護的跨回合耐久筆記（決策、約束、關鍵路徑）；開場可注入摘錄。與 UI transcript 分離。 |

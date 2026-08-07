@@ -10,8 +10,11 @@ import {
   type SerializedResponse,
 } from "./canvasSwProtocol";
 import { readDotEnvTextFromFiles } from "./dotenvParse";
-import { getHostBridge } from "./hostBridge";
+import { getHostBridge, HostBridgeError } from "./hostBridge";
+import { withHostCaller } from "./hostCallerContext";
+import { admitsHostBinding, methodAllowedByScopes } from "./hostScopeMap";
 import { RUNTIME_LOCAL_HOST_METHODS } from "./backendRuntimeRpc";
+import { effectiveCapabilities } from "./samCapabilities";
 import {
   exportUnlockedSecretMaterial,
   isSecretStoreUnlocked,
@@ -145,6 +148,28 @@ async function handleEnvRpc(
         });
         return;
       }
+      const agentId =
+        typeof (host as { getActiveAgent?: () => Promise<string | null> })
+          .getActiveAgent === "function"
+          ? await (
+              host as { getActiveAgent: () => Promise<string | null> }
+            ).getActiveAgent()
+          : null;
+      const isSteward = Boolean(agentId && msg.sandboxId === agentId);
+      const effective = effectiveCapabilities({
+        admitted: getAdmittedCapabilities(msg.sandboxId),
+        isSteward,
+      });
+      if (!isSteward && !methodAllowedByScopes(msg.method, effective)) {
+        reply({
+          ok: false,
+          error: {
+            code: "capability_not_granted",
+            message: `未準入所需 scope，無法呼叫 HOST.${msg.method}`,
+          },
+        });
+        return;
+      }
       const fn = (host as unknown as Record<string, unknown>)[msg.method];
       if (typeof fn !== "function") {
         reply({
@@ -153,11 +178,21 @@ async function handleEnvRpc(
         });
         return;
       }
-      const result = await (fn as (...a: unknown[]) => Promise<unknown>).apply(
-        host,
-        msg.args
-      );
-      reply({ ok: true, result });
+      try {
+        const result = await withHostCaller(msg.sandboxId, () =>
+          (fn as (...a: unknown[]) => Promise<unknown>).apply(host, msg.args)
+        );
+        reply({ ok: true, result });
+      } catch (e) {
+        if (e instanceof HostBridgeError) {
+          reply({
+            ok: false,
+            error: { code: e.code, message: e.message },
+          });
+          return;
+        }
+        throw e;
+      }
       return;
     }
 
@@ -648,8 +683,17 @@ function injectFlags(
       sandboxId === toolId &&
       Boolean(getToolBridge() || getScopedDelegateHost()))
   );
+  const isSteward = Boolean(
+    agentId && sandboxId === agentId && getHostBridge()
+  );
+  const effective = effectiveCapabilities({
+    admitted: getAdmittedCapabilities(sandboxId),
+    isSteward,
+  });
   const injectHost = Boolean(
-    !injectDelegate && agentId && sandboxId === agentId && getHostBridge()
+    !injectDelegate &&
+      getHostBridge() &&
+      (isSteward || admitsHostBinding(effective))
   );
   const injectSession = Boolean(getSessionSeatIdForProject(sandboxId));
   return { injectHost, injectDelegate, injectSession };
@@ -785,16 +829,34 @@ export async function backendControllerAttach(opts: {
   files: FileMap;
   withHost: boolean;
   activeAgentSandboxId: string | null;
+  admittedCapabilities?: readonly string[] | null;
 }): Promise<{ meta?: Record<string, unknown> }> {
   const injectSession = Boolean(getSessionSeatIdForProject(opts.sandboxId));
   const files = cloneFileMapForTransfer(opts.files);
+  const admitted =
+    opts.admittedCapabilities !== undefined
+      ? opts.admittedCapabilities
+      : getAdmittedCapabilities(opts.sandboxId);
+  const isSteward = Boolean(
+    opts.activeAgentSandboxId &&
+      opts.sandboxId === opts.activeAgentSandboxId
+  );
+  const effective = effectiveCapabilities({
+    admitted,
+    isSteward,
+  });
+  // withHost true = steward full HOST; also attach subset when scopes admit HOST.
+  const withHost = Boolean(
+    opts.withHost || admitsHostBinding(effective)
+  );
   const result = await controllerRequest(requestId => ({
     type: "controllerAttach",
     requestId,
     sandboxId: opts.sandboxId,
     files,
-    withHost: opts.withHost,
+    withHost,
     activeAgentSandboxId: opts.activeAgentSandboxId,
+    admittedCapabilities: admitted ? [...admitted] : null,
     injectSession,
   }));
   return (result as { meta?: Record<string, unknown> }) ?? {};

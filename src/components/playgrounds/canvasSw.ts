@@ -29,6 +29,7 @@ import {
   type FunctionsApiForwardMessage,
 } from "./functionsApiRelay";
 import { getAgentRuntimeHub } from "./agentRuntimeHub";
+import { omitGitFromFileMap } from "./gitPathUtils";
 import { readSandboxIdField } from "./sandboxIdCompat";
 import { getSessionSeatIdForProject } from "./sessionBridge";
 import {
@@ -545,10 +546,11 @@ export async function syncCanvasSnapshot(
   if (!worker) {
     throw new Error("畫布 Service Worker 尚未就緒");
   }
+  // §8.4: do not serve `.git/**` as canvas static assets.
   const message: CanvasSyncMessage = buildCanvasSyncMessage(
     sandboxId,
     generation,
-    files
+    omitGitFromFileMap(files)
   );
   const transfer = syncFilesTransferables(message.files);
 

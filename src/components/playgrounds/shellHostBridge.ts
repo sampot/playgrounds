@@ -4,6 +4,11 @@
 
 import { hashBytes, hashUtf8 } from "./contentHash";
 import {
+  assertHostTargetAccess,
+  maybeAutoGrantCreatedSandbox,
+  persistScopeGrantOnTarget,
+} from "./hostAccessGate";
+import {
   assertNotWritingActiveAgent,
   fileContentToUtf8,
   HostBridgeError,
@@ -13,6 +18,7 @@ import {
   type HostCreatePlatformInviteOptions,
   type HostCreateProjectOptions,
   type HostDomSnapshotResult,
+  type HostGrantSandboxAccessOptions,
   type HostMainTabSummary,
   type HostOpenFileOptions,
   type HostOpenMainCanvasOptions,
@@ -22,6 +28,7 @@ import {
   type HostToolSessionInfo,
   type HostWriteFileOptions,
 } from "./hostBridge";
+import { getHostCallerSandboxId } from "./hostCallerContext";
 import { assertBinarySize, base64ToBytes, bytesToBase64 } from "./hostBinary";
 import { getAgentRuntimeHub } from "./agentRuntimeHub";
 import { loadFleetSnapshot, toFleetSummary } from "./fleet/loadFleetSnapshot";
@@ -304,6 +311,10 @@ export function createShellHostBridge(ctx: ShellHostContext): HostBridge {
         inWorkingSet,
         cloneIntent: options?.cloneIntent ?? "steward_for_user",
       });
+      await maybeAutoGrantCreatedSandbox({
+        targetSandboxId: meta.id,
+        activeAgentSandboxId: ctx.getActiveAgentId(),
+      });
       await ctx.refreshProjectList();
       await ctx.onProjectsChanged?.();
       return meta;
@@ -323,6 +334,10 @@ export function createShellHostBridge(ctx: ShellHostContext): HostBridge {
       if (options?.state) {
         await copyProjectState(sourceId, meta.id, options.state);
       }
+      await maybeAutoGrantCreatedSandbox({
+        targetSandboxId: meta.id,
+        activeAgentSandboxId: ctx.getActiveAgentId(),
+      });
       await ctx.refreshProjectList();
       await ctx.onProjectsChanged?.();
       return meta;
@@ -405,8 +420,52 @@ export function createShellHostBridge(ctx: ShellHostContext): HostBridge {
       ctx.setTargetOverride(sandboxId);
     },
 
+    async grantSandboxAccess(options: HostGrantSandboxAccessOptions) {
+      const steward = ctx.getActiveAgentId();
+      const caller = getHostCallerSandboxId();
+      if (!steward || caller !== steward) {
+        throw new HostBridgeError(
+          "forbidden",
+          "grantSandboxAccess 僅對口席可用"
+        );
+      }
+      const target = options.targetSandboxId?.trim();
+      if (!target) {
+        throw new HostBridgeError("bad_args", "targetSandboxId 不可為空");
+      }
+      try {
+        await readMeta(target);
+      } catch {
+        throw new HostBridgeError("not_found", `找不到專案：${target}`);
+      }
+      const grantee =
+        options.granteeSandboxId?.trim() ||
+        caller ||
+        "";
+      if (!grantee) {
+        throw new HostBridgeError("bad_args", "granteeSandboxId 不可為空");
+      }
+      await persistScopeGrantOnTarget({
+        targetSandboxId: target,
+        granteeSandboxId: grantee,
+        paths: options.paths?.length ? options.paths : undefined,
+        mode: options.mode ?? "readwrite",
+        source: "explicit",
+      });
+      return {
+        ok: true as const,
+        targetSandboxId: target,
+        granteeSandboxId: grantee,
+      };
+    },
+
     async listFiles(sandboxId?: string) {
       const id = await resolveTargetId(ctx, sandboxId);
+      await assertHostTargetAccess({
+        targetSandboxId: id,
+        activeAgentSandboxId: ctx.getActiveAgentId(),
+        needWrite: false,
+      });
       if (id === ctx.getActiveId()) {
         return sortProjectPaths(Object.keys(ctx.getWorkFiles()));
       }
@@ -417,6 +476,12 @@ export function createShellHostBridge(ctx: ShellHostContext): HostBridge {
 
     async listDir(options?: ListDirOptions & { sandboxId?: string }) {
       const id = await resolveTargetId(ctx, options?.sandboxId);
+      await assertHostTargetAccess({
+        targetSandboxId: id,
+        activeAgentSandboxId: ctx.getActiveAgentId(),
+        path: options?.prefix || "/",
+        needWrite: false,
+      });
       let files: FileMap;
       let dirs: string[];
       if (id === ctx.getActiveId()) {
@@ -455,6 +520,12 @@ export function createShellHostBridge(ctx: ShellHostContext): HostBridge {
       if (!norm) {
         throw new HostBridgeError("bad_path", "路徑無效");
       }
+      await assertHostTargetAccess({
+        targetSandboxId: id,
+        activeAgentSandboxId: ctx.getActiveAgentId(),
+        path: norm,
+        needWrite: false,
+      });
       const files = await loadTargetFiles(ctx, id);
       const content = files[norm];
       if (content === undefined) {
@@ -487,6 +558,12 @@ export function createShellHostBridge(ctx: ShellHostContext): HostBridge {
       if (!norm) {
         throw new HostBridgeError("bad_path", "路徑無效");
       }
+      await assertHostTargetAccess({
+        targetSandboxId: id,
+        activeAgentSandboxId: ctx.getActiveAgentId(),
+        path: norm,
+        needWrite: true,
+      });
       if (opts.expectedHash) {
         const files = await loadTargetFiles(ctx, id);
         const existing = files[norm];
@@ -525,6 +602,12 @@ export function createShellHostBridge(ctx: ShellHostContext): HostBridge {
       if (!norm) {
         throw new HostBridgeError("bad_path", "路徑無效");
       }
+      await assertHostTargetAccess({
+        targetSandboxId: id,
+        activeAgentSandboxId: ctx.getActiveAgentId(),
+        path: norm,
+        needWrite: true,
+      });
       await createDir(id, norm);
       return { path: norm };
     },
@@ -536,6 +619,12 @@ export function createShellHostBridge(ctx: ShellHostContext): HostBridge {
       if (!norm) {
         throw new HostBridgeError("bad_path", "路徑無效");
       }
+      await assertHostTargetAccess({
+        targetSandboxId: id,
+        activeAgentSandboxId: ctx.getActiveAgentId(),
+        path: norm,
+        needWrite: true,
+      });
       if (id === ctx.getActiveId()) {
         await ctx.removeWorkPath(norm);
       } else {
@@ -729,6 +818,12 @@ export function createShellHostBridge(ctx: ShellHostContext): HostBridge {
       if (!norm) {
         throw new HostBridgeError("bad_path", "路徑無效");
       }
+      await assertHostTargetAccess({
+        targetSandboxId: id,
+        activeAgentSandboxId: ctx.getActiveAgentId(),
+        path: norm,
+        needWrite: false,
+      });
       const files = await loadTargetFiles(ctx, id);
       const content = files[norm];
       if (content === undefined) {
@@ -759,6 +854,12 @@ export function createShellHostBridge(ctx: ShellHostContext): HostBridge {
       if (!norm) {
         throw new HostBridgeError("bad_path", "路徑無效");
       }
+      await assertHostTargetAccess({
+        targetSandboxId: id,
+        activeAgentSandboxId: ctx.getActiveAgentId(),
+        path: norm,
+        needWrite: true,
+      });
       if (typeof base64 !== "string") {
         throw new HostBridgeError("bad_path", "需要 base64 字串");
       }
@@ -1142,6 +1243,11 @@ export function createShellHostBridge(ctx: ShellHostContext): HostBridge {
         throw new HostBridgeError("bad_path", "search 需要 query");
       }
       const id = await resolveTargetId(ctx);
+      await assertHostTargetAccess({
+        targetSandboxId: id,
+        activeAgentSandboxId: ctx.getActiveAgentId(),
+        needWrite: false,
+      });
       const files = await loadTargetFiles(ctx, id);
       return { matches: searchFileMap(files, options) };
     },
@@ -1149,6 +1255,11 @@ export function createShellHostBridge(ctx: ShellHostContext): HostBridge {
     async checkpoint(label?: string): Promise<CheckpointMeta> {
       const id = await resolveTargetId(ctx);
       assertNotWritingActiveAgent(id, ctx.getActiveAgentId(), "checkpoint");
+      await assertHostTargetAccess({
+        targetSandboxId: id,
+        activeAgentSandboxId: ctx.getActiveAgentId(),
+        needWrite: true,
+      });
       const files = await loadTargetFiles(ctx, id);
       const dirs = id === ctx.getActiveId() ? [] : await listProjectDirs(id);
       // Include empty dirs from OPFS when active; work memory may omit empty dirs.
@@ -1162,6 +1273,11 @@ export function createShellHostBridge(ctx: ShellHostContext): HostBridge {
       }
       const id = await resolveTargetId(ctx);
       assertNotWritingActiveAgent(id, ctx.getActiveAgentId(), "restore");
+      await assertHostTargetAccess({
+        targetSandboxId: id,
+        activeAgentSandboxId: ctx.getActiveAgentId(),
+        needWrite: true,
+      });
       const currentFiles = Object.keys(await loadTargetFiles(ctx, id));
       const currentDirs = await listProjectDirs(id);
       const { files, dirs, meta } = await restoreCheckpointIntoProject(

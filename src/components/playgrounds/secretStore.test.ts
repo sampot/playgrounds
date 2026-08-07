@@ -112,7 +112,9 @@ describe("createFunctionsEnv secret bindings", () => {
   it("injects per-name bindings under env.secrets when unlocked", async () => {
     await initializeSecretStore("pw");
     await setSecret("TOKEN", "abc");
-    const env = createFunctionsEnv("work-1");
+    const env = createFunctionsEnv("work-1", {
+      admittedCapabilities: ["secrets:get"],
+    });
     expect(env.SECRETS).toBeUndefined();
     expect(env.TOKEN).toBeUndefined();
     const secrets = env.secrets as Record<
@@ -126,7 +128,9 @@ describe("createFunctionsEnv secret bindings", () => {
     await initializeSecretStore("pw");
     await setSecret("TOKEN", "abc");
     lockSecretStore();
-    const env = createFunctionsEnv("work-1");
+    const env = createFunctionsEnv("work-1", {
+      admittedCapabilities: ["secrets:get"],
+    });
     expect(env.TOKEN).toBeUndefined();
     expect(env.secrets).toEqual({});
   });

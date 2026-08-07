@@ -52,7 +52,9 @@ describe("createFunctionsEnv secret bindings (DEC-029／035)", () => {
   it("exposes DB and env.secrets.* bindings, not SECRETS bag or top-level", async () => {
     await initializeSecretStore("pw");
     await setSecret("TOKEN", "abc");
-    const env = createFunctionsEnv("env-p");
+    const env = createFunctionsEnv("env-p", {
+      admittedCapabilities: ["secrets:get"],
+    });
     expect(env.DB).toBeDefined();
     expect(env.SECRETS).toBeUndefined();
     expect(env.TOKEN).toBeUndefined();
@@ -64,11 +66,22 @@ describe("createFunctionsEnv secret bindings (DEC-029／035)", () => {
     expect(await secrets.TOKEN!.get()).toBe("abc");
   });
 
+  it("omits secret bindings without secrets:get even when unlocked", async () => {
+    await initializeSecretStore("pw");
+    await setSecret("TOKEN", "abc");
+    const env = createFunctionsEnv("env-p", {
+      admittedCapabilities: [],
+    });
+    expect(env.secrets).toEqual({});
+  });
+
   it("omits secret entries when locked but keeps secrets namespace", async () => {
     await initializeSecretStore("pw");
     await setSecret("TOKEN", "abc");
     lockSecretStore();
-    const env = createFunctionsEnv("env-p");
+    const env = createFunctionsEnv("env-p", {
+      admittedCapabilities: ["secrets:get"],
+    });
     expect(env.TOKEN).toBeUndefined();
     expect(env.secrets).toEqual({});
   });
@@ -108,7 +121,9 @@ describe("createFunctionsEnv secret bindings (DEC-029／035)", () => {
       act: async () => ({}),
       leave: async () => ({ ok: true as const }),
     });
-    const env = createFunctionsEnv("worker-1");
+    const env = createFunctionsEnv("worker-1", {
+      admittedCapabilities: ["secrets:get"],
+    });
     expect(env.SESSION).toBeDefined();
     expect(env.HOST).toBeUndefined();
     const secrets = env.secrets as Record<

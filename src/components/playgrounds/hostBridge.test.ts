@@ -36,6 +36,11 @@ function stubBridge(partial: Partial<HostBridge> = {}): HostBridge {
     setActiveAgent: async () => {},
     getTargetProject: async () => null,
     setTargetProject: async () => {},
+    grantSandboxAccess: async () => ({
+      ok: true as const,
+      targetSandboxId: "t",
+      granteeSandboxId: "g",
+    }),
     listFiles: async () => [],
     listDir: async () => ({
       entries: [],

@@ -32,7 +32,7 @@ describe("createFunctionsEnv COMPUTE (DEC-036)", () => {
       runPython: (o: { code: string }) => Promise<unknown>;
       runCmd?: unknown;
     };
-    expect(await compute.capabilities()).toEqual(["runPython"]);
+    expect(await compute.capabilities()).toEqual(["compute:python"]);
     expect(compute.runCmd).toBeUndefined();
     await expect(compute.runPython({ code: "1+1" })).resolves.toMatchObject({
       stdout: "ok",
@@ -65,6 +65,57 @@ describe("createFunctionsEnv COMPUTE (DEC-036)", () => {
       });
       expect(env.HOST).toBeDefined();
       expect(env.COMPUTE).toBeDefined();
+    } finally {
+      registerHostBridge(null);
+    }
+  });
+
+  it("injects subset HOST for non-steward with scopes", async () => {
+    const { registerHostBridge } = await import("./hostBridge");
+    registerHostBridge({
+      apiVersion: async () => "1",
+      capabilities: async () => ["runPython", "createProject"],
+      runPython: async () => ({ stdout: "ok" }),
+      createProject: async () => ({ id: "x" }),
+    } as never);
+    try {
+      const env = createFunctionsEnv("scoped-p", {
+        activeAgentSandboxId: "other-steward",
+        admittedCapabilities: ["compute:python", "sandbox:create"],
+      });
+      expect(env.HOST).toBeDefined();
+      const host = env.HOST as {
+        runPython?: unknown;
+        createProject?: unknown;
+        deleteProject?: unknown;
+        capabilities: () => Promise<string[]>;
+      };
+      expect(typeof host.runPython).toBe("function");
+      expect(typeof host.createProject).toBe("function");
+      expect(host.deleteProject).toBeUndefined();
+      expect(env.COMPUTE).toBeDefined();
+    } finally {
+      registerHostBridge(null);
+    }
+  });
+
+  it("gates env.secrets on secrets:get", async () => {
+    const { registerHostBridge } = await import("./hostBridge");
+    registerHostBridge({
+      apiVersion: async () => "1",
+      capabilities: async () => [],
+    } as never);
+    try {
+      const noSecret = createFunctionsEnv("sec-p", {
+        admittedCapabilities: ["compute:python"],
+      });
+      expect(Object.keys(noSecret.secrets as object)).toHaveLength(0);
+
+      const withSecret = createFunctionsEnv("sec-p", {
+        admittedCapabilities: ["secrets:get"],
+      });
+      // Bindings may be empty if store locked, but namespace is injected.
+      expect(withSecret.secrets).toBeDefined();
     } finally {
       registerHostBridge(null);
     }

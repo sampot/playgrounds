@@ -1,6 +1,6 @@
 /**
  * Shell-registered host API for the active Agent's functions.js (DEC-017).
- * Injected as env.HOST only when sandboxId === activeAgentSandboxId.
+ * Injected as env.HOST for steward (full) or admitted HOST-projecting scopes (subset; DEC-051).
  */
 
 import type { FileContent } from "./fileContent";
@@ -187,6 +187,15 @@ export interface HostWriteFileOptions {
   expectedHash?: string;
 }
 
+/** Explicit scope grant onto a target sandbox (DEC-051 §6.5; steward／UI). */
+export interface HostGrantSandboxAccessOptions {
+  targetSandboxId: string;
+  /** Defaults to HOST caller sandbox. */
+  granteeSandboxId?: string;
+  paths?: string[];
+  mode?: "read" | "readwrite";
+}
+
 export interface HostBridge {
   apiVersion(): Promise<string>;
   capabilities(): Promise<HostCapability[]>;
@@ -211,6 +220,13 @@ export interface HostBridge {
   setActiveAgent(sandboxId: string | null): Promise<void>;
   getTargetProject(): Promise<string | null>;
   setTargetProject(sandboxId: string | null): Promise<void>;
+  /**
+   * Explicit whole-tree／path grant for a scoped SAM on a target (DEC-051).
+   * Steward seat only (not a catalog scope — part of full HOST surface).
+   */
+  grantSandboxAccess(
+    options: HostGrantSandboxAccessOptions
+  ): Promise<{ ok: true; targetSandboxId: string; granteeSandboxId: string }>;
   listFiles(sandboxId?: string): Promise<string[]>;
   /** Truncated directory listing (DEC-027); prefer over listFiles for large projects. */
   listDir(
@@ -493,6 +509,8 @@ export function createHostBinding(): HostBridge {
       requireBridge().getTargetProject(...args),
     setTargetProject: async (...args) =>
       requireBridge().setTargetProject(...args),
+    grantSandboxAccess: async (...args) =>
+      requireBridge().grantSandboxAccess(...args),
     listFiles: async (...args) => requireBridge().listFiles(...args),
     listDir: async (...args) => requireBridge().listDir(...args),
     readFile: async (...args) => requireBridge().readFile(...args),

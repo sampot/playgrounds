@@ -81,7 +81,8 @@ export function createComputeBinding(
   admitted: readonly string[]
 ): Record<string, unknown> {
   const caps = filterKnownCapabilities(admitted).filter(
-    (t): t is KnownCapability => t === "runPython" || t === "runCmd"
+    (t): t is KnownCapability =>
+      t === "compute:python" || t === "compute:cmd"
   );
   const has = new Set(caps);
 
@@ -94,7 +95,7 @@ export function createComputeBinding(
     },
   };
 
-  if (has.has("runPython")) {
+  if (has.has("compute:python")) {
     binding.runPython = async (options: HostPythonRunOptions) => {
       try {
         return await runHostPython(options);
@@ -104,7 +105,7 @@ export function createComputeBinding(
     };
   }
 
-  if (has.has("runCmd")) {
+  if (has.has("compute:cmd")) {
     binding.runCmd = async (
       options: Omit<HostCmdRunOptions, "files"> & { sandboxId?: string }
     ): Promise<Omit<HostCmdRunResult, "filesOut">> => {

@@ -1,4 +1,5 @@
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
+import { isGitPath } from "./gitPathUtils";
 import { normalizeProjectPath } from "./pathUtils";
 import type { ProjectStateBundle } from "./projectState";
 import {
@@ -73,8 +74,12 @@ export function filesToZip(
   const safeFolder =
     folder.replace(/[^\w.\-()+@\u4e00-\u9fff]+/gu, "-") || "project";
   const payload: Record<string, Uint8Array> = {};
-  // DEC-036: do not pack admittedCapabilities — import must re-admit.
-  const { admittedCapabilities: _admitted, ...exportMeta } = meta;
+  // DEC-036／051: do not pack admittedCapabilities／scopeGrants — re-admit／re-grant.
+  const {
+    admittedCapabilities: _admitted,
+    scopeGrants: _grants,
+    ...exportMeta
+  } = meta;
   const metaJson = JSON.stringify(
     { ...exportMeta, updatedAt: new Date().toISOString() },
     null,
@@ -83,6 +88,8 @@ export function filesToZip(
   payload[`${safeFolder}/${META_FILENAME}`] = strToU8(metaJson);
   for (const [path, content] of Object.entries(files)) {
     if (isMetaFilename(path) || isStatePath(path)) continue;
+    // §8.4: default exclude `.git/**` from `.sam` export.
+    if (isGitPath(path)) continue;
     payload[`${safeFolder}/${path}`] = fileContentToBytes(content);
   }
   if (options?.state) {

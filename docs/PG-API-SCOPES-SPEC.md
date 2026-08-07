@@ -1,7 +1,7 @@
 # Playgrounds API Scopes（環境能力準入）規格
 
-> **狀態：** Draft（2026-08-07）— 契約草案；實作未開始（除 DEC-036 MVP：`runPython`／`runCmd` → `env.COMPUTE`）  
-> **權威決策：** 建議 [DECISIONS.md](./DECISIONS.md) **DEC-051**（Proposed）；修訂／延伸 [DEC-036](./DECISIONS.md#dec-036-playgrounds-sam-環境資源綁定與準入)  
+> **狀態：** Implemented（2026-08-08）— Phase 1–3 ＋ §8.4 場殼義務已落地；Phase 4 Git SAM 型錄仍待  
+> **權威決策：** [DECISIONS.md](./DECISIONS.md) **DEC-051**（Accepted）；修訂／延伸 [DEC-036](./DECISIONS.md#dec-036-playgrounds-sam-環境資源綁定與準入)  
 > **相關：** DEC-017／029／035／037／038、[playgrounds-host-api.md](./playgrounds-host-api.md)、[GLOSSARY.md](./GLOSSARY.md)  
 > **動機場景：** §8 Git 客戶端 SAM（完整遠端版本管理；不內建場殼 Git UI）
 
@@ -227,11 +227,12 @@ Scopes 決定「這顆 SAM **能不能**呼叫哪些 HOST 形方法」；**對�
 
 | 階段 | 內容 | 完成定義 |
 | --- | --- | --- |
-| **0. 規格** | 本文件＋DEC-051 Proposed＋GLOSSARY | 目錄 v0 與四層模型無歧義 |
-| **1. 目錄落地** | `KNOWN` 改 scope 形；別名；同意文案；正規化儲存 | 既有 compute 準入回歸綠；舊 token 仍可宣告 |
-| **2. 投影擴充** | `sandbox:*`／`secrets:list`／`canvas:observe` 等進 HOST 形子集；grant：明示＋建立即自動 | 非總管經子集呼叫成功；新建沙盒自動可寫；無 grant 不可碰既有樹 |
-| **3. 對口席重述** | 對口＝全目錄 scopes 自動準入；卸任收回快捷 | host-api／DEC-017／036／051 對齊 |
-| **4. Git SAM（§8）** | 型錄小品＋驗收；`.git` 進樹＋§8.4 排除表 | §8.6 清單 |
+| **0. 規格** | 本文件＋DEC-051＋GLOSSARY | ✅ 目錄 v0 與四層模型無歧義 |
+| **1. 目錄落地** | `KNOWN` 改 scope 形；別名；同意文案；正規化儲存 | ✅ 既有 compute 準入回歸綠；舊 token 仍可宣告 |
+| **2. 投影擴充** | `sandbox:*`／`secrets:list`／`canvas:observe` 等進 HOST 形子集；grant：明示＋建立即自動 | ✅ 非總管經子集呼叫成功；新建沙盒自動可寫；無 grant 不可碰既有樹 |
+| **3. 對口席重述** | 對口＝全目錄 scopes 自動準入；卸任收回快捷 | ✅ host-api／DEC-017／036／051 對齊 |
+| **§8.4 場殼** | search／checkpoint／export／clone／畫布／Files 預設排除 `.git` | ✅（Phase 4 型錄前先落地） |
+| **4. Git SAM（§8）** | 型錄小品＋驗收；`.git` 進樹＋§8.4 排除表 | ⬜ §8.6 清單 |
 
 ---
 
@@ -345,3 +346,4 @@ Scopes 決定「這顆 SAM **能不能**呼叫哪些 HOST 形方法」；**對�
 | 2026-08-07 | 決：`sandbox:edit` 隱含 list＋read＋write；新增 `sandbox:list`；`write`／`read` 不互含 list |
 | 2026-08-07 | 決：建立即自動 grant；納管既有＝明示 grant；一律 HOST 形子集 |
 | 2026-08-07 | 決：對口＝全目錄自動準入；自動 grant 不隨建立者刪而撤內容 |
+| 2026-08-08 | Phase 1–3 ＋ §8.4 落地；DEC-051 Accepted；Phase 4 Git SAM 仍待 |

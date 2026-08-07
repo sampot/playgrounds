@@ -1,6 +1,6 @@
 # 我是山姆鍋 — 架構與工程決策
 
-> **最後更新：** 2026-08-07（DEC-051 Proposed：API scopes／環境能力準入）
+> **最後更新：** 2026-08-08（DEC-051 Accepted：API scopes Phase 1–3 ＋ §8.4）
 > **對象：** 作者、AI agents；必要時給之後的自己讀
 
 本文件以輕量 **ADR**（Architecture Decision Record）記錄本站**顯著且耐久**的架構／工程選擇：選了什麼、為何不選其他、後續工作不可踩破的後果。細節規格仍以 [AGENTS.md](./AGENTS.md)、[TOOLS-PLAN.md](./TOOLS-PLAN.md) 等為準；此檔是可掃讀的決策索引，避免只活在 PR 與聊天裡。
@@ -89,7 +89,7 @@
 | [DEC-047](#dec-047-playgrounds-platform-api) | Playgrounds Platform API（Invite／薄 signaling／後台） | Draft |
 | [DEC-048](#dec-048-playgrounds-宿主-sveltekit-靜態-pwa) | Playgrounds 宿主：SvelteKit 靜態 PWA（卸根 Astro） | Accepted |
 | [DEC-050](#dec-050-playgrounds-純玩版客戶端-gosamkuome) | Playgrounds 純玩版客戶端＠`go.samkuo.me` | Proposed |
-| [DEC-051](#dec-051-playgrounds-api-scopes環境能力準入) | Playgrounds API scopes（環境能力準入） | Proposed |
+| [DEC-051](#dec-051-playgrounds-api-scopes環境能力準入) | Playgrounds API scopes（環境能力準入） | Accepted |
 
 ---
 
@@ -1026,16 +1026,16 @@
 
 ### DEC-051: Playgrounds API scopes（環境能力準入）
 
-- **Status:** Proposed（2026-08-07；契約草案；見 [PG-API-SCOPES-SPEC.md](./PG-API-SCOPES-SPEC.md)）
+- **Status:** Accepted（2026-08-08；Phase 1–3 ＋ §8.4 落地；見 [PG-API-SCOPES-SPEC.md](./PG-API-SCOPES-SPEC.md)；Phase 4 Git SAM 型錄仍待）
 - **Context:** 遊樂場對 SAM 暴露的 API 面隨版本變大（`env.HOST` 為對口席動態全量客戶端）。授權不能只用總管／Tool／worker 等**角色**（太粗），也不能把每個 HOST 方法做成 capability（太細、無法管理）。DEC-036 MVP 僅 `runPython`／`runCmd`→`env.COMPUTE`，且完整 HOST 仍硬綁總管，不足以承載「建沙盒／改他沙盒／讀 secrets」類工具 SAM（例：git 客戶端）。需要 OAuth-style **scopes** 中粒度模型。
 - **Decision:**
   1. **四層分離：** API 面（快變）／scopes（慢變授權標籤）／`env` 綁定（獲准投影）／委派 grant（target path ACL；DEC-037 家族）。角色只影響如何被打開，**不**決定 API 授權。
   2. **`env.HOST`：** 對口席＝**目錄全部 scopes 自動準入**（動態全量快捷）；已準入 SAM＝**同形子集**。卸任收回對口快捷、保留明示準入。**不**另立 `env.SANDBOX`／`env.OBSERVE`；**不**登記單一 scope `host`。
   3. **Scopes：** `resource:action` 形；**`sandbox:edit` 隱含 `list`＋`read`＋`write`；`write` 不隱含 `list`／`read`；`read` 不隱含 `list`**；目錄見規格 §5。
-  4. **Grant：** 明示（同 Tool）或 **建立即自動**。自動 grant **不**隨建立者刪除而撤銷產出沙盒內容（工具產內容；內容≠工具生命）；他 SAM 再操作須另行明示 grant。
+  4. **Grant：** 明示（同 Tool／`grantSandboxAccess`）或 **建立即自動**（`ProjectMeta.scopeGrants`）。自動 grant **不**隨建立者刪除而撤銷產出沙盒內容（工具產內容；內容≠工具生命）；他 SAM 再操作須另行明示 grant。
   5. **相容：** 舊 token `runPython`／`runCmd` → `compute:*`；`env.COMPUTE` 遷移期可雙掛，目標收進 HOST 子集。
   6. **新方法掛接：** 同傷害面→掛既有 scope；擴大傷害面→新 scope＋增量同意。
-  7. **首驗收：** Git 客戶端 SAM——`.git` 進樹；scopes＋grant；不內建場殼 Git UI。
+  7. **首驗收：** Git 客戶端 SAM——`.git` 進樹；scopes＋grant；不內建場殼 Git UI（Phase 4 待做；§8.4 場殼排除已落地）。
   - 細節／階段：[PG-API-SCOPES-SPEC.md](./PG-API-SCOPES-SPEC.md)。
 - **Consequences:**
   - 修訂 DEC-036／017：對口＝全目錄自動準入；非總管經 scopes 得 HOST 形子集；DEC-037 grant 含明示／自動且內容不隨工具刪。
@@ -1046,6 +1046,7 @@
 - **Revision（2026-08-07）：** `edit`⊃list＋read＋write；`sandbox:list`；write／read 不互含 list；`.git` 進樹。
 - **Revision（2026-08-07）：** 建立即自動 grant；納管＝明示 grant；一律 HOST 形子集。
 - **Revision（2026-08-07）：** 對口＝全目錄自動準入；自動 grant 不隨建立者刪而撤內容。
+- **Revision（2026-08-08）：** Accepted — Phase 1–3 ＋ §8.4 場殼義務落地；Phase 4 Git SAM 仍待。
 
 ---
 

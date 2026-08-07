@@ -1,45 +1,93 @@
 import { describe, expect, it } from "vitest";
 import {
   admitsCompute,
+  admitsSecretsGet,
   capabilityLabel,
+  effectiveCapabilities,
+  expandEffectiveCapabilities,
   filterKnownCapabilities,
+  hasCapability,
   pendingCapabilities,
   pruneAdmittedToDeclared,
 } from "./samCapabilities";
 import { declaredCapabilitiesFromHtml } from "./samCapabilitiesDeclare";
 
 describe("samCapabilities", () => {
-  it("filters known tokens and drops unknown", () => {
+  it("normalizes aliases and drops unknown", () => {
     expect(
       filterKnownCapabilities(["runPython", "host", "runCmd", "runPython"])
-    ).toEqual(["runPython", "runCmd"]);
+    ).toEqual(["compute:python", "compute:cmd"]);
+    expect(
+      filterKnownCapabilities(["compute:python", "sandbox:edit"])
+    ).toEqual(["compute:python", "sandbox:edit"]);
   });
 
-  it("computes pending and prunes admitted", () => {
-    expect(pendingCapabilities(["runPython", "runCmd"], ["runPython"])).toEqual(
-      ["runCmd"]
-    );
+  it("lowercases known v0 scopes", () => {
+    expect(filterKnownCapabilities(["Sandbox:Edit"])).toEqual([
+      "sandbox:edit",
+    ]);
+  });
+
+  it("computes pending and prunes admitted with aliases", () => {
     expect(
-      pruneAdmittedToDeclared(["runPython"], ["runPython", "runCmd"])
-    ).toEqual(["runPython"]);
+      pendingCapabilities(["runPython", "runCmd"], ["compute:python"])
+    ).toEqual(["compute:cmd"]);
+    expect(
+      pruneAdmittedToDeclared(["runPython"], ["compute:python", "compute:cmd"])
+    ).toEqual(["compute:python"]);
   });
 
   it("admitsCompute when any compute token present", () => {
     expect(admitsCompute([])).toBe(false);
     expect(admitsCompute(["runPython"])).toBe(true);
-    expect(admitsCompute(["runCmd"])).toBe(true);
+    expect(admitsCompute(["compute:cmd"])).toBe(true);
+  });
+
+  it("edit implies list/read/write at gate-check without expanding store", () => {
+    expect(hasCapability(["sandbox:edit"], "sandbox:list")).toBe(true);
+    expect(hasCapability(["sandbox:edit"], "sandbox:read")).toBe(true);
+    expect(hasCapability(["sandbox:edit"], "sandbox:write")).toBe(true);
+    expect(hasCapability(["sandbox:write"], "sandbox:list")).toBe(false);
+    expect(hasCapability(["sandbox:read"], "sandbox:list")).toBe(false);
+    expect(filterKnownCapabilities(["sandbox:edit"])).toEqual([
+      "sandbox:edit",
+    ]);
+    expect(expandEffectiveCapabilities(["sandbox:edit"])).toEqual([
+      "sandbox:edit",
+      "sandbox:list",
+      "sandbox:read",
+      "sandbox:write",
+    ]);
+  });
+
+  it("steward effective scopes are full catalog", () => {
+    const full = effectiveCapabilities({ admitted: [], isSteward: true });
+    expect(full).toContain("sandbox:create");
+    expect(full).toContain("secrets:get");
+    expect(
+      effectiveCapabilities({ admitted: ["compute:python"], isSteward: false })
+    ).toEqual(["compute:python"]);
+  });
+
+  it("admitsSecretsGet", () => {
+    expect(admitsSecretsGet([])).toBe(false);
+    expect(admitsSecretsGet(["secrets:get"])).toBe(true);
   });
 
   it("labels known tokens", () => {
     expect(capabilityLabel("runPython")).toContain("Python");
+    expect(capabilityLabel("sandbox:edit")).toContain("讀寫");
   });
 });
 
 describe("declaredCapabilitiesFromHtml", () => {
-  it("reads sam:capabilities", () => {
+  it("reads sam:capabilities and normalizes aliases", () => {
     const html = `<head>
-      <meta name="sam:capabilities" content="runPython, bogus, runCmd" />
+      <meta name="sam:capabilities" content="runPython, bogus, sandbox:create" />
     </head>`;
-    expect(declaredCapabilitiesFromHtml(html)).toEqual(["runPython", "runCmd"]);
+    expect(declaredCapabilitiesFromHtml(html)).toEqual([
+      "compute:python",
+      "sandbox:create",
+    ]);
   });
 });

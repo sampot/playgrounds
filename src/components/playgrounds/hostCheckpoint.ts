@@ -2,6 +2,7 @@
  * OPFS snapshots for HOST.checkpoint / restore (PG-AGENT-PLAN Phase 4).
  */
 
+import { omitGitFromDirList, omitGitFromFileMap } from "./gitPathUtils";
 import {
   createDir,
   loadProjectFiles,
@@ -113,14 +114,13 @@ export async function createCheckpoint(
   const projectRoot = await projectCheckpointDir(sandboxId);
   const cpDir = await projectRoot.getDirectoryHandle(id, { create: true });
   const filesDir = await cpDir.getDirectoryHandle("files", { create: true });
+  // §8.4: default exclude `.git/**` (volume; restore workspace ≠ restore git history).
+  const snapFiles = omitGitFromFileMap(files);
+  const snapDirs = omitGitFromDirList(dirs);
   await writeJson(cpDir, "meta.json", meta);
-  await writeJson(cpDir, "dirs.json", sortProjectPaths(dirs));
-  for (const [path, content] of Object.entries(files)) {
-    if (typeof content === "string") {
-      await writeFileAtPath(filesDir, path, content);
-    } else {
-      await writeFileAtPath(filesDir, path, content);
-    }
+  await writeJson(cpDir, "dirs.json", sortProjectPaths(snapDirs));
+  for (const [path, content] of Object.entries(snapFiles)) {
+    await writeFileAtPath(filesDir, path, content);
   }
   return meta;
 }

@@ -311,6 +311,7 @@
     isRecyclableSandbox,
     listWorkingSet,
   } from "./workingSet";
+  import { isGitPath } from "./gitPathUtils";
   import {
     basename,
     buildFileTree,
@@ -1773,10 +1774,14 @@
 
   const fileList = $derived(sortProjectPaths(Object.keys(files)));
   /** Virtual Durable entry points (DEC-037); not OPFS source files. */
+  /** §8.4: hide `.git` tree in Files sidebar by default. */
   const fileTree = $derived(
     buildFileTree(
-      [...fileList, ...BINDINGS_VIRTUAL_LEAF_PATHS],
-      [...dirs, BINDINGS_DIR]
+      [
+        ...fileList.filter(p => !isGitPath(p)),
+        ...BINDINGS_VIRTUAL_LEAF_PATHS,
+      ],
+      [...dirs.filter(d => !isGitPath(d)), BINDINGS_DIR]
     )
   );
   const explorerSelectedPath = $derived(selectedDir ?? openPath);
