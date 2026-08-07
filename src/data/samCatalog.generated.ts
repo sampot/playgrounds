@@ -253,6 +253,15 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     license: "MIT",
   },
   {
+    id: "pg-frogcross",
+    title: "青蛙過街",
+    kind: "game",
+    series: "街機",
+    blurb: "過馬路躲車、踩木筏過河、進巢穴；適配手機方向鍵與滑動，自製 BGM／音效。",
+    source: "sampot/pg-frogcross",
+    license: "MIT",
+  },
+  {
     id: "pg-fruitcut",
     title: "切水果",
     kind: "game",
