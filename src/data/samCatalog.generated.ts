@@ -489,6 +489,15 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     license: "MIT",
   },
   {
+    id: "pg-redpick",
+    title: "撿紅點",
+    kind: "game",
+    series: "桌遊",
+    blurb: "對點數撿牌，只計紅心方塊；四人人機、手機適配與自製音效。",
+    source: "sampot/pg-redpick",
+    license: "MIT",
+  },
+  {
     id: "pg-regexlab",
     title: "正規式試場",
     kind: "tool",
