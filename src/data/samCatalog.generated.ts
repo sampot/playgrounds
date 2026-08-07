@@ -263,6 +263,15 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     license: "MIT",
   },
   {
+    id: "pg-hopkick",
+    title: "跳房子踢毽子",
+    kind: "game",
+    series: "精緻可玩",
+    blurb: "跳房子節拍點格與踢毽子連擊兩模式；適配手機觸控。",
+    source: "sampot/pg-hopkick",
+    license: "MIT",
+  },
+  {
     id: "pg-horselit",
     title: "賽馬機",
     kind: "game",
@@ -414,6 +423,15 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "機台",
     blurb: "復古燈圈跑燈：押注、跑燈、結算；純娛樂。",
     source: "sampot/pg-mali",
+    license: "MIT",
+  },
+  {
+    id: "pg-marblepit",
+    title: "玻璃彈珠坑",
+    kind: "game",
+    series: "街機",
+    blurb: "凹坑對撞彈珠、撥彈進洞比分；與沙盒／釘雨不同玩法，適配手機。",
+    source: "sampot/pg-marblepit",
     license: "MIT",
   },
   {
@@ -606,6 +624,15 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     license: "MIT",
   },
   {
+    id: "pg-statue",
+    title: "一二三木頭人",
+    kind: "game",
+    series: "精緻可玩",
+    blurb: "移動／定格賽跑、簡易人機裁判回頭抓人；適配手機長按前進。",
+    source: "sampot/pg-statue",
+    license: "MIT",
+  },
+  {
     id: "pg-steward",
     title: "總管",
     kind: "agent",
@@ -684,6 +711,15 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "資料",
     blurb: "驗證與 pretty；可掛成工具編輯工作沙盒的 .toml。",
     source: "sampot/pg-tomlfmt",
+    license: "MIT",
+  },
+  {
+    id: "pg-topduel",
+    title: "陀螺對戰",
+    kind: "game",
+    series: "街機",
+    blurb: "蓄力發射、轉速碰撞短局對戰；適配手機，自製音效。",
+    source: "sampot/pg-topduel",
     license: "MIT",
   },
   {

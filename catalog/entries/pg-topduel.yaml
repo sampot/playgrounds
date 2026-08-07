@@ -1,0 +1,7 @@
+title: 陀螺對戰
+kind: game
+series: 街機
+blurb: 蓄力發射、轉速碰撞短局對戰；適配手機，自製音效。
+source: sampot/pg-topduel
+license: MIT
+status: listed
