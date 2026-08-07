@@ -660,6 +660,15 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     license: "MIT",
   },
   {
+    id: "pg-towerdef",
+    title: "迷你塔防",
+    kind: "game",
+    series: "街機",
+    blurb: "單一路徑防守：箭塔／炮塔／冰塔、十二波；適配手機點建，自製音效。",
+    source: "sampot/pg-towerdef",
+    license: "MIT",
+  },
+  {
     id: "pg-twland",
     title: "台灣路名地產",
     kind: "game",
