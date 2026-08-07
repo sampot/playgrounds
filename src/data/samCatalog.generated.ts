@@ -64,6 +64,15 @@ export const GENERATED_SAM_PAGE = {
 
 export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
   {
+    id: "pg-airhockey",
+    title: "空氣曲棍球",
+    kind: "game",
+    series: "街機",
+    blurb: "拖曳球拍彈盤進門、人機對戰先得七分；適配手機，自製音效。",
+    source: "sampot/pg-airhockey",
+    license: "MIT",
+  },
+  {
     id: "pg-banqi",
     title: "暗棋對弈",
     kind: "game",
