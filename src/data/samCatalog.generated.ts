@@ -543,6 +543,15 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     license: "MIT",
   },
   {
+    id: "pg-twland",
+    title: "台灣路名地產",
+    kind: "game",
+    series: "桌遊",
+    blurb: "台灣版紙本規則：買地蓋房、機會命運、熱座 2–4 人／AI 託管；忠孝東路等路名。",
+    source: "sampot/pg-twland",
+    license: "MIT",
+  },
+  {
     id: "pg-tzlook",
     title: "時區對照",
     kind: "tool",
