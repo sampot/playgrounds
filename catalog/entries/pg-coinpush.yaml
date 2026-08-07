@@ -1,0 +1,7 @@
+title: 推幣機
+kind: game
+series: 機台
+blurb: 落幣堆疊、推板擠落得分；致敬推幣機玩法類型。
+source: sampot/pg-coinpush
+license: MIT
+status: listed
