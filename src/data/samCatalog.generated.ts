@@ -615,6 +615,15 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     license: "MIT",
   },
   {
+    id: "pg-tankduel",
+    title: "戰車對決",
+    kind: "game",
+    series: "街機",
+    blurb: "俯視坦克對戰：履帶炮塔、掩體彈道、重低音爆炸；適配手機搖桿，自製音效。",
+    source: "sampot/pg-tankduel",
+    license: "MIT",
+  },
+  {
     id: "pg-textdiff",
     title: "文字對照",
     kind: "tool",
