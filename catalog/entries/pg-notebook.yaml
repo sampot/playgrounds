@@ -1,0 +1,7 @@
+title: Python 筆記本
+kind: tool
+series: 環境
+blurb: 輕量 Markdown／Python cell；經場殼 Pyodide 執行（非 Jupyter）。
+source: sampot/pg-notebook
+license: MIT
+status: listed
