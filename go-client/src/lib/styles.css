@@ -76,21 +76,38 @@ a {
 }
 .chrome a.play-link {
   display: inline-flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.05rem;
   min-height: 2.75rem;
-  padding: 0 0.35rem;
+  min-width: 0;
+  flex: 1;
+  padding: 0.2rem 0.35rem;
   font-size: 0.875rem;
   font-weight: 600;
   color: rgb(var(--ink));
   text-decoration: none;
+  border-radius: var(--radius);
+  -webkit-tap-highlight-color: color-mix(in oklab, rgb(var(--accent)) 18%, transparent);
 }
-.chrome a.play-link:hover {
+.chrome a.play-link:hover,
+.chrome a.play-link:focus-visible {
   color: rgb(var(--accent));
+  outline: none;
+}
+.chrome a.play-link:focus-visible {
+  box-shadow: 0 0 0 2px color-mix(in oklab, rgb(var(--accent)) 45%, transparent);
+}
+.chrome .play-label {
+  line-height: 1.2;
 }
 .chrome .host {
   font-size: 0.7rem;
+  font-weight: 500;
   color: rgb(var(--muted));
   word-break: break-all;
+  line-height: 1.2;
 }
 .main {
   flex: 1;

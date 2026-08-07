@@ -66,7 +66,7 @@ export function createRosterSessionTunnelBridge(opts: {
     async getState() {
       return {
         ready: true,
-        note: "遠端 getState 尚未隧道；以事件為準",
+        note: "對局狀態以即時更新為準",
       };
     },
     async getEventChannel() {
@@ -85,7 +85,7 @@ export function createRosterSessionTunnelBridge(opts: {
     async leave() {
       throw new SessionBridgeError(
         "forbidden",
-        "遠端座位請在主持場請離（leave 隧道未通）"
+        "請在主持端請離此座位"
       );
     },
   };

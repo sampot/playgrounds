@@ -75,8 +75,8 @@ const defaultDeps: RosterSeatMaterializeDeps = {
 
 function seatName(invite: SessionInvitePayload, title?: string): string {
   const role = invite.role.trim() || SESSION_PARTICIPANT_DEFAULT_ROLE;
-  if (title?.trim()) return `${title.trim()} · 遠端座位`;
-  return `遠端座位 · ${role}`;
+  if (title?.trim()) return `${title.trim()} · 對弈`;
+  return `對弈 · ${role}`;
 }
 
 function resolveGithubRef(

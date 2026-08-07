@@ -17,6 +17,12 @@ export type PlatformComposeShell = {
    * keep IDE chrome hidden until「看原始碼」.
    */
   enterTryPlayCanvas?: () => void;
+  /**
+   * Leave play-first／invite chrome (e.g. after signal.handshake — no SAM canvas).
+   */
+  exitTryPlayToWorkspace?: () => void;
+  /** Focus 線上（Avatars）tab — roster connection success. */
+  focusAvatarsTab?: () => void;
   /** Current work-canvas sandbox id (for seating human-visible preview). */
   getActiveSandboxId?: () => string | null;
 };

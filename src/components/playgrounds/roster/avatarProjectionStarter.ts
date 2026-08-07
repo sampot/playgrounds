@@ -5,7 +5,7 @@
 
 import type { FileMap } from "../projectTypes";
 
-export const AVATAR_PROJECTION_STARTER_TITLE = "化身投影";
+export const AVATAR_PROJECTION_STARTER_TITLE = "連線畫面";
 
 /** postMessage bridge between projection iframe and AvatarsPanel. */
 export const ROSTER_AVATAR_BRIDGE = "playgrounds-roster-avatar" as const;
@@ -29,7 +29,7 @@ export function createAvatarProjectionStarterFiles(
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>${escapeHtml(name)} · 化身</title>
+    <title>${escapeHtml(name)}</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -38,7 +38,7 @@ export function createAvatarProjectionStarterFiles(
         <img id="icon" class="icon" alt="" width="36" height="36" />
         <div class="meta">
           <strong id="name"></strong>
-          <span class="muted">投影 · 權威在對方場</span>
+          <span class="muted">對方場上的連線畫面</span>
         </div>
       </header>
       <button type="button" id="ping" class="btn">打招呼</button>
@@ -131,7 +131,7 @@ window.addEventListener("message", ev => {
 });
 
 postToShell({ action: "ready" });
-log("投影就緒");
+log("已就緒");
 `,
   };
 }

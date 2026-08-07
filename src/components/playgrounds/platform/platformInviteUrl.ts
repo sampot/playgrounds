@@ -3,7 +3,14 @@
  * Secret is opaque invite secret — not a Roster wire.
  */
 
+import { resolveShortInvite } from "./platformClient";
+
 export const PG_INVITE_HASH_KEY = "pg";
+
+export type PlatformInviteTextRef =
+  | { kind: "secret"; secret: string }
+  | { kind: "shortId"; shortId: string }
+  | { kind: "ambiguous"; value: string };
 
 export type PgInviteFromLocation = {
   secret: string;
@@ -80,4 +87,88 @@ export function buildPgInviteDeepLink(opts: {
   const secret = opts.secret.trim();
   if (!secret) throw new Error("invite secret required");
   return `${origin}${pathname}#${PG_INVITE_HASH_KEY}=${encodeURIComponent(secret)}`;
+}
+
+/**
+ * Extract Platform invite secret／short id from pasted text or scanned QR
+ * (short URL、`#pg=`、deep link、opaque code). Not for OOB Roster wire.
+ */
+export function extractPlatformInviteRefFromText(
+  text: string
+): PlatformInviteTextRef | null {
+  const raw = text.trim();
+  if (!raw) return null;
+
+  const fromPgParam = (s: string): string | null => {
+    const m = s.match(/(?:^|[?#&])pg=([^&\s#]+)/i);
+    if (!m?.[1]) return null;
+    try {
+      return decodeURIComponent(m[1]).trim() || null;
+    } catch {
+      return m[1].trim() || null;
+    }
+  };
+
+  const fromShortPath = (s: string): string | null => {
+    const m = s.match(/\/i\/([A-Za-z0-9_-]+)/);
+    return m?.[1]?.trim() || null;
+  };
+
+  const pgDirect = fromPgParam(raw);
+  if (pgDirect) return { kind: "secret", secret: pgDirect };
+
+  const shortDirect = fromShortPath(raw);
+  if (shortDirect) return { kind: "shortId", shortId: shortDirect };
+
+  // Full／partial URL without scheme
+  const asUrlCandidate = (() => {
+    if (/^https?:\/\//i.test(raw)) return raw;
+    if (/^[a-z0-9.-]+\.[a-z]{2,}\//i.test(raw) || raw.startsWith("//")) {
+      return raw.startsWith("//") ? `https:${raw}` : `https://${raw}`;
+    }
+    return null;
+  })();
+  if (asUrlCandidate) {
+    try {
+      const u = new URL(asUrlCandidate);
+      const shortId = fromShortPath(u.pathname);
+      if (shortId) return { kind: "shortId", shortId };
+      const parsed = parsePgInviteFromLocation({
+        hash: u.hash,
+        search: u.search,
+      });
+      if (parsed?.secret) return { kind: "secret", secret: parsed.secret };
+    } catch {
+      /* fall through */
+    }
+  }
+
+  // Opaque token: short id or invite secret (same alphabet).
+  if (/^[A-Za-z0-9_-]{6,200}$/.test(raw) && !raw.includes(".")) {
+    return { kind: "ambiguous", value: raw };
+  }
+
+  return null;
+}
+
+/** Resolve pasted／scanned invite text to Platform invite secret. */
+export async function resolvePlatformInviteSecretFromText(
+  text: string,
+  origin?: string
+): Promise<string> {
+  const ref = extractPlatformInviteRefFromText(text);
+  if (!ref) {
+    throw new Error("無法辨識邀請連結或邀請碼");
+  }
+  if (ref.kind === "secret") return ref.secret;
+  if (ref.kind === "shortId") {
+    const mapped = await resolveShortInvite(ref.shortId, origin);
+    return mapped.secret;
+  }
+  try {
+    const mapped = await resolveShortInvite(ref.value, origin);
+    return mapped.secret;
+  } catch {
+    return ref.value;
+  }
 }

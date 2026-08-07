@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import {
+  import {
   buildPgInviteDeepLink,
   clearPgInviteHashFromLocation,
+  extractPlatformInviteRefFromText,
   parsePgInviteFromLocation,
   PG_INVITE_HASH_KEY,
 } from "./platformInviteUrl";
@@ -32,6 +33,18 @@ describe("platformInviteUrl", () => {
   it("clears hash when present", () => {
     // jsdom may not exist — only assert helper is callable
     expect(() => clearPgInviteHashFromLocation()).not.toThrow();
+  });
+  it("extracts short id from go／api /i/ URL", () => {
+    expect(
+      extractPlatformInviteRefFromText("https://go.samkuo.me/i/abc_12")
+    ).toEqual({ kind: "shortId", shortId: "abc_12" });
+    expect(
+      extractPlatformInviteRefFromText("https://play.samkuo.me/#pg=secXYZ")
+    ).toEqual({ kind: "secret", secret: "secXYZ" });
+    expect(extractPlatformInviteRefFromText("opaqueTok1")).toEqual({
+      kind: "ambiguous",
+      value: "opaqueTok1",
+    });
   });
 });
 

@@ -1500,7 +1500,7 @@
       case "session_seat":
         return "session 分身";
       case "roster_avatar":
-        return "化身投影";
+        return "連線畫面";
       case "experiment":
         return "試驗";
       default:
@@ -3451,7 +3451,7 @@
       async getState() {
         throw new SessionBridgeError(
           "forbidden",
-          "遠端座位狀態請在 homePeer 以事件為準"
+          "請在己方場上查看對局狀態"
         );
       },
       async getEventChannel() {
@@ -3464,13 +3464,13 @@
       async act() {
         throw new SessionBridgeError(
           "forbidden",
-          "遠端座位請在 homePeer 發言（act 經 Roster 隧道）"
+          "請在己方場上操作"
         );
       },
       async leave() {
         throw new SessionBridgeError(
           "forbidden",
-          "遠端座位請由主持場請離"
+          "請由主持端請離此座位"
         );
       },
     };
@@ -3551,8 +3551,8 @@
     // Canvas load happens once from iframe {@attach} (must not mutate
     // participantIframes inside rebuild — that caused effect_update_depth_exceeded).
     status = opts.remote
-      ? `化身已入座（遠端 proxy · ${opts.role}）`
-      : `已入座 ${opts.role}（${opts.sandboxId.slice(0, 8)}…）`;
+      ? `對手已入座（${opts.role}）`
+      : `已入座 ${opts.role}`;
     return {
       seatId: seat.seatId,
       role: seat.role,
@@ -3570,7 +3570,7 @@
       catalogId: opts?.catalogId,
       source: opts?.source,
     });
-    status = `已邀請化身入座（${invite.protocol.protocolId}）`;
+    status = `已邀請對手入座（${invite.protocol.protocolId}）`;
     return {
       inviteId: invite.inviteId,
       sessionId: invite.sessionId,
@@ -3587,7 +3587,7 @@
   }): Promise<void> {
     const session = sessionRuntime.getSession();
     if (!session || session.sessionId !== ev.sessionId) {
-      status = "收到化身接受，但通道已關閉或 session 不符";
+      status = "對方已接受，但連線通道已關閉或不符";
       return;
     }
     let sandboxId = getRosterProjectionSandboxId(ev.peerAgentId);
@@ -3599,7 +3599,7 @@
       }
     }
     if (!sandboxId) {
-      status = "找不到化身投影沙盒，無法入座";
+      status = "找不到對方畫面，無法入座";
       return;
     }
     try {
@@ -3627,13 +3627,13 @@
           },
           ev.peerAgentId
         );
-        status = `化身已入座；seat_bound 已送出（${joined.role}）`;
+        status = `對手已入座（${joined.role}）`;
       }
     } catch (e) {
       status =
         e instanceof Error
-          ? `化身入座失敗：${e.message}`
-          : `化身入座失敗：${String(e)}`;
+          ? `對手入座失敗：${e.message}`
+          : `對手入座失敗：${String(e)}`;
     }
   }
 
@@ -3681,7 +3681,7 @@
     if (!seat?.sandboxId) {
       reply(false, undefined, {
         code: "not_found",
-        message: "找不到遠端座位",
+        message: "找不到對弈席位",
       });
       return;
     }
@@ -3724,12 +3724,12 @@
   }): Promise<void> {
     try {
       await openProject(ev.sandboxId);
-      status = `遠端座位橋已就緒（可發言）`;
+      status = `已入座，可以開始`;
     } catch (e) {
       status =
         e instanceof Error
-          ? `開啟遠端座位失敗：${e.message}`
-          : `開啟遠端座位失敗：${String(e)}`;
+          ? `開啟對弈畫面失敗：${e.message}`
+          : `開啟對弈畫面失敗：${String(e)}`;
     }
   }
 
@@ -5792,6 +5792,12 @@
       enterTryPlayCanvas: () => {
         enterTryPlayCanvas({ invite: invitePlaySession || bootInvitePlay });
       },
+      exitTryPlayToWorkspace: () => {
+        exitTryPlayToWorkspace();
+      },
+      focusAvatarsTab: () => {
+        selectSidebarTab("avatars");
+      },
       getActiveSandboxId: () => activeId || null,
     });
     unregPlatformCompose = unregCompose;
@@ -6411,9 +6417,18 @@
         composeProtocolId,
         displayName: opts.displayName,
       });
-      inviteJoinStatus = "已連線，等待入座…";
-      inviteJoinOpen = false;
-      status = "已同意入座 — 連線中";
+      const handshakeOnly = payload.meta.kind === "signal.handshake";
+      if (handshakeOnly) {
+        exitTryPlayToWorkspace();
+        selectSidebarTab("avatars");
+        inviteJoinStatus = "連線完成";
+        inviteJoinOpen = false;
+        status = "連線完成 — 可在「線上」看到對方";
+      } else {
+        inviteJoinStatus = "已連線，等待入座…";
+        inviteJoinOpen = false;
+        status = "已同意入座 — 連線中";
+      }
     } catch (e) {
       inviteJoinError =
         e instanceof Error ? e.message : String(e);

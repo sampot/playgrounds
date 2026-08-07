@@ -13,5 +13,10 @@
 </p>
 <p class="status">
   完整遊樂場（開發／本機沙盒）在
-  <a href={`${PLAY_ORIGIN}/`} onclick={openPlaygroundHome}>{PLAY_ORIGIN}</a>
+  <a
+    href={`${PLAY_ORIGIN}/`}
+    target="_blank"
+    rel="noopener noreferrer"
+    onclick={openPlaygroundHome}>{PLAY_ORIGIN}</a
+  >
 </p>

@@ -43,7 +43,7 @@ export function createSessionHostStarterFiles(): FileMap {
       <div id="controls" class="controls">
         <button type="button" id="btn-open" class="primary">開始這一場</button>
         <button type="button" id="btn-spawn" class="secondary" disabled>加入一位參與者</button>
-        <button type="button" id="btn-invite-roster" class="secondary" disabled>邀請化身入座</button>
+        <button type="button" id="btn-invite-roster" class="secondary" disabled>邀請對手入座</button>
         <button type="button" id="btn-pause" class="secondary" disabled>暫停</button>
         <button type="button" id="btn-close" class="secondary" disabled>結束</button>
       </div>
@@ -155,7 +155,7 @@ function renderSeats(seats) {
   seatsEl.innerHTML = "";
   for (const seat of seats || []) {
     const li = document.createElement("li");
-    const remote = seat.remote ? " · 遠端化身" : "";
+    const remote = seat.remote ? " · 遠端" : "";
     const label = (seat.kind === "human" ? "人類" : "參與者") + " · " + seat.role + remote;
     li.appendChild(document.createTextNode(label));
     if (seat.kind !== "human" && seat.seatId) {
@@ -279,7 +279,7 @@ async function onSpawn() {
 }
 
 async function onInviteRoster() {
-  setStatus("邀請化身入座…");
+  setStatus("邀請對手入座…");
   try {
     const invited = await shell("/invite-roster", {
       method: "POST",

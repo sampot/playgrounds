@@ -121,6 +121,36 @@ export async function previewInvite(
   return parseJson<InviteMeta>(res);
 }
 
+/** Public short id → invite secret (for pasted go／api `/i/…` links). */
+export async function resolveShortInvite(
+  shortId: string,
+  origin = platformApiOrigin()
+): Promise<{
+  shortId: string;
+  secret: string;
+  inviteId: string;
+  targetField: string;
+  expiresAt: number;
+}> {
+  const id = shortId.trim();
+  if (!id) throw new Error("short id required");
+  const res = await fetch(`${origin}/v1/shorts/${encodeURIComponent(id)}`);
+  const data = await parseJson<{
+    short_id: string;
+    secret: string;
+    invite_id: string;
+    target_field: string;
+    expires_at: number;
+  }>(res);
+  return {
+    shortId: data.short_id,
+    secret: data.secret,
+    inviteId: data.invite_id,
+    targetField: data.target_field,
+    expiresAt: data.expires_at,
+  };
+}
+
 export async function createJoin(
   secret: string,
   origin = platformApiOrigin()

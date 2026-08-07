@@ -67,9 +67,14 @@ export async function consumePgInviteFromLocation(opts?: {
       return { handled: true, ok: false, error: "invite_closed" };
     }
 
-    if (meta.kind === "invite.compose") {
+    const shell = getPlatformComposeShell();
+
+    if (meta.kind === "signal.handshake") {
+      // `#pg=` boots play-first; handshake has no SAM — restore field chrome
+      // so consent is not over an empty maximized canvas.
+      shell?.exitTryPlayToWorkspace?.();
+    } else if (meta.kind === "invite.compose") {
       const sam = composeSamSource(meta.intent);
-      const shell = getPlatformComposeShell();
       // Hide IDE before install／open so consumers never flash the workspace.
       if (shell) {
         shell.enterTryPlayCanvas?.() ?? shell.maximizePreview();

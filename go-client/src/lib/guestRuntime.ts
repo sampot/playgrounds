@@ -47,6 +47,13 @@ import {
   installGoCanvasApiListener,
   syncGoCanvasSnapshot,
 } from "./goCanvas";
+import { isGoCanvasSwUsable } from "./goCanvasSupport";
+import {
+  buildGoMemoryCanvas,
+  installGoMemorySessionListener,
+  publishGoMemoryBroadcast,
+  revokeGoMemoryBlobs,
+} from "./goMemoryCanvas";
 import { platformApiOrigin } from "./platformClient";
 
 export type GuestPhase =
@@ -60,13 +67,21 @@ export type GuestPhase =
   | "ready"
   | "error";
 
+export type GuestCanvasMode = "sw" | "memory";
+
 export type GuestStatus = {
   phase: GuestPhase;
   message: string;
   error: string | null;
   meta: InviteMeta | null;
   shortId: string | null;
+  /** SW virtual-origin canvas URL (when canvasMode === "sw"). */
   canvasUrl: string | null;
+  /** srcdoc for WebView fallback (when canvasMode === "memory"). */
+  canvasSrcdoc: string | null;
+  canvasMode: GuestCanvasMode | null;
+  /** Remount key for memory iframe. */
+  canvasGeneration: number;
   displayName: string;
 };
 
@@ -110,6 +125,9 @@ export function createGuestRuntime() {
     meta: null,
     shortId: null,
     canvasUrl: null,
+    canvasSrcdoc: null,
+    canvasMode: null,
+    canvasGeneration: 0,
     displayName: "對手",
   };
   const listeners = new Set<Listener>();
@@ -117,6 +135,8 @@ export function createGuestRuntime() {
   let sandboxId: string | null = null;
   let generation = 1;
   let samFiles: FileMap | null = null;
+  let canvasMode: GuestCanvasMode | null = null;
+  let memoryBlobUrls: string[] = [];
   let peerSession: RosterPeerSession | null = null;
   let peerAgentId: string | null = null;
   let composeProtocolId: string | null = null;
@@ -126,16 +146,46 @@ export function createGuestRuntime() {
   let homeSandboxByInvite = new Map<string, string>();
   let tunnelChannelBySession = new Map<string, string>();
 
+  function clearMemoryBlobs() {
+    if (memoryBlobUrls.length) {
+      revokeGoMemoryBlobs(memoryBlobUrls);
+      memoryBlobUrls = [];
+    }
+  }
+
+  function buildMemorySrcdoc(): string {
+    if (!samFiles) throw new Error("小品尚未載入");
+    clearMemoryBlobs();
+    const built = buildGoMemoryCanvas(samFiles, generation);
+    memoryBlobUrls = built.blobUrls;
+    return built.srcdoc;
+  }
+
   /**
    * Remount canvas after seat_bound so SAM re-probes `/api/session/seat`
-   * (gomoku tryBootAsPlayer is one-shot at boot). Mirrors field-shell
-   * notifyRosterHomeSeatReady → openProject → rebuildPreview.
+   * (gomoku tryBootAsPlayer is one-shot at boot).
    */
-  async function remountCanvasAfterSeat(): Promise<string | null> {
-    if (!sandboxId || !samFiles) return null;
+  async function remountCanvasAfterSeat(): Promise<
+    Partial<GuestStatus> | null
+  > {
+    if (!sandboxId || !samFiles || !canvasMode) return null;
     generation += 1;
+    if (canvasMode === "memory") {
+      const srcdoc = buildMemorySrcdoc();
+      return {
+        canvasMode: "memory",
+        canvasSrcdoc: srcdoc,
+        canvasUrl: null,
+        canvasGeneration: generation,
+      };
+    }
     await syncGoCanvasSnapshot(sandboxId, generation, samFiles);
-    return canvasEntryUrl(sandboxId, generation);
+    return {
+      canvasMode: "sw",
+      canvasUrl: canvasEntryUrl(sandboxId, generation),
+      canvasSrcdoc: null,
+      canvasGeneration: generation,
+    };
   }
 
   function emit() {
@@ -243,12 +293,12 @@ export function createGuestRuntime() {
         error: null,
       });
       void remountCanvasAfterSeat()
-        .then(url => {
+        .then(partial => {
           set({
             phase: "ready",
             message: "已入座 — 等待主持開始",
             error: null,
-            ...(url ? { canvasUrl: url } : {}),
+            ...(partial || {}),
           });
         })
         .catch(e => {
@@ -267,7 +317,15 @@ export function createGuestRuntime() {
     }
     if (isSessionEventRelayPayload(payload)) {
       const channel = tunnelChannelBySession.get(payload.sessionId);
-      if (channel) publishRosterRelayedSessionEvent(channel, payload);
+      if (channel) {
+        publishRosterRelayedSessionEvent(channel, payload);
+        publishGoMemoryBroadcast(channel, {
+          type: "session-event",
+          sessionId: payload.sessionId,
+          seq: payload.seq,
+          event: payload.event,
+        });
+      }
     }
   }
 
@@ -279,6 +337,9 @@ export function createGuestRuntime() {
       error: null,
       meta: null,
       canvasUrl: null,
+      canvasSrcdoc: null,
+      canvasMode: null,
+      canvasGeneration: 0,
     });
     try {
       const secret = await resolveShortSecret(shortId);
@@ -345,7 +406,6 @@ export function createGuestRuntime() {
     try {
       const files = await loadSamFiles(source);
       if (!files["index.html"] && !files["/index.html"]) {
-        // github paths are usually without leading slash
         const hasIndex = Object.keys(files).some(
           p => p === "index.html" || p.endsWith("/index.html")
         );
@@ -357,12 +417,36 @@ export function createGuestRuntime() {
       samFiles = files;
       generation += 1;
       unlistenApi?.();
-      unlistenApi = installGoCanvasApiListener(() => sandboxId);
-      await syncGoCanvasSnapshot(sandboxId, generation, files);
-      // Defer iframe until seated (roster) so Guest cannot poke local UI mid-handshake.
+      clearMemoryBlobs();
+
+      const preferSw = isGoCanvasSwUsable();
+      if (preferSw) {
+        try {
+          unlistenApi = installGoCanvasApiListener(() => sandboxId);
+          await syncGoCanvasSnapshot(sandboxId, generation, files);
+          canvasMode = "sw";
+        } catch {
+          // LINE / broken SW stubs — fall through to memory srcdoc.
+          unlistenApi?.();
+          unlistenApi = null;
+          canvasMode = null;
+        }
+      }
+      if (!canvasMode) {
+        unlistenApi = installGoMemorySessionListener(() => sandboxId);
+        buildMemorySrcdoc(); // validate build; show only after ready
+        canvasMode = "memory";
+      }
+
       set({
         canvasUrl: null,
-        message: "小品已載入，正在連線…",
+        canvasSrcdoc: null,
+        canvasMode,
+        canvasGeneration: generation,
+        message:
+          canvasMode === "memory"
+            ? "小品已載入（相容模式），正在連線…"
+            : "小品已載入，正在連線…",
       });
     } catch (e) {
       set({
@@ -377,16 +461,31 @@ export function createGuestRuntime() {
     }
 
     if (!wantsRosterSignal(meta.kind, meta.intent)) {
-      if (!sandboxId) {
+      if (!sandboxId || !canvasMode) {
         set({ phase: "error", error: "沙盒未就緒", message: "" });
         return;
       }
-      const url = canvasEntryUrl(sandboxId, generation);
-      set({
-        phase: "ready",
-        canvasUrl: url,
-        message: "已開啟小品（此邀請不含連線）",
-      });
+      if (canvasMode === "memory") {
+        const srcdoc = buildMemorySrcdoc();
+        set({
+          phase: "ready",
+          canvasMode: "memory",
+          canvasSrcdoc: srcdoc,
+          canvasUrl: null,
+          canvasGeneration: generation,
+          message: "已開啟小品（此邀請不含連線）",
+        });
+      } else {
+        const url = canvasEntryUrl(sandboxId, generation);
+        set({
+          phase: "ready",
+          canvasMode: "sw",
+          canvasUrl: url,
+          canvasSrcdoc: null,
+          canvasGeneration: generation,
+          message: "已開啟小品（此邀請不含連線）",
+        });
+      }
       return;
     }
 
@@ -466,11 +565,18 @@ export function createGuestRuntime() {
     peerSession?.close();
     peerSession = null;
     samFiles = null;
+    canvasMode = null;
+    unlistenApi?.();
+    unlistenApi = null;
+    clearMemoryBlobs();
     set({
       phase: "idle",
       message: "已取消",
       meta: null,
       canvasUrl: null,
+      canvasSrcdoc: null,
+      canvasMode: null,
+      canvasGeneration: 0,
     });
   }
 

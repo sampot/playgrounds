@@ -33,7 +33,7 @@ export async function spawnRosterAvatarProjection(
     name,
     identiconUrl,
   });
-  const meta = await createProject(`化身 · ${name}`, files, {
+  const meta = await createProject(`連線 · ${name}`, files, {
     agentManaged: true,
     inWorkingSet: false,
     cloneIntent: "roster_avatar",

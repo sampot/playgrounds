@@ -72,7 +72,7 @@ describe("materializeRosterInviteSeat", () => {
     });
     expect(cloneProject).toHaveBeenCalledWith(
       "local-1",
-      expect.stringContaining("遠端座位"),
+      expect.stringContaining("對弈"),
       expect.objectContaining({ cloneIntent: "session_seat" })
     );
   });
@@ -80,7 +80,7 @@ describe("materializeRosterInviteSeat", () => {
   it("lazy-installs from catalog GitHub source", async () => {
     const createProject = vi.fn(async () => ({
       id: "new-1",
-      name: "Coding Agent · 遠端座位",
+      name: "Coding Agent · 對弈",
     }));
     const fetchGithub = vi.fn(async () => ({ "index.html": "<html></html>" }));
     const result = await materializeRosterInviteSeat(
@@ -126,7 +126,7 @@ describe("materializeRosterInviteSeat", () => {
   it("uses brainstorm builtin when no candidates", async () => {
     const createProject = vi.fn(async (_n, _f, opts) => ({
       id: "builtin-1",
-      name: "遠端座位 · participant",
+      name: "對弈 · participant",
       ...opts,
     }));
     const result = await materializeRosterInviteSeat(invite(), {

@@ -35,6 +35,7 @@
   let copyStatus = $state<string | null>(null);
 
   const kind = $derived(payload?.meta.kind ?? "");
+  const isHandshakeOnly = $derived(kind === "signal.handshake");
   const protocolId = $derived.by(() => {
     const proto = payload ? composeSessionProtocol(payload.meta.intent) : null;
     if (
@@ -117,7 +118,11 @@
   <div class="playgrounds-dialog-head">
     <div class="playgrounds-dialog-title-row">
       <h2 id="pg-invite-join-title" class="m-0 text-base font-semibold">
-        {showSafariRecovery ? "無法開始" : "加入對弈"}
+        {showSafariRecovery
+          ? "無法開始"
+          : isHandshakeOnly
+            ? "加入連線"
+            : "加入對弈"}
       </h2>
     </div>
     <button
@@ -186,13 +191,16 @@
       </button>
     {:else if payload}
       <p class="text-skin-base/55 m-0 text-[12px] leading-relaxed">
-        {#if protocolId}
+        {#if isHandshakeOnly}
+          對方邀請你建立連線。同意後只會出現在線上名冊，不會自動加入任何局。
+        {:else if protocolId}
           主持邀請你以對手身分加入
           <span class="text-skin-base font-medium">{protocolId}</span>。
+          同意後才會連線入座；拒絕則不會佔用邀請。
         {:else}
           主持邀請你加入這場連線（{kind || "invite"}）。
+          同意後才會連線入座；拒絕則不會佔用邀請。
         {/if}
-        同意後才會連線入座；拒絕則不會佔用邀請。
       </p>
 
       {#if expiresLabel}
@@ -226,7 +234,11 @@
           onclick={() =>
             void onAccept?.({ displayName: displayName.trim() || "對手" })}
         >
-          {busy ? "連線中…" : "同意入座並連線"}
+          {busy
+            ? "連線中…"
+            : isHandshakeOnly
+              ? "連上"
+              : "同意入座並連線"}
         </button>
         <button
           type="button"

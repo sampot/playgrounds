@@ -34,7 +34,7 @@ describe("rosterAvatarHost", () => {
   it("spawns agentManaged roster_avatar projection out of working set", async () => {
     createProject.mockResolvedValue({
       id: "sbx-1",
-      name: "化身 · Bob",
+      name: "連線 · Bob",
       entry: "index.html",
       createdAt: "t",
       updatedAt: "t",
@@ -54,7 +54,9 @@ describe("rosterAvatarHost", () => {
     expect(result.files["index.html"]).toContain("Bob");
     expect(createProject).toHaveBeenCalledOnce();
     const [name, files, meta] = createProject.mock.calls[0]!;
-    expect(name).toBe("化身 · Bob");
+    expect(name).toBe("連線 · Bob");
+    expect(files?.["index.html"]).not.toContain("權威");
+    expect(files?.["index.html"]).not.toContain("投影 ·");
     expect(files?.["app.js"]).toContain("bob");
     expect(meta).toMatchObject({
       agentManaged: true,

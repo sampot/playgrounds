@@ -121,7 +121,7 @@ export function sendRosterRelayPayload(
   payload: RosterAvatarRelayMsg["payload"],
   to?: string
 ): void {
-  if (!sendRelay) throw new Error("化身連線尚未就緒");
+  if (!sendRelay) throw new Error("連線尚未就緒");
   sendRelay(payload, to);
 }
 
@@ -175,9 +175,9 @@ export function inviteRosterAvatarToSession(opts?: {
   source?: string;
 }): SessionInvitePayload {
   if (!openSession) throw new Error("尚未開啟多人通道");
-  if (!sendRelay) throw new Error("化身連線尚未就緒");
+  if (!sendRelay) throw new Error("連線尚未就緒");
   const peerId = getPeerAgentId?.();
-  if (!peerId) throw new Error("還沒有連線中的化身");
+  if (!peerId) throw new Error("還沒有已連線的對手");
   const protocolId = openSession.protocol.protocolId;
   const isCodingOrch = protocolId === CODING_ORCH_PROTOCOL_ID;
   const isGomoku = protocolId === GOMOKU_PROTOCOL_ID;

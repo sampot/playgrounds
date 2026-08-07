@@ -10,12 +10,18 @@
     composeSamSource,
     composeSessionProtocol,
   } from "@pg/platform/platformCompose";
+  import {
+    likelyInAppBrowser,
+  } from "$lib/goCanvasSupport";
+  import { setGoMemoryCanvasWindow } from "$lib/goMemoryCanvas";
 
   const shortId = $derived(page.params.shortId?.trim() || "");
   let status = $state<GuestStatus | null>(null);
   let nameInput = $state("對手");
   let busy = $state(false);
+  let copyFlash = $state("");
   const runtime = createGuestRuntime();
+  const inAppHint = $derived(likelyInAppBrowser());
 
   const protocolLabel = $derived.by(() => {
     const meta = status?.meta;
@@ -30,6 +36,16 @@
   const samSource = $derived(
     status?.meta ? composeSamSource(status.meta.intent) : null
   );
+
+  const showCanvas = $derived(
+    status?.phase === "ready" &&
+      (Boolean(status.canvasUrl) || Boolean(status.canvasSrcdoc))
+  );
+
+  function onMemoryFrameLoad(ev: Event) {
+    const el = ev.currentTarget as HTMLIFrameElement;
+    setGoMemoryCanvasWindow(el.contentWindow);
+  }
 
   onMount(() => {
     const unsub = runtime.subscribe(s => {
@@ -52,6 +68,18 @@
   function onDecline() {
     runtime.decline();
   }
+
+  async function copyInviteLink() {
+    try {
+      await navigator.clipboard.writeText(location.href);
+      copyFlash = "已複製連結";
+      window.setTimeout(() => {
+        copyFlash = "";
+      }, 2000);
+    } catch {
+      copyFlash = "複製失敗，請手動選取網址列";
+    }
+  }
 </script>
 
 <svelte:head>
@@ -67,12 +95,30 @@
 {:else if status.phase === "error"}
   <h1>無法開始</h1>
   <p class="err" role="alert">{status.error}</p>
+  <div class="actions" style="margin-top: 1rem">
+    <button type="button" class="btn primary" onclick={() => void copyInviteLink()}>
+      複製邀請連結
+    </button>
+  </div>
+  {#if copyFlash}
+    <p class="status" role="status">{copyFlash}</p>
+  {/if}
   <p class="status" style="margin-top: 1rem">
-    可請主持重新邀請，或開啟
-    <a href={`${PLAY_ORIGIN}/`} onclick={openPlaygroundHome}>遊樂場主頁</a>
+    若在 LINE 等 App 內開啟失敗，請用系統瀏覽器開啟連結（iPhone：⋯ → 在 Safari 開啟）。也可請主持重新邀請，或開啟
+    <a
+      href={`${PLAY_ORIGIN}/`}
+      target="_blank"
+      rel="noopener noreferrer"
+      onclick={openPlaygroundHome}>遊樂場主頁</a
+    >
   </p>
 {:else if status.phase === "consent"}
   <h1>加入對弈</h1>
+  {#if inAppHint}
+    <p class="hint" role="note">
+      偵測到 App 內建瀏覽器。若加入後無法顯示棋盤，請改用 Safari／Chrome 開啟本連結。
+    </p>
+  {/if}
   <p class="lead">
     {#if protocolLabel}
       協定 <span class="mono">{protocolLabel}</span>
@@ -113,16 +159,28 @@
   {#if status.error}
     <p class="err" role="alert">{status.error}</p>
   {/if}
-  {#if status.phase === "ready" && status.canvasUrl}
+  {#if showCanvas}
     <div class="stage">
-      {#key status.canvasUrl}
-        <iframe
-          class="play"
-          title="小品畫布"
-          src={status.canvasUrl}
-          allow="autoplay"
-        ></iframe>
-      {/key}
+      {#if status.canvasMode === "memory" && status.canvasSrcdoc}
+        {#key status.canvasGeneration}
+          <iframe
+            class="play"
+            title="小品畫布"
+            srcdoc={status.canvasSrcdoc}
+            allow="autoplay"
+            onload={onMemoryFrameLoad}
+          ></iframe>
+        {/key}
+      {:else if status.canvasUrl}
+        {#key status.canvasUrl}
+          <iframe
+            class="play"
+            title="小品畫布"
+            src={status.canvasUrl}
+            allow="autoplay"
+          ></iframe>
+        {/key}
+      {/if}
     </div>
   {:else}
     <div class="wait" role="status" aria-live="polite">
@@ -213,6 +271,16 @@
     margin: 0;
     color: rgb(var(--muted));
     font-size: 0.9rem;
+  }
+  .hint {
+    margin: 0 0 0.75rem;
+    padding: 0.65rem 0.75rem;
+    border-radius: var(--radius);
+    border: 1px solid rgb(var(--line));
+    background: rgb(var(--fill));
+    color: rgb(var(--muted));
+    font-size: 0.85rem;
+    line-height: 1.4;
   }
   .stage {
     flex: 1;

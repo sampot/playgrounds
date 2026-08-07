@@ -20,8 +20,14 @@ import {
   getSessionSeatIdForProject,
 } from "@pg/sessionBridge";
 import { configurePlaygroundsPaths } from "@pg/playgroundsPaths";
+import { isGoCanvasSwUsable } from "./goCanvasSupport";
 
 configurePlaygroundsPaths({ basePath: "", mode: "standalone" });
+
+/** Sync helper for install listener (avoid circular async import). */
+function isGoCanvasSwUsableSync(): boolean {
+  return isGoCanvasSwUsable();
+}
 
 /** Bump with go-client/static/sw.js GO_SW_REV so phones pick up bridge fixes. */
 const SW_URL = "/sw.js?v=2";
@@ -38,8 +44,9 @@ function withCanvasBridge(files: FileMap): FileMap {
 }
 
 export async function ensureGoCanvasSw(): Promise<ServiceWorkerRegistration> {
-  if (!("serviceWorker" in navigator)) {
-    throw new Error("此瀏覽器不支援 Service Worker（無法載入小品）");
+  if (!isGoCanvasSwUsable()) {
+    const { goCanvasSwUnavailableMessage } = await import("./goCanvasSupport");
+    throw new Error(goCanvasSwUnavailableMessage());
   }
   const reg = await navigator.serviceWorker.register(SW_URL, { scope: "/" });
   await navigator.serviceWorker.ready;
@@ -120,18 +127,26 @@ function jsonResponse(data: unknown, status = 200): SerializedResponse {
   };
 }
 
-async function handleSessionApi(
+/** Shared by SW canvas API and memory/srcdoc canvas (LINE WebView fallback). */
+export async function handleGoSessionApi(
   sandboxId: string,
   request: { method: string; url: string; body: ArrayBuffer | null }
 ): Promise<SerializedResponse> {
   const seatId = getSessionSeatIdForProject(sandboxId);
-  const url = new URL(request.url);
-  const path = url.pathname.replace(/\/+$/, "") || "/";
+  let path = "/";
+  try {
+    path = new URL(request.url, "https://go.local").pathname.replace(/\/+$/, "") || "/";
+  } catch {
+    path = String(request.url || "");
+  }
   const isProbe =
     request.method === "GET" &&
     (path.endsWith("/api/session/seat") ||
+      path.includes("/api/session/seat") ||
       path.endsWith("/api/session/channel") ||
-      path.endsWith("/api/session/state"));
+      path.includes("/api/session/channel") ||
+      path.endsWith("/api/session/state") ||
+      path.includes("/api/session/state"));
 
   if (!seatId) {
     if (isProbe) {
@@ -148,26 +163,29 @@ async function handleSessionApi(
   }
   const SESSION = getSessionBridge(seatId);
   if (!SESSION) {
-    return jsonResponse({ error: "座位橋遺失", code: "session_inactive" }, 409);
+    return jsonResponse(
+      { error: "尚未入座或連線已中斷", code: "session_inactive" },
+      409
+    );
   }
   try {
-    if (path.endsWith("/api/session/seat") && request.method === "GET") {
+    if (path.includes("/api/session/seat") && request.method === "GET") {
       return jsonResponse(await SESSION.getSeat());
     }
-    if (path.endsWith("/api/session/channel") && request.method === "GET") {
+    if (path.includes("/api/session/channel") && request.method === "GET") {
       return jsonResponse(await SESSION.getEventChannel());
     }
-    if (path.endsWith("/api/session/state") && request.method === "GET") {
+    if (path.includes("/api/session/state") && request.method === "GET") {
       return jsonResponse(await SESSION.getState());
     }
-    if (path.endsWith("/api/session/act") && request.method === "POST") {
+    if (path.includes("/api/session/act") && request.method === "POST") {
       const text = request.body
         ? new TextDecoder().decode(request.body)
         : "{}";
       const payload = JSON.parse(text || "{}");
       return jsonResponse(await SESSION.act(payload));
     }
-    if (path.endsWith("/api/session/leave") && request.method === "POST") {
+    if (path.includes("/api/session/leave") && request.method === "POST") {
       return jsonResponse(await SESSION.leave());
     }
     return jsonResponse({ error: "找不到路由", code: "not_found" }, 404);
@@ -181,8 +199,18 @@ async function handleSessionApi(
   }
 }
 
+async function handleSessionApi(
+  sandboxId: string,
+  request: { method: string; url: string; body: ArrayBuffer | null }
+): Promise<SerializedResponse> {
+  return handleGoSessionApi(sandboxId, request);
+}
+
 /** Listen for SW canvas API forwards; handle /api/session/* via SessionBridge. */
 export function installGoCanvasApiListener(getSandboxId: () => string | null): () => void {
+  if (!isGoCanvasSwUsableSync()) {
+    return () => {};
+  }
   const onMessage = (ev: MessageEvent) => {
     const data = ev.data as CanvasApiMessage | undefined;
     if (!data || data.type !== CANVAS_API_TYPE) return;

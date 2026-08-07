@@ -1,6 +1,7 @@
 /**
  * Host-side Ticket answer loop (DEC-047).
- * Serializes acceptRosterOffer → putAnswer; keeps sessions for multi-peer.
+ * Serializes acceptRosterOffer → putAnswer.
+ * Default: keep answering (multi-peer). Pass maxAnswers: 1 for roster-only invites.
  */
 
 import {
@@ -29,11 +30,28 @@ export function startPlatformHostAnswerLoop(opts: {
     handlers: RosterPeerHandlers;
     attachSession: (session: RosterPeerSession) => void;
   };
+  /**
+   * Stop after this many successful answers. Omit／0 = unlimited (compose multi-join).
+   * Roster connection invites use 1.
+   */
+  maxAnswers?: number;
   onStatus?: (msg: string) => void;
   onError?: (msg: string) => void;
+  /** After a successful answer (before maxAnswers check). */
+  onAnswered?: (info: {
+    joinId: string;
+    answerCount: number;
+  }) => void | Promise<void>;
+  /** When the loop stops after reaching maxAnswers. */
+  onDone?: () => void;
 }): PlatformHostLoopHandle {
   const ac = new AbortController();
   const inviteId = opts.inviteId;
+  const maxAnswers =
+    typeof opts.maxAnswers === "number" && opts.maxAnswers > 0
+      ? opts.maxAnswers
+      : 0;
+  let answerCount = 0;
 
   void (async () => {
     while (!ac.signal.aborted) {
@@ -71,6 +89,17 @@ export function startPlatformHostAnswerLoop(opts: {
           apiKey: opts.apiKey,
           answerWire: wire,
         });
+        answerCount += 1;
+        await opts.onAnswered?.({
+          joinId: pending.join_id,
+          answerCount,
+        });
+        if (maxAnswers > 0 && answerCount >= maxAnswers) {
+          opts.onStatus?.("對方已連上");
+          opts.onDone?.();
+          ac.abort();
+          return;
+        }
         opts.onStatus?.("已回覆一筆邀請，繼續等待下一位…");
       } catch (e) {
         if (ac.signal.aborted) return;

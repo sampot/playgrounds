@@ -66,17 +66,24 @@
   import {
     createJoin,
     fetchGuestTurnIceServers,
+    platformFieldLoginUrl,
     postOfferAndWaitAnswer,
+    previewInvite,
+    revokePlatformInvite,
     type InviteMeta,
   } from "../platform/platformClient";
   import { hostCreatePlatformInvite } from "../platform/platformHostProxy";
-  import { getPlatformFieldApiKey } from "../platform/platformFieldCredential";
+  import {
+    getPlatformFieldApiKey,
+    subscribePlatformFieldCredential,
+  } from "../platform/platformFieldCredential";
   import { wantsRosterSignal } from "../platform/platformCompose";
   import { getPlatformComposeShell } from "../platform/platformComposeShell";
   import { registerPlatformInviteShell } from "../platform/platformInviteShell";
   import { startPlatformHostAnswerLoop } from "../platform/platformHostLoop";
   import { presentPlatformInviteShare } from "../platform/platformInviteShareShell";
   import { registerPlatformGuestJoinBridge } from "../platform/platformGuestJoinBridge";
+  import { resolvePlatformInviteSecretFromText } from "../platform/platformInviteUrl";
   const btn =
     "inline-flex items-center justify-center rounded-md border border-skin-line bg-skin-card px-2 py-1 text-xs font-medium text-skin-base transition hover:bg-skin-card disabled:opacity-40";
   const inputCls =
@@ -101,13 +108,13 @@
   let platformHostLoop = $state<{ stop: () => void; inviteId: string } | null>(
     null
   );
-  let platformInvite = $state<{
+  /** Roster-only Platform invite shown inline (QR + paste text) while waiting. */
+  let platformConnInvite = $state<{
     inviteId: string;
-    secret: string;
-    shortUrl: string;
-    deepLink: string;
+    shareText: string;
+    qrUrl: string | null;
+    expiresLabel: string | null;
   } | null>(null);
-  let platformShortQr = $state<string | null>(null);
   /** After shell compose consent, auto-accept matching session_invite once. */
   let composeConsentProtocolId = $state<string | null>(null);
   let autoInvitedPeerId: string | null = null;
@@ -119,6 +126,12 @@
   /** Exchange panels: shown only after CTA (or deep-link); hidden when connected. */
   let startOpen = $state(false);
   let joinOpen = $state(false);
+  /** Logged-in users: OOB join is separate from Platform paste join. */
+  let oobJoinOpen = $state(false);
+  /** Logged-in: collapse OOB wire exchange behind advanced. */
+  let advancedOobOpen = $state(false);
+  let platformLoggedIn = $state(Boolean(getPlatformFieldApiKey()));
+  let unsubPlatformCred: (() => void) | null = null;
 
   let pendingIncoming = $state<SessionInvitePayload | null>(null);
   let outboundInviteId = $state<string | null>(null);
@@ -171,14 +184,26 @@
   function openStartPanel(): void {
     if (cameraScanning === "invite") stopLiveCameraScan();
     joinOpen = false;
+    oobJoinOpen = false;
     startOpen = true;
+    if (platformLoggedIn) advancedOobOpen = true;
     error = null;
   }
 
   function openJoinPanel(): void {
     if (cameraScanning === "reply") stopLiveCameraScan();
     startOpen = false;
+    oobJoinOpen = false;
     joinOpen = true;
+    error = null;
+  }
+
+  function openOobJoinPanel(): void {
+    if (cameraScanning === "reply") stopLiveCameraScan();
+    startOpen = false;
+    joinOpen = false;
+    oobJoinOpen = true;
+    advancedOobOpen = true;
     error = null;
   }
 
@@ -186,6 +211,7 @@
     stopLiveCameraScan();
     startOpen = false;
     joinOpen = false;
+    oobJoinOpen = false;
   }
 
   onMount(() => {
@@ -196,6 +222,10 @@
     unsubHub = subscribeRosterSessionHub(() => {
       refreshCanInvite();
       if (peerAgentId) maybeAutoInviteRoster(peerAgentId);
+    });
+    platformLoggedIn = Boolean(getPlatformFieldApiKey());
+    unsubPlatformCred = subscribePlatformFieldCredential(() => {
+      platformLoggedIn = Boolean(getPlatformFieldApiKey());
     });
     unregTransport = registerRosterRelayTransport({
       send: (payload, to) => sendAvatarRelay(payload, to),
@@ -235,7 +265,10 @@
         error = null;
         status = "正在與主持握手…";
         await runPlatformTicketJoin(opts.secret, opts.meta);
-        status = "Platform 握手完成，等待入座…";
+        status =
+          opts.meta.kind === "invite.compose" || protoId
+            ? "連線完成，等待入座…"
+            : "連線完成";
       },
     });
   });
@@ -251,7 +284,8 @@
       pendingLinkOffer = parsed.wire;
       pasteInvite = parsed.wire;
       lan = parsed.lan;
-      openJoinPanel();
+      if (platformLoggedIn) openOobJoinPanel();
+      else openJoinPanel();
       status = "收到邀請連結 — 確認後即可加入";
     } else {
       // Answer links are for pasting back to the initiator, not auto-navigate.
@@ -266,9 +300,12 @@
     unregInviteShell = null;
     unregGuestJoin?.();
     unregGuestJoin = null;
+    unsubPlatformCred?.();
+    unsubPlatformCred = null;
     stopLiveCameraScan();
     platformHostLoop?.stop();
     platformHostLoop = null;
+    platformConnInvite = null;
     for (const s of platformByPeer.values()) {
       try {
         s.close();
@@ -418,8 +455,8 @@
       console.error("[roster avatar]", agentId, e);
       error =
         e instanceof Error
-          ? `化身投影載入失敗：${e.message}`
-          : `化身投影載入失敗：${String(e)}`;
+          ? `對方畫面載入失敗：${e.message}`
+          : `對方畫面載入失敗：${String(e)}`;
     } finally {
       mountingAgents.delete(agentId);
     }
@@ -469,8 +506,8 @@
         console.error("[roster avatar spawn]", e);
         error =
           e instanceof Error
-            ? `無法建立化身投影：${e.message}`
-            : `無法建立化身投影：${String(e)}`;
+            ? `無法建立對方畫面：${e.message}`
+            : `無法建立對方畫面：${String(e)}`;
         return;
       }
     }
@@ -543,7 +580,7 @@
     if (isSessionSeatBoundPayload(payload)) {
       const homeSandboxId = homeSandboxByInvite.get(payload.inviteId);
       if (!homeSandboxId) {
-        status = "收到 seat_bound，但本機參與者沙盒遺失";
+        status = "收到入座確認，但本機參與畫面遺失";
         return;
       }
       const binding = bindingFromSeatBound(
@@ -564,7 +601,7 @@
         sessionId: binding.sessionId,
         inviteId: binding.inviteId,
       });
-      status = "遠端座位橋已就緒（可發言）";
+      status = "已入座，可以開始";
       return;
     }
     if (isSessionActPayload(payload)) {
@@ -605,25 +642,23 @@
     intent?: unknown;
     ttlMs?: number;
   }) {
+    const kind = opts.kind || "invite.compose";
+    const handshake = kind === "signal.handshake";
     const created = await hostCreatePlatformInvite({
-      kind: opts.kind || "invite.compose",
+      kind,
       intent: opts.intent,
       ttlMs: opts.ttlMs,
       targetField: window.location.origin,
     });
     const apiKey = await readPlatformApiKey();
-    platformInvite = {
-      inviteId: created.invite_id,
-      secret: created.secret,
-      shortUrl: created.short_url,
-      deepLink: created.deep_link,
-    };
     platformHostLoop?.stop();
     platformHostLoop = startPlatformHostAnswerLoop({
       inviteId: created.invite_id,
       apiKey,
       lan,
       localPresence: localPresence(),
+      // Connection invite: one guest only (API replaces host reply paste).
+      maxAnswers: handshake ? 1 : undefined,
       prepareHandlers: () => {
         const slot: { s: RosterPeerSession | null } = { s: null };
         return {
@@ -639,27 +674,124 @@
       onError: msg => {
         error = friendlyError(msg);
       },
+      onAnswered: async () => {
+        if (!handshake) return;
+        try {
+          await revokePlatformInvite({
+            inviteId: created.invite_id,
+            apiKey,
+          });
+        } catch {
+          /* already closed／network — ignore */
+        }
+      },
+      onDone: () => {
+        if (!handshake) return;
+        platformHostLoop = null;
+        platformConnInvite = null;
+        status = "對方已連上";
+      },
     });
-    status = "已建立 Platform 邀請 — 分享短網址；本機正在作答循環";
-    try {
-      platformShortQr = await encodeRosterQrPngDataUrl(created.short_url);
-    } catch {
-      platformShortQr = null;
+    status = "已建立邀請 — 請分享給對方，等待連上";
+    if (handshake) {
+      // Guest already in Playgrounds: scan／paste in「線上」(no login).
+      const shareText = (created.short_url || created.deep_link).trim();
+      let qrUrl: string | null = null;
+      try {
+        qrUrl = await encodeRosterQrPngDataUrl(shareText);
+      } catch {
+        qrUrl = null;
+      }
+      platformConnInvite = {
+        inviteId: created.invite_id,
+        shareText,
+        qrUrl,
+        expiresLabel: Number.isFinite(created.expires_at)
+          ? new Date(created.expires_at).toLocaleString("zh-Hant", {
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : null,
+      };
+      status = "等待對方掃 QR 或貼上邀請文字（對方不必登入）…";
+    } else {
+      platformConnInvite = null;
+      presentPlatformInviteShare({
+        shortUrl: created.short_url,
+        deepLink: created.deep_link,
+        expiresAt: Number.isFinite(created.expires_at)
+          ? new Date(created.expires_at).toLocaleString("zh-Hant", {
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : undefined,
+        kind: created.kind,
+        title: "邀請對手",
+        hint: "對手無需註冊。請保持本頁在線；入座後由主持按「開始」開局。",
+      });
     }
-    presentPlatformInviteShare({
-      shortUrl: created.short_url,
-      deepLink: created.deep_link,
-      expiresAt: Number.isFinite(created.expires_at)
-        ? new Date(created.expires_at).toLocaleString("zh-Hant", {
-            hour: "2-digit",
-            minute: "2-digit",
-          })
-        : undefined,
-      kind: created.kind,
-      title: "邀請對手",
-      hint: "對手無需註冊。請保持本頁在線；入座後由主持按「開始」開局。",
-    });
     return created;
+  }
+
+  async function handlePlatformMintConnection(): Promise<void> {
+    error = null;
+    busy = true;
+    persistName();
+    closeExchangePanels();
+    try {
+      await mintPlatformInviteAndAnswer({ kind: "signal.handshake" });
+    } catch (e) {
+      error = friendlyError(e instanceof Error ? e.message : String(e));
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function copyPlatformConnInvite(): Promise<void> {
+    const text = platformConnInvite?.shareText?.trim();
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      status = "已複製邀請文字 — 可貼到聊天或另一分頁";
+    } catch {
+      error = "無法複製，請改用選取文字手動複製";
+    }
+  }
+
+  async function handlePlatformJoinFromPaste(): Promise<void> {
+    const text = pasteInvite.trim();
+    if (!text) {
+      error = "請掃描對方的 QR，或貼上對方傳來的邀請文字";
+      return;
+    }
+    error = null;
+    busy = true;
+    persistName();
+    try {
+      const secret = await resolvePlatformInviteSecretFromText(text);
+      const meta = await previewInvite(secret);
+      if (meta.revoked || !meta.open) {
+        throw new Error(meta.revoked ? "邀請已撤銷" : "邀請已關閉或過期");
+      }
+      status = "正在與對方握手…";
+      await runPlatformTicketJoin(secret, meta);
+      status =
+        meta.kind === "invite.compose"
+          ? "連線完成（入座另需對方邀請）"
+          : "連線完成";
+      closeExchangePanels();
+    } catch (e) {
+      error = friendlyError(e instanceof Error ? e.message : String(e));
+    } finally {
+      busy = false;
+    }
+  }
+
+  function stopPlatformHost(): void {
+    platformHostLoop?.stop();
+    platformHostLoop = null;
+    platformConnInvite = null;
+    status = "已停止等待對方連線";
   }
 
   async function acceptIncomingInvite(toPeerId?: string): Promise<void> {
@@ -695,7 +827,7 @@
           : seated.via === "installed"
             ? "本機 clone"
             : "內建範本";
-      status = `已接受邀請（${viaLabel}；等待 seat_bound）`;
+      status = `已接受邀請（${viaLabel}；等待主持確認座位）`;
     } catch (e) {
       const message =
         e instanceof Error
@@ -856,21 +988,6 @@
     return key;
   }
 
-  async function handlePlatformMint(): Promise<void> {
-    error = null;
-    busy = true;
-    persistName();
-    try {
-      await mintPlatformInviteAndAnswer({
-        kind: "signal.handshake",
-      });
-    } catch (e) {
-      error = friendlyError(e instanceof Error ? e.message : String(e));
-    } finally {
-      busy = false;
-    }
-  }
-
   function peerHandlersSlot(slot: {
     s: RosterPeerSession | null;
   }): RosterPeerHandlers {
@@ -936,14 +1053,6 @@
     });
     await applyRosterAnswer(result.session, answered.answer);
     status = "Platform 握手完成，正在連線…";
-  }
-
-  function stopPlatformHost(): void {
-    platformHostLoop?.stop();
-    platformHostLoop = null;
-    platformInvite = null;
-    platformShortQr = null;
-    status = "已停止 Platform 作答循環";
   }
 
   function friendlyError(msg: string): string {
@@ -1167,6 +1276,11 @@
       if (which === "invite") pasteInvite = text;
       else pasteReply = text;
       status = "已從 QR 讀取";
+      if (joinOpen && which === "invite") {
+        busy = false;
+        await handlePlatformJoinFromPaste();
+        return;
+      }
     } catch (e) {
       error = friendlyError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -1205,6 +1319,9 @@
             status = "已用相機讀取回覆 QR";
           }
           stopLiveCameraScan();
+          if (joinOpen && which === "invite") {
+            void handlePlatformJoinFromPaste();
+          }
         },
         onError: err => {
           error = friendlyError(err.message);
@@ -1257,7 +1374,7 @@
                   <div class="text-skin-base/40 truncate text-[10px]">
                     {a.connectionState === "connected"
                       ? a.sandboxId
-                        ? "投影就緒"
+                        ? "已就緒"
                         : "連線中…"
                       : a.connectionState}
                   </div>
@@ -1265,7 +1382,7 @@
               </div>
               {#if a.sandboxId}
                 <iframe
-                  title={`化身 ${a.name}`}
+                  title={`${a.name} 的連線畫面`}
                   class="border-skin-line bg-skin-fill block h-40 w-full border-t"
                   use:avatarFrameAction={a.agentId}
                 ></iframe>
@@ -1275,12 +1392,29 @@
         </ul>
       {/if}
       <div class="flex flex-wrap gap-1">
-        <button
-          type="button"
-          class={btn}
-          disabled={busy}
-          onclick={openStartPanel}>發起連線</button
-        >
+        {#if platformLoggedIn}
+          <button
+            type="button"
+            class={btn}
+            disabled={busy}
+            onclick={() => void handlePlatformMintConnection()}
+            >邀請連線</button
+          >
+          {#if platformHostLoop}
+            <button
+              type="button"
+              class={btn}
+              disabled={busy}
+              onclick={stopPlatformHost}>停止等候</button
+            >
+          {/if}
+        {:else}
+          <a
+            class="{btn} no-underline"
+            href={platformFieldLoginUrl()}
+            rel="noopener noreferrer">登入後邀請</a
+          >
+        {/if}
         <button
           type="button"
           class={btn}
@@ -1288,59 +1422,164 @@
           onclick={openJoinPanel}>加入連線</button
         >
       </div>
-      {#if avatars.length > 0}
-        <p class="text-skin-base/40 m-0 text-[10px]">
-          Platform 邀請可同時多人；OOB 發起／加入仍會重置現有 OOB 連線
-        </p>
-      {/if}
+      <p class="text-skin-base/45 m-0 text-[10px]">
+        受邀方不必登入：掃 QR 或貼文字即可連上。後端代替邀請者回貼回覆；每則邀請僅一人。
+      </p>
     </section>
 
-    <section
-      class="border-skin-line bg-skin-card space-y-2 rounded border px-2 py-2"
-    >
-      <h3 class="text-skin-base m-0 text-[11px] font-semibold">
-        Platform 邀請
-      </h3>
-      <p class="text-skin-base/55 m-0 text-[10px]">
-        短連結多人加入。需先按工具列「登入」（經後台回到本場）。
-      </p>
-      <div class="flex flex-wrap gap-1">
-        <button
-          type="button"
-          class={btn}
-          disabled={busy}
-          onclick={() => void handlePlatformMint()}>建立短連結邀請</button
-        >
-        {#if platformHostLoop}
+    {#if platformConnInvite}
+      <section
+        class="border-skin-line bg-skin-card space-y-2 rounded border px-2 py-2"
+      >
+        <h3 class="text-skin-base m-0 text-[11px] font-semibold">
+          連線邀請
+        </h3>
+        <p class="text-skin-base/55 m-0 text-[11px]">
+          請對方打開遊樂場 →「線上」→「加入連線」，掃下方 QR 或貼上文字（同機分頁／聊天皆可）。對方不必登入；此邀請僅一人可加入。
+        </p>
+        {#if platformConnInvite.qrUrl}
+          <img
+            src={platformConnInvite.qrUrl}
+            alt="連線邀請 QR"
+            class="border-skin-line mx-auto block max-w-[11rem] rounded border bg-white p-1"
+            width="176"
+            height="176"
+          />
+        {:else}
+          <p class="text-skin-base/45 m-0 text-[10px]">
+            無法產生 QR，請複製下方文字給對方貼上。
+          </p>
+        {/if}
+        <label class="text-skin-base/70 block text-[11px]">
+          邀請文字
+          <textarea
+            class="{inputCls} mt-0.5 min-h-[3rem] resize-y"
+            readonly
+            value={platformConnInvite.shareText}
+            aria-label="邀請文字"
+            onclick={e => (e.currentTarget as HTMLTextAreaElement).select()}
+          ></textarea>
+        </label>
+        <div class="flex flex-wrap gap-1">
+          <button
+            type="button"
+            class={btn}
+            onclick={() => void copyPlatformConnInvite()}>複製文字</button
+          >
+        </div>
+        {#if platformConnInvite.expiresLabel}
+          <p class="text-skin-base/40 m-0 text-[10px]">
+            約於 {platformConnInvite.expiresLabel} 前有效
+          </p>
+        {/if}
+      </section>
+    {/if}
+
+    {#if joinOpen}
+      <section
+        class="border-skin-line bg-skin-card space-y-2 rounded border px-2 py-2"
+      >
+        <div class="flex items-center justify-between gap-2">
+          <h3 class="text-skin-base m-0 text-[11px] font-semibold">
+            加入連線
+          </h3>
+          <button type="button" class={btn} onclick={closeExchangePanels}
+            >隱藏</button
+          >
+        </div>
+        <p class="text-skin-base/50 m-0 text-[11px]">
+          掃描對方畫面上的 QR，或貼上對方傳來的邀請文字。不必登入；只建立連線，不入座。
+        </p>
+        <label class="text-skin-base/70 block text-[11px]">
+          邀請文字
+          <textarea
+            class="{inputCls} mt-0.5 min-h-[3.5rem] resize-y"
+            bind:value={pasteInvite}
+            disabled={busy}
+            placeholder="貼上對方複製的邀請文字…"
+          ></textarea>
+        </label>
+        <div class="flex flex-wrap gap-1">
+          <label class={btn}>
+            從檔案讀取 QR
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/*"
+              class="hidden"
+              disabled={busy}
+              onchange={e => void onScanFile(e, "invite")}
+            />
+          </label>
+          {#if cameraSupported}
+            {#if cameraScanning === "invite"}
+              <button
+                type="button"
+                class={btn}
+                onclick={stopLiveCameraScan}>停止相機</button
+              >
+            {:else}
+              <button
+                type="button"
+                class={btn}
+                disabled={busy}
+                onclick={() => void startLiveCameraScan("invite")}
+                >相機掃 QR</button
+              >
+            {/if}
+          {/if}
           <button
             type="button"
             class={btn}
             disabled={busy}
-            onclick={stopPlatformHost}>停止作答</button
+            onclick={() => void handlePlatformJoinFromPaste()}>連上</button
           >
+        </div>
+        {#if cameraScanning === "invite"}
+          <video
+            bind:this={scanVideoEl}
+            class="border-skin-line bg-black mx-auto block max-h-48 w-full rounded border object-cover"
+            playsinline
+            muted
+            aria-label="相機預覽"
+          ></video>
         {/if}
-      </div>
-      {#if platformInvite}
-        <div class="space-y-1">
-          <p class="text-skin-base/70 m-0 break-all font-mono text-[10px]">
-            {platformInvite.shortUrl}
-          </p>
-          <div class="flex flex-wrap gap-1">
-            <button
-              type="button"
-              class={btn}
-              onclick={() =>
-                void navigator.clipboard.writeText(platformInvite!.shortUrl)
-              }>複製短網址</button
-            >
-          </div>
-          {#if platformShortQr}
-            <img
-              src={platformShortQr}
-              alt="邀請 QR"
-              class="border-skin-line max-w-[10rem] rounded border bg-white p-1"
-            />
-          {/if}
+      </section>
+    {/if}
+
+    <section class="space-y-2">
+      <button
+        type="button"
+        class="{btn} w-full justify-between"
+        onclick={() => {
+          advancedOobOpen = !advancedOobOpen;
+          if (!advancedOobOpen) {
+            startOpen = false;
+            oobJoinOpen = false;
+          }
+        }}
+      >
+        <span>手動交換（無後端）</span>
+        <span class="text-skin-base/40"
+          >{advancedOobOpen ? "收合" : "展開"}</span
+        >
+      </button>
+      {#if advancedOobOpen}
+        <p class="text-skin-base/40 m-0 text-[10px]">
+          雙方交換邀請與回覆文字／QR（邀請者還需回掃或回貼）。登入後用「邀請連線」可省掉這一步。
+        </p>
+        <div class="flex flex-wrap gap-1">
+          <button
+            type="button"
+            class={btn}
+            disabled={busy}
+            onclick={openStartPanel}>發起（手動）</button
+          >
+          <button
+            type="button"
+            class={btn}
+            disabled={busy}
+            onclick={openOobJoinPanel}>加入（手動）</button
+          >
         </div>
       {/if}
     </section>
@@ -1408,7 +1647,7 @@
             type="button"
             class={btn}
             disabled={!canInvite || Boolean(outboundInviteId) || busy}
-            onclick={handleInviteAvatar}>邀請化身入座</button
+            onclick={handleInviteAvatar}>邀請對手入座</button
           >
           {#if outboundInviteId}
             <button
@@ -1419,7 +1658,7 @@
           {/if}
         </div>
         <p class="text-skin-base/45 m-0 text-[10px]">
-          需已開啟多人通道（如腦力激盪）且化身已連線
+          需已開啟多人通道（如腦力激盪）且對方已連線
         </p>
       </section>
     {/if}
@@ -1536,7 +1775,7 @@
       </section>
     {/if}
 
-    {#if joinOpen}
+    {#if oobJoinOpen}
       <section class="border-skin-line space-y-2 rounded border p-2">
         <div class="flex items-center justify-between gap-2">
           <h3 class="text-skin-base m-0 text-[11px] font-semibold">加入連線</h3>

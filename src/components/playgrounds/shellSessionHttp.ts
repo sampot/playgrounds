@@ -236,7 +236,7 @@ export async function handleShellSessionHttp(
     if (path === `${base}/invite-roster` && method === "POST") {
       if (!handlers.inviteRoster) {
         return json(
-          { error: "此殼未支援邀請化身", code: "not_found" },
+          { error: "此殼未支援邀請對手", code: "not_found" },
           404
         );
       }

@@ -1,5 +1,7 @@
 <script lang="ts">
   import { openPlaygroundHome, PLAY_ORIGIN } from "$lib/openPlayground";
+
+  const playHost = PLAY_ORIGIN.replace(/^https:\/\//, "");
 </script>
 
 <header class="chrome" aria-label="站群">
@@ -15,10 +17,12 @@
   <a
     class="play-link"
     href={`${PLAY_ORIGIN}/`}
-    title="在系統瀏覽器開啟遊樂場（可行時跳出 App 內嵌瀏覽）"
+    title="開啟遊樂場"
+    target="_blank"
+    rel="noopener noreferrer"
     onclick={openPlaygroundHome}
   >
-    遊樂場
+    <span class="play-label">遊樂場</span>
+    <span class="host">{playHost}</span>
   </a>
-  <span class="host" aria-hidden="true">{PLAY_ORIGIN.replace(/^https:\/\//, "")}</span>
 </header>

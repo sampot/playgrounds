@@ -17,9 +17,13 @@
 
   const shortUrl = $derived(payload?.shortUrl?.trim() || "");
   const title = $derived(payload?.title?.trim() || "邀請對手");
+  const isHandshakeOnly = $derived(payload?.kind === "signal.handshake");
+  const linkLabel = $derived(isHandshakeOnly ? "邀請連結" : "短網址");
   const hint = $derived(
     payload?.hint?.trim() ||
-      "對手無需註冊。請保持本頁在線以完成連線。"
+      (isHandshakeOnly
+        ? "對方掃描 QR 或開啟連結即可連上。只建立連線，不會自動加入任何局。"
+        : "對手無需註冊。請保持本頁在線以完成連線。")
   );
 
   $effect(() => {
@@ -63,7 +67,7 @@
     if (!shortUrl) return;
     try {
       await navigator.clipboard.writeText(shortUrl);
-      copyFlash = "已複製短網址";
+      copyFlash = "已複製連結";
     } catch {
       copyFlash = "請手動選取複製";
     }
@@ -100,7 +104,7 @@
       {#if qrUrl}
         <img
           src={qrUrl}
-          alt="邀請短網址 QR"
+          alt={isHandshakeOnly ? "邀請連線 QR" : "邀請短網址 QR"}
           class="h-44 w-44 max-w-full rounded bg-white p-2"
           width="176"
           height="176"
@@ -108,12 +112,12 @@
       {:else if qrBusy}
         <p class="text-skin-base/45 m-0 text-xs" role="status">產生 QR…</p>
       {:else}
-        <p class="text-skin-base/45 m-0 text-xs">無法產生 QR，請用下方短網址</p>
+        <p class="text-skin-base/45 m-0 text-xs">無法產生 QR，請用下方連結</p>
       {/if}
     </div>
 
     <label class="flex flex-col gap-1">
-      <span class="text-skin-base/50 text-[11px]">短網址</span>
+      <span class="text-skin-base/50 text-[11px]">{linkLabel}</span>
       <input
         class="border-skin-line bg-skin-fill text-skin-base min-h-11 w-full rounded-md border px-2.5 font-mono text-[11px]"
         type="text"
@@ -130,7 +134,7 @@
         disabled={!shortUrl}
         onclick={() => void copyShortUrl()}
       >
-        複製短網址
+        複製連結
       </button>
       <button
         type="button"
