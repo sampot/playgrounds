@@ -31,7 +31,7 @@ import type { WorkNetworkEntry } from "./workNetworkBuffer";
 export type HostCreatePlatformInviteOptions = {
   kind?: string;
   intent?: unknown;
-  /** Default: current field host (`location.host`). */
+  /** Default: current field origin (`location.origin`, e.g. http://localhost:5173). */
   targetField?: string;
   ttlMs?: number;
 };
@@ -386,7 +386,7 @@ export interface HostBridge {
   }>;
   /**
    * Mint a Platform field Invite via shell proxy (DEC-047).
-   * Reads SecretStore `PLAYGROUNDS_API_KEY`; never returns the key.
+   * Reads field shell memory API key (after dash provision); never returns the key.
    */
   createPlatformInvite(
     options?: HostCreatePlatformInviteOptions

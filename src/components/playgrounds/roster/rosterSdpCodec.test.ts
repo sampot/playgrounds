@@ -66,4 +66,9 @@ describe("rosterSdpCodec", () => {
     expect(lan.candidates).toHaveLength(1);
     expect(lan.candidates[0]!.type).toBe("host");
   });
+
+  it("keepRelay retains relay candidates for Platform TURN path", () => {
+    const kept = prepareFieldsForExchange(SAMPLE_OFFER, { keepRelay: true });
+    expect(kept.candidates.some(c => c.type === "relay")).toBe(true);
+  });
 });

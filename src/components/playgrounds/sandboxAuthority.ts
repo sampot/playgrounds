@@ -10,6 +10,7 @@
 
 import type { FileContent, FileMap, ProjectMeta } from "./projectTypes";
 import * as opfs from "./opfsStore";
+import { mainThreadNeedsOpfsWorkerWrites } from "./opfsStore";
 import { withSandboxFsGate } from "./sandboxFsGate";
 
 export { defaultCloneProjectName, isOpfsSupported } from "./opfsStore";
@@ -21,8 +22,14 @@ async function viaRuntimeOrLocal<T>(
   local: () => Promise<T>
 ): Promise<T> {
   const exec = async () => {
-    const { backendFsOp, isBackendRuntimeLive } = await import("./backendHost");
-    if (isBackendRuntimeLive()) {
+    const {
+      backendFsOp,
+      ensureBackendRuntimeWorker,
+      isBackendRuntimeLive,
+    } = await import("./backendHost");
+    // Safari／iOS: main-thread createWritable missing → always use Runtime Worker.
+    if (isBackendRuntimeLive() || mainThreadNeedsOpfsWorkerWrites()) {
+      await ensureBackendRuntimeWorker();
       return (await backendFsOp(op, args)) as T;
     }
     return local();

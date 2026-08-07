@@ -62,8 +62,26 @@ export function joinCapPlaintext(): string {
 /** Default dashboard access token TTL (7d). */
 export const ACCESS_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
+/** Short-lived Host provision token (dash → field shell). */
+export const PROVISION_TTL_MS = 120_000;
+
+/** Official field reserved names (DEC-042); not valid default_field_url. */
+export const FIELD_RESERVED_SUBDOMAINS = [
+  "www",
+  "blog",
+  "api",
+  "docs",
+  "dash",
+  "old-blog",
+] as const;
+
 export function shortId(): string {
   return randomId(10);
+}
+
+/** One-time field provision Bearer — not an API key. */
+export function provisionTokenPlaintext(): string {
+  return `pg_pv_${randomId(24)}`;
 }
 
 export function inviteSecret(): string {
@@ -90,10 +108,68 @@ export function fieldDeepLink(
   targetField: string,
   secret: string
 ): string {
-  const host = targetField.replace(/^https?:\/\//, "").replace(/\/$/, "");
-  return `https://${host}/#pg=${encodeURIComponent(secret)}`;
+  const origin =
+    normalizeFieldOrigin(targetField) ||
+    `https://${DEFAULT_TARGET_FIELD}`;
+  return `${origin}/#pg=${encodeURIComponent(secret)}`;
+}
+
+/** Host provision deep link — never embeds pg_sk_. */
+export function fieldProvisionDeepLink(
+  fieldOriginOrHost: string,
+  provisionToken: string
+): string {
+  const origin = normalizeFieldOrigin(fieldOriginOrHost);
+  if (!origin) {
+    return `https://${DEFAULT_TARGET_FIELD}/#pg_provision=${encodeURIComponent(provisionToken)}`;
+  }
+  return `${origin}/#pg_provision=${encodeURIComponent(provisionToken)}`;
 }
 
 export function shortUrl(origin: string, id: string): string {
   return `${origin.replace(/\/$/, "")}/i/${id}`;
+}
+
+/**
+ * Normalize field to origin (no path) or null if invalid.
+ * Official `*.samkuo.me` → https. Localhost／127.0.0.1 → keep scheme;
+ * bare host without scheme defaults to **http** for loopback, else https.
+ */
+export function normalizeFieldOrigin(input: string): string | null {
+  const raw = input.trim();
+  if (!raw) return null;
+  let url: URL;
+  try {
+    if (raw.includes("://")) {
+      url = new URL(raw);
+    } else {
+      const hostname = raw.split("/")[0]?.split(":")[0]?.toLowerCase() || "";
+      const scheme =
+        hostname === "localhost" || hostname === "127.0.0.1" ? "http" : "https";
+      url = new URL(`${scheme}://${raw}`);
+    }
+  } catch {
+    return null;
+  }
+  const host = url.hostname.toLowerCase();
+  if (host === "localhost" || host === "127.0.0.1") {
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    const port = url.port ? `:${url.port}` : "";
+    return `${url.protocol}//${host}${port}`;
+  }
+  if (url.protocol !== "https:") return null;
+  if (host === "samkuo.me") return null;
+  if (!host.endsWith(".samkuo.me")) return null;
+  const sub = host.slice(0, -".samkuo.me".length);
+  if (!sub || sub.includes(".")) return null;
+  if ((FIELD_RESERVED_SUBDOMAINS as readonly string[]).includes(sub)) {
+    return null;
+  }
+  return `https://${host}`;
+}
+
+export function defaultFieldOriginOrFallback(
+  stored: string | null | undefined
+): string {
+  return normalizeFieldOrigin(stored || "") || `https://${DEFAULT_TARGET_FIELD}`;
 }

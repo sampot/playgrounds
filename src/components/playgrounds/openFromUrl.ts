@@ -23,6 +23,10 @@ import {
   readResponseBytes,
   type ByteProgress,
 } from "./transferProgress";
+import {
+  isTransientStorageError,
+  transientStorageHint,
+} from "./storageErrors";
 
 export type OpenRole = "work" | "tool" | "agent";
 
@@ -36,7 +40,7 @@ export type OpenQueryOptions = {
   name?: string;
   /** ask = DEC-018 dialog when package has state; none = skip all state. */
   state: "ask" | "none";
-  /** When true, always create a new project (skip same-source reuse). */
+  /** When true, always create a new project (skip same-source conflict prompt). */
   fresh: boolean;
   /**
    * `canvas` → maximize canvas after open (catalog share / casual try).
@@ -371,7 +375,7 @@ export function sourceLabelFromOpenIntent(intent: OpenIntent): string | null {
 }
 
 /**
- * Canonical key for same-source reuse (dedupe). Stable across equivalent URLs.
+ * Canonical key for same-source conflict detection. Stable across equivalent URLs.
  */
 export function openSourceKey(intent: OpenIntent): string | null {
   if (intent.kind === "sam") {
@@ -457,6 +461,10 @@ export function explainOpenFromUrlError(
 ): string {
   const msg = error instanceof Error ? error.message : String(error);
   const lower = msg.toLowerCase();
+
+  if (isTransientStorageError(error)) {
+    return `無法寫入本機沙盒儲存（${msg}）。${transientStorageHint()}`;
+  }
 
   if (
     kind === "sam" ||

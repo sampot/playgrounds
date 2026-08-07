@@ -22,8 +22,35 @@
     hasRosterInviteInLocation,
     type SessionActPayload,
   } from "./roster";
+  import { consumePgProvisionFromLocation } from "./platform/consumePgProvision";
+  import { consumePgInviteFromLocation } from "./platform/consumePgInvite";
   import { hasPgInviteInLocation } from "./platform/platformInviteUrl";
+  import {
+    isConsumerPlayLanding,
+    isPlatformInviteLanding,
+  } from "./platform/platformConsumerLanding";
+  import {
+    clearPlatformFieldApiKey,
+    hasPlatformFieldApiKey,
+    installPlatformFieldCredentialLifecycle,
+    subscribePlatformFieldCredential,
+  } from "./platform/platformFieldCredential";
+  import { platformFieldLoginUrl } from "./platform/platformClient";
   import { registerPlatformComposeShell } from "./platform/platformComposeShell";
+  import { getPlatformInviteShell } from "./platform/platformInviteShell";
+  import {
+    registerPlatformInviteShareShell,
+    type PlatformInviteSharePayload,
+  } from "./platform/platformInviteShareShell";
+  import {
+    presentPlatformInviteJoinPending,
+    registerPlatformInviteJoinShell,
+    type PlatformInviteJoinPayload,
+  } from "./platform/platformInviteJoinShell";
+  import { guestJoinPlatformTicket } from "./platform/platformGuestJoinBridge";
+  import { composeSessionProtocol } from "./platform/platformCompose";
+  import PlatformInviteShareDialog from "./platform/PlatformInviteShareDialog.svelte";
+  import PlatformInviteJoinDialog from "./platform/PlatformInviteJoinDialog.svelte";
   import {
     assertCanvasEntryServed,
     buildCanvasEntryUrl,
@@ -336,6 +363,7 @@
     zipToFiles,
   } from "./zipProject";
   import {
+    DEFAULT_OPEN_OPTIONS,
     buildPlaygroundsOpenUrl,
     canBuildOpenUrlFromSource,
     beginSharedBootOpen,
@@ -380,6 +408,8 @@
 
   type SaveState = "idle" | "dirty" | "saving" | "saved";
 
+  type InstallConflictChoice = "replace" | "keep";
+
   type UiDialog =
     | {
         kind: "confirm";
@@ -414,6 +444,14 @@
         confirmLabel: string;
         icon: PgIconName;
         resolve: (value: ProjectStateParts | null) => void;
+      }
+    | {
+        kind: "installConflict";
+        title: string;
+        message: string;
+        existingName: string;
+        icon: PgIconName;
+        resolve: (value: InstallConflictChoice | null) => void;
       };
 
   const btn =
@@ -466,9 +504,25 @@
   let openPath = $state<string | null>(null);
   let draft = $state("");
   let status = $state("就緒");
+  let platformFieldLoggedIn = $state(false);
   const builtAtLabel = PLAYGROUNDS_BUILT_AT
     ? formatPlaygroundsBuiltAt(PLAYGROUNDS_BUILT_AT)
     : "";
+
+  function syncPlatformFieldLoginState() {
+    platformFieldLoggedIn = hasPlatformFieldApiKey();
+  }
+
+  function logoutPlatformField() {
+    clearPlatformFieldApiKey();
+    status = "已登出遊樂場通行證";
+  }
+
+  function platformLoginHref(): string {
+    return platformFieldLoginUrl(
+      typeof location !== "undefined" ? location.origin : ""
+    );
+  }
   let error = $state<string | null>(null);
   let consoleLines = $state<ConsoleLineView[]>([]);
   let consoleLevelFilter = $state<ConsoleLevelFilter>("all");
@@ -568,13 +622,20 @@
   let addBottomSamPickId = $state("");
   /** Left sidebar: file tree vs agent chat vs Avatars. Default Files; restore from layout. */
   let sidebarTab = $state<"files" | "agent" | "avatars">("files");
+  /** `#pg=`／`view=canvas`: first paint already play-first (no IDE flash). */
+  const bootConsumerPlay =
+    typeof window !== "undefined" && isConsumerPlayLanding();
+  const bootInvitePlay =
+    typeof window !== "undefined" && isPlatformInviteLanding();
   let previewOpen = $state(true);
-  let previewMaximized = $state(false);
+  let previewMaximized = $state(bootConsumerPlay);
   /**
-   * Share／試玩進場（`view=canvas`）：畫布可常駐最大化；型錄／隨機不還原工作區。
+   * Share／試玩進場（`view=canvas`／`#pg=`）：畫布可常駐最大化；型錄／隨機不還原工作區。
    * 唯「看原始碼」清除並 restorePreview。
    */
-  let tryPlaySession = $state(false);
+  let tryPlaySession = $state(bootConsumerPlay);
+  /** Platform invite guest: hide preview IDE chrome (traffic lights) too. */
+  let invitePlaySession = $state(bootInvitePlay);
   /** Main content (Editor 槽) fills the viewport; mutually exclusive with previewMaximized. */
   let editorMaximized = $state(false);
   /** Hide site header so the sandbox fills the viewport. */
@@ -601,6 +662,17 @@
   let unregRosterRemoteAct: (() => void) | null = null;
   let unregRosterHomeSeatReady: (() => void) | null = null;
   let unregPlatformCompose: (() => void) | null = null;
+  let unregPlatformInviteShare: (() => void) | null = null;
+  let unregPlatformInviteJoin: (() => void) | null = null;
+  let inviteShareOpen = $state(false);
+  let inviteSharePayload = $state<PlatformInviteSharePayload | null>(null);
+  let inviteJoinOpen = $state(false);
+  let inviteJoinPayload = $state<PlatformInviteJoinPayload | null>(null);
+  let inviteJoinPending = $state(false);
+  let inviteJoinBusy = $state(false);
+  let inviteJoinError = $state<string | null>(null);
+  let inviteJoinStatus = $state<string | null>(null);
+  let unsubPlatformFieldCred: (() => void) | null = null;
   let agentIframeEl = $state<HTMLIFrameElement | null>(null);
   /** Agent canvas loaded for this project id; cold while Files tab on boot. */
   let agentUiMountedId: string | null = null;
@@ -667,7 +739,7 @@
   let toolPrefsTick = $state(0);
   /** HOST setTargetProject override; null = use activeId. */
   let targetProjectOverride = $state<string | null>(null);
-  let filesSidebarOpen = $state(true);
+  let filesSidebarOpen = $state(!bootConsumerPlay);
   let filesW = $state(216);
   /** Mobile stacked layout: Files panel height (px). Unused on desktop. */
   let filesH = $state(220);
@@ -947,6 +1019,7 @@
     if (!previewMaximized) return;
     previewMaximized = false;
     tryPlaySession = false;
+    invitePlaySession = false;
     syncPageChrome();
     previewOpen = true;
     persistLayout();
@@ -960,11 +1033,13 @@
   /** Try-play: reveal IDE (only intentional exit that exposes the shell). */
   function exitTryPlayToWorkspace() {
     tryPlaySession = false;
+    invitePlaySession = false;
     restorePreview();
   }
 
-  function enterTryPlayCanvas() {
+  function enterTryPlayCanvas(opts?: { invite?: boolean }) {
     tryPlaySession = true;
+    if (opts?.invite) invitePlaySession = true;
     maximizePreview();
   }
 
@@ -2143,6 +2218,46 @@
   }
 
   /**
+   * Same-source install already present: replace (full wipe, same id) or
+   * keep existing and install into a new sandbox id. Cancel → null.
+   */
+  function askInstallConflict(options: {
+    existingName: string;
+    sourceLabel?: string;
+  }): Promise<InstallConflictChoice | null> {
+    const sourceHint = options.sourceLabel?.trim()
+      ? `來源：${options.sourceLabel.trim()}`
+      : "";
+    return new Promise(resolve => {
+      uiDialog = {
+        kind: "installConflict",
+        title: "本機已有相同來源",
+        message: sourceHint
+          ? `此來源的 SAM 已安裝在本機。要取代既有沙盒，或保留既有並另裝到新沙盒？\n${sourceHint}`
+          : "此來源的 SAM 已安裝在本機。要取代既有沙盒，或保留既有並另裝到新沙盒？",
+        existingName: options.existingName,
+        icon: "layers",
+        resolve: onceResolve(resolve),
+      };
+      queueMicrotask(() => uiDialogEl?.showModal());
+    });
+  }
+
+  /**
+   * Full wipe — same cleanup as UI「刪除沙盒」
+   * (OPFS recursive remove + KV／DB／checkpoint + shell bindings).
+   * Used by delete UI and by「取代」before recreate under the same id.
+   */
+  async function deleteInstalledSandboxFully(id: string): Promise<void> {
+    await deleteProject(id);
+    await clearMockKvStore(id);
+    await clearMockDbStore(id);
+    await clearCheckpointsForProject(id);
+    invalidateFunctionsModuleCache();
+    await clearShellStateForDeletedProject(id);
+  }
+
+  /**
    * Choose which durable stores (KV / DB) to move with source files.
    * Default is none — opt-in per store. Cancel → null.
    */
@@ -2170,7 +2285,7 @@
   }
 
   function closeUiDialog(
-    result: boolean | string | ProjectStateParts | null
+    result: boolean | string | ProjectStateParts | InstallConflictChoice | null
   ) {
     const current = uiDialog;
     if (!current) return;
@@ -2185,6 +2300,8 @@
           ? result
           : null
       );
+    } else if (current.kind === "installConflict") {
+      current.resolve(result === "replace" || result === "keep" ? result : null);
     } else {
       current.resolve(typeof result === "string" ? result : null);
     }
@@ -2543,12 +2660,7 @@
     if (!ok) return;
     busy = true;
     try {
-      await deleteProject(targetId);
-      await clearMockKvStore(targetId);
-      await clearMockDbStore(targetId);
-      await clearCheckpointsForProject(targetId);
-      invalidateFunctionsModuleCache();
-      await clearShellStateForDeletedProject(targetId);
+      await deleteInstalledSandboxFully(targetId);
       await refreshProjects();
       status = "已刪除沙盒";
       if (!activeId && projects.length > 0) {
@@ -2912,6 +3024,16 @@
     /** Offer to delete session_seat clones (default true). Skip on unmount. */
     offerSeatCleanup?: boolean;
   }) {
+    // Notify remote seats before tearing bridges／DC (Guest must see「主持結束」).
+    if (sessionRuntime.getSession()) {
+      try {
+        sessionRuntime.publishEvents([
+          { type: "session.closed", reason: "host_closed" },
+        ]);
+      } catch {
+        /* ignore — still close locally */
+      }
+    }
     const seatSandboxIds = sessionRuntime
       .listSeats()
       .filter(s => s.kind === "agent" && s.sandboxId)
@@ -3046,9 +3168,13 @@
     }
     syncMultiAgentSessionView();
     status = `多人通道已開啟（${protocol.protocolId}）`;
-    if (hostSandboxId === activeId) {
-      schedulePreview(true);
-    } else if (hostSandboxId === activeAgentSandboxId) {
+    // Do not remount the work-canvas Host preview: schedulePreview would wipe
+    // in-iframe UI state (e.g. gomoku「邀請對弈」flow). Domain open already
+    // ran via notifyHostSessionOpen. Steward Host still rebuilds agent canvas.
+    if (
+      hostSandboxId === activeAgentSandboxId &&
+      hostSandboxId !== activeId
+    ) {
       void rebuildAgentPreview();
     }
     return {
@@ -3428,8 +3554,16 @@
     };
   }
 
-  async function inviteRosterAvatarSeat(opts?: { role?: string }) {
-    const invite = inviteRosterAvatarToSession({ role: opts?.role });
+  async function inviteRosterAvatarSeat(opts?: {
+    role?: string;
+    catalogId?: string;
+    source?: string;
+  }) {
+    const invite = inviteRosterAvatarToSession({
+      role: opts?.role,
+      catalogId: opts?.catalogId,
+      source: opts?.source,
+    });
     status = `已邀請化身入座（${invite.protocol.protocolId}）`;
     return {
       inviteId: invite.inviteId,
@@ -3450,7 +3584,14 @@
       status = "收到化身接受，但通道已關閉或 session 不符";
       return;
     }
-    const sandboxId = getRosterProjectionSandboxId(ev.peerAgentId);
+    let sandboxId = getRosterProjectionSandboxId(ev.peerAgentId);
+    // Presence spawn can race accept; wait briefly for projection id.
+    if (!sandboxId) {
+      for (let i = 0; i < 20 && !sandboxId; i++) {
+        await new Promise(r => setTimeout(r, 50));
+        sandboxId = getRosterProjectionSandboxId(ev.peerAgentId);
+      }
+    }
     if (!sandboxId) {
       status = "找不到化身投影沙盒，無法入座";
       return;
@@ -4621,6 +4762,26 @@
       error = "無法解析 GitHub URL（完整網址或 owner/repo）";
       return;
     }
+    const intent: OpenIntent = {
+      kind: "github",
+      input: githubUrl.trim(),
+      ref: parsed,
+      options: { ...DEFAULT_OPEN_OPTIONS },
+    };
+    let replaceSandboxId: string | null = null;
+    const existingId = findSandboxIdByOpenSource(projects, intent);
+    if (existingId) {
+      const existing = projects.find(p => p.id === existingId);
+      const choice = await askInstallConflict({
+        existingName: existing?.name ?? existingId,
+        sourceLabel: existing?.source || formatGithubSource(parsed),
+      });
+      if (choice === null) {
+        status = "已取消安裝";
+        return;
+      }
+      if (choice === "replace") replaceSandboxId = existingId;
+    }
     busy = true;
     openingFromUrl = true;
     openTransferProgress = { ratio: null };
@@ -4637,14 +4798,22 @@
       const name = parsed.path
         ? parsed.path.split("/").pop() || parsed.repo
         : parsed.repo;
+      if (replaceSandboxId) {
+        status = "正在清空既有沙盒…";
+        await deleteInstalledSandboxFully(replaceSandboxId);
+        status = "正在重新安裝…";
+      }
       const created = await createProject(name, remoteFiles, {
+        ...(replaceSandboxId ? { id: replaceSandboxId } : {}),
         source: formatGithubSource(parsed),
         inWorkingSet: true,
       });
       await refreshProjects();
       await openProject(created.id);
       githubUrl = "";
-      status = "已複製至 OPFS；可用選單複製開啟連結分享";
+      status = replaceSandboxId
+        ? "已清空並重新安裝本機沙盒；可用選單複製開啟連結分享"
+        : "已複製至 OPFS；可用選單複製開啟連結分享";
     } catch (e) {
       error = explainOpenFromUrlError(e, "github");
       status = "複製失敗";
@@ -4732,22 +4901,32 @@
     }
 
     const { options } = intent;
+    let replaceSandboxId: string | null = null;
+
+    if (!options.fresh) {
+      const existingId = findSandboxIdByOpenSource(projects, intent);
+      if (existingId) {
+        const existing = projects.find(p => p.id === existingId);
+        const choice = await askInstallConflict({
+          existingName: existing?.name ?? existingId,
+          sourceLabel:
+            existing?.source || sourceLabelFromOpenIntent(intent) || undefined,
+        });
+        if (choice === null) {
+          status = "已取消安裝";
+          return false;
+        }
+        if (choice === "replace") replaceSandboxId = existingId;
+        // keep → fall through and create a new sandbox id
+      }
+    }
+
     busy = true;
     openingFromUrl = true;
     openTransferProgress = { ratio: null };
     error = null;
 
     try {
-      if (!options.fresh) {
-        const existingId = findSandboxIdByOpenSource(projects, intent);
-        if (existingId) {
-          status = "發現相同來源沙盒，直接開啟…";
-          openTransferProgress = null;
-          await applyOpenFromUrlRole(existingId, options.as, true);
-          return true;
-        }
-      }
-
       status =
         intent.kind === "sam"
           ? "正在從網址下載沙盒包裹…"
@@ -4800,7 +4979,13 @@
           defaultNameFromOpenIntent(intent) ||
           imported.meta.name ||
           "imported-project";
+        if (replaceSandboxId) {
+          status = "正在清空既有沙盒…";
+          await deleteInstalledSandboxFully(replaceSandboxId);
+          status = "正在重新安裝…";
+        }
         const created = await createProject(name, imported.files, {
+          ...(replaceSandboxId ? { id: replaceSandboxId } : {}),
           entry: imported.meta.entry,
           source:
             sourceLabelFromOpenIntent(intent) ||
@@ -4830,7 +5015,13 @@
           options.name ||
           defaultNameFromOpenIntent(intent) ||
           intent.ref.repo;
+        if (replaceSandboxId) {
+          status = "正在清空既有沙盒…";
+          await deleteInstalledSandboxFully(replaceSandboxId);
+          status = "正在重新安裝…";
+        }
         const created = await createProject(name, remoteFiles, {
+          ...(replaceSandboxId ? { id: replaceSandboxId } : {}),
           source:
             sourceLabelFromOpenIntent(intent) ||
             formatGithubSource(intent.ref),
@@ -4851,7 +5042,13 @@
           defaultNameFromOpenIntent(intent) ||
           intent.ref.projectPath.split("/").pop() ||
           "gitlab-project";
+        if (replaceSandboxId) {
+          status = "正在清空既有沙盒…";
+          await deleteInstalledSandboxFully(replaceSandboxId);
+          status = "正在重新安裝…";
+        }
         const created = await createProject(name, remoteFiles, {
+          ...(replaceSandboxId ? { id: replaceSandboxId } : {}),
           source: sourceLabelFromOpenIntent(intent) || undefined,
           inWorkingSet: true,
         });
@@ -4860,8 +5057,14 @@
       }
 
       await applyOpenFromUrlRole(sandboxId, options.as, false);
-      if (statusExtra && options.as === "work") {
-        status = `已從網址開啟沙盒${statusExtra}；可用選單複製開啟連結分享`;
+      if (options.as === "work") {
+        if (replaceSandboxId) {
+          status = statusExtra
+            ? `已清空並重新安裝本機沙盒${statusExtra}；可用選單複製開啟連結分享`
+            : "已清空並重新安裝本機沙盒；可用選單複製開啟連結分享";
+        } else if (statusExtra) {
+          status = `已從網址開啟沙盒${statusExtra}；可用選單複製開啟連結分享`;
+        }
       }
       return true;
     } catch (e) {
@@ -5507,17 +5710,25 @@
   }
 
   onMount(() => {
+    if (bootConsumerPlay) {
+      // Before layout restore: keep page chrome play-first from first paint.
+      syncPageChrome();
+    }
     canWebShare = canUseWebShare();
+    installPlatformFieldCredentialLifecycle();
+    syncPlatformFieldLoginState();
+    const unsubFieldCred = subscribePlatformFieldCredential(() => {
+      syncPlatformFieldLoginState();
+    });
+    unsubPlatformFieldCred = unsubFieldCred;
     applyPlaygroundsPathsFromLocation({
       pathname: window.location.pathname,
       hostname: window.location.hostname,
     });
+    // Roster OOB wire still uses 線上 tab. Platform `#pg=` guest join is shell
+    // modal + maximized SAM — do not force AvatarsPanel / IDE chrome.
     if (
       hasRosterInviteInLocation({
-        hash: window.location.hash,
-        search: window.location.search,
-      }) ||
-      hasPgInviteInLocation({
         hash: window.location.hash,
         search: window.location.search,
       })
@@ -5525,8 +5736,20 @@
       filesSidebarOpen = true;
       selectSidebarTab("avatars");
     }
+    const landingPgInvite = hasPgInviteInLocation({
+      hash: window.location.hash,
+      search: window.location.search,
+    });
+    void consumePgProvisionFromLocation().then((result) => {
+      if (result.ok === true) {
+        status = "已登入遊樂場通行證（僅本頁有效）";
+        syncPlatformFieldLoginState();
+      } else if ("error" in result && result.error) {
+        status = `通行證兌換失敗：${result.error}`;
+      }
+    });
     const unregCompose = registerPlatformComposeShell({
-      openSamSource: async source => {
+      openSamSource: async (source, opts) => {
         const intent = parseOpenIntent(
           new URLSearchParams({ open: source.trim() })
         );
@@ -5537,14 +5760,76 @@
               : "無法辨識開啟來源"
           );
         }
-        const ok = await runOpenFromUrl(intent);
-        if (!ok) throw new Error("開啟小品失敗");
+        const preferReuse = opts?.preferReuse === true;
+        if (preferReuse) {
+          const existingId = findSandboxIdByOpenSource(projects, intent);
+          if (existingId) {
+            await openProject(existingId);
+            return;
+          }
+        }
+        // Guest invite: skip replace/keep dialog; install under a new id.
+        const toOpen = preferReuse
+          ? {
+              ...intent,
+              options: { ...intent.options, fresh: true },
+            }
+          : intent;
+        const ok = await runOpenFromUrl(toOpen);
+        if (!ok) {
+          throw new Error(error?.trim() || "開啟小品失敗");
+        }
       },
       maximizePreview: () => {
         maximizePreview();
       },
+      enterTryPlayCanvas: () => {
+        enterTryPlayCanvas({ invite: invitePlaySession || bootInvitePlay });
+      },
+      getActiveSandboxId: () => activeId || null,
     });
     unregPlatformCompose = unregCompose;
+    unregPlatformInviteShare = registerPlatformInviteShareShell({
+      present: payload => {
+        inviteSharePayload = {
+          shortUrl: payload.shortUrl,
+          deepLink: payload.deepLink,
+          expiresAt: payload.expiresAt,
+          kind: payload.kind,
+          title: payload.title,
+          hint: payload.hint,
+        };
+        inviteShareOpen = true;
+      },
+      dismiss: () => {
+        inviteShareOpen = false;
+      },
+    });
+    unregPlatformInviteJoin = registerPlatformInviteJoinShell({
+      present: payload => {
+        inviteJoinPayload = payload;
+        inviteJoinPending = false;
+        inviteJoinError = null;
+        inviteJoinStatus = null;
+        inviteJoinBusy = false;
+        inviteJoinOpen = true;
+      },
+      presentPending: opts => {
+        inviteJoinPayload = null;
+        inviteJoinPending = !opts.error;
+        inviteJoinError = opts.error ?? null;
+        inviteJoinStatus = null;
+        inviteJoinBusy = false;
+        inviteJoinOpen = true;
+      },
+      dismiss: () => {
+        inviteJoinOpen = false;
+      },
+    });
+    if (landingPgInvite) {
+      // Cover IDE chrome ASAP; full consume runs after OPFS boot.
+      presentPlatformInviteJoinPending({});
+    }
     const unregRosterInvite = registerRosterInviteAcceptedHandler(ev =>
       onRosterInviteAccepted(ev)
     );
@@ -5618,6 +5903,12 @@
       if (saved === "open") filesSidebarOpen = true;
     } catch {
       /* ignore */
+    }
+    if (landingPgInvite || bootConsumerPlay) {
+      // Consumer landing: layout restore must not re-expose the IDE.
+      filesSidebarOpen = false;
+      previewOpen = true;
+      enterTryPlayCanvas({ invite: landingPgInvite || bootInvitePlay });
     }
     if (!supported) {
       error = "此瀏覽器不支援 OPFS，無法作為本機實驗環境。";
@@ -5746,6 +6037,24 @@
         leave: seatId => leaveMultiAgentSeat(seatId),
         spawnParticipant: opts => spawnMultiAgentParticipant(opts),
         inviteRoster: opts => inviteRosterAvatarSeat(opts),
+        hostDomainFetch: opts =>
+          hostSessionDomainFetch(opts.path, {
+            method: opts.method,
+            headers: opts.headers,
+            body: opts.body,
+          }),
+      },
+      shellPlatformHttp: {
+        createInvite: async opts => {
+          const inviteShell = getPlatformInviteShell();
+          if (!inviteShell) {
+            throw new HostBridgeError(
+              "not_found",
+              "線上邀請服務尚未就緒 — 請打開側欄「線上」後再試"
+            );
+          }
+          return inviteShell.mintAndAnswer(opts);
+        },
       },
       onConsole: line => {
         pushWorkConsoleLine(line.level, line.text);
@@ -5993,7 +6302,9 @@
         );
 
         if (!openedFromUrl) {
-          if (projects.length > 0) {
+          // Guest `#pg=`: don't open a previous work sandbox — avoids OPFS races
+          // with invite install／open, and keeps the play surface clean.
+          if (projects.length > 0 && !landingPgInvite) {
             const savedWork = readActiveWorkSandboxId();
             const initialId =
               savedWork && projects.some(p => p.id === savedWork)
@@ -6019,17 +6330,79 @@
         // Rehydrate Agent-form Controllers (DEC-031; not only 總管席).
         await ensureWorkingSetAgentControllers();
       } catch (e) {
-        error = e instanceof Error ? e.message : String(e);
+        error = explainOpenFromUrlError(e, "unknown");
       } finally {
         openFromUrlBootReady = true;
         shellBootReady = true;
+        // After OPFS／open boot: Guest `#pg=` → SAM maximized + consent modal.
+        if (landingPgInvite) {
+          if (error) {
+            presentPlatformInviteJoinPending({
+              error: `無法讀取邀請：${error}`,
+            });
+          } else {
+            void consumePgInviteFromLocation();
+          }
+        }
       }
     })();
   });
 
+  async function onInviteJoinAccept(opts: {
+    displayName: string;
+  }): Promise<void> {
+    const payload = inviteJoinPayload;
+    if (!payload) return;
+    inviteJoinBusy = true;
+    inviteJoinError = null;
+    inviteJoinStatus = "正在與主持握手…";
+    try {
+      const proto = composeSessionProtocol(payload.meta.intent);
+      let composeProtocolId: string | null = null;
+      if (
+        proto &&
+        typeof proto === "object" &&
+        "protocolId" in proto &&
+        typeof (proto as { protocolId: unknown }).protocolId === "string"
+      ) {
+        composeProtocolId = (proto as { protocolId: string }).protocolId.trim();
+      }
+      await guestJoinPlatformTicket({
+        secret: payload.secret,
+        meta: payload.meta,
+        composeProtocolId,
+        displayName: opts.displayName,
+      });
+      inviteJoinStatus = "已連線，等待入座…";
+      inviteJoinOpen = false;
+      status = "已同意入座 — 連線中";
+    } catch (e) {
+      inviteJoinError =
+        e instanceof Error ? e.message : String(e);
+      inviteJoinStatus = null;
+    } finally {
+      inviteJoinBusy = false;
+    }
+  }
+
+  function onInviteJoinDecline(): void {
+    inviteJoinOpen = false;
+    inviteJoinPayload = null;
+    inviteJoinPending = false;
+    inviteJoinError = null;
+    inviteJoinStatus = null;
+    inviteJoinBusy = false;
+  }
+
   onDestroy(() => {
     unregPlatformCompose?.();
     unregPlatformCompose = null;
+    unregPlatformInviteShare?.();
+    unregPlatformInviteShare = null;
+    unregPlatformInviteJoin?.();
+    unregPlatformInviteJoin = null;
+    unsubPlatformFieldCred?.();
+    unsubPlatformFieldCred = null;
     unregRosterInviteAccepted?.();
     unregRosterInviteAccepted = null;
     unregRosterRemoteAct?.();
@@ -6116,6 +6489,32 @@
       : ''}"
   >
     <span class="playgrounds-toolbar-brand">遊樂場</span>
+    <div
+      class="playgrounds-toolbar-auth"
+      role="status"
+      aria-label="遊樂場通行證"
+    >
+      {#if platformFieldLoggedIn}
+        <span class="text-skin-base/55 hidden text-[11px] sm:inline">已登入</span>
+        <button
+          type="button"
+          class="{btn} h-8 min-h-8 gap-1 px-2.5 text-[11px]"
+          title="清除本頁通行證（關閉頁面也會清除）"
+          onclick={logoutPlatformField}
+        >
+          登出
+        </button>
+      {:else}
+        <span class="text-skin-base/45 hidden text-[11px] sm:inline">未登入</span>
+        <a
+          class="{btnPrimary} inline-flex h-8 min-h-8 items-center gap-1 px-2.5 text-[11px] no-underline"
+          href={platformLoginHref()}
+          title="前往後台登入，成功後回到此遊樂場"
+        >
+          登入
+        </a>
+      {/if}
+    </div>
     <div class="playgrounds-toolbar-project">
       {#if !shellBootReady}
         <span class="text-skin-base/45 px-1 text-xs">載入中…</span>
@@ -6282,13 +6681,14 @@
           aria-haspopup="menu"
           aria-expanded={actionsMenuOpen}
           aria-controls="playgrounds-actions-menu-list"
+          aria-label="遊樂場選項"
           disabled={busy}
           title="遊樂場選項"
           onclick={toggleActionsMenu}
         >
           <PgIcon name="moreHorizontal" size={13} />
-          選項
-          <span class="text-skin-base/45 -ml-0.5" aria-hidden="true">
+          <span class="hidden sm:inline">選項</span>
+          <span class="text-skin-base/45 hidden -ml-0.5 sm:inline" aria-hidden="true">
             <PgIcon name={actionsMenuOpen ? "chevronUp" : "chevronDown"} size={11} />
           </span>
         </button>
@@ -6450,7 +6850,7 @@
         {/if}
       </div>
     </div>
-    <div class="playgrounds-toolbar-trailing ml-auto">
+    <div class="playgrounds-toolbar-trailing">
       <div
         class="playgrounds-toolbar-appearance"
         role="group"
@@ -7036,6 +7436,11 @@
             }}>線上</button
           >
           <span class="text-skin-base/40 text-[10px]">{fileList.length}</span>
+        </div>
+        <!-- Keep Roster／Platform join transport mounted while rail is collapsed
+             (Guest `#pg=` collapses sidebar so play surface shows first). -->
+        <div hidden aria-hidden="true">
+          <AvatarsPanel />
         </div>
       {/if}
     </aside>
@@ -7791,6 +8196,9 @@
     <!-- 畫布（程式渲染結果／runtime） -->
     <div class="playgrounds-preview-pane flex min-h-0 flex-col overflow-hidden">
       <div class="bg-skin-card flex min-h-0 flex-1 flex-col">
+        {#if invitePlaySession && previewMaximized}
+          <!-- Consumer invite: no IDE chrome; join modal owns status. -->
+        {:else}
         <div
           class="border-skin-line flex h-8 shrink-0 items-center gap-1.5 border-b px-2.5"
         >
@@ -7872,6 +8280,7 @@
             {/if}
           </div>
         </div>
+        {/if}
         <div class="playgrounds-preview-frame flex min-h-0 flex-1 flex-col">
           <iframe
             bind:this={iframeEl}
@@ -8134,9 +8543,9 @@
         </p>
         <p class="text-skin-base/50 m-0 text-[11px] leading-relaxed">
           貼上 .sam 網址、GitHub 或 GitLab。「立即開啟」等同
-          <code class="text-[10px]">?open=</code>；相同來源預設重用本機沙盒。可加
+          <code class="text-[10px]">?open=</code>；相同來源若本機已安裝會詢問取代或保留（另建新沙盒）。可加
           <code class="text-[10px]">as=agent|tool</code>、
-          <code class="text-[10px]">fresh=1</code>。
+          <code class="text-[10px]">fresh=1</code>（略過詢問、強制新建）。
         </p>
         <input
           class={field}
@@ -8849,6 +9258,45 @@
             onclick={submitUiTypeConfirm}>{uiDialog.confirmLabel}</button
           >
         </div>
+      {:else if uiDialog.kind === "installConflict"}
+        <p class="text-skin-base/80 whitespace-pre-line text-sm leading-relaxed">
+          {uiDialog.message}
+        </p>
+        <p class="text-skin-base/55 mt-2 text-xs leading-relaxed">
+          既有沙盒：<span class="text-skin-base/80 font-medium"
+            >{uiDialog.existingName}</span
+          >
+        </p>
+        <div class="mt-4 flex flex-col gap-2">
+          <button
+            type="button"
+            class="{btnPrimary} min-h-11 w-full justify-center gap-1.5 px-3 py-2.5 text-sm"
+            onclick={() => closeUiDialog("replace")}
+          >
+            取代
+          </button>
+          <p class="text-skin-base/45 m-0 text-[11px] leading-relaxed">
+            完全清空既有沙盒（檔案目錄、KV、DB、checkpoint）後，以相同沙盒
+            ID 重新安裝。
+          </p>
+          <button
+            type="button"
+            class="{btn} min-h-11 w-full justify-center gap-1.5 px-3 py-2.5 text-sm"
+            onclick={() => closeUiDialog("keep")}
+          >
+            保留
+          </button>
+          <p class="text-skin-base/45 m-0 text-[11px] leading-relaxed">
+            保留既有沙盒不動，另裝到新的沙盒 ID。
+          </p>
+          <button
+            type="button"
+            class="{btn} min-h-11 w-full justify-center px-3 py-2.5 text-sm"
+            onclick={() => closeUiDialog(null)}
+          >
+            取消
+          </button>
+        </div>
       {:else if uiDialog.kind === "stateMove"}
         <p class="text-skin-base/70 text-xs leading-relaxed">
           {uiDialog.message}
@@ -9233,3 +9681,19 @@
     {/if}
   </div>
 </dialog>
+
+<PlatformInviteShareDialog
+  bind:open={inviteShareOpen}
+  bind:payload={inviteSharePayload}
+/>
+
+<PlatformInviteJoinDialog
+  bind:open={inviteJoinOpen}
+  bind:payload={inviteJoinPayload}
+  bind:pending={inviteJoinPending}
+  bind:error={inviteJoinError}
+  bind:busy={inviteJoinBusy}
+  bind:status={inviteJoinStatus}
+  onAccept={onInviteJoinAccept}
+  onDecline={onInviteJoinDecline}
+/>

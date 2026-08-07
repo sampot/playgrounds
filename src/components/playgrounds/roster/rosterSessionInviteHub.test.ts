@@ -46,6 +46,28 @@ describe("rosterSessionInviteHub", () => {
     );
   });
 
+  it("gomoku invite prefills catalogId／source／player role", () => {
+    const send = vi.fn();
+    registerRosterRelayTransport({
+      send,
+      getPeerAgentId: () => "peer-1",
+      getProjectionSandboxId: () => "proj-1",
+    });
+    setRosterOpenSession({
+      sessionId: "sess-g",
+      status: "open",
+      protocol: {
+        protocolId: "gomoku.v1",
+        apiVersion: "1",
+        roles: ["host", "player"],
+      },
+    });
+    const invite = inviteRosterAvatarToSession();
+    expect(invite.role).toBe("player");
+    expect(invite.catalogId).toBe("pg-gomoku");
+    expect(invite.source).toBe("sampot/pg-gomoku");
+  });
+
   it("coding-orch invite prefills catalogId／source／worker role", () => {
     const send = vi.fn();
     registerRosterRelayTransport({

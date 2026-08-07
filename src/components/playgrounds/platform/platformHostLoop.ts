@@ -8,7 +8,11 @@ import {
   type RosterPeerHandlers,
   type RosterPeerSession,
 } from "../roster";
-import { pollPendingOffer, putAnswer } from "./platformClient";
+import {
+  fetchHostTurnIceServers,
+  pollPendingOffer,
+  putAnswer,
+} from "./platformClient";
 
 export type PlatformHostLoopHandle = {
   stop: () => void;
@@ -46,12 +50,20 @@ export function startPlatformHostAnswerLoop(opts: {
         opts.onStatus?.(
           `排隊握手中（join ${pending.join_id.slice(0, 6)}…）`
         );
+        const iceServers = opts.lan
+          ? undefined
+          : ((await fetchHostTurnIceServers({
+              apiKey: opts.apiKey,
+              sessionId: pending.join_id,
+            })) ?? undefined);
         const prepared = opts.prepareHandlers();
         const { session, wire } = await acceptRosterOffer({
           offerWire: pending.offer,
           lan: opts.lan,
+          transport: "signal",
           localPresence: opts.localPresence,
           handlers: prepared.handlers,
+          iceServers,
         });
         prepared.attachSession(session);
         await putAnswer({

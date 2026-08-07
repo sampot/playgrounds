@@ -92,14 +92,20 @@
 | 薄 signaling（遊樂場 Roster） | signaling | **每握手槽**只完成一次 WebRTC offer／answer（非 trickle；1× offer＋1× answer；用完銷槽）。≠ 全場只能一 peer。載荷經**剪裁＋固定樣板**；QR／文字／可選 Platform rendezvous。不中繼資料／心跳／重談。見 DEC-045／047。 |
 | Roster 樣板 SDP（遊樂場） | 樣板壓縮／交換 payload | 自完整 SDP 抽取必要欄位，依固定樣板編解碼還原；**QR 與文字**（及可選 Platform rendezvous）共用同一字串。可選**同區網**旗標以進一步剪裁 candidates。見 DEC-045、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)。 |
 | 同區網 Roster（遊樂場） | LAN／同區網模式 | 使用者宣告 peers 同一區網時，offer／answer 可更小；誤選須新邀請改模式，不經同房補 candidates。見 DEC-045。 |
-| Playgrounds Platform API | Platform API | 獨立於場殼的 Cloudflare Workers 服務：**`api.samkuo.me`**（API／短連結）、**`dash.samkuo.me`**（後台 UI，同 Worker）：Invite、薄 signal、帳號。後台持 **access token**；場殼持 **API key**。不中繼 session／DataChannel。後台 UI 規格見 [PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md)。見 DEC-047、[PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)。 |
-| Platform Invite（遊樂場） | Invite／`#pg=` | 一條邀請（短連結或深鏈）；**多人可經同一連結加入**。內嵌 intent；**不**預帶 WebRTC offer。每次加入＝短命 join。kind 含 `signal.handshake`、`invite.compose`。**鑄造：** SAM 經場殼代理呼叫 Platform API（持 `PLAYGROUNDS_API_KEY`）；**非**後台 UI。**不是** Platform 註冊邀請、**不是** `#roster=`。見 DEC-047、[PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md) §7。 |
+| Playgrounds Platform API | Platform API | 獨立於場殼的 Cloudflare Workers 服務：**`api.samkuo.me`**（API／短連結）、**`dash.samkuo.me`**（後台 UI，同 Worker）：Invite、薄 signal、帳號。後台持 **access token**；場殼持 **API key**（記憶體，經 provision）。不中繼 session／DataChannel。後台 UI 規格見 [PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md)。見 DEC-047、[PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)。 |
+| Platform Invite（遊樂場） | Invite／`#pg=` | 一條邀請（短連結或深鏈）；**多人可經同一連結加入**。內嵌 intent；**不**預帶 WebRTC offer。每次加入＝短命 join。kind 含 `signal.handshake`、`invite.compose`。**鑄造：** SAM 經場殼代理呼叫 Platform API（持殼頁**記憶體** API key）；**非**後台 UI。**不是** Platform 註冊邀請、**不是** `#roster=`、**不是** `#pg_provision=`。見 DEC-047、[PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md) §7。 |
 | Platform Ticket／join | join capability | 單次加入用的短命 capability（由 Invite 核發）。若雙方**已有** PeerConnection → **重用**，不跑 signaling。僅尚未連線時：加入者出 offer，同回合等邀請者 answer；握手排隊串行。見 DEC-047。 |
 | Platform 短連結 | `/i/<short_id>` | 對 **Invite** 穩定的短 URL → 302 到場 `#pg=`。**邀請 QR 預設**。與 Invite 同壽命；非通用縮址。見 DEC-047。 |
 | invite.compose（Platform） | 複合邀請 | Invite intent：開指定 SAM → **放大畫布** → 詢問入座（完整 protocol）；可選 Roster signal。場殼持 API key 可鑄。見 DEC-047。 |
+| 場邀請 E2E MVP（五子棋） | 邀請 E2E／`gomoku.v1` | 以型錄 **`pg-gomoku`** 跑通「註冊 Host 鑄 Invite → 未註冊 Guest 短連結入座 → 對弈」；示範協議 `gomoku.v1`（非 brainstorm 狗糧當產品敘事）。見 [PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)、DEC-047／045／023。 |
 | 放大畫布（遊樂場） | 放大畫布／`maximizePreview` | 場殼把 SAM 畫布放到主工作面（`previewMaximized`）；`?open=`／型錄開啟成功後常用。**不是**瀏覽器全螢幕。見 DEC-025／047。 |
-| Platform access token | access token／後台 session | 後台 UI（`dash`）登入後呼叫帳號／金鑰／admin API 的憑證（SSO 換發）。**≠** API key；**不**給場殼。見 DEC-047、[PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md) §5。 |
-| PLAYGROUNDS_API_KEY | Playgrounds API key（SecretStore） | SecretStore **保留 binding 名**：場內持有 Platform **API key**（`pg_sk_…`）；`env.secrets.PLAYGROUNDS_API_KEY.get()`。**僅遊樂場殼頁**用於 Invite／signal 等場 API。明文由 Platform 後台建立時顯示一次，再由使用者寫入密鑰庫。永不進 `.sam`。**不是**後台登入憑證。見 DEC-029／047。 |
+| Platform access token | access token／後台 session | 後台 UI（`dash`）登入後呼叫帳號／通行證／admin API 的憑證（SSO 換發）。**≠** API key；**不**給場殼。見 DEC-047、[PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md) §5。 |
+| Platform field API key | 場用 API key／通行證（`pg_sk_…`） | 每帳號至多 1 把；**僅遊樂場殼頁記憶體**；經後台「登入我的遊樂場」→ 短命 **provision** redeem 取得。每次入場輪替（單席）。用於殼代理鑄 Invite／signal。**∉ SecretStore**、**不**掛 `env.secrets.*`、**不**進 URL／`.sam`。**不是**後台登入憑證。對讀者可稱「通行證」。見 DEC-047、DASH-SPEC §5／§6.2。 |
+| Platform provision | provision／`#pg_provision=` | 短命、單次 token：後台→場殼交接場用 API key。Deep link **只**帶 provision，**永不**帶 `pg_sk_`。Redeem 後作廢。**≠** `#pg=` 場 Invite。見 DEC-047、DASH-SPEC §7.0。 |
+| Platform 點數 | 點數／credits | 註冊帳號餘額；有營運成本的備援（首項＝官方 TURN）按實際消耗扣點。**非**訂閱制。扣點掛 **Host**；Guest 無帳號不持點。見 [PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)。 |
+| 官方 TURN（Platform） | hosted TURN／連線轉發 | Platform 簽發短命 TURN credentials；admin 開通＋點數。建 peer 時殼**自動**納入；**Host／Guest 人機不分辨**直連 vs relay。資料面權威仍在 peer；**不**經 signaling 中繼 session。見 DEC-045／[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)／[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md) §3.1。 |
+| 自備 TURN（否決） | — | 使用者自填 TURN URI／credential。**非產品路徑**（UX 過差）；DEC-045／047 否決。跨網備援僅官方 TURN。 |
+| PLAYGROUNDS_API_KEY（廢止主路徑） | （舊）SecretStore 保留名 | **曾**為場內持 Platform API key 的 SecretStore binding。契約改為記憶體＋provision 後**不得**再作為主路徑；實作債務須汰除。BYOK 仍走 SecretStore（DEC-029），名稱自選、非此保留名語意。 |
 | Host 本地面／殼面（遊樂場後端） | HOST local｜shell | 本地面＝Runtime 內儲存／純資料；殼面＝終端 UI 指令（執行期不得再打 Runtime 權威儲存完成該指令）。見 DEC-038、SPEC §6。 |
 | Host Proxy／RPC（遊樂場後端） | 殼面終端通道 | Runtime→殼的殼面方法通道。**不是**整包 HOST 一律 RPC；**禁止**矛盾迴路（後端→殼→後端權威）。見 DEC-038。 |
 | UI←網路→後端（遊樂場 SAM） | UI 只經網路打後端 | 模擬 UI←網路→（`functions.js`∥`controller.js`）↔resources。畫布只打 `/api`→`functions.js`；不直連 Controller／bindings。見 AGENT-MODEL 規格、DEC-031。 |
@@ -108,7 +114,7 @@
 | sam-runtime | sam-runtime | 可攜 SAM 實例 runtime（`src/sam-runtime/`）：載入 Controller／Infrastructure、排程、多實例；與 DOM／OPFS 解耦。 |
 | headless host（SAM） | headless host | 不渲染 UI 的宿主（如 Node `src/sam-host/node/`）；可同時跑多個 `SamInstance`。 |
 | 沙盒包裹（遊樂場） | 沙盒包裹 | 匯入／匯出整份沙盒時的檔案；副檔名 **`.sam`**（內容為 ZIP，僅便於辨識為 Playgrounds／SAM）。介面用語為「匯入／匯出沙盒」；需與一般 ZIP 區隔時才說「沙盒包裹」。**只接受 `.sam` 匯入**。預設為原始碼；可選附帶執行期狀態目錄 **`.playgrounds-state/`**（KV／DB／Secrets；見 DEC-018）。舊稱「專案包裹」。 |
-| open-from-URL／一鍵開啟（遊樂場） | 從網址開啟 | deep link：文件預設 `https://play.samkuo.me/?open=<來源>`；任意場 `https://<name>.samkuo.me/?open=`；過渡舊場 `/playgrounds/?open=`（可選 `as`／`state`／`name`／`fresh`）。匯入 `.sam` 或複製 public GitHub／GitLab；同源去重。見 DEC-025／041／042。行銷口語可稱「一鍵開 SAM 小」；**正式文件／UI 主標**用本列用詞；**無** `/sam` 短鏈。 |
+| open-from-URL／一鍵開啟（遊樂場） | 從網址開啟 | deep link：文件預設 `https://play.samkuo.me/?open=<來源>`；任意場 `https://<name>.samkuo.me/?open=`；過渡舊場 `/playgrounds/?open=`（可選 `as`／`state`／`name`／`fresh`）。匯入 `.sam` 或複製 public GitHub／GitLab；同源已安裝時詢問取代／保留。見 DEC-025／041／042。行銷口語可稱「一鍵開 SAM 小」；**正式文件／UI 主標**用本列用詞；**無** `/sam` 短鏈。 |
 | 執行期狀態（遊樂場） | 執行期狀態／Durable 狀態 | 相對沙盒原始碼樹的 side store：`env.KV`、`env.DB`（checkpoints 另存；舊 per-sandbox Secrets 已廢）。搬動 SAM（export／import／clone／HOST clone）時可顯式選擇是否一併處理；**預設不帶**。密鑰改 **SecretStore**（DEC-029），**永不**進 `.sam`。 |
 | Preview 面板（遊樂場） | 畫布 | 程式在同源 iframe 的**渲染／執行結果**（場網經 `/canvas/` SW 虛擬站台；過渡舊場仍為 `/playgrounds/canvas/`），不是靜態預覽稿，也不是 chat artifact。程式識別可仍含 `preview`。工作沙盒走原畫布。見 DEC-041／042。 |
 | Console 面板（遊樂場） | Console | 下方 dock **常駐**面板：工作沙盒畫布 `console.*`／runtime 錯誤（經 bridge `postMessage`）。預設**不**鏡像到瀏覽器 DevTools；可在「選項 → 設定」開啟。見 DEC-016／044。 |

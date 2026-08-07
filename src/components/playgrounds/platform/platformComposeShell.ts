@@ -3,8 +3,22 @@
  */
 
 export type PlatformComposeShell = {
-  openSamSource: (source: string) => Promise<void>;
+  /**
+   * Install／open compose SAM. Guest invite path should reuse an existing
+   * same-source sandbox when present (no conflict dialog; less OPFS write).
+   */
+  openSamSource: (
+    source: string,
+    opts?: { preferReuse?: boolean }
+  ) => Promise<void>;
   maximizePreview: () => void;
+  /**
+   * Consumer play surface (same as `view=canvas` try-play): maximize canvas and
+   * keep IDE chrome hidden until「看原始碼」.
+   */
+  enterTryPlayCanvas?: () => void;
+  /** Current work-canvas sandbox id (for seating human-visible preview). */
+  getActiveSandboxId?: () => string | null;
 };
 
 let shell: PlatformComposeShell | null = null;

@@ -15,6 +15,7 @@ Reader-facing narrative stays personal／non-product (blog DEC-004).
 ## UI／UX（硬）
 
 - **禁止瀏覽器原生 Dialog：** 不得使用 `alert`／`confirm`／`prompt`（或同等）向使用者確認或索取文字；一律用頁內 UI（確認面、表單、flash／toast）。見 `.cursor/rules/no-native-dialogs.mdc`。
+- **Mobile-first：** 所有 UX 設計與實作以窄螢幕為先，再遞增至大螢幕；主操作／狀態在手機可用，勿靠 hover-only。見 `.cursor/rules/mobile-first-ux.mdc`。
 - **Svelte 5 runes（DEC-005）：** 本 repo 的 Svelte／SvelteKit 元件**必須**用 runes（`$state`／`$derived`／`$effect`／`$props` 等）。**禁止** legacy `export let`、`$:`、隱式 `let` 反應性。維持 `compilerOptions.runes: true`。
 
 ## Commands

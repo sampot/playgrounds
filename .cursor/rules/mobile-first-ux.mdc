@@ -1,0 +1,16 @@
+---
+description: All Playgrounds UX design is mobile-first
+alwaysApply: true
+---
+
+# Mobile-first UX
+
+**Hard rule for all Playgrounds UI/UX** (field shell, Platform dash, docs chrome, SAM surfaces, any in-app UI):
+
+- **Design and implement for the narrow viewport first**, then enhance for larger screens (`min-width` media queries / progressive disclosure). Do **not** design desktop-first and “shrink” later.
+- **Primary actions, status, and navigation must be usable on a phone** without horizontal scrolling of the main chrome, without relying on hover-only affordances, and without truncating critical labels into unrecoverable icons-only when space is tight—prefer wrap, stack, or a clear overflow menu.
+- **Touch targets:** interactive controls should be comfortably tappable (about ≥44×44px hit area where practical); avoid dense icon rows that only work with a mouse.
+- **Toolbar／header：** on small screens, keep brand + the one primary action visible; secondary controls collapse or move before clipping or overlapping.
+- **CSS：** default styles = mobile; use `@media (min-width: …)` (or container queries) to add multi-column／side-by-side layouts—not the reverse (`max-width` as the only “mobile fix” after a desktop layout).
+
+Exceptions: none for product UI. Print／devtools-only surfaces are out of scope.

@@ -23,6 +23,31 @@ function invite(
 }
 
 describe("materializeRosterInviteSeat", () => {
+  it("reuses preferReuseSandboxId without cloning", async () => {
+    const cloneProject = vi.fn();
+    const result = await materializeRosterInviteSeat(
+      invite({
+        role: "player",
+        source: "sampot/pg-gomoku",
+        protocol: {
+          protocolId: "gomoku.v1",
+          apiVersion: "1",
+          roles: ["host", "player"],
+        },
+      }),
+      {
+        resolve: async () => [],
+        preferReuseSandboxId: "work-canvas-1",
+        cloneProject: cloneProject as never,
+        createProject: vi.fn() as never,
+        fetchGithub: vi.fn() as never,
+      }
+    );
+    expect(result.sandboxId).toBe("work-canvas-1");
+    expect(result.via).toBe("installed");
+    expect(cloneProject).not.toHaveBeenCalled();
+  });
+
   it("clones installed candidate", async () => {
     const cloneProject = vi.fn(async () => ({
       id: "clone-1",

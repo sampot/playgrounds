@@ -310,6 +310,21 @@ describe("SessionRuntime", () => {
     expect(seen[1]).toMatchObject({ seq: 2, event: { type: "b" } });
   });
 
+  it("can publish session.closed before close for remote fanout", () => {
+    const rt = setup();
+    rt.open("host-1", protocol);
+    const seen: unknown[] = [];
+    rt.setAfterPublish(items => {
+      for (const item of items) seen.push(item.event);
+    });
+    rt.publishEvents([{ type: "session.closed", reason: "host_closed" }]);
+    expect(seen).toEqual([
+      { type: "session.closed", reason: "host_closed" },
+    ]);
+    rt.close();
+    expect(rt.getSession()).toBeNull();
+  });
+
   it("defaults via to apply when omitted", () => {
     const rt = setup();
     rt.open("host-1", { ...protocol, joinPolicy: "invite_only" });

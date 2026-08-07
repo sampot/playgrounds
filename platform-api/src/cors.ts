@@ -4,7 +4,7 @@ export function corsHeaders(req: Request): HeadersInit {
   const origin = req.headers.get("Origin") || "";
   const allow = ALLOWED_ORIGIN.test(origin) ? origin : "";
   const h: Record<string, string> = {
-    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Authorization, Content-Type",
     "Access-Control-Max-Age": "86400",
   };

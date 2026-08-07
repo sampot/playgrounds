@@ -443,6 +443,11 @@ function ensureWorker(): Promise<void> {
   return ready;
 }
 
+/** Ensure the Runtime Worker exists (for Safari OPFS writes without full Leader bootstrap). */
+export async function ensureBackendRuntimeWorker(): Promise<void> {
+  await ensureWorker();
+}
+
 /** Start Runtime for the Leader tab (idempotent). */
 export async function startBackendRuntime(epoch: number): Promise<void> {
   leaderEpoch = epoch;

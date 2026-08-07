@@ -467,8 +467,8 @@
 - **Decision:**
   - **方案 A：** query 契約固定 **`?open=<url-encoded 來源>`**（**不**另設 `/sam` 短鏈）；遊樂場 boot 時解析一次，成功後清除 `open`／`as`／`name`／`state`／`fresh`／`view`。**文件預設絕對 URL**＝`https://play.samkuo.me/?open=…`（根路徑；DEC-042）；任意場為 `https://<name>.samkuo.me/?open=…`；過渡舊場仍為 `/playgrounds/?open=…`。
   - **辨型：** 路徑以 **`.sam`** 結尾的 http(s) URL → 沙盒包裹 `fetch`（GitHub／GitLab blob／raw 改寫為 raw）；GitHub URL 或 `owner/repo` → GitHub 複製；**GitLab.com** URL → GitLab 複製；無法辨型則錯誤提示。
-  - **選用參數：** `as=work|tool|agent`（預設 work）；`state=ask|none`；`name=`；`fresh=1` 強制新建；**`view=canvas`**＝開啟後放大畫布（`maximizePreview`；型錄「分享」連結用；一鍵開不加此參數）。
-  - **同源去重：** 正規化 `meta.source` 與本次來源；命中則重用本機專案並套用 `as=`（除非 `fresh=1`）。
+  - **選用參數：** `as=work|tool|agent`（預設 work）；`state=ask|none`；`name=`；`fresh=1` 強制新建（略過衝突詢問）；**`view=canvas`**＝開啟後放大畫布（`maximizePreview`；型錄「分享」連結用；一鍵開不加此參數）。
+  - **同源衝突：** 正規化 `meta.source` 與本次來源；命中則以頁內對話詢問「取代」或「保留」（取消則中止）。**取代**＝先完整清空既有沙盒（等同刪除：OPFS 遞迴移除＋該沙盒 KV／DB／checkpoint），再以**相同沙盒 id**重新安裝（非單純檔案覆蓋）；**保留**＝另建新沙盒 id、既有不動。`fresh=1` 略過詢問、一律新建。
   - **角色：** `agent` 需 `controller.js`，否則降級為工作沙盒並提示；`tool` 另確保 host 工作沙盒後掛 Editor 槽（不把 toolId 當 `openProject`）。
   - **網路：** 瀏覽器直連；**.sam 宿主須開放 CORS**；**不**做站內通用 proxy（對齊 DEC-016）。
   - UI：**複製開啟連結**；專案對話「立即開啟」。
@@ -480,6 +480,7 @@
 - **Revision（2026-08-05）：** 正式絕對 URL 初訂 `playgrounds.samkuo.me/?open=`（DEC-041）。
 - **Revision（2026-08-05）：** 文件預設改 `play.samkuo.me/?open=`；場網 `*.samkuo.me`（DEC-042）；query 契約不變。
 - **Revision（2026-08-06）：** 選用 `view=canvas`：分享給一般接收者時放大畫布；型錄「一鍵開」仍為預設殼面。
+- **Revision（2026-08-07）：** 同源已安裝改為詢問「取代／保留」，不再靜默重用；`fresh=1` 略過詢問。**取代**＝完整清空後同 id 重裝（非檔案覆蓋）。
 
 ### DEC-026: Playgrounds Agent context hygiene
 
@@ -869,7 +870,7 @@
   5. **Signaling（硬約束）：** 伺服器（或 OOB 貼上）**只**用來完成**一次** WebRTC **offer／answer**（每握手槽恰好 **1× offer**＋**1× answer**）。採 **非 trickle**（ICE 收進後再發布；**無** candidate 訊息）。該槽用完／失敗／TTL → **銷槽**；拒再寫。需重連該 peer → **新握手**。**已有可用 PeerConnection 的對端 → 重用，不再經 signaling**（Platform Invite 同此；見 [DEC-047](#dec-047-playgrounds-platform-api)）。**禁止**經 signaling：DataChannel 流量、presence 心跳、session／mailbox／FS、Avatar 投影流量、renegotiation、同一槽第二輪 offer／answer。多人加入時可有多個握手槽（可串行）；**不得**把「一次一握手」解釋成「全場只能一 peer」。
   6. **壓縮載荷（硬約束）：** 交換的不是完整原始 SDP 字串。雙方依**固定樣板**重建 SDP：先剪裁／抽取必要欄位（如 fingerprint、ICE ufrag／pwd、精簡 candidates），再編碼進樣板 payload。**交換方式＝QR 或文字**（複製／貼上）二選一，**同等一等**；同一壓縮字串可顯示為 QR 或純文字。載荷須小到**單張 QR 仍易掃**（過大則失敗提示，勿默認多碼拼圖）。薄 rendezvous（[DEC-047](#dec-047-playgrounds-platform-api)）若存在，亦用同一格式；Platform 路徑時序／誰出 offer 見該決策。
   7. **同區網選項：** 使用者可宣告 **peers 位於同一區網（LAN）**。此模式下 offer／answer **可進一步剪裁**（例如只帶 host／link-local candidates、略過需公網 STUN／relay 的候選；細節以樣板版號為準）。載荷須標明此模式，雙方一致解碼。誤選則連線可能失敗——應提示可改「一般／跨網」重發，勿默默升格加 candidates 走第二輪 signaling。
-  8. **資料面：** 連上後只走 WebRTC（一般模式可用 STUN；TURN 預設不做，可選使用者自備）。同區網模式可不依賴公網 STUN。Avatar 投影與對端通訊走同一 DataChannel（或同 peer 上約定之 channel），**不**經 signaling 伺服器。
+  8. **資料面：** 連上後只走 WebRTC（一般模式可用 STUN）。**不支援使用者自備 TURN**（產品不提供填 TURN URI／credential／SecretStore 接 TURN 的路徑——UX 過差）。**預設不做**營運 TURN；若日後需要跨網備援，**僅**經 Platform **官方 TURN**（admin 開通＋點數制；見 [PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)）。有權時殼**自動**附 TURN credentials；**Host／Guest 人機不分辨**直連 vs relay（對齊五子棋 E2E）。同區網模式可不依賴公網 STUN。Avatar 投影與對端通訊走同一 DataChannel（或同 peer 上約定之 channel），**不**經 signaling 伺服器。
   9. **Session（不特規 Avatar）：** 遠端入座沿用 **DEC-023** 同一套邀請／協定閘／`joinPolicy`——**不**為 Avatar 另建協定系統。邀請附**完整 protocol 規格**；接收場以型錄為虛擬可用集合、**lazy install** 兌現相容 SAM（類比 virtual actor／dehibernate）。Avatar 只負責本場投影呈現（化身卡片可顯示邀請）與 Roster DataChannel 橋；本場看到的參與者是 Avatar 投影，執行／權威仍在對方 homePeer。落地前 DEC-023 本地範圍不變；遠端橋見計劃 Phase 3。
   10. **Rate limit：** signaling 必須可限流（IP／碼／TTL）；可疊 CF zone path 規則。
   11. **敘事：** DEC-004——場與人串連，非多租戶協作 SaaS。
@@ -882,7 +883,9 @@
   - 勿把 Avatar 塞進總管 tab 或 Files 樹；勿預設外站頭像 CDN。
   - 勿把完整 SDP 原文塞進 QR／文字交換；勿以多張 QR 拼圖當預設 UX；勿只做 QR 不做文字（或相反）。
   - 勿在同區網失敗後經同一房補 candidates／重談；改新邀請或改模式。
-  - 勿預設營運 TURN 或把 session／Avatar 真相放上 Workers／DO／R2。
+  - 勿預設免費無限營運 TURN；勿把 session／Avatar 真相放上 Workers／DO／R2。
+  - **勿**做自備 TURN（殼設定貼 URI／帳密、SecretStore 長期存 TURN、教使用者自架 coturn 當產品路徑）。
+  - 官方 TURN／點數見 [PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)；未落地前跨網可能連不上＝已知限制。
   - 勿把「每槽一次握手」寫成全場只能一個 peer；多 peer 為需求，單 peer 僅過渡實作缺口。
   - 同步 [GLOSSARY.md](./GLOSSARY.md)、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)；遠端座位落地時修訂 DEC-023。
 - **Revision（2026-08-05）：** 場主 UX＝左側 **Avatars** tab（並列 Files／總管）；頭像預設 identicon。
@@ -902,6 +905,8 @@
 - **Revision（2026-08-05）：** Phase 4.2：化身 tab 相機即時掃 QR（邀請／回覆）；檔案上傳掃碼仍可用。
 - **Revision（2026-08-06）：** 可選薄 rendezvous／會議邀請深鏈改由 [DEC-047](#dec-047-playgrounds-platform-api) Platform Invite／signal 承載；本筆硬約束不變。
 - **Revision（2026-08-06）：** 明確 **多 peer** 為需求；「一次一握手」≠「只能一 peer」。Platform Ticket 路徑 O／A 角色見 DEC-047。
+- **Revision（2026-08-07）：** **否決自備 TURN**（非產品路徑）；預設仍無營運 TURN；跨網備援僅未來官方 TURN＋點數（[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)）。
+- **Revision（2026-08-07）：** 官方 TURN 對人透明（自動納入 ICE；Host／Guest 不分辨直連／relay）；有權 Host 之場邀請 E2E（五子棋）在無法直連時仍須能連。
 
 
 ### DEC-046: Playgrounds 型錄結構化資料與查詢面
@@ -926,7 +931,7 @@
 
 ### DEC-047: Playgrounds Platform API
 
-- **Status:** Draft（2026-08-06；契約；見 [PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)）
+- **Status:** Draft（2026-08-07；契約；見 [PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)、[PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md)）
 - **Context:** Roster 需要可選薄 rendezvous，且近程要支援「一條邀請連結 → 開 SAM → 放大畫布 → 詢問入座」、**多人共用同一連結**。邀請者預產 offer 無法優雅服務多人；須對齊 DEC-045（每輪 1× O／A、無資料面中繼；**Roster 可同時多 peer**）、DEC-042、DEC-023／025／029，且避免做成協作 SaaS（DEC-004）。
 - **Decision:**
   1. **獨立服務：** Cloudflare Workers 上的 **Playgrounds Platform API**＋後台；**不**併進場殼 Worker。**`api.samkuo.me`**＝API；**`dash.samkuo.me`**＝後台 UI（同 Worker custom domain 別名）。
@@ -934,15 +939,15 @@
   3. **Ticket 路徑 signaling（僅 Platform）：** 鑄 Invite 時**不**帶 offer。**加入者**提交 offer，**同一邏輯回合** long-poll 等 answer；**邀請者（session host）**排隊串行作答。同時僅一筆 WebRTC handshake；忙線＝**排隊**。Host 離線 → 需新連線者超時（預期）。**若雙方已有可用 PeerConnection → 重用該連線，不跑 signaling**（signaling **僅**尚未連線或既有 peer 不可用時）。OOB `#roster=`／QR／文字 **不變**（仍發起者 offer）。Wire／非 trickle／每輪 1× O／A 不變；禁止對已連線 peer 經 Platform renegotiation。
   4. **與 Roster：** Platform **串行發握手**（僅未連線）；連上後 Roster **並行持多 peer**（見 DEC-045）。
   5. **深鏈與短連結：** `#pg=<invite>`（hash）；**`/i/<short_id>`** → 302（canonical 在 `api`）；**QR 預設短連結**。
-  6. **身分：** 註冊邀請制；Social SSO（**GitHub 必做、Google 次做**；見 [PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md)）；不存密碼；可 MFA。SSO → **access token**（後台 session）。Bootstrap：一次性 **`ADMIN_BOOTSTRAP_TOKEN`**。
-  7. **API key：** 每帳號最多 1 把；僅建立時顯示；**專供遊樂場殼頁**（SecretStore **`PLAYGROUNDS_API_KEY`**）鑄 Invite／signal。**後台 UI 登入後呼叫 API 使用 access token，不用 API key。**
+  6. **身分：** 註冊邀請制；Social SSO（**GitHub 必做、Google 次做**；見 [PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md)）；不存密碼；可 MFA。SSO → **access token**（後台 session）。Bootstrap：一次性 **`ADMIN_BOOTSTRAP_TOKEN`**。**不做場內 SSO** 發放場憑證。
+  7. **API key／Host 入場：** 每帳號最多 1 把場用 API key；**僅遊樂場殼頁記憶體**（經 dash「登入我的遊樂場」→ 短命 **provision** redeem；**URL 永不帶 `pg_sk_`**）。每次入場 **輪替**（單席，避免共用）。**∉ SecretStore**（DEC-029 專供 BYOK）。**後台 UI 登入後呼叫 API 使用 access token，不用 API key。**
   8. **呈現：** 放大＝**`maximizePreview`（放大畫布）**，非瀏覽器全螢幕。
-  9. **後台 UI：** 權威規格 [PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md)（品牌對齊場殼；`dash.samkuo.me`）。**統一進入介面**；登入後依角色顯示（user＝金鑰管理；admin＝金鑰＋營運）；一般使用者不可見管理者專用 UI。**場邀請短網址由 SAM 經場殼代理呼叫 API 取得；後台不鑄場 Invite。**
-  10. **非目標：** 資料面中繼、trickle、預設 TURN、公開自助註冊、平行多 handshake、通用縮址。
+  9. **後台 UI：** 權威規格 [PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md)（品牌對齊場殼；`dash.samkuo.me`）。**統一進入介面**；登入後依角色顯示；**Host 主要入口**＝「登入我的遊樂場」（可設預設遊樂場網址）。**場邀請短網址由 SAM 經場殼代理呼叫 API 取得；後台不鑄場 Invite。**
+  10. **非目標：** 資料面中繼、trickle、**預設**／免費無限 TURN、**使用者自備 TURN**（對齊 DEC-045）、公開自助註冊、平行多 handshake、通用縮址、場內 SSO、以 SecretStore 存放 Platform API key、deep link 承載 `pg_sk_`。官方 TURN＋點數制另見 [PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（**訂閱制**非目標）。
   - 階段見 [PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)。
 - **Consequences:**
   - 勿把 Platform 做成聊天室或 ICE trickle 匯流排；勿為每個場 name 建租戶。
-  - 勿混淆 Platform 註冊邀請與場 Invite／`#roster=`；勿要求接收者註冊才能加入。
+  - 勿混淆 Platform 註冊邀請與場 Invite／`#roster=`／`#pg_provision=`；勿要求接收者註冊才能加入。
   - 勿在 Ticket 路徑讓邀請者預產 offer；勿用忙線踢人取代排隊。
   - 勿對已連線的 peer 再走 Platform O／A／renegotiation；已連線則重用。
   - 勿把「同時僅一 handshake」誤寫成「Roster 只能一 peer」。
@@ -950,7 +955,8 @@
   - `dash`／`api` 為場網保留名；短連結 canonical 在 api，後台在 dash。
   - 後台勿用產品／SaaS 控制台腔（DEC-004）；SSO 供應商以 DASH-SPEC 為準，勿默認任意 IdP。
   - **勿**把使用者場邀請入口做在 `dash`；勿讓 SAM 繞過殼代理直接暴露 API key。
-  - **勿**以後台 access token 當場殼憑證；**勿**以 API key 當後台常態 session（過渡債務須汰除）。
+  - **勿**以後台 access token 當場殼憑證；**勿**以 API key 當後台常態 session。
+  - **勿**把 Platform API key 寫入 SecretStore 或教使用者手動貼上；**勿**在 URL 放 `pg_sk_`。
   - 同步 GLOSSARY、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)、[PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md)。
 - **Revision（2026-08-06）：** 初版 Draft。
 - **Revision（2026-08-06）：** 短連結 `/i/`；QR 預設短 URL。
@@ -964,7 +970,8 @@
 - **Revision（2026-08-06）：** 後台統一進入；依角色顯示；user 不見營運 UI。
 - **Revision（2026-08-06）：** 後台＝access token；API key＝僅場殼。
 - **Revision（2026-08-06）：** 移除後台 API key 登入過渡；進入僅 GitHub SSO。
-
+- **Revision（2026-08-07）：** Host 入場＝dash provision → 場殼記憶體 API key；∉ SecretStore；單席輪替；不做場內 SSO。
+- **Revision（2026-08-07）：** 非目標明示**自備 TURN**（與 DEC-045 對齊）；官方 TURN／點數指向 CREDITS 計劃。
 
 ### DEC-048: Playgrounds 宿主 SvelteKit 靜態 PWA
 
@@ -1029,6 +1036,8 @@
 | [PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md) | 跨場 Roster／Avatar／薄 signaling（DEC-045） |
 | [PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md) | Platform API／Ticket／signal／後台（DEC-047 Draft） |
 | [PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md) | Platform 後台 UI 規格（`dash.samkuo.me`；DEC-047） |
+| [PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md) | Platform 點數制與官方 TURN（Draft；非訂閱；**否決**自備 TURN） |
+| [PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md) | 場邀請 E2E MVP（載體五子棋／`gomoku.v1`；DEC-047／045／023） |
 | [PG-STANDALONE-PLAN.md](./PG-STANDALONE-PLAN.md) | 場網／Workers／開源／舊場暫留（DEC-041／042） |
 | [PG-CATALOG-PLAN.md](./PG-CATALOG-PLAN.md) | 小品型錄 YAML／PR 投稿（`catalog/entries/`） |
 | [PG-CATALOG-QUERY-PLAN.md](./PG-CATALOG-QUERY-PLAN.md) | 型錄結構化 JSON＋Playgrounds 查詢／lazy install（DEC-046 Draft） |

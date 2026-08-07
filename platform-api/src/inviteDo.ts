@@ -105,6 +105,24 @@ export class InviteDurableObject extends DurableObject {
         return json({ join_cap: joinCap, join_id: joinId });
       }
 
+      if (request.method === "POST" && path === "/validate-join") {
+        const body = (await request.json()) as { joinCap: string };
+        const hash = await sha256Hex(body.joinCap);
+        const joinId = rec.joins[hash];
+        if (!joinId) {
+          return json({ error: "invalid_join_cap" }, 403);
+        }
+        if (!inviteOpen(rec, Date.now())) {
+          return json({ error: "invite_expired_or_revoked" }, 410);
+        }
+        return json({
+          ok: true,
+          ownerUserId: rec.ownerUserId,
+          joinId,
+          inviteId: rec.inviteId,
+        });
+      }
+
       if (request.method === "POST" && path === "/signal/offer") {
         const body = (await request.json()) as {
           joinCap: string;

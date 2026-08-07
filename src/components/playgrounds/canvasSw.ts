@@ -36,6 +36,11 @@ import {
   isShellSessionApiPath,
   type ShellSessionHttpHandlers,
 } from "./shellSessionHttp";
+import {
+  handleShellPlatformHttp,
+  isShellPlatformApiPath,
+  type ShellPlatformHttpHandlers,
+} from "./shellPlatformHttp";
 import type { FileMap } from "./projectTypes";
 
 const SESSION_PROBE_PATH = /\/api\/session\/(?:seat|channel|state)\/?$/i;
@@ -105,6 +110,10 @@ export interface CanvasApiHandlerContext {
    * Domain UX stays in the Host SAM; shell only exposes the channel.
    */
   shellSessionHttp?: ShellSessionHttpHandlers;
+  /**
+   * Platform invite mint for Host work-canvas SAMs (DEC-047／PG-INVITE-E2E-MVP).
+   */
+  shellPlatformHttp?: ShellPlatformHttpHandlers;
   /**
    * When Host ≠ work sandbox (coding-orchestration: steward Host), session
    * protocol routes live in that Host's functions.js — do not short-circuit
@@ -396,6 +405,22 @@ async function handleCanvasApiMessage(
       const response = await handleShellSessionHttp(
         request,
         ctx.shellSessionHttp
+      );
+      const serialized = await serializeResponse(response);
+      replyApi(port, data.requestId, { response: serialized });
+      return;
+    }
+
+    // Host work project → Platform invite mint (answer loop via invite shell).
+    if (
+      ctx.shellPlatformHttp &&
+      workId &&
+      requestSandboxId === workId &&
+      isShellPlatformApiPath(reqUrl.pathname)
+    ) {
+      const response = await handleShellPlatformHttp(
+        request,
+        ctx.shellPlatformHttp
       );
       const serialized = await serializeResponse(response);
       replyApi(port, data.requestId, { response: serialized });

@@ -43,6 +43,7 @@
     notifyRosterRemoteAct,
     notifyRosterHomeSeatReady,
     rosterCanInviteToSession,
+    getRosterProjectionSandboxId,
     createRosterSessionTunnelBridge,
     publishRosterRelayedSessionEvent,
     applySessionActResultFromRelay,
@@ -64,29 +65,18 @@
   import { registerSessionBridge } from "../sessionBridge";
   import {
     createJoin,
-    PLAYGROUNDS_API_KEY_SECRET,
+    fetchGuestTurnIceServers,
     postOfferAndWaitAnswer,
-    previewInvite,
     type InviteMeta,
   } from "../platform/platformClient";
   import { hostCreatePlatformInvite } from "../platform/platformHostProxy";
-  import {
-    composeNeedsMaximize,
-    composeSamSource,
-    composeSessionProtocol,
-    wantsRosterSignal,
-  } from "../platform/platformCompose";
+  import { getPlatformFieldApiKey } from "../platform/platformFieldCredential";
+  import { wantsRosterSignal } from "../platform/platformCompose";
   import { getPlatformComposeShell } from "../platform/platformComposeShell";
+  import { registerPlatformInviteShell } from "../platform/platformInviteShell";
   import { startPlatformHostAnswerLoop } from "../platform/platformHostLoop";
-  import {
-    clearPgInviteHashFromLocation,
-    parsePgInviteFromLocation,
-  } from "../platform/platformInviteUrl";
-  import {
-    getSecretPlaintext,
-    isSecretStoreUnlocked,
-  } from "../secretStore";
-
+  import { presentPlatformInviteShare } from "../platform/platformInviteShareShell";
+  import { registerPlatformGuestJoinBridge } from "../platform/platformGuestJoinBridge";
   const btn =
     "inline-flex items-center justify-center rounded-md border border-skin-line bg-skin-card px-2 py-1 text-xs font-medium text-skin-base transition hover:bg-skin-card disabled:opacity-40";
   const inputCls =
@@ -118,10 +108,11 @@
     deepLink: string;
   } | null>(null);
   let platformShortQr = $state<string | null>(null);
-  let pendingPgSecret = $state<string | null>(null);
-  let pendingPgMeta = $state<InviteMeta | null>(null);
-  let pendingComposeProtocol = $state<unknown | null>(null);
-  let pendingComposeConsent = $state(false);
+  /** After shell compose consent, auto-accept matching session_invite once. */
+  let composeConsentProtocolId = $state<string | null>(null);
+  let autoInvitedPeerId: string | null = null;
+  let unregInviteShell: (() => void) | null = null;
+  let unregGuestJoin: (() => void) | null = null;
   let avatars = $state<RosterAvatarStub[]>([]);
   let localName = $state("我");
   let peerAgentId = $state<string | null>(null);
@@ -202,7 +193,10 @@
     unsub = subscribeRosterAvatars(() => {
       avatars = listRosterAvatars();
     });
-    unsubHub = subscribeRosterSessionHub(refreshCanInvite);
+    unsubHub = subscribeRosterSessionHub(() => {
+      refreshCanInvite();
+      if (peerAgentId) maybeAutoInviteRoster(peerAgentId);
+    });
     unregTransport = registerRosterRelayTransport({
       send: (payload, to) => sendAvatarRelay(payload, to),
       getPeerAgentId: () => {
@@ -224,7 +218,26 @@
     window.addEventListener("message", onWindowMessage);
     cameraSupported = rosterCameraScanSupported();
     consumeRosterInviteHash();
-    consumePgInviteHash();
+    unregInviteShell = registerPlatformInviteShell({
+      mintAndAnswer: opts => mintPlatformInviteAndAnswer(opts),
+      getPreferSeatSandboxId: () =>
+        getPlatformComposeShell()?.getActiveSandboxId?.() ?? null,
+    });
+    // Product consent UI is shell modal; this bridge is WebRTC／入座 only.
+    unregGuestJoin = registerPlatformGuestJoinBridge({
+      setLocalDisplayName: name => {
+        localName = name.trim() || "對手";
+        persistName();
+      },
+      joinTicket: async opts => {
+        const protoId = opts.composeProtocolId?.trim();
+        if (protoId) composeConsentProtocolId = protoId;
+        error = null;
+        status = "正在與主持握手…";
+        await runPlatformTicketJoin(opts.secret, opts.meta);
+        status = "Platform 握手完成，等待入座…";
+      },
+    });
   });
 
   function consumeRosterInviteHash(): void {
@@ -248,32 +261,11 @@
     }
   }
 
-  function consumePgInviteHash(): void {
-    const parsed = parsePgInviteFromLocation({
-      hash: window.location.hash,
-      search: window.location.search,
-    });
-    if (!parsed) return;
-    clearPgInviteHashFromLocation();
-    pendingPgSecret = parsed.secret;
-    void loadPendingPgMeta();
-  }
-
-  async function loadPendingPgMeta(): Promise<void> {
-    if (!pendingPgSecret) return;
-    try {
-      pendingPgMeta = await previewInvite(pendingPgSecret);
-      status = "收到 Platform 邀請 — 確認後加入";
-    } catch (e) {
-      error =
-        e instanceof Error
-          ? `無法讀取邀請：${e.message}`
-          : `無法讀取邀請：${String(e)}`;
-      pendingPgSecret = null;
-    }
-  }
-
   onDestroy(() => {
+    unregInviteShell?.();
+    unregInviteShell = null;
+    unregGuestJoin?.();
+    unregGuestJoin = null;
     stopLiveCameraScan();
     platformHostLoop?.stop();
     platformHostLoop = null;
@@ -460,24 +452,42 @@
     error = null;
     refreshCanInvite();
 
-    if (stub.sandboxId) return;
-    try {
-      const spawned = await spawnRosterAvatarProjection({
-        agentId: data.agentId,
-        name: data.name,
-        identiconUrl: stub.identiconUrl,
-      });
-      filesByAgent.set(data.agentId, spawned.files);
-      setRosterAvatarSandboxId(data.agentId, spawned.sandboxId);
-      const el = iframeByAgent.get(data.agentId);
-      if (el) await mountAvatarIframe(data.agentId, el);
-    } catch (e) {
-      console.error("[roster avatar spawn]", e);
-      error =
-        e instanceof Error
-          ? `無法建立化身投影：${e.message}`
-          : `無法建立化身投影：${String(e)}`;
+    // Host must have a projection sandbox before sending session_invite —
+    // otherwise onRosterInviteAccepted cannot seat the peer.
+    if (!stub.sandboxId) {
+      try {
+        const spawned = await spawnRosterAvatarProjection({
+          agentId: data.agentId,
+          name: data.name,
+          identiconUrl: stub.identiconUrl,
+        });
+        filesByAgent.set(data.agentId, spawned.files);
+        setRosterAvatarSandboxId(data.agentId, spawned.sandboxId);
+        const el = iframeByAgent.get(data.agentId);
+        if (el) await mountAvatarIframe(data.agentId, el);
+      } catch (e) {
+        console.error("[roster avatar spawn]", e);
+        error =
+          e instanceof Error
+            ? `無法建立化身投影：${e.message}`
+            : `無法建立化身投影：${String(e)}`;
+        return;
+      }
     }
+    maybeAutoInviteRoster(data.agentId);
+    tryComposeAutoAccept(data.agentId);
+  }
+
+  /** Compose guest: auto-accept matching session_invite once peer id is known. */
+  function tryComposeAutoAccept(fromPeerId?: string): void {
+    if (!composeConsentProtocolId || !pendingIncoming) return;
+    if (pendingIncoming.protocol.protocolId !== composeConsentProtocolId) {
+      return;
+    }
+    const peer = fromPeerId || peerAgentId;
+    if (!peer) return;
+    composeConsentProtocolId = null;
+    void acceptIncomingInvite(peer);
   }
 
   function clearHomeSessionTunnels(): void {
@@ -495,7 +505,9 @@
     const payload = msg.payload;
     if (isSessionInvitePayload(payload)) {
       pendingIncoming = payload;
+      if (!peerAgentId) peerAgentId = msg.from;
       status = `收到 session 邀請（${payload.protocol.protocolId}）`;
+      tryComposeAutoAccept(msg.from);
       return;
     }
     if (isSessionInviteAcceptPayload(payload)) {
@@ -572,16 +584,99 @@
     postRelayToIframe(msg.from, payload);
   }
 
-  async function acceptIncomingInvite(): Promise<void> {
+  function maybeAutoInviteRoster(peerId: string): void {
+    if (autoInvitedPeerId === peerId) return;
+    if (!rosterCanInviteToSession()) return;
+    // Projection sandbox must exist before invite — host seats via this id.
+    if (!getRosterProjectionSandboxId(peerId)) return;
+    try {
+      const invite = inviteRosterAvatarToSession();
+      autoInvitedPeerId = peerId;
+      outboundInviteId = invite.inviteId;
+      outboundSessionId = invite.sessionId;
+      status = `已自動送出入座邀請（${invite.protocol.protocolId}）`;
+    } catch {
+      /* session may not be ready yet */
+    }
+  }
+
+  async function mintPlatformInviteAndAnswer(opts: {
+    kind?: string;
+    intent?: unknown;
+    ttlMs?: number;
+  }) {
+    const created = await hostCreatePlatformInvite({
+      kind: opts.kind || "invite.compose",
+      intent: opts.intent,
+      ttlMs: opts.ttlMs,
+      targetField: window.location.origin,
+    });
+    const apiKey = await readPlatformApiKey();
+    platformInvite = {
+      inviteId: created.invite_id,
+      secret: created.secret,
+      shortUrl: created.short_url,
+      deepLink: created.deep_link,
+    };
+    platformHostLoop?.stop();
+    platformHostLoop = startPlatformHostAnswerLoop({
+      inviteId: created.invite_id,
+      apiKey,
+      lan,
+      localPresence: localPresence(),
+      prepareHandlers: () => {
+        const slot: { s: RosterPeerSession | null } = { s: null };
+        return {
+          handlers: peerHandlersSlot(slot),
+          attachSession: sess => {
+            slot.s = sess;
+          },
+        };
+      },
+      onStatus: msg => {
+        status = msg;
+      },
+      onError: msg => {
+        error = friendlyError(msg);
+      },
+    });
+    status = "已建立 Platform 邀請 — 分享短網址；本機正在作答循環";
+    try {
+      platformShortQr = await encodeRosterQrPngDataUrl(created.short_url);
+    } catch {
+      platformShortQr = null;
+    }
+    presentPlatformInviteShare({
+      shortUrl: created.short_url,
+      deepLink: created.deep_link,
+      expiresAt: Number.isFinite(created.expires_at)
+        ? new Date(created.expires_at).toLocaleString("zh-Hant", {
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        : undefined,
+      kind: created.kind,
+      title: "邀請對手",
+      hint: "對手無需註冊。請保持本頁在線；入座後由主持按「開始」開局。",
+    });
+    return created;
+  }
+
+  async function acceptIncomingInvite(toPeerId?: string): Promise<void> {
     const invite = pendingIncoming;
-    if (!invite || !peerAgentId) return;
-    const peerId = peerAgentId;
+    const peerId = toPeerId || peerAgentId;
+    if (!invite || !peerId) return;
+    if (!peerAgentId) peerAgentId = peerId;
     inviteBusy = true;
     error = null;
     status = "解析型錄／安裝座位中…";
     try {
       const role = invite.role || SESSION_PARTICIPANT_DEFAULT_ROLE;
-      const seated = await materializeRosterInviteSeat(invite);
+      const preferReuseSandboxId =
+        getPlatformComposeShell()?.getActiveSandboxId?.() ?? null;
+      const seated = await materializeRosterInviteSeat(invite, {
+        preferReuseSandboxId,
+      });
       sendAvatarRelay(
         {
           kind: SESSION_INVITE_ACCEPT_KIND,
@@ -752,16 +847,13 @@
   }
 
   async function readPlatformApiKey(): Promise<string> {
-    if (!isSecretStoreUnlocked()) {
-      throw new Error("請先解鎖密鑰庫（SecretStore）");
-    }
-    try {
-      return await getSecretPlaintext(PLAYGROUNDS_API_KEY_SECRET);
-    } catch {
+    const key = getPlatformFieldApiKey();
+    if (!key) {
       throw new Error(
-        `密鑰庫沒有 ${PLAYGROUNDS_API_KEY_SECRET} — 請在後台建立 API key 後寫入密鑰庫`
+        "尚未登入遊樂場通行證 — 請按工具列「登入」"
       );
     }
+    return key;
   }
 
   async function handlePlatformMint(): Promise<void> {
@@ -769,45 +861,9 @@
     busy = true;
     persistName();
     try {
-      const created = await hostCreatePlatformInvite({
+      await mintPlatformInviteAndAnswer({
         kind: "signal.handshake",
-        targetField: window.location.host,
       });
-      const apiKey = await readPlatformApiKey();
-      platformInvite = {
-        inviteId: created.invite_id,
-        secret: created.secret,
-        shortUrl: created.short_url,
-        deepLink: created.deep_link,
-      };
-      platformHostLoop?.stop();
-      platformHostLoop = startPlatformHostAnswerLoop({
-        inviteId: created.invite_id,
-        apiKey,
-        lan,
-        localPresence: localPresence(),
-        prepareHandlers: () => {
-          const slot: { s: RosterPeerSession | null } = { s: null };
-          return {
-            handlers: peerHandlersSlot(slot),
-            attachSession: sess => {
-              slot.s = sess;
-            },
-          };
-        },
-        onStatus: msg => {
-          status = msg;
-        },
-        onError: msg => {
-          error = friendlyError(msg);
-        },
-      });
-      status = "已建立 Platform 邀請 — 分享短網址；本機正在作答循環";
-      try {
-        platformShortQr = await encodeRosterQrPngDataUrl(created.short_url);
-      } catch {
-        platformShortQr = null;
-      }
     } catch (e) {
       error = friendlyError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -847,60 +903,6 @@
     };
   }
 
-  function dismissPendingPg(): void {
-    pendingPgSecret = null;
-    pendingPgMeta = null;
-    pendingComposeProtocol = null;
-    pendingComposeConsent = false;
-  }
-
-  async function confirmPendingPgJoin(): Promise<void> {
-    if (!pendingPgSecret || !pendingPgMeta) return;
-    const meta = pendingPgMeta;
-    const secret = pendingPgSecret;
-    error = null;
-    busy = true;
-    persistName();
-    try {
-      if (meta.kind === "invite.compose") {
-        const proto = composeSessionProtocol(meta.intent);
-        pendingComposeProtocol = proto;
-        const sam = composeSamSource(meta.intent);
-        const shell = getPlatformComposeShell();
-        if (sam && shell) {
-          await shell.openSamSource(sam);
-          if (composeNeedsMaximize(meta.intent)) shell.maximizePreview();
-        }
-        if (proto) {
-          pendingComposeConsent = true;
-          status = "已開啟小品 — 請確認是否加入 session";
-          busy = false;
-          return;
-        }
-      }
-      await runPlatformTicketJoin(secret, meta);
-      dismissPendingPg();
-    } catch (e) {
-      error = friendlyError(e instanceof Error ? e.message : String(e));
-    } finally {
-      busy = false;
-    }
-  }
-
-  async function confirmComposeAndJoin(): Promise<void> {
-    if (!pendingPgSecret || !pendingPgMeta) return;
-    pendingComposeConsent = false;
-    busy = true;
-    try {
-      await runPlatformTicketJoin(pendingPgSecret, pendingPgMeta);
-      dismissPendingPg();
-    } catch (e) {
-      error = friendlyError(e instanceof Error ? e.message : String(e));
-    } finally {
-      busy = false;
-    }
-  }
-
   async function runPlatformTicketJoin(
     secret: string,
     meta: InviteMeta
@@ -913,10 +915,18 @@
     // Without stable host peer id we always signal for new joiners.
     const join = await createJoin(secret);
     const slot: { s: RosterPeerSession | null } = { s: null };
+    const iceServers = lan
+      ? undefined
+      : ((await fetchGuestTurnIceServers({
+          inviteId: meta.inviteId,
+          joinCap: join.join_cap,
+        })) ?? undefined);
     const result = await createRosterOffer({
       lan,
+      transport: "signal",
       localPresence: localPresence(),
       handlers: peerHandlersSlot(slot),
+      iceServers,
     });
     slot.s = result.session;
     const answered = await postOfferAndWaitAnswer({
@@ -937,6 +947,9 @@
   }
 
   function friendlyError(msg: string): string {
+    if (/not_provisioned|登入我的遊樂場|通行證/.test(msg)) {
+      return msg;
+    }
     if (/secret_locked|解鎖密鑰庫/.test(msg)) {
       return msg;
     }
@@ -951,6 +964,9 @@
     }
     if (/host candidate/i.test(msg) || /找不到可用/.test(msg)) {
       return "同區網模式下找不到可用連線資訊，可取消「同一區網」再試";
+    }
+    if (/ICE gathering/i.test(msg)) {
+      return "連線資訊收集逾時（可重試；同機／同網通常數秒內完成）";
     }
     if (/ICE/i.test(msg)) {
       return "連線準備逾時，請重試";
@@ -1286,8 +1302,7 @@
         Platform 邀請
       </h3>
       <p class="text-skin-base/55 m-0 text-[10px]">
-        短連結多人加入（Ticket：加入者出邀請）。需密鑰庫
-        <code class="font-mono">PLAYGROUNDS_API_KEY</code>
+        短連結多人加入。需先按工具列「登入」（經後台回到本場）。
       </p>
       <div class="flex flex-wrap gap-1">
         <button
@@ -1329,60 +1344,6 @@
         </div>
       {/if}
     </section>
-
-    {#if pendingPgSecret && pendingPgMeta}
-      <section
-        class="border-skin-line bg-skin-card space-y-2 rounded border px-2 py-2"
-      >
-        <h3 class="text-skin-base m-0 text-[11px] font-semibold">
-          Platform 邀請連結
-        </h3>
-        <p class="text-skin-base/70 m-0 text-[11px]">
-          {pendingPgMeta.kind}
-          {#if pendingPgMeta.expiresAt}
-            · 到期 {new Date(pendingPgMeta.expiresAt).toLocaleTimeString()}
-          {/if}
-        </p>
-        {#if pendingComposeConsent}
-          <p class="text-skin-base/70 m-0 text-[11px]">
-            將加入 session
-            {#if pendingComposeProtocol && typeof pendingComposeProtocol === "object" && pendingComposeProtocol && "protocolId" in pendingComposeProtocol}
-              （{(pendingComposeProtocol as { protocolId: string }).protocolId}）
-            {/if}
-            。同意後開始連線。
-          </p>
-          <div class="flex flex-wrap gap-1">
-            <button
-              type="button"
-              class={btn}
-              disabled={busy}
-              onclick={() => void confirmComposeAndJoin()}>同意入座並連線</button
-            >
-            <button
-              type="button"
-              class={btn}
-              disabled={busy}
-              onclick={dismissPendingPg}>拒絕</button
-            >
-          </div>
-        {:else}
-          <div class="flex flex-wrap gap-1">
-            <button
-              type="button"
-              class={btn}
-              disabled={busy}
-              onclick={() => void confirmPendingPgJoin()}>加入</button
-            >
-            <button
-              type="button"
-              class={btn}
-              disabled={busy}
-              onclick={dismissPendingPg}>忽略</button
-            >
-          </div>
-        {/if}
-      </section>
-    {/if}
 
     {#if pendingLinkOffer}
       <section

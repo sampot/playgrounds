@@ -30,7 +30,7 @@ curl -sS -X POST http://127.0.0.1:8787/v1/admin/bootstrap \
 
 Or use the bootstrap form on the dashboard.
 
-Response includes **`api_key`** (`pg_sk_…`, for field shell SecretStore) and **`access_token`** (`pg_at_…`, for dashboard). Account APIs (`/v1/me`, `/v1/keys`, admin) require access token; Invite／signal require API key.
+Response includes **`access_token`** (`pg_at_…`, for dashboard). Field shell API key (`pg_sk_…`) is obtained via dash **「登入我的遊樂場」** → short-lived **provision** → redeem into **shell memory** (not SecretStore). Account APIs (`/v1/me`, `/v1/field/provision`, admin) require access token; Invite／signal require API key.
 
 ### GitHub / Google SSO
 
@@ -43,6 +43,9 @@ GOOGLE_CLIENT_ID=…
 GOOGLE_CLIENT_SECRET=…
 OAUTH_STATE_SECRET=…
 ADMIN_BOOTSTRAP_TOKEN=…   # optional for first admin
+# Official TURN (Cloudflare Realtime) — required for cross-NAT relay
+TURN_KEY_ID=…
+TURN_API_TOKEN=…
 ```
 
 Production:
@@ -53,7 +56,14 @@ npx wrangler secret put GITHUB_CLIENT_SECRET
 npx wrangler secret put GOOGLE_CLIENT_ID
 npx wrangler secret put GOOGLE_CLIENT_SECRET
 npx wrangler secret put OAUTH_STATE_SECRET
+npx wrangler secret put TURN_API_TOKEN
+# TURN_KEY_ID may be wrangler var (not secret):
+# npx wrangler secret put TURN_KEY_ID
 ```
+
+Create a TURN key in Cloudflare Dashboard → Realtime → TURN. Put **Key ID** as `TURN_KEY_ID` and the API token as `TURN_API_TOKEN`.
+
+Admin opens **連線備援** + **加點** for a Host; field shell auto-mints ICE servers when entitled (Host via API key, Guest via join_cap). Without TURN secrets or entitlement, peers fall back to STUN-only.
 
 **GitHub** OAuth App callback URL:
 
@@ -89,4 +99,4 @@ npm test
 
 Invite default TTL is **5 minutes** (session already started; not a reservation).
 Short links (`/i/…`) are canonical on `api.samkuo.me`.
-Field invites are minted by the playground shell (API key), not the dashboard.
+Field invites are minted by the playground shell (in-memory API key after dash provision), not the dashboard.

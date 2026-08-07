@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { prepareFieldsForExchange } from "./rosterSdpCodec";
 import {
   ROSTER_WIRE_MAX_CHARS,
+  ROSTER_WIRE_MAX_CHARS_SIGNAL,
   decodeRosterWire,
   decodeRosterWireToSdp,
   encodeFieldsToRosterWire,
@@ -44,12 +45,25 @@ describe("rosterWire", () => {
     expect(decoded.sdp).toContain("a=ice-ufrag:AbCd");
   });
 
-  it("rejects oversized payload", () => {
+  it("rejects oversized payload under OOB QR cap", () => {
     const fields = prepareFieldsForExchange(SAMPLE_OFFER, {});
     const payload = fieldsToWirePayload(fields, { role: "offer" });
     // Blow up fingerprint field to force size.
     payload.f = "AA".repeat(8000);
     expect(() => encodeRosterWire(payload)).toThrow(/過長/);
+  });
+
+  it("Platform signal transport allows wires above OOB QR cap", () => {
+    const fields = prepareFieldsForExchange(SAMPLE_OFFER, {});
+    const payload = fieldsToWirePayload(fields, { role: "offer" });
+    // ~1.3k–2k chars: over OOB QR cap, under signal cap (short-link path).
+    payload.f = "AA".repeat(900);
+    expect(() => encodeRosterWire(payload)).toThrow(/過長/);
+    const wire = encodeRosterWire(payload, {
+      maxChars: ROSTER_WIRE_MAX_CHARS_SIGNAL,
+    });
+    expect(wire.length).toBeGreaterThan(ROSTER_WIRE_MAX_CHARS);
+    expect(wire.length).toBeLessThanOrEqual(ROSTER_WIRE_MAX_CHARS_SIGNAL);
   });
 
   it("rejects bad wire", () => {

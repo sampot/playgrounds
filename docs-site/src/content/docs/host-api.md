@@ -30,7 +30,7 @@ description: 現行 Agent 可用的 HOST 契約摘要（v1）。
 | `runCmd` / `listCmds` | WASI CLI（見 [runCmd 邊界](/host-api/run-cmd/)） |
 | `captureCanvas` | 畫布截圖（best-effort） |
 | `getSecretStoreStatus` / `listSecrets` / `listSecretNames` | 密鑰庫中繼（無值） |
-| `createPlatformInvite` / `revokePlatformInvite` | 殼代理鑄／撤場 Invite（持 `PLAYGROUNDS_API_KEY`；不回傳 key） |
+| `createPlatformInvite` / `revokePlatformInvite` | 殼代理鑄／撤場 Invite（持場殼記憶體 Platform API key；不回傳 key；無 key → `not_provisioned`） |
 | `checkpoint` / `listCheckpoints` / `restore` | target 快照 |
 | `listFleetSummary` / `getAgentUi` / `setAgentUi` | 艦隊觀測／顯示標註 |
 

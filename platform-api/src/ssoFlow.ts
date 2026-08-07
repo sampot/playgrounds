@@ -178,9 +178,6 @@ export async function completeSsoIntent(opts: {
     if (!claimed.ok) return fail(claimed.error);
     const linked = await linkSso(store, claimed.userId, subject);
     if (!linked.ok) return fail(linked.error);
-    await store.put(`reveal:user:${claimed.userId}`, claimed.apiKey, {
-      expirationTtl: 600,
-    });
     return success(
       claimed.accessToken,
       claimed.accessTokenExpiresAt,

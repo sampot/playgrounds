@@ -1,5 +1,6 @@
 import {
   claimRegistrationInvite,
+  createFieldProvision,
   deleteApiKey,
   deleteSecretMapping,
   deleteUserAccount,
@@ -19,11 +20,24 @@ import {
   putApiKey,
   putRegistrationInvite,
   putShortMapping,
+  putUser,
+  redeemFieldProvision,
   revokeAccessToken,
   setUserDisabled,
   unlinkGithub,
   unlinkGoogle,
 } from "./auth.js";
+import {
+  addCredits,
+  debitTurnCredentials,
+  listCreditSessions,
+  setTurnHosted,
+  setTurnPrefer,
+  userCredits,
+  userTurnHosted,
+  userTurnPrefer,
+} from "./credits.js";
+import { generateCloudflareIceServers, turnConfigured } from "./turn.js";
 import { FAVICON_SVG } from "./faviconSvg.js";
 import { withCors } from "./cors.js";
 import {
@@ -51,11 +65,14 @@ import {
   apiKeyPlaintext,
   DASH_ORIGIN,
   DEFAULT_TARGET_FIELD,
+  defaultFieldOriginOrFallback,
   fieldDeepLink,
+  fieldProvisionDeepLink,
   inviteSecret,
   INVITE_TTL_MS,
   isApiHost,
   isDashHost,
+  normalizeFieldOrigin,
   randomId,
   requestHostname,
   shortId,
@@ -76,6 +93,10 @@ export type Env = {
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
   OAUTH_STATE_SECRET?: string;
+  /** Cloudflare Realtime TURN key id (not secret). */
+  TURN_KEY_ID?: string;
+  /** Cloudflare Realtime TURN API token (secret). */
+  TURN_API_TOKEN?: string;
 };
 
 function json(
@@ -99,6 +120,40 @@ function parseAccessCredential(req: Request): string | null {
 function inviteStub(env: Env, inviteId: string): DurableObjectStub {
   const id = env.INVITES.idFromName(inviteId);
   return env.INVITES.get(id);
+}
+
+async function mintTurnIceServers(
+  env: Env,
+  ownerUserId: string,
+  sessionId?: string
+): Promise<Response> {
+  if (!turnConfigured(env)) {
+    return json({ error: "turn_unavailable" }, 503);
+  }
+  const debit = await debitTurnCredentials(env.STORE, ownerUserId, sessionId);
+  if (!debit.ok) {
+    const status =
+        debit.error === "credits_insufficient"
+        ? 402
+        : debit.error === "turn_not_entitled" ||
+            debit.error === "turn_not_preferred"
+          ? 403
+          : debit.error === "user_disabled"
+            ? 403
+            : 404;
+    return json({ error: debit.error }, status);
+  }
+  const gen = await generateCloudflareIceServers(env);
+  if (!gen.ok) {
+    // Refund 1 credit on provider failure
+    await addCredits(env.STORE, ownerUserId, 1, "turn_mint_refund");
+    return json({ error: gen.error }, gen.status);
+  }
+  return json({
+    iceServers: gen.iceServers,
+    ttl_sec: gen.ttlSec,
+    balance: debit.balance,
+  });
 }
 
 /** Field shell: Invite / signal — API key only. */
@@ -642,6 +697,132 @@ async function route(
       key: key
         ? { prefix: key.prefix, created_at: key.createdAt }
         : null,
+      default_field_url: defaultFieldOriginOrFallback(user?.defaultFieldUrl),
+      credits: user ? userCredits(user) : 0,
+      turn_hosted: user ? userTurnHosted(user) : false,
+      turn_prefer: user ? userTurnPrefer(user) : false,
+    });
+  }
+
+  if (request.method === "GET" && pathname === "/v1/me/credits") {
+    const auth = await requireAccessToken(env, request);
+    if (!auth.ok) return auth.res;
+    const user = await getUser(env.STORE, auth.userId);
+    if (!user) return json({ error: "user_not_found" }, 404);
+    return json({
+      balance: userCredits(user),
+      turn_hosted: userTurnHosted(user),
+      turn_prefer: userTurnPrefer(user),
+    });
+  }
+
+  if (request.method === "GET" && pathname === "/v1/me/credits/sessions") {
+    const auth = await requireAccessToken(env, request);
+    if (!auth.ok) return auth.res;
+    const sessions = await listCreditSessions(env.STORE, auth.userId);
+    return json({ sessions });
+  }
+
+  // Update account preferences (default field)
+  if (request.method === "PATCH" && pathname === "/v1/me") {
+    const auth = await requireAccessToken(env, request);
+    if (!auth.ok) return auth.res;
+    const user = await getUser(env.STORE, auth.userId);
+    if (!user) return json({ error: "user_not_found" }, 404);
+    const body = (await request.json().catch(() => ({}))) as {
+      default_field_url?: string;
+      turn_prefer?: boolean;
+    };
+    if (typeof body.default_field_url === "string") {
+      const normalized = normalizeFieldOrigin(body.default_field_url);
+      if (!normalized) {
+        return json({ error: "invalid_default_field_url" }, 400);
+      }
+      user.defaultFieldUrl = normalized;
+      await putUser(env.STORE, user);
+    }
+    if (typeof body.turn_prefer === "boolean") {
+      const pref = await setTurnPrefer(
+        env.STORE,
+        auth.userId,
+        body.turn_prefer
+      );
+      if (!pref.ok) {
+        const status =
+          pref.error === "turn_not_entitled"
+            ? 403
+            : pref.error === "user_disabled"
+              ? 403
+              : 404;
+        return json({ error: pref.error }, status);
+      }
+    }
+    const fresh = await getUser(env.STORE, auth.userId);
+    return json({
+      ok: true,
+      default_field_url: defaultFieldOriginOrFallback(fresh?.defaultFieldUrl),
+      turn_hosted: fresh ? userTurnHosted(fresh) : false,
+      turn_prefer: fresh ? userTurnPrefer(fresh) : false,
+      credits: fresh ? userCredits(fresh) : 0,
+    });
+  }
+
+  // Host provision: rotate key + short-lived token (no pg_sk_ in response URL builder only)
+  if (request.method === "POST" && pathname === "/v1/field/provision") {
+    const auth = await requireAccessToken(env, request);
+    if (!auth.ok) return auth.res;
+    const user = await getUser(env.STORE, auth.userId);
+    if (!user || user.disabled) {
+      return json({ error: "forbidden" }, 403);
+    }
+    const body = (await request.json().catch(() => ({}))) as {
+      target_field?: string;
+    };
+    let fieldOrigin = defaultFieldOriginOrFallback(user.defaultFieldUrl);
+    if (typeof body.target_field === "string" && body.target_field.trim()) {
+      const normalized = normalizeFieldOrigin(body.target_field);
+      if (!normalized) {
+        return json({ error: "invalid_target_field" }, 400);
+      }
+      fieldOrigin = normalized;
+    }
+    const prov = await createFieldProvision(
+      env.STORE,
+      auth.userId,
+      auth.role
+    );
+    const fieldUrl = fieldProvisionDeepLink(fieldOrigin, prov.provisionToken);
+    return json({
+      provision_token: prov.provisionToken,
+      expires_at: prov.expiresAt,
+      field_url: fieldUrl,
+      key: { prefix: prov.keyPrefix, created_at: prov.keyCreatedAt },
+      note: "Open field_url once. API key is not in the URL; redeem on the field shell into memory.",
+    });
+  }
+
+  // Redeem provision → api_key once (field shell; no access token required)
+  if (request.method === "POST" && pathname === "/v1/field/provision/redeem") {
+    const body = (await request.json().catch(() => ({}))) as {
+      provision_token?: string;
+    };
+    const fromBody =
+      typeof body.provision_token === "string" ? body.provision_token.trim() : "";
+    const bearer = parseBearer(request);
+    const token =
+      fromBody ||
+      (bearer && bearer.startsWith("pg_pv_") ? bearer : "") ||
+      "";
+    if (!token) return json({ error: "unauthorized" }, 401);
+    const result = await redeemFieldProvision(env.STORE, token);
+    if (!result.ok) {
+      const status =
+        result.error === "expired" || result.error === "used" ? 410 : 401;
+      return json({ error: result.error }, status);
+    }
+    return json({
+      api_key: result.apiKey,
+      note: "Store in field shell memory only. Not for SecretStore.",
     });
   }
 
@@ -708,6 +889,8 @@ async function route(
           key: key
             ? { prefix: key.prefix, created_at: key.createdAt }
             : null,
+          credits: userCredits(u),
+          turn_hosted: userTurnHosted(u),
         };
       })
     );
@@ -746,7 +929,112 @@ async function route(
     });
   }
 
-  // Rotate / create field API key — access token; session unchanged
+  // Admin: add credits
+  const adminCredits = /^\/v1\/admin\/users\/([^/]+)\/credits$/.exec(pathname);
+  if (request.method === "POST" && adminCredits) {
+    const auth = await requireAccessToken(env, request);
+    if (!auth.ok) return auth.res;
+    if (auth.role !== "admin") {
+      return json({ error: "forbidden" }, 403);
+    }
+    const targetId = decodeURIComponent(adminCredits[1]!);
+    const body = (await request.json().catch(() => ({}))) as {
+      amount?: number;
+      note?: string;
+    };
+    const result = await addCredits(
+      env.STORE,
+      targetId,
+      Number(body.amount),
+      body.note
+    );
+    if (!result.ok) {
+      const status =
+        result.error === "invalid_amount"
+          ? 400
+          : result.error === "user_disabled"
+            ? 403
+            : 404;
+      return json({ error: result.error }, status);
+    }
+    return json({ ok: true, balance: result.balance });
+  }
+
+  // Admin: turn.hosted entitlement
+  const adminTurnEnt =
+    /^\/v1\/admin\/users\/([^/]+)\/entitlements\/turn\.hosted$/.exec(pathname);
+  if (request.method === "POST" && adminTurnEnt) {
+    const auth = await requireAccessToken(env, request);
+    if (!auth.ok) return auth.res;
+    if (auth.role !== "admin") {
+      return json({ error: "forbidden" }, 403);
+    }
+    const targetId = decodeURIComponent(adminTurnEnt[1]!);
+    const body = (await request.json().catch(() => ({}))) as {
+      enabled?: boolean;
+    };
+    if (typeof body.enabled !== "boolean") {
+      return json({ error: "invalid_enabled" }, 400);
+    }
+    const result = await setTurnHosted(env.STORE, targetId, body.enabled);
+    if (!result.ok) {
+      const status = result.error === "user_disabled" ? 403 : 404;
+      return json({ error: result.error }, status);
+    }
+    return json({ ok: true, turn_hosted: result.turnHosted });
+  }
+
+  // Host: mint TURN iceServers (API key)
+  if (request.method === "POST" && pathname === "/v1/field/turn/credentials") {
+    const auth = await requireApiKey(env, request);
+    if (!auth.ok) return auth.res;
+    const body = (await request.json().catch(() => ({}))) as {
+      session_id?: string;
+    };
+    return mintTurnIceServers(
+      env,
+      auth.userId,
+      typeof body.session_id === "string" ? body.session_id : undefined
+    );
+  }
+
+  // Guest: mint TURN iceServers (join_cap) — billed to invite owner
+  const guestTurn =
+    /^\/v1\/invites\/([^/]+)\/turn\/credentials$/.exec(pathname);
+  if (request.method === "POST" && guestTurn) {
+    const joinCap = parseBearer(request);
+    if (!joinCap) return json({ error: "unauthorized" }, 401);
+    const inviteId = decodeURIComponent(guestTurn[1]!);
+    const stub = inviteStub(env, inviteId);
+    const validated = await stub.fetch("https://invite/validate-join", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ joinCap }),
+    });
+    const vText = await validated.text();
+    let vData: {
+      error?: string;
+      ownerUserId?: string;
+      joinId?: string;
+    } = {};
+    try {
+      vData = vText ? JSON.parse(vText) : {};
+    } catch {
+      /* ignore */
+    }
+    if (!validated.ok) {
+      return json(
+        { error: vData.error || "invalid_join_cap" },
+        validated.status
+      );
+    }
+    if (!vData.ownerUserId) {
+      return json({ error: "invalid_join_cap" }, 403);
+    }
+    return mintTurnIceServers(env, vData.ownerUserId, vData.joinId);
+  }
+
+  // Rotate / create field API key — legacy; prefer POST /v1/field/provision
   if (request.method === "POST" && pathname === "/v1/keys") {
     const auth = await requireAccessToken(env, request);
     if (!auth.ok) return auth.res;
@@ -761,7 +1049,7 @@ async function route(
       api_key: plaintext,
       prefix: record.prefix,
       created_at: record.createdAt,
-      note: "Previous field API key revoked. Store this key in SecretStore. Dashboard session unchanged.",
+      note: "Legacy. Prefer POST /v1/field/provision — field shell memory via redeem.",
     });
   }
 
@@ -822,10 +1110,9 @@ async function route(
       {
         user_id: claimed.userId,
         role: claimed.role,
-        api_key: claimed.apiKey,
         access_token: claimed.accessToken,
         expires_at: claimed.accessTokenExpiresAt,
-        note: "Store api_key for the field shell. Dashboard uses access_token.",
+        note: "Account created. Create a field API key from the dashboard when needed.",
       },
       200,
       {

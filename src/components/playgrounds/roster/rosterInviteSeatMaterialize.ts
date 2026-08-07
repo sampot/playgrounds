@@ -55,6 +55,12 @@ export type RosterSeatMaterializeDeps = {
   fetchGithub: (ref: GithubRef) => Promise<FileMap>;
   parseGithub: (input: string) => GithubRef | null;
   getCatalogSource: (catalogId: string) => string | undefined;
+  /**
+   * Prefer seating this already-open sandbox (e.g. compose-opened work canvas)
+   * instead of cloning into a hidden participant iframe — required for human
+   * playable invites (PG-INVITE-E2E-MVP).
+   */
+  preferReuseSandboxId?: string | null;
 };
 
 const defaultDeps: RosterSeatMaterializeDeps = {
@@ -96,6 +102,27 @@ export async function materializeRosterInviteSeat(
   const d: RosterSeatMaterializeDeps = { ...defaultDeps, ...deps };
   const candidates = await d.resolve(invite);
   const role = invite.role.trim() || SESSION_PARTICIPANT_DEFAULT_ROLE;
+
+  const preferId = d.preferReuseSandboxId?.trim();
+  if (preferId) {
+    const hit = candidates.find(c => c.sandboxId?.trim() === preferId);
+    if (hit?.sandboxId) {
+      return {
+        sandboxId: hit.sandboxId,
+        name: seatName(invite, hit.title),
+        via: "installed",
+      };
+    }
+    // Compose-opened work canvas: seat the visible preview even if head probe
+    // has not yet declared protocols (human-playable invite path).
+    if (invite.source?.trim() || invite.catalogId?.trim()) {
+      return {
+        sandboxId: preferId,
+        name: seatName(invite),
+        via: "installed",
+      };
+    }
+  }
 
   const installed = candidates.find(c => c.sandboxId?.trim());
   if (installed?.sandboxId) {

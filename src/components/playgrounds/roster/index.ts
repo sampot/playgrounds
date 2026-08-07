@@ -17,6 +17,7 @@ export type {
 export {
   ROSTER_WIRE_VERSION,
   ROSTER_WIRE_MAX_CHARS,
+  ROSTER_WIRE_MAX_CHARS_SIGNAL,
   encodeSdpToRosterWire,
   encodeFieldsToRosterWire,
   decodeRosterWire,
@@ -36,6 +37,7 @@ export type {
   RosterPeerHandlers,
   RosterPresenceMsg,
   RosterAvatarRelayMsg,
+  RosterWireTransport,
 } from "./rosterPeer";
 
 export { drawIdenticon, identiconDataUrl } from "./rosterIdenticon";

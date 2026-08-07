@@ -196,10 +196,12 @@ export function rebuildSdpFromFields(
 
 export function prepareFieldsForExchange(
   sdp: string,
-  opts: { lan?: boolean }
+  opts: { lan?: boolean; keepRelay?: boolean } = {}
 ): RosterSdpFields {
   const fields = extractSdpFields(sdp);
-  let candidates = fields.candidates.filter(c => c.type !== "relay");
+  let candidates = opts.keepRelay
+    ? fields.candidates
+    : fields.candidates.filter(c => c.type !== "relay");
   if (opts.lan) {
     candidates = filterCandidatesForLan(candidates);
     if (candidates.length === 0) {
@@ -208,6 +210,17 @@ export function prepareFieldsForExchange(
         "同區網模式找不到可用的 host candidate"
       );
     }
+  }
+  // Bound wire size when keeping TURN relays (signal path has larger budget).
+  if (opts.keepRelay && candidates.length > 12) {
+    const hostSrflx = candidates.filter(
+      c => c.type === "host" || c.type === "srflx"
+    );
+    const relays = candidates.filter(c => c.type === "relay").slice(0, 6);
+    const rest = candidates.filter(
+      c => c.type !== "host" && c.type !== "srflx" && c.type !== "relay"
+    );
+    candidates = [...hostSrflx, ...relays, ...rest].slice(0, 14);
   }
   return { ...fields, candidates };
 }

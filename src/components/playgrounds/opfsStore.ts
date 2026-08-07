@@ -29,6 +29,7 @@ import {
   applySamHeadToolFields,
   projectToolFieldsFromFiles,
 } from "./samHeadProjectMeta";
+import { isTransientStorageError } from "./storageErrors";
 
 const ROOT_DIR = "playgrounds-projects";
 /** Pre-rename OPFS root; migrated into ROOT_DIR on first access. */
@@ -49,6 +50,20 @@ export function isOpfsSupported(): boolean {
     typeof navigator !== "undefined" &&
     typeof navigator.storage?.getDirectory === "function"
   );
+}
+
+/**
+ * Safari／iOS (＜Safari 26) lack window `createWritable`; OPFS writes must run
+ * in a Dedicated Worker via `createSyncAccessHandle` (Backend Runtime).
+ */
+export function mainThreadNeedsOpfsWorkerWrites(): boolean {
+  if (typeof FileSystemFileHandle === "undefined") return false;
+  const inWorker =
+    typeof self !== "undefined" &&
+    typeof (self as unknown as { importScripts?: unknown }).importScripts ===
+      "function";
+  if (inWorker) return false;
+  return typeof FileSystemFileHandle.prototype.createWritable !== "function";
 }
 
 async function directoryHasEntries(
@@ -131,7 +146,83 @@ async function ensureDir(
   return cur;
 }
 
-async function writeProjectFile(
+async function contentToBytes(
+  content: string | Uint8Array
+): Promise<Uint8Array> {
+  if (typeof content === "string") {
+    return new TextEncoder().encode(content);
+  }
+  return content;
+}
+
+async function writeBytesToFileHandle(
+  handle: FileSystemFileHandle,
+  bytes: Uint8Array
+): Promise<void> {
+  const createSync = (
+    handle as FileSystemFileHandle & {
+      createSyncAccessHandle?: () => Promise<{
+        truncate: (n: number) => void;
+        write: (buf: BufferSource, opts?: { at?: number }) => number;
+        flush: () => void;
+        close: () => void;
+      }>;
+    }
+  ).createSyncAccessHandle;
+
+  // Dedicated Worker (and Safari): SyncAccessHandle.
+  if (typeof createSync === "function") {
+    const access = await createSync.call(handle);
+    try {
+      access.truncate(0);
+      if (bytes.byteLength > 0) {
+        access.write(
+          bytes.buffer.slice(
+            bytes.byteOffset,
+            bytes.byteOffset + bytes.byteLength
+          ) as ArrayBuffer,
+          { at: 0 }
+        );
+      }
+      access.flush();
+    } finally {
+      access.close();
+    }
+    return;
+  }
+
+  // Chrome／Safari 26+ window: createWritable.
+  if (typeof handle.createWritable === "function") {
+    const writable = await handle.createWritable();
+    try {
+      if (bytes.byteLength > 0) {
+        await writable.write(
+          bytes.buffer.slice(
+            bytes.byteOffset,
+            bytes.byteOffset + bytes.byteLength
+          ) as ArrayBuffer
+        );
+      } else {
+        await writable.write(new ArrayBuffer(0));
+      }
+      await writable.close();
+    } catch (e) {
+      try {
+        await writable.abort();
+      } catch {
+        /* ignore */
+      }
+      throw e;
+    }
+    return;
+  }
+
+  throw new Error(
+    "此瀏覽器無法在目前執行緒寫入 OPFS（需 SyncAccessHandle Worker 或 createWritable）"
+  );
+}
+
+async function writeProjectFileOnce(
   dir: FileSystemDirectoryHandle,
   path: string,
   content: string | Uint8Array
@@ -141,18 +232,29 @@ async function writeProjectFile(
   const name = basename(normalized);
   const target = await ensureDir(dir, dirPath);
   const handle = await target.getFileHandle(name, { create: true });
-  const writable = await handle.createWritable();
-  if (typeof content === "string") {
-    await writable.write(content);
-  } else {
-    await writable.write(
-      content.buffer.slice(
-        content.byteOffset,
-        content.byteOffset + content.byteLength
-      ) as ArrayBuffer
-    );
+  const bytes = await contentToBytes(content);
+  await writeBytesToFileHandle(handle, bytes);
+}
+
+/** Write one file; retry brief UnknownError races common on mobile OPFS. */
+async function writeProjectFile(
+  dir: FileSystemDirectoryHandle,
+  path: string,
+  content: string | Uint8Array
+): Promise<void> {
+  const attempts = 3;
+  let last: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      await writeProjectFileOnce(dir, path, content);
+      return;
+    } catch (e) {
+      last = e;
+      if (!isTransientStorageError(e) || i === attempts - 1) throw e;
+      await new Promise(r => setTimeout(r, 40 * (i + 1)));
+    }
   }
-  await writable.close();
+  throw last;
 }
 
 async function readTextFile(

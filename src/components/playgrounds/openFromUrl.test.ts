@@ -248,6 +248,15 @@ describe("explainOpenFromUrlError", () => {
     ).toMatch(/頻率限制|公開/);
     expect(explainOpenFromUrlError(new Error("其他"), "unknown")).toBe("其他");
   });
+
+  it("explains OPFS transient / UnknownError storage failures", () => {
+    const err = new DOMException(
+      "The operation failed for an unknown transient reason (e.g. out of memory).",
+      "UnknownError"
+    );
+    expect(explainOpenFromUrlError(err, "github")).toMatch(/本機沙盒儲存/);
+    expect(explainOpenFromUrlError(err, "github")).toMatch(/無痕|掃碼|Safari/);
+  });
 });
 
 describe("beginSharedBootOpen", () => {

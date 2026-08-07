@@ -1,11 +1,11 @@
 # Playgrounds Platform API 計劃（DEC-047）
 
-> **狀態：** Phase 0 **完成**；Phase 1–4 **完成**（Signal／`#pg=`／後台／compose 場殼兌換）；Phase 5 **進行中**（GitHub＋Google SSO／access token／HOST 殼代理已落地；MFA 未）  
+> **狀態：** Phase 0 **完成**；Phase 1–4 **完成**（Signal／`#pg=`／後台／compose 場殼兌換）；Phase 5 **進行中**（GitHub＋Google SSO／access token／HOST 殼代理／**field provision＋記憶體通行證**已落地；MFA 未）  
 > **權威決策：** [DECISIONS.md](./DECISIONS.md) **DEC-047**  
 > **後台 UI 規格：** [PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md)  
-> **相關：** DEC-023（session 邀請＋完整 protocol）、DEC-025（`?open=`／放大畫布）、DEC-029（SecretStore）、DEC-042（場網／保留名 `api`）、DEC-045（Roster／薄 signaling）、DEC-046（型錄查詢）、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)、[GLOSSARY.md](./GLOSSARY.md)
+> **相關：** DEC-023（session 邀請＋完整 protocol）、DEC-025（`?open=`／放大畫布）、DEC-029（SecretStore＝**BYOK**；**不含** Platform API key）、DEC-042（場網／保留名 `api`）、DEC-045（Roster／薄 signaling）、DEC-046（型錄查詢）、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)、[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（點數／官方 TURN Draft）、[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)（代表性 E2E＝五子棋）、[GLOSSARY.md](./GLOSSARY.md)
 
-一句話：**獨立 Cloudflare Workers 上的 Platform API＋後台——以 Invite（一連結多人加入）＋短命 join capability 為中心；已有 PeerConnection 則重用；僅尚未連線時走 Ticket 路徑 signaling（加入者 offer、long-poll 等 answer、握手排隊）。Invite 預設 TTL＝5m（session 已開始後的初始動作，非預約）。近程 `invite.compose`（開 SAM、放大畫布、詢問入座）。短連結為 QR 預設。註冊邀請制＋Social SSO；後台＝access token；API key（每帳號一把）僅場殼（SecretStore 保留名）。**
+一句話：**獨立 Cloudflare Workers 上的 Platform API＋後台——以 Invite（一連結多人加入）＋短命 join capability 為中心；已有 PeerConnection 則重用；僅尚未連線時走 Ticket 路徑 signaling（加入者 offer、long-poll 等 answer、握手排隊）。Invite 預設 TTL＝5m（session 已開始後的初始動作，非預約）。近程 `invite.compose`（開 SAM、放大畫布、詢問入座）。短連結為 QR 預設。註冊邀請制＋Social SSO；後台＝access token；**Host 入場＝dash「登入我的遊樂場」→ 短命 provision → 場殼記憶體持 API key（每帳號一把、每次輪替、∉ SecretStore）**。**
 
 ---
 
@@ -25,11 +25,11 @@
 - 連上後 **Roster 可同時持有多 peer**（Platform 只負責串行發握手；見 DEC-045）。
 - 近程：`invite.compose`（SAM＋放大畫布＋完整 protocol＋consent）。
 - **短連結** `/i/<short_id>`：正式支援；**邀請 QR 預設**。
-- 身分：邀請制註冊、Social SSO、不存密碼、可要求 MFA；後台 **access token**；每帳號 API key **1** 把（僅場殼）。
+- 身分：邀請制註冊、Social SSO、不存密碼、可要求 MFA；後台 **access token**；每帳號 API key **1** 把（僅場殼**記憶體**；經 dash provision）。
 
 ## 非目標
 
-- Session／DataChannel／presence／mailbox／檔案中繼；trickle ICE；renegotiation；預設營運 TURN。
+- Session／DataChannel／presence／mailbox／檔案中繼；trickle ICE；renegotiation；**預設**／免費無限營運 TURN；**使用者自備 TURN**（DEC-045）；官方 TURN＋點數制另見 [PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（**訂閱制**非目標）。
 - 平行多筆 WebRTC handshake（忙線＝**排隊**，不是並行建 PC）。
 - 場網每 name 雲端租戶；跨 origin 自動搬 OPFS／SecretStore。
 - 平台存密碼；自助公開註冊；通用 URL 縮址。
@@ -53,13 +53,13 @@
 | 層 | 職責 |
 | --- | --- |
 | Platform API | 帳號／key／Invite／join／signal mailbox（排隊）；限流 |
-| 後台 UI（`dash`） | **統一進入**；登入後 **access token** 呼叫 API；依角色（user＝金鑰管理；admin＝＋營運）；**不**鑄場 Invite；**不以** API key 當後台 session |
-| 場殼 | 代理 SAM 呼叫 Platform（持 `PLAYGROUNDS_API_KEY`）；`#pg=` redeem、`maximizePreview`、consent；邀請者作答循環 |
+| 後台 UI（`dash`） | **統一進入**；登入後 **access token**；主 CTA「登入我的遊樂場」（provision）；依角色（user＝遊樂場／帳號；admin＝＋營運）；**不**鑄場 Invite；**不以** API key 當後台 session |
+| 場殼 | redeem provision → **記憶體**持 API key；代理 SAM 呼叫 Platform；`#pg=` redeem、`maximizePreview`、consent；邀請者作答循環 |
 | SAM | **發起**鑄場邀請（經殼代理取得 `short_url`／深鏈並呈現） |
 | Roster | **可同時多 peer**；每 peer 一條 DataChannel／Avatar |
 | Session（DEC-023） | 入座權威、protocol 閘、`act`／事件 |
 
-**一句話：** 場邀請 URL＝**SAM → 殼代理 → API**；Platform **串行發握手**；Roster **並行持連線**；後台只管帳號與金鑰。
+**一句話：** Host 入場＝**dash → provision → 場殼記憶體**；場邀請 URL＝**SAM → 殼代理 → API**；Platform **串行發握手**；Roster **並行持連線**。
 
 ---
 
@@ -70,11 +70,11 @@
 | 層 | 說明 |
 | --- | --- |
 | **Platform 帳號** | 邀請制＋**Social SSO**；**不存密碼**；可要求 **MFA**；後台持 **access token** |
-| **API key** | 每帳號最多 **1** 把；**僅遊樂場殼頁**使用（SecretStore）；後台只負責建立／輪替／撤銷 UI |
-| **Access token** | 後台 UI 登入後呼叫帳號／金鑰／admin API 的憑證；**≠** API key |
-| **SecretStore `PLAYGROUNDS_API_KEY`** | 場內持有 API key 副本（DEC-029） |
+| **API key** | 每帳號最多 **1** 把；**僅遊樂場殼頁記憶體**；經 dash「登入我的遊樂場」輪替＋provision 取得；**∉ SecretStore**；**不做場內 SSO** |
+| **Access token** | 後台 UI 登入後呼叫帳號／通行證／admin API 的憑證；**≠** API key |
+| **Provision token** | 短命、單次；deep link 交接用；redeem 後作廢；**URL 永不帶 `pg_sk_`** |
 | **Invite／`#pg=`** | 場邀請；接收者通常**無** Platform 帳號 |
-| **Platform 加入邀請** | admin 核發註冊用——**≠** 場 Invite |
+| **Platform 加入邀請** | admin 核發註冊用——**≠** 場 Invite、**≠** provision |
 
 ### Bootstrap
 
@@ -85,16 +85,19 @@
 
 | 角色 | 能力 |
 | --- | --- |
-| **user**（後台：access token；場：有效 API key） | 後台自管唯一 API key；場殼鑄 Invite／`invite.compose`／signal |
+| **user**（後台：access token；場：記憶體有效 API key） | 後台「登入我的遊樂場」／撤銷／預設場；場殼鑄 Invite／`invite.compose`／signal |
 | **admin** | 同上＋Platform 註冊邀請、停用使用者、營運（後台持 access token） |
-| **無帳號** | 僅能經 Invite 連結加入，不能鑄邀請 |
+| **無帳號** | 僅能經 Invite 連結加入，不能鑄邀請、不能 provision |
 
-### API key／SecretStore／註冊邀請
+### API key／provision／註冊邀請
 
-- API key：建立時顯示一次；伺服器只存 hash；輪替＝撤舊發新；**用途＝場殼**。
-- 場內：`env.secrets.PLAYGROUNDS_API_KEY.get()`；永不進 `.sam`。
-- 註冊：`https://dash.samkuo.me/join/<token>`（與 `#pg=` 分開）。
+- API key：伺服器只存 hash；「登入我的遊樂場」＝**輪替**（舊立刻失效＝**單席**，避免共用）；明文經 redeem **一次**進場殼記憶體。
+- 場內：**不**寫 SecretStore、**不**掛 `env.secrets.PLAYGROUNDS_API_KEY`；殼代理讀記憶體。關頁／重整＝清空。
+- Provision：TTL 建議 60–120s；單次；可選綁目標 origin。
+- 預設遊樂場網址：帳號偏好；初版允許清單＝官方 `*.samkuo.me` 場（排除保留名）；預設 `https://play.samkuo.me`。
+- 註冊：`https://dash.samkuo.me/join/<token>`（與 `#pg=`／`#pg_provision=` 分開）。
 - 後台：**不以** API key 登入或當 Bearer；僅 SSO → access token（見 DASH-SPEC §5）。
+- **廢止：** 以 SecretStore `PLAYGROUNDS_API_KEY` 為 Platform 主路徑（實作債務須汰除）。
 
 ---
 
@@ -255,10 +258,13 @@ Auth：`Authorization: Bearer <access_token|api_key|join_cap|…>`（依端點�
 
 | 方法 | 路徑 | 憑證 | 行為 |
 | --- | --- | --- | --- |
-| `GET` | `/me` | access token | 目前使用者／角色／key prefix |
+| `GET` | `/me` | access token | 目前使用者／角色／key prefix／`default_field_url` |
+| `PATCH` | `/me` | access token | 更新偏好（至少 `default_field_url`；允許清單校驗） |
 | `DELETE` | `/me` | access token | 刪除自己的帳戶（`last_admin` → 409） |
 | `DELETE` | `/me/sso/github`／`/me/sso/google` | access token | 解除 SSO（至少保留一個；`last_sso` → 409） |
-| `POST`／`DELETE` | `/keys` | access token | 輪替／撤銷場用 API key |
+| `POST` | `/field/provision` | access token | **輪替**場用 API key＋核發短命 provision；回 `provision_token`／`expires_at`／`field_url`（含 `#pg_provision=`）；**不**回 `pg_sk_` |
+| `POST` | `/field/provision/redeem` | provision token（body 或 Bearer 約定） | 單次兌換 → 回 `api_key` 一次；作廢 token；錯／過期／已用 → 4xx |
+| `DELETE` | `/keys` | access token | 撤銷場用 API key（不登出後台） |
 | `GET` | `/admin/users` | access token＋admin | 列出註冊使用者 |
 | `POST` | `/admin/users/:id/disable`／`enable` | access token＋admin | 停用／復用（不可對自己；`last_admin`） |
 | `POST` | `/admin/registration-invites` | access token＋admin | 核發註冊邀請 |
@@ -274,9 +280,11 @@ Auth：`Authorization: Bearer <access_token|api_key|join_cap|…>`（依端點�
 
 錯誤：`401`／`403`／`404`／`408`／`410`／`429`；隊列滿可視情況 `503`＋稍後自動重試（仍排隊語意）。
 
-**Rate limit：** 每 IP／每 key／每 Invite 的 join 與 offer 嘗試；可疊 CF WAF。
+**Rate limit：** 每 IP／每 key／每 Invite 的 join 與 offer 嘗試；provision redeem 嚴格限流；可疊 CF WAF。
 
-**信任域：** 後台帳號面＝**access token**；場 Invite／signal＝**API key**；join＝**join_cap**。三者勿混用用途。
+**信任域：** 後台帳號面＝**access token**；Host 交接＝**provision**；場 Invite／signal＝**API key**；join＝**join_cap**。四者勿混用用途。
+
+**廢止／過渡：** 後台 `POST /keys` 揭示明文供貼密鑰庫——改由 provision／redeem；過渡期可保留撤銷 `DELETE /keys`。
 
 ---
 
@@ -289,21 +297,23 @@ Auth：`Authorization: Bearer <access_token|api_key|join_cap|…>`（依端點�
 摘要（細節以 DASH-SPEC 為準）：
 
 1. Social SSO：**GitHub 必做、Google 次做**；（政策）MFA → **access token**。
-2. 後台登入後 API：**僅 access token**；**API key 專供場殼**。
-3. **我的 API key：** 輪替／撤銷；硬頂 1；明文僅建立／輪替／claim 時顯示；提示寫入 `PLAYGROUNDS_API_KEY`。
+2. 後台登入後 API：**僅 access token**；**API key 專供場殼記憶體**。
+3. **登入我的遊樂場：** provision（輪替＋深鏈）；單席說明；預設遊樂場網址；通行證 status／撤銷。**不**以貼 `PLAYGROUNDS_API_KEY` 為主路徑。
 4. **Admin：** Platform **註冊**邀請（`/join/<token>`）；**管理註冊使用者**（列表／停用／復用）；用量後段。帳號 tab：SSO 連結／解除（≥1）、自刪帳戶。
-5. **不鑄場 Invite**——短網址由 **SAM → 殼代理 → API**（持 API key；見 DASH-SPEC §7）。
-6. 品牌與場殼同一色票／頂欄族；DEC-004 非產品腔。
+5. **不鑄場 Invite**——短網址由 **SAM → 殼代理 → API**（持記憶體 API key；見 DASH-SPEC §7）。
+6. **不做場內 SSO。**
+7. 品牌與場殼同一色票／頂欄族；DEC-004 非產品腔。
 
 ---
 
 ## 安全與隱私
 
-- Invite 短連結、API key、access token、join_cap 視同 secret。
-- Wire：TLS；日誌截斷；handshake 槽短命。
+- Invite 短連結、API key、access token、provision token、join_cap 視同 secret。
+- Wire：TLS；日誌截斷；handshake 槽短命；**勿**把 `pg_sk_` 寫進 URL／Referer 可達處。
 - Host 必須在線作答；規格不承諾離線入座。
 - CORS：場 origin 策略文件化。
-- SecretStore：重整＝lock。
+- SecretStore（DEC-029）：仍為 BYOK；重整＝lock；**與 Platform 通行證無關**。
+- 場殼 Platform key：僅記憶體；document 卸載清空。
 
 ---
 
@@ -314,6 +324,7 @@ Auth：`Authorization: Bearer <access_token|api_key|join_cap|…>`（依端點�
 | `?open=` | 無 Platform | 開 SAM |
 | `#roster=<wire>` | 無伺服器 | OOB；**發起者 offer** |
 | `#pg=`／`/i/` | Platform Invite | **一連結多人**；Ticket 路徑 **加入者 offer** |
+| `#pg_provision=` | Platform provision | Host 通行證交接（單次）；**≠** 場 Invite |
 | `/join/<token>` | Platform | 僅註冊 SSO |
 
 ---
@@ -327,7 +338,7 @@ Auth：`Authorization: Bearer <access_token|api_key|join_cap|…>`（依端點�
 | **2. 深鏈＋短連結＋場殼** | `#pg=`／`/i/`；QR 短 URL；Roster 接上；**多 peer 並存** | 同一短連結兩人先後加入且雙方名冊可見 | **完成** |
 | **3. 後台** | API key UI；註冊邀請 claim；admin；`dash.samkuo.me`；品牌對齊場殼 | 使用者自助持 key | **完成**（claim；完整 SSO→P5） |
 | **4. invite.compose** | protocol＋開 SAM＋放大畫布＋consent | 掃短鏈可走到詢問入座 | **完成** |
-| **5.（可選）** | 完整 Social SSO（GitHub→Google）、MFA、用量、自架文件 | 見 [PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md) §9.2 | **進行中**（GitHub＋Google SSO／access token／HOST `createPlatformInvite` 已落地；MFA 未） |
+| **5.（可選）** | 完整 Social SSO（GitHub→Google）、MFA、用量、自架文件；**provision／記憶體通行證** | 見 [PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md) §9.2 | **進行中**（SSO／access token／HOST invite／**provision＋場殼記憶體**已落地；MFA 未） |
 
 ---
 
@@ -348,3 +359,4 @@ Auth：`Authorization: Bearer <access_token|api_key|join_cap|…>`（依端點�
 | 2026-08-06 | 後台＝access token；API key＝僅場殼 |
 | 2026-08-06 | 實作 access token（`pg_at_`）；帳號面／場 API 憑證分離 |
 | 2026-08-06 | 移除後台 API key 登入（`/v1/auth/token`） |
+| 2026-08-07 | **Host provision：** dash「登入我的遊樂場」→ 短命 token → 場殼記憶體 API key；∉ SecretStore；單席輪替；預設場網址；不做場內 SSO |

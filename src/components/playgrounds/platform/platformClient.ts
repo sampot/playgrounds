@@ -4,9 +4,20 @@
 
 export const DEFAULT_PLATFORM_API_ORIGIN = "https://api.samkuo.me";
 
-/** SecretStore reserved name for field-held Platform API key (DEC-047／029). */
+/** SecretStore reserved name — **deprecated** for Platform key (use shell memory). */
 export const PLAYGROUNDS_API_KEY_SECRET = "PLAYGROUNDS_API_KEY";
 
+export async function redeemFieldProvision(
+  provisionToken: string,
+  origin = platformApiOrigin()
+): Promise<{ api_key: string }> {
+  const res = await fetch(`${origin}/v1/field/provision/redeem`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ provision_token: provisionToken }),
+  });
+  return parseJson<{ api_key: string }>(res);
+}
 export function platformApiOrigin(): string {
   const fromEnv =
     typeof import.meta !== "undefined" &&
@@ -16,6 +27,45 @@ export function platformApiOrigin(): string {
     return fromEnv.trim().replace(/\/$/, "");
   }
   return DEFAULT_PLATFORM_API_ORIGIN;
+}
+
+export const DEFAULT_PLATFORM_DASH_ORIGIN = "https://dash.samkuo.me";
+
+/** Dashboard origin (field login redirect). Local wrangler：同 API origin. */
+export function platformDashOrigin(): string {
+  const fromEnv =
+    typeof import.meta !== "undefined" &&
+    (import.meta as ImportMeta & { env?: Record<string, string> }).env
+      ?.PUBLIC_PLATFORM_DASH_URL;
+  if (typeof fromEnv === "string" && fromEnv.trim()) {
+    return fromEnv.trim().replace(/\/$/, "");
+  }
+  const api = platformApiOrigin();
+  try {
+    const u = new URL(api);
+    if (u.hostname === "api.samkuo.me") return DEFAULT_PLATFORM_DASH_ORIGIN;
+    if (u.hostname === "localhost" || u.hostname === "127.0.0.1") {
+      return api;
+    }
+  } catch {
+    /* ignore */
+  }
+  return DEFAULT_PLATFORM_DASH_ORIGIN;
+}
+
+/**
+ * Redirect to dash with `?field=` so after SSO the user is provisioned back
+ * to this playground origin.
+ */
+export function platformFieldLoginUrl(
+  fieldOrigin: string = typeof location !== "undefined" ? location.origin : ""
+): string {
+  const dash = platformDashOrigin();
+  const url = new URL("/", dash.endsWith("/") ? dash : `${dash}/`);
+  if (fieldOrigin.trim()) {
+    url.searchParams.set("field", fieldOrigin.trim());
+  }
+  return url.toString();
 }
 
 export type InviteMeta = {
@@ -231,4 +281,68 @@ export async function revokePlatformInvite(opts: {
     }
   );
   await parseJson(res);
+}
+
+export type TurnIceServersResult = {
+  iceServers: RTCIceServer[];
+  ttl_sec?: number;
+  balance?: number;
+};
+
+/**
+ * Host: official TURN credentials (API key). Returns null if unavailable
+ * (not entitled, no credits, TURN not configured) — caller falls back to STUN.
+ */
+export async function fetchHostTurnIceServers(opts: {
+  apiKey: string;
+  sessionId?: string;
+  origin?: string;
+}): Promise<RTCIceServer[] | null> {
+  const origin = opts.origin ?? platformApiOrigin();
+  try {
+    const res = await fetch(`${origin}/v1/field/turn/credentials`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${opts.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(
+        opts.sessionId ? { session_id: opts.sessionId } : {}
+      ),
+    });
+    if (!res.ok) return null;
+    const data = await parseJson<TurnIceServersResult>(res);
+    return Array.isArray(data.iceServers) ? data.iceServers : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Guest: TURN credentials via join_cap (billed to Host). Soft-fail → null.
+ */
+export async function fetchGuestTurnIceServers(opts: {
+  inviteId: string;
+  joinCap: string;
+  origin?: string;
+}): Promise<RTCIceServer[] | null> {
+  const origin = opts.origin ?? platformApiOrigin();
+  try {
+    const res = await fetch(
+      `${origin}/v1/invites/${encodeURIComponent(opts.inviteId)}/turn/credentials`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${opts.joinCap}`,
+          "Content-Type": "application/json",
+        },
+        body: "{}",
+      }
+    );
+    if (!res.ok) return null;
+    const data = await parseJson<TurnIceServersResult>(res);
+    return Array.isArray(data.iceServers) ? data.iceServers : null;
+  } catch {
+    return null;
+  }
 }

@@ -1,8 +1,8 @@
 # Playgrounds 跨場 Roster／Avatar 計劃（DEC-045）
 
-> **狀態：** Phase 0–3 **已落地**；Phase 4.1–4.2 **已落地**（邀請連結＋相機掃 QR）；薄 CF rendezvous → [PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)／DEC-047；TURN 未做  
+> **狀態：** Phase 0–3 **已落地**；Phase 4.1–4.2 **已落地**（邀請連結＋相機掃 QR）；薄 CF rendezvous → [PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)／DEC-047；**否決自備 TURN**（DEC-045）；官方 TURN＋點數 → [PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（未做）  
 > **權威決策：** [DECISIONS.md](./DECISIONS.md) **DEC-045**  
-> **相關：** DEC-017（側欄 Files／總管）、DEC-023（本地 session；邀請＋protocol 規格＋型錄 lazy install）、DEC-031（peer／homePeer／virtual actor）、DEC-038（WebRTC 通道路線）、DEC-042（場網／無租戶）、DEC-046（型錄查詢）、DEC-047（Platform Invite／signal）、[GLOSSARY.md](./GLOSSARY.md)
+> **相關：** DEC-017（側欄 Files／總管）、DEC-023（本地 session；邀請＋protocol 規格＋型錄 lazy install）、DEC-031（peer／homePeer／virtual actor）、DEC-038（WebRTC 通道路線）、DEC-042（場網／無租戶）、DEC-046（型錄查詢）、DEC-047（Platform Invite／signal）、[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（點數／官方 TURN Draft；**無**自備 TURN）、[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)（場邀請 E2E＝五子棋）、[GLOSSARY.md](./GLOSSARY.md)
 
 一句話：**薄 signaling 只完成每握手槽一次經樣板壓縮的 offer／answer；連上後只走 WebRTC；Roster＝本場連線使用者名冊（可同時多 peer）；每位連線者在本場自動出現一個 Avatar（薄投影 SAM／User agent），權威與執行仍在對方 `homePeer`，經 Roster DataChannel 轉。Session 入座不為 Avatar 特規——邀請附完整 protocol 規格，遊樂場以型錄為虛擬可用集合、lazy install 兌現相容 SAM。**
 
@@ -47,7 +47,7 @@
 
 - Signaling 中繼 DataChannel／presence 心跳／session 事件／檔案（資料面只走 WebRTC peer）。
 - Trickle ICE、renegotiation、第二輪 offer／answer 走同一房。
-- 預設營運 TURN；跨 origin 自動搬 OPFS／SecretStore（DEC-042）。
+- 預設／免費無限營運 TURN；**使用者自備 TURN**（DEC-045）；跨 origin 自動搬 OPFS／SecretStore（DEC-042）。
 - 把對方沙盒 **clone** 成本場權威；把 Avatar 當成擁有對方 FS 的本機實體 agent。
 - 為 Avatar **另建**一套 session／protocol 系統（與 DEC-023 分叉）。
 - 完整 WebRTC Runtime 叢集（DEC-038 長線；本計劃先 Roster／Avatar 投影）。
@@ -81,7 +81,7 @@ layout 還原：側欄 tab 鍵 `avatars`（與 `files`／`agent` 一併 persist�
 | **樣板壓縮** | 剪裁必要欄位 → 固定樣板編碼／解碼還原 SDP；**不**傳完整原始 SDP |
 | **同區網（可選）** | 宣告 peers 同一 LAN 時，offer／answer **進一步剪裁**（載荷標明模式；雙方一致） |
 | **交換方式** | **QR** 或 **文字**（複製／貼上）同等；同一壓縮字串；可選 Platform 短連結 rendezvous |
-| **QR 尺寸** | 載荷須小到**單張 QR 易掃**；Platform 邀請 QR **預設短連結**（見 DEC-047） |
+| **QR 尺寸** | **OOB** wire 載荷須小到單張 QR 易掃（≈1200）；**Platform** 邀請 QR＝**短連結**，offer／answer wire 走 API，**不**套用 OOB QR 上限（另有 signal 上限） |
 | **用完即銷** | 該握手槽：answer 完成、失敗或 TTL → 銷槽；拒再寫 |
 | **無重談** | 需重連該 peer → **新握手**；舊槽作廢。**已連線 peer 重用**，不經 Platform／OOB 再跑 O／A（見 DEC-047） |
 | **無資料面** | 伺服器永不轉發 session／mailbox／FS／Avatar 投影流量 |
@@ -107,8 +107,8 @@ layout 還原：側欄 tab 鍵 `avatars`（與 `files`／`agent` 一併 persist�
 | **2. Presence stub＋側欄** | 連入後雙方列表＋identicon；斷線清除 | 雙方互見對方 stub（投影 SAM 前身） | **完成** |
 | **2.5. 投影 Avatar SAM** | 連上即在本場 spawn 薄投影 Avatar；卡片掛其 UI；DataChannel 轉發 | 斷線撕投影；權威仍在 homePeer | **完成** |
 | **3. Session bridge** | 遠端 invite／`act`／事件經投影轉 homePeer；**邀請附完整 protocol 規格**；型錄匹配／**lazy install**；修訂 DEC-023 遠端範圍 | 狗糧可邀遠端 Avatar 入座；與本機 Participant 同一協定閘 | **完成**（3.1 邀請＋proxy；3.2 act／事件；3.3 型錄／lazy install） |
-| **4. UX** | 開放連入／邀請連結／權限 | 非工程使用者可走完 | **進行中**（4.1 連結；**4.2** 相機掃 QR；**4.3** Platform Invite＝[計劃](./PG-PLATFORM-API-PLAN.md)；**4.4 多 peer** Platform 路徑已並存；OOB 仍單次重置；TURN 另段） |
-| **5.（可選）** | 自備 TURN；mailbox 跨 peer；自訂頭像 | 另規 | 未開始 |
+| **4. UX** | 開放連入／邀請連結／權限 | 非工程使用者可走完 | **進行中**（4.1 連結；**4.2** 相機掃 QR；**4.3** Platform Invite＝[計劃](./PG-PLATFORM-API-PLAN.md)；**4.4 多 peer** Platform 路徑已並存；OOB 仍單次重置；官方 TURN＝[點數計劃](./PG-PLATFORM-CREDITS-PLAN.md)） |
+| **5.（可選）** | mailbox 跨 peer；自訂頭像 | 另規；**不含**自備 TURN（已否決） | 未開始 |
 
 ---
 
@@ -138,3 +138,5 @@ layout 還原：側欄 tab 鍵 `avatars`（與 `files`／`agent` 一併 persist�
 | 2026-08-05 | Phase 4.2：相機即時掃邀請／回覆 QR（BarcodeDetector 或 canvas＋`qr/decode`）；檔案上傳掃碼保留 |
 | 2026-08-06 | Phase 4.3 指向 DEC-047／`PG-PLATFORM-API-PLAN.md`（Invite＋薄 signal；非本計劃內自建 CF room） |
 | 2026-08-06 | **多 peer** 升為規格需求（現單 peer＝實作缺口）；Platform：一連結多人、加入者 offer、握手排隊 |
+| 2026-08-07 | TURN 後段指向 [PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（點數制；官方 TURN opt-in） |
+| 2026-08-07 | **否決自備 TURN**（DEC-045）；Phase 5 刪自備 TURN |

@@ -1,5 +1,7 @@
 <script lang="ts">
+  import { browser } from "$app/environment";
   import { page } from "$app/state";
+  import { isConsumerPlayLanding } from "../components/playgrounds/platform/platformConsumerLanding";
   import "@styles/global.css";
 
   let { children } = $props();
@@ -13,10 +15,21 @@
     page.url.pathname.startsWith("/sam") ? ("sam" as const) : ("field" as const)
   );
   let isPage = $derived(activeNav === "sam");
+  /**
+   * Client first paint: hide host header for `#pg=`／`view=canvas`.
+   * Hash is not available to SSR — read `window` on the client only.
+   */
+  let consumerLanding = $state(
+    browser ? isConsumerPlayLanding() : false
+  );
 </script>
 
 <div
-  class={["playgrounds-page", isPage && "playgrounds-page--scroll"]
+  class={[
+    "playgrounds-page",
+    isPage && "playgrounds-page--scroll",
+    consumerLanding && "preview-maximized",
+  ]
     .filter(Boolean)
     .join(" ")}
 >

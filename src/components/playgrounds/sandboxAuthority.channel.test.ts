@@ -2,10 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { FileMap, ProjectMeta } from "./projectTypes";
 
 const isBackendRuntimeLive = vi.fn<() => boolean>(() => false);
+const ensureBackendRuntimeWorker = vi.fn<() => Promise<void>>(async () => {});
 const backendFsOp = vi.fn<(op: string, args: unknown[]) => Promise<unknown>>();
 
 vi.mock("./backendHost", () => ({
   isBackendRuntimeLive: () => isBackendRuntimeLive(),
+  ensureBackendRuntimeWorker: () => ensureBackendRuntimeWorker(),
   backendFsOp: (op: string, args: unknown[]) => backendFsOp(op, args),
 }));
 
@@ -16,6 +18,7 @@ vi.mock("./opfsStore", async importOriginal => {
   const actual = await importOriginal<typeof import("./opfsStore")>();
   return {
     ...actual,
+    mainThreadNeedsOpfsWorkerWrites: () => false,
     saveFile: (id: string, path: string, content: unknown) =>
       opfsSaveFile(id, path, content),
   };

@@ -71,12 +71,24 @@ export interface ShellSessionHttpHandlers {
   /** Invite connected Roster Avatar into the open session (DEC-045 Phase 3). */
   inviteRoster?: (opts?: {
     role?: string;
+    catalogId?: string;
+    source?: string;
   }) => Promise<{
     inviteId: string;
     sessionId: string;
     role: string;
     protocolId: string;
   }>;
+  /**
+   * Forward to Host SAM /api/session/* and publish returned events on the
+   * shell channel (needed so Roster peers see Host UI acts).
+   */
+  hostDomainFetch?: (opts: {
+    path: string;
+    method?: string;
+    headers?: Record<string, string>;
+    body?: string;
+  }) => Promise<unknown>;
 }
 
 function json(data: unknown, status = 200): Response {
@@ -230,8 +242,41 @@ export async function handleShellSessionHttp(
       }
       const body = (await request.json().catch(() => ({}))) as {
         role?: string;
+        catalogId?: string;
+        source?: string;
       };
-      return json(await handlers.inviteRoster({ role: body.role }));
+      return json(
+        await handlers.inviteRoster({
+          role: body.role,
+          catalogId: body.catalogId,
+          source: body.source,
+        })
+      );
+    }
+    if (path === `${base}/host-domain` && method === "POST") {
+      if (!handlers.hostDomainFetch) {
+        return json(
+          { error: "此殼未支援 Host domain 轉發", code: "not_found" },
+          404
+        );
+      }
+      const body = (await request.json().catch(() => null)) as {
+        path?: string;
+        method?: string;
+        headers?: Record<string, string>;
+        body?: string;
+      } | null;
+      if (!body?.path || typeof body.path !== "string") {
+        return json({ error: "缺少 path", code: "act_rejected" }, 400);
+      }
+      return json(
+        await handlers.hostDomainFetch({
+          path: body.path,
+          method: body.method,
+          headers: body.headers,
+          body: body.body,
+        })
+      );
     }
     return json({ error: "找不到路由", code: "not_found" }, 404);
   } catch (e) {

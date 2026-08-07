@@ -3,6 +3,8 @@ import {
   accessTokenPlaintext,
   apiKeyPlaintext,
   keyPrefix,
+  PROVISION_TTL_MS,
+  provisionTokenPlaintext,
   sha256Hex,
 } from "./ids.js";
 
@@ -41,14 +43,24 @@ const USER_REC = (userId: string) => `user:${userId}`;
 const SSO_GITHUB = (subject: string) => `sso:github:${subject}`;
 const SSO_GOOGLE = (subject: string) => `sso:google:${subject}`;
 const SHORT_TO_INVITE = (shortId: string) => `short:${shortId}`;
+const PROVISION_BY_HASH = (hash: string) => `prov:hash:${hash}`;
+const PROVISION_BY_USER = (userId: string) => `prov:user:${userId}`;
 
 export type PlatformUser = {
   userId: string;
   role: "admin" | "user";
   createdAt: number;
   disabled?: boolean;
+  /** Canonical origin e.g. https://play.samkuo.me */
+  defaultFieldUrl?: string;
   github?: { id: string; login: string; linkedAt: number };
   google?: { id: string; email: string; linkedAt: number };
+  /** Point balance (PG-PLATFORM-CREDITS-PLAN). */
+  credits?: number;
+  /** Admin: may use official TURN when credits allow. */
+  turnHosted?: boolean;
+  /** User preference: actually use connection relay when entitled. */
+  turnPrefer?: boolean;
 };
 
 export async function getUser(
@@ -317,6 +329,7 @@ export async function deleteApiKey(
   store: EnvStore,
   userId: string
 ): Promise<boolean> {
+  await invalidateUserProvision(store, userId);
   const existing = await store.get(KEY_BY_USER(userId));
   if (!existing) return false;
   const prev = JSON.parse(existing) as StoredApiKey;
@@ -436,6 +449,7 @@ export async function deleteUserAccount(
   }
   if (user.github) await store.delete(SSO_GITHUB(user.github.id));
   if (user.google) await store.delete(SSO_GOOGLE(user.google.id));
+  await invalidateUserProvision(store, userId);
   await deleteApiKey(store, userId);
   await revokeAllAccessTokensForUser(store, userId);
   await store.delete(USER_REC(userId));
@@ -469,7 +483,7 @@ export async function getRegistrationInvite(
   return JSON.parse(raw) as RegistrationInvite;
 }
 
-/** Invite-only registration without Social SSO (Phase 3 MVP claim). */
+/** Invite-only registration: create account + access token; no field API key. */
 export async function claimRegistrationInvite(
   store: EnvStore,
   token: string,
@@ -479,7 +493,6 @@ export async function claimRegistrationInvite(
       ok: true;
       userId: string;
       role: "user" | "admin";
-      apiKey: string;
       accessToken: string;
       accessTokenExpiresAt: number;
     }
@@ -492,9 +505,7 @@ export async function claimRegistrationInvite(
   }
   if (inv.usedAt) return { ok: false, error: "already_used", status: 410 };
   const userId = `user_${token.slice(0, 12)}`;
-  const apiKey = apiKeyPlaintext();
   await ensureUser(store, userId, role);
-  await putApiKey(store, apiKey, userId, role);
   const at = await issueAccessToken(store, userId, role);
   inv.usedAt = Date.now();
   await putRegistrationInvite(store, inv);
@@ -502,7 +513,6 @@ export async function claimRegistrationInvite(
     ok: true,
     userId,
     role,
-    apiKey,
     accessToken: at.plaintext,
     accessTokenExpiresAt: at.record.expiresAt,
   };
@@ -574,6 +584,103 @@ export async function deleteSecretMapping(
   secret: string
 ): Promise<void> {
   await store.delete(`secret:${secret}`);
+}
+
+export type StoredProvision = {
+  userId: string;
+  hash: string;
+  /** Plaintext API key held until single redeem or expiry. */
+  apiKey: string;
+  createdAt: number;
+  expiresAt: number;
+  usedAt: number | null;
+};
+
+async function deleteProvisionRecord(
+  store: EnvStore,
+  userId: string,
+  hash: string
+): Promise<void> {
+  await store.delete(PROVISION_BY_HASH(hash));
+  const cur = await store.get(PROVISION_BY_USER(userId));
+  if (cur === hash) await store.delete(PROVISION_BY_USER(userId));
+}
+
+/** Invalidate any outstanding provision for this user (e.g. before new one). */
+export async function invalidateUserProvision(
+  store: EnvStore,
+  userId: string
+): Promise<void> {
+  const hash = await store.get(PROVISION_BY_USER(userId));
+  if (!hash) return;
+  await deleteProvisionRecord(store, userId, hash);
+}
+
+/**
+ * Rotate field API key and issue a one-time provision token (plaintext returned once).
+ */
+export async function createFieldProvision(
+  store: EnvStore,
+  userId: string,
+  role: "admin" | "user",
+  ttlMs: number = PROVISION_TTL_MS
+): Promise<{
+  provisionToken: string;
+  expiresAt: number;
+  keyPrefix: string;
+  keyCreatedAt: number;
+}> {
+  await invalidateUserProvision(store, userId);
+  const apiKey = apiKeyPlaintext();
+  const keyRec = await putApiKey(store, apiKey, userId, role);
+  const provisionToken = provisionTokenPlaintext();
+  const hash = await sha256Hex(provisionToken);
+  const createdAt = Date.now();
+  const expiresAt = createdAt + ttlMs;
+  const record: StoredProvision = {
+    userId,
+    hash,
+    apiKey,
+    createdAt,
+    expiresAt,
+    usedAt: null,
+  };
+  await store.put(PROVISION_BY_HASH(hash), JSON.stringify(record));
+  await store.put(PROVISION_BY_USER(userId), hash);
+  return {
+    provisionToken,
+    expiresAt,
+    keyPrefix: keyRec.prefix,
+    keyCreatedAt: keyRec.createdAt,
+  };
+}
+
+export async function redeemFieldProvision(
+  store: EnvStore,
+  token: string
+): Promise<
+  | { ok: true; apiKey: string; userId: string }
+  | { ok: false; error: "invalid" | "expired" | "used" }
+> {
+  if (!token.startsWith("pg_pv_")) {
+    return { ok: false, error: "invalid" };
+  }
+  const hash = await sha256Hex(token);
+  const raw = await store.get(PROVISION_BY_HASH(hash));
+  if (!raw) return { ok: false, error: "invalid" };
+  const record = JSON.parse(raw) as StoredProvision;
+  if (record.usedAt != null) return { ok: false, error: "used" };
+  if (Date.now() > record.expiresAt) {
+    await deleteProvisionRecord(store, record.userId, hash);
+    return { ok: false, error: "expired" };
+  }
+  const user = await getUser(store, record.userId);
+  if (!user || user.disabled) {
+    await deleteProvisionRecord(store, record.userId, hash);
+    return { ok: false, error: "invalid" };
+  }
+  await deleteProvisionRecord(store, record.userId, hash);
+  return { ok: true, apiKey: record.apiKey, userId: record.userId };
 }
 
 export function parseBearer(req: Request): string | null {

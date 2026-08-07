@@ -6,6 +6,10 @@ export type Me = {
   github: { id: string; login: string } | null;
   google: { id: string; email: string } | null;
   key: { prefix: string; created_at: number } | null;
+  default_field_url?: string;
+  credits?: number;
+  turn_hosted?: boolean;
+  turn_prefer?: boolean;
 };
 
 export type AdminUser = {
@@ -16,6 +20,15 @@ export type AdminUser = {
   github: { id: string; login: string } | null;
   google: { id: string; email: string } | null;
   key: { prefix: string; created_at: number } | null;
+  credits?: number;
+  turn_hosted?: boolean;
+};
+
+export type CreditSessionRow = {
+  at: number;
+  delta: number;
+  reason: string;
+  sessionId?: string;
 };
 
 export function getAccessToken(): string {

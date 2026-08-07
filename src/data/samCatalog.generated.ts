@@ -194,9 +194,10 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     title: "五子棋",
     kind: "game",
     series: "桌遊",
-    blurb: "15×15 雙人／人機／AI 對 AI。",
+    blurb: "15×15 雙人／人機／AI 對 AI；可邀請遠端對手（gomoku.v1）。",
     source: "sampot/pg-gomoku",
     license: "MIT",
+    protocols: [{"protocolId":"gomoku.v1","apiVersion":"1","roles":["host","player"]}],
   },
   {
     id: "pg-hashlab",

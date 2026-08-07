@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  claimRegistrationInvite,
   deleteUserAccount,
   ensureUser,
+  getApiKeyForUser,
   getUser,
   issueAccessToken,
   linkGithub,
@@ -10,6 +12,7 @@ import {
   lookupAccessToken,
   lookupApiKey,
   putApiKey,
+  putRegistrationInvite,
   setUserDisabled,
   unlinkGithub,
   unlinkGoogle,
@@ -85,6 +88,23 @@ describe("account lifecycle", () => {
 
     const lastG = await unlinkGoogle(store, "u1");
     expect(lastG).toEqual({ ok: false, error: "last_sso" });
+  });
+
+  it("claim registration does not create an API key", async () => {
+    const store = memoryStore();
+    const token = "invite_no_key_01";
+    await putRegistrationInvite(store, {
+      token,
+      createdBy: "admin",
+      createdAt: Date.now(),
+      expiresAt: Date.now() + 60_000,
+      usedAt: null,
+    });
+    const claimed = await claimRegistrationInvite(store, token, "user");
+    expect(claimed.ok).toBe(true);
+    if (!claimed.ok) return;
+    expect(await getApiKeyForUser(store, claimed.userId)).toBeNull();
+    expect(await getUser(store, claimed.userId)).not.toBeNull();
   });
 
   it("deletes account and revokes credentials", async () => {

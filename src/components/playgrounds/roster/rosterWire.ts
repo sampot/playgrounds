@@ -14,8 +14,17 @@ import {
 
 export const ROSTER_WIRE_VERSION = 1 as const;
 
-/** Soft cap so a single QR stays scannable. */
+/**
+ * OOB／文字／`#roster=`／直掃 wire QR：單張 QR 易掃上限（DEC-045）。
+ * Platform 短網址 QR **不**承載此字串——見 `ROSTER_WIRE_MAX_CHARS_SIGNAL`。
+ */
 export const ROSTER_WIRE_MAX_CHARS = 1200;
+
+/**
+ * Platform Invite signaling（offer／answer 經 API JSON）：短網址才進 QR，
+ * wire 本身不受 OOB QR 1200 限制；仍設合理上限防濫用。
+ */
+export const ROSTER_WIRE_MAX_CHARS_SIGNAL = 16_384;
 
 export type RosterWirePayload = {
   v: typeof ROSTER_WIRE_VERSION;
@@ -162,19 +171,27 @@ export function wirePayloadToFields(payload: RosterWirePayload): RosterSdpFields
   };
 }
 
-export function encodeRosterWire(payload: RosterWirePayload): string {
+export function encodeRosterWire(
+  payload: RosterWirePayload,
+  opts?: { maxChars?: number }
+): string {
   if (payload.v !== ROSTER_WIRE_VERSION) {
     throw new RosterWireError("bad_version", `不支援的 wire 版本：${payload.v}`);
   }
   if (payload.tpl !== ROSTER_SDP_TPL) {
     throw new RosterWireError("bad_tpl", `不支援的樣板：${payload.tpl}`);
   }
+  const maxChars = opts?.maxChars ?? ROSTER_WIRE_MAX_CHARS;
   const json = JSON.stringify(payload);
   const wire = toBase64Url(utf8Encode(json));
-  if (wire.length > ROSTER_WIRE_MAX_CHARS) {
+  if (wire.length > maxChars) {
+    const hint =
+      maxChars <= ROSTER_WIRE_MAX_CHARS
+        ? "；請改用同區網模式、Platform 短連結，或減少 candidates"
+        : "；candidates 過多，請重試或改同區網模式";
     throw new RosterWireError(
       "too_large",
-      `交換字串過長（${wire.length}＞${ROSTER_WIRE_MAX_CHARS}）；請改用同區網模式或減少 candidates`
+      `交換字串過長（${wire.length}＞${maxChars}）${hint}`
     );
   }
   return wire;
@@ -185,7 +202,8 @@ export function decodeRosterWire(wire: string): RosterWirePayload {
   if (!trimmed) {
     throw new RosterWireError("empty", "交換字串為空");
   }
-  if (trimmed.length > ROSTER_WIRE_MAX_CHARS * 2) {
+  // Accept Platform-sized wires (short-link path); OOB stays small by encode cap.
+  if (trimmed.length > ROSTER_WIRE_MAX_CHARS_SIGNAL * 2) {
     throw new RosterWireError("too_large", "交換字串過長");
   }
   let json: string;
@@ -224,18 +242,22 @@ export function decodeRosterWire(wire: string): RosterWirePayload {
 
 export function encodeSdpToRosterWire(
   sdp: string,
-  opts: { role: RosterSdpRole; lan?: boolean }
+  opts: { role: RosterSdpRole; lan?: boolean; maxChars?: number }
 ): string {
   const fields = prepareFieldsForExchange(sdp, { lan: opts.lan });
-  return encodeRosterWire(fieldsToWirePayload(fields, opts));
+  return encodeRosterWire(fieldsToWirePayload(fields, opts), {
+    maxChars: opts.maxChars,
+  });
 }
 
 /** Prefer this over encodeSdpToRosterWire when fields already prepared. */
 export function encodeFieldsToRosterWire(
   fields: RosterSdpFields,
-  opts: { role: RosterSdpRole; lan?: boolean }
+  opts: { role: RosterSdpRole; lan?: boolean; maxChars?: number }
 ): string {
-  return encodeRosterWire(fieldsToWirePayload(fields, opts));
+  return encodeRosterWire(fieldsToWirePayload(fields, opts), {
+    maxChars: opts.maxChars,
+  });
 }
 
 export function decodeRosterWireToSdp(wire: string): {

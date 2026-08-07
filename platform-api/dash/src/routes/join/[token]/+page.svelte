@@ -56,7 +56,7 @@
       <p class="lede">正在確認邀請…</p>
     {:else if status === "valid"}
       <p class="lede">
-        邀請有效。請選擇一種方式完成註冊；完成後可進入後台，並取得一把給遊樂場使用的金鑰。
+        邀請有效。請選擇一種方式完成註冊；完成後即可進入後台。
       </p>
       {#if expiresAt}
         <p class="meta">到期：{formatTime(expiresAt)}</p>

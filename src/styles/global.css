@@ -158,10 +158,13 @@
 }
 .playgrounds-toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem;
-  height: 2.75rem;
-  padding: 0 0.75rem;
+  column-gap: 0.5rem;
+  row-gap: 0.35rem;
+  min-height: 2.75rem;
+  height: auto;
+  padding: 0.35rem 0.75rem;
 }
 .playgrounds-toolbar--agent-linked {
   box-shadow: inset 0 -2px 0 0 rgb(var(--color-accent));
@@ -172,19 +175,28 @@
   font-weight: 600;
   letter-spacing: 0.02em;
 }
+.playgrounds-toolbar-auth {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.35rem;
+  padding-right: 0.5rem;
+  border-right: 1px solid rgb(var(--color-border));
+}
 .playgrounds-toolbar-project {
   display: flex;
-  margin-left: 0;
+  /* Mobile-first: own row so picker／玩玩看 never collide with 登入 */
+  flex: 1 1 100%;
   min-width: 0;
-  flex: 0 1 auto;
   align-items: center;
   gap: 0.375rem;
+  order: 5;
 }
 .playgrounds-toolbar-picker {
   position: relative;
-  flex: 0 1 12rem;
-  width: 12rem;
-  max-width: min(12rem, calc(100vw - 7rem));
+  flex: 1 1 auto;
+  width: auto;
+  max-width: none;
   min-width: 0;
 }
 .playgrounds-picker--agent-linked {
@@ -204,6 +216,8 @@
   align-items: center;
   gap: 0.15rem;
   flex-shrink: 0;
+  margin-left: auto;
+  order: 4;
 }
 /* Appearance: always on standalone (no site header); on blog only when header hidden. */
 .playgrounds-toolbar-appearance {
@@ -216,6 +230,35 @@
 .playgrounds-page.sandbox-maximized .playgrounds-toolbar-appearance,
 .playgrounds-page.preview-maximized .playgrounds-toolbar-appearance {
   display: inline-flex;
+}
+
+/* ≥640px: single-row toolbar; project shares the row and flexes */
+@media (width >= 640px) {
+  .playgrounds-toolbar {
+    flex-wrap: nowrap;
+    height: 2.75rem;
+    padding: 0 0.75rem;
+  }
+  .playgrounds-toolbar-project {
+    flex: 0 1 auto;
+    order: 0;
+    max-width: none;
+  }
+  .playgrounds-toolbar-picker {
+    flex: 0 1 12rem;
+    width: 12rem;
+    max-width: min(12rem, 30vw);
+  }
+  .playgrounds-toolbar-trailing {
+    order: 0;
+  }
+}
+@media (width >= 1180px) {
+  .playgrounds-toolbar-picker {
+    flex: 0 1 16rem;
+    width: 16rem;
+    max-width: 16rem;
+  }
 }
 .playgrounds-font-size-controls {
   display: inline-flex;
@@ -542,13 +585,6 @@ html[data-theme="dark"] .playgrounds-dialog-icon--danger {
   color: color-mix(in oklab, rgb(var(--color-text)) 50%, transparent);
 }
 
-@media (width >= 1180px) {
-  .playgrounds-toolbar-picker {
-    flex: 0 1 16rem;
-    width: 16rem;
-    max-width: 16rem;
-  }
-}
 .playgrounds-body {
   display: flex;
   flex: 1 1 auto;

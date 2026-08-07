@@ -1,6 +1,6 @@
 /**
  * Shell proxy for Platform Invite APIs (DEC-047／DASH-SPEC §7).
- * Reads PLAYGROUNDS_API_KEY from SecretStore; never returns the key to SAM.
+ * Reads field API key from shell memory (provision); never returns the key to SAM.
  */
 
 import {
@@ -8,61 +8,29 @@ import {
   type HostCreatePlatformInviteOptions,
   type HostRevokePlatformInviteOptions,
 } from "../hostBridge";
-import { getSecretPlaintext, getSecretStoreStatus } from "../secretStore";
+import { getPlatformFieldApiKey } from "./platformFieldCredential";
 import {
   createPlatformInvite as createInviteHttp,
-  PLAYGROUNDS_API_KEY_SECRET,
   revokePlatformInvite as revokeInviteHttp,
   type CreateInviteResult,
 } from "./platformClient";
 
-async function resolvePlaygroundsApiKey(): Promise<string> {
-  const status = await getSecretStoreStatus();
-  if (status.state === "absent") {
+function resolvePlaygroundsApiKey(): string {
+  const key = getPlatformFieldApiKey();
+  if (!key) {
     throw new HostBridgeError(
-      "secret_absent",
-      `尚未建立密鑰庫 — 請先解鎖並寫入 ${PLAYGROUNDS_API_KEY_SECRET}`
+      "not_provisioned",
+      "尚未登入遊樂場通行證 — 請按工具列「登入」"
     );
   }
-  if (status.state === "locked") {
-    throw new HostBridgeError(
-      "secret_locked",
-      `請先解鎖密鑰庫後再鑄場邀請（需要 ${PLAYGROUNDS_API_KEY_SECRET}）`
-    );
-  }
-  try {
-    const key = await getSecretPlaintext(PLAYGROUNDS_API_KEY_SECRET);
-    if (!key.trim()) {
-      throw new HostBridgeError(
-        "secret_not_found",
-        `密鑰庫沒有 ${PLAYGROUNDS_API_KEY_SECRET} — 請在後台建立 API key 後寫入`
-      );
-    }
-    return key;
-  } catch (e) {
-    if (e instanceof HostBridgeError) throw e;
-    const msg = e instanceof Error ? e.message : String(e);
-    if (msg === "secret_locked") {
-      throw new HostBridgeError(
-        "secret_locked",
-        `請先解鎖密鑰庫後再鑄場邀請（需要 ${PLAYGROUNDS_API_KEY_SECRET}）`
-      );
-    }
-    if (msg === "secret_not_found") {
-      throw new HostBridgeError(
-        "secret_not_found",
-        `密鑰庫沒有 ${PLAYGROUNDS_API_KEY_SECRET} — 請在後台建立 API key 後寫入`
-      );
-    }
-    throw new HostBridgeError("secret_error", msg);
-  }
+  return key;
 }
 
 function defaultTargetField(): string {
-  if (typeof location !== "undefined" && location.host) {
-    return location.host;
+  if (typeof location !== "undefined" && location.origin) {
+    return location.origin;
   }
-  return "play.samkuo.me";
+  return "https://play.samkuo.me";
 }
 
 function mapPlatformHttpError(e: unknown, fallback: string): never {
@@ -82,7 +50,7 @@ function mapPlatformHttpError(e: unknown, fallback: string): never {
 export async function hostCreatePlatformInvite(
   options: HostCreatePlatformInviteOptions = {}
 ): Promise<CreateInviteResult> {
-  const apiKey = await resolvePlaygroundsApiKey();
+  const apiKey = resolvePlaygroundsApiKey();
   try {
     return await createInviteHttp({
       apiKey,
@@ -104,7 +72,7 @@ export async function hostRevokePlatformInvite(
   if (!inviteId) {
     throw new HostBridgeError("bad_args", "revokePlatformInvite 需要 inviteId");
   }
-  const apiKey = await resolvePlaygroundsApiKey();
+  const apiKey = resolvePlaygroundsApiKey();
   try {
     await revokeInviteHttp({ inviteId, apiKey });
     return { ok: true };

@@ -18,6 +18,12 @@ const CODING_ORCH_CATALOG_ID = "pg-llm-agent";
 const CODING_ORCH_CATALOG_SOURCE = "sampot/pg-llm-agent";
 const CODING_ORCH_DEFAULT_ROLE = "worker";
 
+/** Catalog hint when inviting into gomoku.v1 (PG-INVITE-E2E-MVP). */
+const GOMOKU_PROTOCOL_ID = "gomoku.v1";
+const GOMOKU_CATALOG_ID = "pg-gomoku";
+const GOMOKU_CATALOG_SOURCE = "sampot/pg-gomoku";
+const GOMOKU_DEFAULT_ROLE = "player";
+
 export type RosterSessionOpenSnapshot = {
   sessionId: string;
   protocol: MultiAgentSession["protocol"];
@@ -172,19 +178,32 @@ export function inviteRosterAvatarToSession(opts?: {
   if (!sendRelay) throw new Error("化身連線尚未就緒");
   const peerId = getPeerAgentId?.();
   if (!peerId) throw new Error("還沒有連線中的化身");
-  const isCodingOrch =
-    openSession.protocol.protocolId === CODING_ORCH_PROTOCOL_ID;
+  const protocolId = openSession.protocol.protocolId;
+  const isCodingOrch = protocolId === CODING_ORCH_PROTOCOL_ID;
+  const isGomoku = protocolId === GOMOKU_PROTOCOL_ID;
   const role =
     opts?.role?.trim() ||
     (isCodingOrch
       ? CODING_ORCH_DEFAULT_ROLE
-      : openSession.protocol.roles.find(r => r !== "human") || "participant");
+      : isGomoku
+        ? GOMOKU_DEFAULT_ROLE
+        : openSession.protocol.roles.find(
+            r => r !== "human" && r !== "host"
+          ) || "participant");
   const catalogId =
     opts?.catalogId?.trim() ||
-    (isCodingOrch ? CODING_ORCH_CATALOG_ID : undefined);
+    (isCodingOrch
+      ? CODING_ORCH_CATALOG_ID
+      : isGomoku
+        ? GOMOKU_CATALOG_ID
+        : undefined);
   const source =
     opts?.source?.trim() ||
-    (isCodingOrch ? CODING_ORCH_CATALOG_SOURCE : undefined);
+    (isCodingOrch
+      ? CODING_ORCH_CATALOG_SOURCE
+      : isGomoku
+        ? GOMOKU_CATALOG_SOURCE
+        : undefined);
   const invite = buildSessionInvitePayload({
     sessionId: openSession.sessionId,
     protocol: openSession.protocol,

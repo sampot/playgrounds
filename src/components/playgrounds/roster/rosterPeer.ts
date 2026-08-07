@@ -6,9 +6,25 @@ import {
   prepareFieldsForExchange,
   type RosterSdpRole,
 } from "./rosterSdpCodec";
-import { encodeFieldsToRosterWire, decodeRosterWireToSdp } from "./rosterWire";
+import {
+  ROSTER_WIRE_MAX_CHARS,
+  ROSTER_WIRE_MAX_CHARS_SIGNAL,
+  encodeFieldsToRosterWire,
+  decodeRosterWireToSdp,
+} from "./rosterWire";
 
-const DEFAULT_STUN = [{ urls: "stun:stun.cloudflare.com:3478" }];
+const DEFAULT_STUN: RTCIceServer[] = [
+  { urls: "stun:stun.cloudflare.com:3478" },
+  { urls: "stun:stun.l.google.com:19302" },
+];
+
+/** Hard cap waiting for ICE gather (Chromium often never reaches `complete`). */
+const ICE_GATHER_HARD_MS = 12_000;
+/**
+ * After the first candidate, wait briefly for srflx／extra hosts then proceed.
+ * Non-trickle (DEC-045) needs *some* candidates in the wire — not all of them.
+ */
+const ICE_GATHER_SETTLE_MS = 2_500;
 
 export type RosterPresenceMsg = {
   type: "presence";
@@ -43,24 +59,76 @@ export type RosterPeerSession = {
   send: (data: unknown) => void;
 };
 
-function waitIceComplete(pc: RTCPeerConnection): Promise<void> {
+/** Exported for tests — true when SDP already embeds ICE candidates. */
+export function sdpHasIceCandidates(sdp: string | undefined | null): boolean {
+  if (!sdp) return false;
+  return /(?:^|\r?\n)a=candidate:/m.test(sdp);
+}
+
+/**
+ * Wait until ICE gather is usable for non-trickle offer／answer.
+ * Chromium may never emit gatheringState `complete` (STUN／mDNS hang) — also
+ * finish on null `icecandidate`, or soft-timeout once candidates exist.
+ */
+export function waitIceComplete(
+  pc: RTCPeerConnection,
+  opts?: { hardMs?: number; settleMs?: number }
+): Promise<void> {
   if (pc.iceGatheringState === "complete") return Promise.resolve();
+  const hardMs = opts?.hardMs ?? ICE_GATHER_HARD_MS;
+  const settleMs = opts?.settleMs ?? ICE_GATHER_SETTLE_MS;
+
   return new Promise((resolve, reject) => {
-    const t = setTimeout(() => {
+    let settled = false;
+    let sawCandidate = false;
+    let settleTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const cleanup = () => {
+      clearTimeout(hardTimer);
+      if (settleTimer) clearTimeout(settleTimer);
+      pc.removeEventListener("icegatheringstatechange", onGathering);
+      pc.removeEventListener("icecandidate", onCandidate);
+    };
+
+    const finishOk = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve();
+    };
+
+    const finishFail = () => {
+      if (settled) return;
+      settled = true;
       cleanup();
       reject(new Error("ICE gathering timeout"));
-    }, 20_000);
-    const onChange = () => {
-      if (pc.iceGatheringState === "complete") {
-        cleanup();
-        resolve();
+    };
+
+    const hardTimer = setTimeout(() => {
+      if (sdpHasIceCandidates(pc.localDescription?.sdp)) finishOk();
+      else finishFail();
+    }, hardMs);
+
+    const onGathering = () => {
+      if (pc.iceGatheringState === "complete") finishOk();
+    };
+
+    const onCandidate = (ev: RTCPeerConnectionIceEvent) => {
+      // null candidate = end-of-candidates (more reliable than gatheringState).
+      if (ev.candidate === null) {
+        finishOk();
+        return;
       }
+      if (sawCandidate) return;
+      sawCandidate = true;
+      settleTimer = setTimeout(() => {
+        if (sdpHasIceCandidates(pc.localDescription?.sdp)) finishOk();
+      }, settleMs);
     };
-    const cleanup = () => {
-      clearTimeout(t);
-      pc.removeEventListener("icegatheringstatechange", onChange);
-    };
-    pc.addEventListener("icegatheringstatechange", onChange);
+
+    pc.addEventListener("icegatheringstatechange", onGathering);
+    pc.addEventListener("icecandidate", onCandidate);
+    onGathering();
   });
 }
 
@@ -107,10 +175,32 @@ function attachChannel(
   });
 }
 
-function createPc(lan: boolean): RTCPeerConnection {
-  return new RTCPeerConnection({
-    iceServers: lan ? [] : DEFAULT_STUN,
+function createPc(
+  lan: boolean,
+  iceServers?: RTCIceServer[]
+): RTCPeerConnection {
+  if (lan) {
+    return new RTCPeerConnection({ iceServers: [] });
+  }
+  const servers =
+    iceServers && iceServers.length > 0 ? iceServers : DEFAULT_STUN;
+  return new RTCPeerConnection({ iceServers: servers });
+}
+
+function shouldKeepRelay(iceServers?: RTCIceServer[]): boolean {
+  if (!iceServers || iceServers.length === 0) return false;
+  return iceServers.some(s => {
+    const urls = Array.isArray(s.urls) ? s.urls : [s.urls];
+    return urls.some(u => typeof u === "string" && /^turns?:/i.test(u));
   });
+}
+
+function iceWaitOpts(iceServers?: RTCIceServer[]): {
+  hardMs?: number;
+  settleMs?: number;
+} {
+  if (!shouldKeepRelay(iceServers)) return {};
+  return { hardMs: 20_000, settleMs: 6_000 };
 }
 
 function wrapSession(
@@ -148,38 +238,65 @@ function wrapSession(
   };
 }
 
-/** Host: create offer wire string (after ICE complete). */
+/**
+ * Wire size budget:
+ * - `oob`（預設）：直掃／貼上 QR 上限 1200
+ * - `signal`：Platform 短網址路徑；wire 走 API，用較大上限
+ */
+export type RosterWireTransport = "oob" | "signal";
+
+function wireMaxChars(transport: RosterWireTransport | undefined): number {
+  return transport === "signal"
+    ? ROSTER_WIRE_MAX_CHARS_SIGNAL
+    : ROSTER_WIRE_MAX_CHARS;
+}
+
+/** Create offer wire string (after ICE complete). Platform guest also uses this. */
 export async function createRosterOffer(opts: {
   lan?: boolean;
+  /** Default `oob`. Platform Invite must pass `signal`. */
+  transport?: RosterWireTransport;
   handlers?: RosterPeerHandlers;
   /** Sent when DataChannel opens (mutual presence). */
   localPresence?: { agentId: string; name: string };
+  /** Optional ICE servers (STUN＋official TURN). Omitted → default STUN. */
+  iceServers?: RTCIceServer[];
 }): Promise<{ session: RosterPeerSession; wire: string }> {
   const lan = Boolean(opts.lan);
   const handlers = opts.handlers ?? {};
-  const pc = createPc(lan);
+  const pc = createPc(lan, opts.iceServers);
   const channel = pc.createDataChannel("roster", { ordered: true });
   attachChannel(channel, handlers, opts.localPresence);
 
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
-  await waitIceComplete(pc);
+  await waitIceComplete(pc, iceWaitOpts(opts.iceServers));
   const local = pc.localDescription?.sdp;
   if (!local) throw new Error("缺少 local SDP");
-  const fields = prepareFieldsForExchange(local, { lan });
-  const wire = encodeFieldsToRosterWire(fields, { role: "offer", lan });
+  const fields = prepareFieldsForExchange(local, {
+    lan,
+    keepRelay: shouldKeepRelay(opts.iceServers),
+  });
+  const wire = encodeFieldsToRosterWire(fields, {
+    role: "offer",
+    lan,
+    maxChars: wireMaxChars(opts.transport),
+  });
   const session = wrapSession(pc, "host", () => channel, handlers);
   return { session, wire };
 }
 
-/** Guest: accept offer wire → produce answer wire. */
+/** Accept offer wire → produce answer wire. Platform host answer loop uses this. */
 export async function acceptRosterOffer(opts: {
   offerWire: string;
   lan?: boolean;
+  /** Default `oob`. Platform Invite must pass `signal`. */
+  transport?: RosterWireTransport;
   handlers?: RosterPeerHandlers;
   /** @deprecated use localPresence */
   presence?: { agentId: string; name: string };
   localPresence?: { agentId: string; name: string };
+  iceServers?: RTCIceServer[];
 }): Promise<{ session: RosterPeerSession; wire: string }> {
   const handlers = opts.handlers ?? {};
   const localPresence = opts.localPresence ?? opts.presence;
@@ -188,7 +305,7 @@ export async function acceptRosterOffer(opts: {
     throw new Error("期待 offer 字串");
   }
   const lan = opts.lan ?? decoded.lan;
-  const pc = createPc(lan);
+  const pc = createPc(lan, opts.iceServers);
   let channel: RTCDataChannel | null = null;
 
   pc.addEventListener("datachannel", ev => {
@@ -199,13 +316,17 @@ export async function acceptRosterOffer(opts: {
   await pc.setRemoteDescription({ type: "offer", sdp: decoded.sdp });
   const answer = await pc.createAnswer();
   await pc.setLocalDescription(answer);
-  await waitIceComplete(pc);
+  await waitIceComplete(pc, iceWaitOpts(opts.iceServers));
   const local = pc.localDescription?.sdp;
   if (!local) throw new Error("缺少 local SDP");
-  const fields = prepareFieldsForExchange(local, { lan });
+  const fields = prepareFieldsForExchange(local, {
+    lan,
+    keepRelay: shouldKeepRelay(opts.iceServers),
+  });
   const wire = encodeFieldsToRosterWire(fields, {
     role: "answer" satisfies RosterSdpRole,
     lan,
+    maxChars: wireMaxChars(opts.transport),
   });
   const session = wrapSession(pc, "guest", () => channel, handlers);
   return { session, wire };
