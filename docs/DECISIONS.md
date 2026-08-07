@@ -1,6 +1,6 @@
 # 我是山姆鍋 — 架構與工程決策
 
-> **最後更新：** 2026-08-07（DEC-050 Proposed：純玩版 `go.samkuo.me`）
+> **最後更新：** 2026-08-07（DEC-051 Proposed：API scopes／環境能力準入）
 > **對象：** 作者、AI agents；必要時給之後的自己讀
 
 本文件以輕量 **ADR**（Architecture Decision Record）記錄本站**顯著且耐久**的架構／工程選擇：選了什麼、為何不選其他、後續工作不可踩破的後果。細節規格仍以 [AGENTS.md](./AGENTS.md)、[TOOLS-PLAN.md](./TOOLS-PLAN.md) 等為準；此檔是可掃讀的決策索引，避免只活在 PR 與聊天裡。
@@ -89,6 +89,7 @@
 | [DEC-047](#dec-047-playgrounds-platform-api) | Playgrounds Platform API（Invite／薄 signaling／後台） | Draft |
 | [DEC-048](#dec-048-playgrounds-宿主-sveltekit-靜態-pwa) | Playgrounds 宿主：SvelteKit 靜態 PWA（卸根 Astro） | Accepted |
 | [DEC-050](#dec-050-playgrounds-純玩版客戶端-gosamkuome) | Playgrounds 純玩版客戶端＠`go.samkuo.me` | Proposed |
+| [DEC-051](#dec-051-playgrounds-api-scopes環境能力準入) | Playgrounds API scopes（環境能力準入） | Proposed |
 
 ---
 
@@ -322,7 +323,8 @@
   - 勿再把 API key 寫進 Agent 畫布 `localStorage`／SAM 檔案樹（見 DEC-029）。
   - 變更 HOST 語意或雙執行面模型時更新本決策、DEC-018／DEC-024／DEC-029 與 [GLOSSARY.md](./GLOSSARY.md)。
   - Runtime 階段見 [PG-AGENT-PLAN.md](./PG-AGENT-PLAN.md)；三層／headless 見 [PG-SAM-RUNTIME-PLAN.md](./PG-SAM-RUNTIME-PLAN.md)；密鑰見 [PG-SECRETSTORE-PLAN.md](./PG-SECRETSTORE-PLAN.md)。
-- **Revision（2026-08-04）：** 完整 `env.HOST` 仍僅總管席。一般 SAM 經宣告＋準入取得窄 **`env.COMPUTE`**（如 `runPython`）見 [DEC-036](#dec-036-playgrounds-sam-環境資源綁定與準入)；不視為第二份 HOST。
+  - **Revision（2026-08-04）：** 完整 `env.HOST` 仍僅總管席。一般 SAM 經宣告＋準入取得窄 **`env.COMPUTE`**（如 `runPython`）見 [DEC-036](#dec-036-playgrounds-sam-環境資源綁定與準入)；不視為第二份 HOST。
+  - **Revision（2026-08-07）：** API 授權粒度升級為 OAuth-style scopes（[DEC-051](#dec-051-playgrounds-api-scopes環境能力準入) Proposed）；`env.HOST`＝對口席動態全量客戶端；非總管經 scopes 得子集——見 [PG-API-SCOPES-SPEC.md](./PG-API-SCOPES-SPEC.md)。
 - **Revision（2026-08-04）：** 總管種子改開源小品 [`sampot/pg-steward`](https://github.com/sampot/pg-steward)；遊樂場移除內建「總管」範本與「套用最新總管範本」。產品路徑與 workflow（DEC-034）同為一 SAM 一 repo＋`?open=`。
 - **Revision（2026-08-04）：** 產品級 BYOK LLM Agent（子代理／編排工人）種子為 [`sampot/pg-llm-agent`](https://github.com/sampot/pg-llm-agent)；遊樂場不內嵌。見 DEC-033 修訂與 [PG-LLM-AGENT-PLAN.md](./PG-LLM-AGENT-PLAN.md)。
 
@@ -679,22 +681,23 @@
 
 ### DEC-036: Playgrounds SAM 環境資源綁定與準入
 
-- **Status:** Accepted（2026-08-04；規格初版；**核心已落地**：宣告／準入／`env.COMPUTE`）
+- **Status:** Accepted（2026-08-04；規格初版；**核心已落地**：宣告／準入／`env.COMPUTE`；**2026-08-07：** 目錄升級與授權粒度見 **DEC-051** Proposed／[PG-API-SCOPES-SPEC.md](./PG-API-SCOPES-SPEC.md)）
 - **Context:** User 與 Agent 都是遊樂場參與者——差別主要是 UI vs API，對環境資源的存取都應明確規範。一般 SAM（例：spreadsheet-like 分析 UI）需要 `runPython` 等共用服務時，不應被迫成為總管，也不應讓畫布直連 runner。DEC-017 將完整 `env.HOST` 綁總管席仍然正確，但缺少「非總管窄能力」的宣告／同意／注入模型。自己的檔案樹與沙盒狀態則屬實例內建，不應塞進同意清單。
 - **Decision:**
-  1. **Actor 一律規範：** 環境資源分 **sandbox-intrinsic**（預設可開）與 **environment capability**（須 `sam:capabilities` 宣告＋使用者同意才準入）。
+  1. **Actor 一律規範：** 環境資源分 **sandbox-intrinsic**（預設可開）與 **environment capability／scope**（須 `sam:capabilities` 宣告＋使用者同意才準入）。
   2. **Intrinsic（不必宣告）：** 自己沙盒檔案樹讀寫、`env.vars`、自己的 `KV`／`DB`、自己的畫布資產與 `/api`→functions、runtime 膠水。**不含**他沙盒、完整 HOST、SESSION、secrets 具名權、人類 REPL／Shell。
-  3. **宣告：** `index.html` `<meta name="sam:capabilities" content="runPython, …">`；不承載值／密鑰。
+  3. **宣告：** `index.html` `<meta name="sam:capabilities" content="…">`；不承載值／密鑰。MVP 落地 token＝`runPython`／`runCmd`；目標目錄＝OAuth-style scopes（DEC-051）。
   4. **準入：** 匯入／升級／手動；已核發集合存遊樂場 Config；**預設不進 `.sam`**；import／clone 重準入。
-  5. **窄 binding：** MVP 準入 `runPython`／`runCmd` 後注入 **`env.COMPUTE`**（方法按已準入子集暴露）；與總管 `HOST` 共用 runner 語意，**不是**完整 HOST。一般 SAM 宣告 `host` → MVP 不核發。
-  6. **總管席：** 設為總管仍得完整 `HOST`（不必 capability 宣告）；卸任收回 HOST，已準入窄能力保留除非撤銷。
+  5. **窄 binding：** MVP 準入 `runPython`／`runCmd` 後注入 **`env.COMPUTE`**（方法按已準入子集暴露）；與總管 `HOST` 共用 runner 語意，**不是**完整 HOST。**不**以單一 capability `host` 核發動態全量 HOST 面（見 DEC-051）。
+  6. **總管席：** 設為總管仍得完整 `HOST`（不必 capability 宣告）；卸任收回 HOST，已準入窄能力保留除非撤銷。非總管經 scopes 取得 API 子集見 DEC-051。
   7. **UI：** 畫布只經 `/api`→`functions.js`；不直連 compute（DEC-031）。
-  - 細節：[PG-SAM-BINDINGS-SPEC.md](./PG-SAM-BINDINGS-SPEC.md)。
+  - 細節：MVP 行為以實作為準；scopes 擴充規格 [PG-API-SCOPES-SPEC.md](./PG-API-SCOPES-SPEC.md)（取代未落地之 `PG-SAM-BINDINGS-SPEC.md` 指針）。
 - **Consequences:**
   - 頂層保留名新增 `COMPUTE`；分析類 SAM 示範宣告＋薄 `/api` 路由（實作階段）。
   - 修訂「只有總管能碰 runPython」的隱含假設——總管仍獨享完整 HOST；`runPython` 可經準入之 `COMPUTE` 提供給一般 SAM。
   - 勿把 intrinsic 誤做成同意項；勿用完整 HOST 充當分析 SAM 的預設注入；勿讓已核發集合默認隨 `.sam` 信任轉移。
-  - 契約變更同步 GLOSSARY、host-api、SAM-ENV-SPEC 交叉引用；實作另開計劃。
+  - 契約變更同步 GLOSSARY、host-api、SAM-ENV-SPEC 交叉引用；scopes 目錄演進見 DEC-051。
+- **Revision（2026-08-07）：** 指向 DEC-051／API Scopes 規格；廢「宣告 `host` 整包」敘事，改 scope 切片。
 
 ### DEC-037: Playgrounds 委派授權（Delegate Grant）
 
@@ -1021,6 +1024,29 @@
 - **Revision（2026-08-07）：** chrome：山姆鍋 logo＋露出 `play.samkuo.me`。
 - **Revision（2026-08-07）：** `play` 鏈：可行時外開系統瀏覽器／Safari（跳出 WebView）；非保證。
 
+### DEC-051: Playgrounds API scopes（環境能力準入）
+
+- **Status:** Proposed（2026-08-07；契約草案；見 [PG-API-SCOPES-SPEC.md](./PG-API-SCOPES-SPEC.md)）
+- **Context:** 遊樂場對 SAM 暴露的 API 面隨版本變大（`env.HOST` 為對口席動態全量客戶端）。授權不能只用總管／Tool／worker 等**角色**（太粗），也不能把每個 HOST 方法做成 capability（太細、無法管理）。DEC-036 MVP 僅 `runPython`／`runCmd`→`env.COMPUTE`，且完整 HOST 仍硬綁總管，不足以承載「建沙盒／改他沙盒／讀 secrets」類工具 SAM（例：git 客戶端）。需要 OAuth-style **scopes** 中粒度模型。
+- **Decision:**
+  1. **四層分離：** API 面（快變）／scopes（慢變授權標籤）／`env` 綁定（獲准投影）／委派 grant（target path ACL；DEC-037 家族）。角色只影響如何被打開，**不**決定 API 授權。
+  2. **`env.HOST`：** 對口席＝**目錄全部 scopes 自動準入**（動態全量快捷）；已準入 SAM＝**同形子集**。卸任收回對口快捷、保留明示準入。**不**另立 `env.SANDBOX`／`env.OBSERVE`；**不**登記單一 scope `host`。
+  3. **Scopes：** `resource:action` 形；**`sandbox:edit` 隱含 `list`＋`read`＋`write`；`write` 不隱含 `list`／`read`；`read` 不隱含 `list`**；目錄見規格 §5。
+  4. **Grant：** 明示（同 Tool）或 **建立即自動**。自動 grant **不**隨建立者刪除而撤銷產出沙盒內容（工具產內容；內容≠工具生命）；他 SAM 再操作須另行明示 grant。
+  5. **相容：** 舊 token `runPython`／`runCmd` → `compute:*`；`env.COMPUTE` 遷移期可雙掛，目標收進 HOST 子集。
+  6. **新方法掛接：** 同傷害面→掛既有 scope；擴大傷害面→新 scope＋增量同意。
+  7. **首驗收：** Git 客戶端 SAM——`.git` 進樹；scopes＋grant；不內建場殼 Git UI。
+  - 細節／階段：[PG-API-SCOPES-SPEC.md](./PG-API-SCOPES-SPEC.md)。
+- **Consequences:**
+  - 修訂 DEC-036／017：對口＝全目錄自動準入；非總管經 scopes 得 HOST 形子集；DEC-037 grant 含明示／自動且內容不隨工具刪。
+  - 勿用角色名代替 scope；勿平行 `env.SANDBOX`／`env.OBSERVE`；勿把 path 塞进 `sam:capabilities`。
+  - 勿因刪工具 SAM 而級聯刪其建立的沙盒內容。
+  - 同步 GLOSSARY、host-api；實作見規格 §7。
+- **Revision（2026-08-07）：** 初版 Proposed。
+- **Revision（2026-08-07）：** `edit`⊃list＋read＋write；`sandbox:list`；write／read 不互含 list；`.git` 進樹。
+- **Revision（2026-08-07）：** 建立即自動 grant；納管＝明示 grant；一律 HOST 形子集。
+- **Revision（2026-08-07）：** 對口＝全目錄自動準入；自動 grant 不隨建立者刪而撤內容。
+
 ---
 
 ## 4. 相關文件
@@ -1053,7 +1079,7 @@
 | [PG-SANDBOX-INSTANCE-PLAN.md](./PG-SANDBOX-INSTANCE-PLAN.md) | 沙盒實例工作集／管理面／clone 血統（DEC-028） |
 | [PG-SECRETSTORE-PLAN.md](./PG-SECRETSTORE-PLAN.md) | SecretStore／unlock·lock／binding get（DEC-029） |
 | [PG-SAM-ENV-SPEC.md](./PG-SAM-ENV-SPEC.md) | `.env`→`env.vars`／`env.secrets.*` 命名空間（DEC-035） |
-| [PG-SAM-BINDINGS-SPEC.md](./PG-SAM-BINDINGS-SPEC.md) | 環境能力宣告／準入／`env.COMPUTE`（DEC-036） |
+| [PG-API-SCOPES-SPEC.md](./PG-API-SCOPES-SPEC.md) | API scopes／環境能力準入（DEC-036／**051**）；含 Git SAM 動機場景 |
 | [PG-DELEGATE-GRANT-PLAN.md](./PG-DELEGATE-GRANT-PLAN.md) | 委派授權／`.bindings`／Tool＝worker grant（DEC-037） |
 | [PG-BACKEND-RUNTIME-SPEC.md](./PG-BACKEND-RUNTIME-SPEC.md) | 後端執行面／可替換通道（DEC-038；WebRTC 遷移路線） |
 | [PG-BACKEND-RUNTIME-PLAN.md](./PG-BACKEND-RUNTIME-PLAN.md) | Backend Runtime 實作階段（DEC-038） |

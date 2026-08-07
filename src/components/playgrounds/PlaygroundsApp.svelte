@@ -505,6 +505,9 @@
   let filesFilterQuery = $state("");
   let uploadInputEl = $state<HTMLInputElement | null>(null);
   let uploadDirInputEl = $state<HTMLInputElement | null>(null);
+  /** New-sandbox dialog: .sam / directory pickers (outside the dialog chrome). */
+  let newProjectSamInputEl = $state<HTMLInputElement | null>(null);
+  let newProjectDirInputEl = $state<HTMLInputElement | null>(null);
   let openPath = $state<string | null>(null);
   let draft = $state("");
   let status = $state("就緒");
@@ -4527,6 +4530,14 @@
     uploadDirInputEl?.click();
   }
 
+  function beginImportSamAsProject() {
+    newProjectSamInputEl?.click();
+  }
+
+  function beginImportDirectoryAsProject() {
+    newProjectDirInputEl?.click();
+  }
+
   async function handleUploadOs(ev: Event) {
     const input = ev.currentTarget as HTMLInputElement;
     // Copy before clearing: input.files is a live FileList; value="" empties it.
@@ -4695,6 +4706,7 @@
       newProjectName = "";
       await refreshProjects();
       await openProject(created.id);
+      closeProjectDialog();
       status = `已從本機目錄建立沙盒（${Object.keys(fileMap).length} 個檔案）`;
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
@@ -4752,6 +4764,7 @@
       newProjectName = "";
       await refreshProjects();
       await openProject(created.id);
+      closeProjectDialog();
       status = anyStateSelected(applied)
         ? `已匯入沙盒（含 ${summarizeStateParts(applied)}）`
         : "已匯入沙盒";
@@ -8409,6 +8422,25 @@
   </div>
 </div>
 
+<!-- OS pickers for 新沙盒 import — outside <dialog> so confirm UI stays in-app. -->
+<input
+  bind:this={newProjectSamInputEl}
+  type="file"
+  accept=".sam"
+  class="hidden"
+  disabled={busy}
+  onchange={e => void handleImport(e)}
+/>
+<input
+  bind:this={newProjectDirInputEl}
+  type="file"
+  class="hidden"
+  multiple
+  webkitdirectory
+  disabled={busy}
+  onchange={e => void handleImportDirectoryAsProject(e)}
+/>
+
 <dialog
   bind:this={dialogEl}
   class="playgrounds-project-dialog playgrounds-dialog border-skin-line bg-skin-fill text-skin-base m-auto w-[min(34rem,calc(100%-2rem))] max-h-[min(38rem,calc(100%-2rem))] rounded-xl border p-0 shadow-2xl backdrop:bg-black/55"
@@ -8536,35 +8568,26 @@
           上方「沙盒名稱」有填則優先使用；否則用目錄名或 .sam 內名稱。
         </p>
         <div class="flex flex-wrap gap-2">
-          <label
-            class="{btn} inline-flex cursor-pointer gap-1.5"
+          <button
+            type="button"
+            class="{btn} inline-flex gap-1.5"
             title="選擇 .sam 沙盒包裹"
+            disabled={busy}
+            onclick={() => void beginImportSamAsProject()}
           >
             <PgIcon name="upload" size={13} />
             選擇 .sam
-            <input
-              type="file"
-              accept=".sam"
-              class="hidden"
-              onchange={handleImport}
-              disabled={busy}
-            />
-          </label>
-          <label
-            class="{btn} inline-flex cursor-pointer gap-1.5"
+          </button>
+          <button
+            type="button"
+            class="{btn} inline-flex gap-1.5"
             title="選擇本機目錄（含巢狀子目錄）建立新沙盒"
+            disabled={busy}
+            onclick={() => void beginImportDirectoryAsProject()}
           >
             <PgIcon name="folderUp" size={13} />
             上傳目錄
-            <input
-              type="file"
-              class="hidden"
-              multiple
-              webkitdirectory
-              onchange={handleImportDirectoryAsProject}
-              disabled={busy}
-            />
-          </label>
+          </button>
         </div>
       </div>
 

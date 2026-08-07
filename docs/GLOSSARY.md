@@ -135,11 +135,12 @@
 | SAM 實例（遊樂場） | 實例 | 一沙盒對應一 SAM 實例（Code＋Data＋Configuration；即使未執行）。`clone` 產另一實例，之後程式碼分叉。數量爆炸主因常是實例增殖，而非僅「新建」。見 DEC-028。 |
 | clonedFrom／cloneIntent（沙盒 meta） | 血統／clone 意圖 | `clonedFrom`＝直接來源 `sandboxId`；`cloneIntent` 區分人手保留、總管代建、自迭代、session 分身等，供管理面分區與 GC。見 DEC-028。 |
 | Agent 區（遊樂場） | Agent 區 | 左側側欄與 Files／**線上** 以 Tab 切換的 iframe；內容為**總管**（現行 Agent 席）的 UI。遊樂場介面 Tab 標籤顯示「總管」；程式／layout 鍵仍可為 `agent`。見 DEC-017。Roster Avatar 列表見 DEC-045（**線上** tab，非此 iframe）。下方 dock 預設 Console；REPL／Shell／自選 SAM 為 opt-in（DEC-044）。 |
-| host binding（遊樂場） | host binding／`env.HOST` | 遊樂場介面注入給現行 Agent（總管）`functions.js` 的環境 API；總管經 tools／functions 與 OPFS／畫布互動的完整編排通道。一般 SAM 的窄 compute 見 `env.COMPUTE`／DEC-036。 |
-| sandbox-intrinsic（遊樂場） | 沙盒內建／intrinsic | 該沙盒自己的檔案樹、`env.vars`、自己的 KV／DB、自己的畫布↔functions 等；**預設可開、不必** `sam:capabilities` 宣告。見 DEC-036、[PG-SAM-BINDINGS-SPEC.md](./PG-SAM-BINDINGS-SPEC.md)。 |
-| environment capability（遊樂場） | 環境能力／capability | 共用或跨邊界服務的機器 token（如 `runPython`）；須 `sam:capabilities` 宣告＋使用者同意才準入。見 DEC-036。 |
-| 準入（遊樂場 binding） | 準入／admit | 使用者同意後，將 capability 記入沙盒已核發集合並允許注入對應 binding。已核發集合預設不進 `.sam`。見 DEC-036。 |
-| compute binding（遊樂場） | `env.COMPUTE` | 已準入 `runPython`／`runCmd` 等後注入的**窄** binding；≠ 完整 `env.HOST`。見 DEC-036、[PG-SAM-BINDINGS-SPEC.md](./PG-SAM-BINDINGS-SPEC.md)。 |
+| host binding（遊樂場） | host binding／`env.HOST` | **對口席**＝目錄全部 scopes **自動準入**→動態全量；**已準入 SAM**＝同形子集。卸任收回對口快捷。不另立 `env.SANDBOX`／`env.OBSERVE`。見 DEC-017／036／**051**、[PG-API-SCOPES-SPEC.md](./PG-API-SCOPES-SPEC.md)。 |
+| sandbox-intrinsic（遊樂場） | 沙盒內建／intrinsic | 該沙盒自己的檔案樹、`env.vars`、自己的 KV／DB、自己的畫布↔functions 等；**預設可開、不必** `sam:capabilities` 宣告。見 DEC-036、[PG-API-SCOPES-SPEC.md](./PG-API-SCOPES-SPEC.md)。 |
+| environment capability（遊樂場） | 環境能力／capability／scope | 共用或跨邊界 API 的授權標籤（OAuth-style scope，如 `compute:python`、`sandbox:create`）；須 `sam:capabilities` 宣告＋使用者同意才準入。MVP 別名仍認 `runPython`／`runCmd`。見 DEC-036／**051**、[PG-API-SCOPES-SPEC.md](./PG-API-SCOPES-SPEC.md)。 |
+| API scope（遊樂場） | scope／`resource:action` | 中粒度授權單位（非角色、非逐 HOST 方法）；慢變目錄；獲准後投影為 `env.*` 方法子集。見 DEC-051、[PG-API-SCOPES-SPEC.md](./PG-API-SCOPES-SPEC.md)。 |
+| 準入（遊樂場 binding） | 準入／admit | 使用者同意後，將 scope／capability 記入沙盒已核發集合並允許注入對應 binding。已核發集合預設不進 `.sam`。見 DEC-036／051。 |
+| compute binding（遊樂場） | `env.COMPUTE` | MVP：已準入 `compute:*`（或舊名 `runPython`／`runCmd`）後注入的窄 binding。目標收進 **HOST 形子集**（DEC-051）；遷移期可雙掛。≠ 對口全量 `env.HOST`。見 DEC-036／051、[PG-API-SCOPES-SPEC.md](./PG-API-SCOPES-SPEC.md)。 |
 | Durable KV（遊樂場） | Durable KV | 對齊 Cloudflare KV 形的模擬 binding；OPFS 後端（`playgrounds-kv/<sandboxId>/`；目錄前綴歷史名可保留），跨重整存活；export／clone **預設**不複製（可選）。見 DEC-018。Agent 對話 session 以 **工作沙盒 id** 為 scope（`agent:sessions:<workSandboxId>:…`），切換工作沙盒即換對話 history。 |
 | context hygiene（遊樂場 Agent） | context hygiene／脈絡衛生 | 送 LLM 前的字元預算、舊 tool stub、舊輪次 digest，外加 `.agent/plan.md`／`.agent/memory.md`；**不是** Embedding RAG。見 DEC-026、PG-AGENT-PLAN Phase 12。 |
 | working memory（遊樂場 Agent） | 工作記憶／`.agent/memory.md` | Agent 應維護的跨回合耐久筆記（決策、約束、關鍵路徑）；開場可注入摘錄。與 UI transcript 分離。 |
@@ -162,7 +163,7 @@
 | main content tab（遊樂場） | main tab | Editor 槽 tab：固定**編輯器**（不可關）＋最多 **4** 個沙盒 **canvas** tab；可切換 Editor 與任一已掛 SAM。見 DEC-030、[PG-MAIN-CONTENT-PLAN.md](./PG-MAIN-CONTENT-PLAN.md)。下槽輔助掛載見下方 dock／DEC-044。 |
 | plain 畫布掛載（遊樂場） | plain 畫布／只看畫布 | canvas tab **無** grant、**無** `env.DELEGATE`；不切 `activeId`。與 Tool 相對。可出現在 main content 或下方 dock（後者 MVP 僅 plain）。見 DEC-030／044。 |
 | 下方自選 SAM（遊樂場） | 下方 SAM／dock SAM | 使用者明確加入下方 dock 的 plain 沙盒畫布（硬頂 3；重整不還原；不可與 main 雙掛同一 `sandboxId`）。見 DEC-044。 |
-| 授權／grant（遊樂場工具） | 授權／grant／委派 grant | 遊樂場介面核發給 **delegate**（Tool canvas tab 或 session worker）：host／工作沙盒＋paths（OPFS 及／或虛擬 `.bindings/*`）＋`read`｜`readwrite`。Plain 無 grant。Tool 與 worker **同一家族**。見 DEC-022／037、[PG-DELEGATE-GRANT-PLAN.md](./PG-DELEGATE-GRANT-PLAN.md)。 |
+| 授權／grant（遊樂場工具） | 授權／grant／委派 grant | 核發給 delegate 或 scoped SAM：target 沙盒＋paths＋模式。明示（Tool／納管）或 **建立即自動**。自動 grant **不**因建立者 SAM 刪除而清掉產出沙盒內容。見 DEC-037／051、[PG-API-SCOPES-SPEC.md](./PG-API-SCOPES-SPEC.md) §6.5。 |
 | delegate（遊樂場） | 受委派者／delegate | 接受工作沙盒委派、在最小權限 grant 內執行的角色——**含 Tool SAM 與 session worker Agent**。對委派方負責；無完整 `env.HOST`。見 DEC-037。 |
 | `.bindings`（遊樂場） | `.bindings/` | Files／授權用的**虛擬**共同子目錄：`.bindings/db`→工作沙盒 `env.DB`、`.bindings/kv`→工作沙盒 `env.KV`。樹上只顯示入口、不展開內容；**不**對齊 `.sam` 的 `.playgrounds-state/`。見 DEC-037、DELEGATE-GRANT 計劃。 |
 | delegate binding（遊樂場） | `env.DELEGATE` | 帶委派 grant 時注入的窄 API（Tool 與 worker **統一**）；可含 OPFS 與（若 grant 含虛擬節點）工作沙盒 DB／KV 代理；**不是**完整 `env.HOST`。歷史名 **`env.TOOL`**（遷移後非權威）。見 DEC-037、[PG-DELEGATE-GRANT-PLAN.md](./PG-DELEGATE-GRANT-PLAN.md)。 |

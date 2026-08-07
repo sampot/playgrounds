@@ -10,5 +10,7 @@ alwaysApply: true
 - **Do not** use `window.alert`, `window.confirm`, or `window.prompt` (or equivalents) to confirm actions or collect text from the user.
 - **Do** use in-app UI: custom confirm panels／modals, inline forms, toast／flash status, dedicated pages.
 - Destructive actions still need an explicit confirm step — implement it in the page chrome, with keyboard focus and cancel.
+- **Do not** add confirm steps for actions the user already initiated explicitly when they are **not** destructive（例：新沙盒「上傳目錄」選完即建立——不是覆蓋既有內容；勿再多一層「確定建立？」）。
+- **OS file／directory pickers** (`<input type="file">`／`webkitdirectory`／File System Access pickers) are allowed **to select local files**. They are not a substitute for in-app confirm on **destructive** ops（覆蓋、刪除、重置等）；那些仍須頁內 `askConfirm`／同等 UI。
 
 Exceptions: none for product UI. Devtools-only scripts outside the shipped UI are out of scope.
