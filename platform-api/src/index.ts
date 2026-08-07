@@ -2,6 +2,7 @@ import {
   claimRegistrationInvite,
   deleteApiKey,
   deleteSecretMapping,
+  deleteUserAccount,
   ensureUser,
   getApiKeyForUser,
   getRegistrationInvite,
@@ -9,6 +10,7 @@ import {
   getUser,
   isBootstrapped,
   issueAccessToken,
+  listUsers,
   lookupAccessToken,
   lookupApiKey,
   markBootstrapped,
@@ -18,13 +20,10 @@ import {
   putRegistrationInvite,
   putShortMapping,
   revokeAccessToken,
+  setUserDisabled,
+  unlinkGithub,
+  unlinkGoogle,
 } from "./auth.js";
-import {
-  adminHtml,
-  bootstrapHtml,
-  htmlResponse,
-  joinLandingHtml,
-} from "./adminUi.js";
 import { FAVICON_SVG } from "./faviconSvg.js";
 import { withCors } from "./cors.js";
 import {
@@ -70,6 +69,7 @@ export { InviteDurableObject };
 export type Env = {
   STORE: KVNamespace;
   INVITES: DurableObjectNamespace;
+  ASSETS?: Fetcher;
   ADMIN_BOOTSTRAP_TOKEN?: string;
   GITHUB_CLIENT_ID?: string;
   GITHUB_CLIENT_SECRET?: string;
@@ -128,6 +128,10 @@ async function requireApiKey(
   const key = await lookupApiKey(env.STORE, bearer);
   if (!key) {
     return { ok: false, res: json({ error: "unauthorized" }, 401) };
+  }
+  const user = await getUser(env.STORE, key.userId);
+  if (user?.disabled) {
+    return { ok: false, res: json({ error: "forbidden" }, 403) };
   }
   return { ok: true, userId: key.userId, role: key.role };
 }
@@ -220,15 +224,36 @@ async function dashSuccessRedirect(
   });
 }
 
-function serveDashboard(request: Request, url: URL): Response | null {
+function isLocalHost(host: string): boolean {
+  return (
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host.endsWith(".workers.dev")
+  );
+}
+
+function isWorkerOwnedPath(pathname: string): boolean {
+  return (
+    pathname === "/health" ||
+    pathname.startsWith("/v1/") ||
+    pathname.startsWith("/auth/") ||
+    pathname.startsWith("/i/") ||
+    pathname === "/favicon.svg" ||
+    pathname === "/favicon.ico"
+  );
+}
+
+/** Serve Kit static assets for dash UI (SPA fallback via wrangler assets). */
+async function serveDashAssets(
+  request: Request,
+  env: Env,
+  url: URL
+): Promise<Response | null> {
   const host = requestHostname(request);
   const path = url.pathname;
   const isDash = isDashHost(host);
   const isApi = isApiHost(host);
-  const isLocal =
-    host === "localhost" ||
-    host === "127.0.0.1" ||
-    host.endsWith(".workers.dev");
+  const isLocal = isLocalHost(host);
 
   if (path === "/favicon.svg" || path === "/favicon.ico") {
     return new Response(FAVICON_SVG, {
@@ -239,26 +264,31 @@ function serveDashboard(request: Request, url: URL): Response | null {
     });
   }
 
-  if (isApi && (path === "/" || path === "/admin" || path === "/admin/")) {
-    return Response.redirect(`${DASH_ORIGIN}/`, 302);
+  if (
+    isApi &&
+    (path === "/" ||
+      path === "/admin" ||
+      path === "/admin/" ||
+      path === "/bootstrap" ||
+      path === "/bootstrap/")
+  ) {
+    const dest =
+      path.startsWith("/bootstrap") ? `${DASH_ORIGIN}/bootstrap/` : `${DASH_ORIGIN}/`;
+    return Response.redirect(dest, 302);
   }
 
-  if (isApi && (path === "/bootstrap" || path === "/bootstrap/")) {
-    return Response.redirect(`${DASH_ORIGIN}/bootstrap/`, 302);
+  const joinMatch = /^\/join\/([A-Za-z0-9_-]+)\/?$/.exec(path);
+  if (isApi && joinMatch) {
+    return Response.redirect(`${DASH_ORIGIN}/join/${joinMatch[1]}`, 302);
   }
 
   if (
+    request.method === "GET" &&
     (isDash || isLocal) &&
-    (path === "/bootstrap" || path === "/bootstrap/")
+    env.ASSETS &&
+    !isWorkerOwnedPath(path)
   ) {
-    return htmlResponse(bootstrapHtml());
-  }
-
-  if (
-    (isDash || isLocal) &&
-    (path === "/" || path === "/admin" || path === "/admin/")
-  ) {
-    return htmlResponse(adminHtml());
+    return env.ASSETS.fetch(request);
   }
 
   return null;
@@ -272,7 +302,7 @@ export default {
 
     const url = new URL(request.url);
     if (request.method === "GET") {
-      const dash = serveDashboard(request, url);
+      const dash = await serveDashAssets(request, env, url);
       if (dash) return dash;
     }
 
@@ -310,48 +340,29 @@ async function route(
     });
   }
 
-  // Platform registration invite landing
-  const joinMatchPath = /^\/join\/([A-Za-z0-9_-]+)$/.exec(pathname);
-  if (request.method === "GET" && joinMatchPath) {
-    const token = joinMatchPath[1]!;
+  // Public registration-invite status (dash Kit landing)
+  const joinStatusMatch = /^\/v1\/join\/([A-Za-z0-9_-]+)$/.exec(pathname);
+  if (request.method === "GET" && joinStatusMatch) {
+    const token = joinStatusMatch[1]!;
     const inv = await getRegistrationInvite(env.STORE, token);
     if (!inv) {
-      return htmlResponse(
-        joinLandingHtml({
-          ok: false,
-          message: "這份註冊邀請不存在或無效。",
-        }),
-        404
-      );
+      return json({ ok: false, status: "not_found" }, 404);
     }
     if (Date.now() >= inv.expiresAt) {
-      return htmlResponse(
-        joinLandingHtml({
-          ok: false,
-          message: "這份註冊邀請已過期。",
-          expiresAt: inv.expiresAt,
-        }),
+      return json(
+        { ok: false, status: "expired", expires_at: inv.expiresAt },
         410
       );
     }
     if (inv.usedAt) {
-      return htmlResponse(
-        joinLandingHtml({
-          ok: false,
-          message: "這份註冊邀請已經使用過了。",
-        }),
-        410
-      );
+      return json({ ok: false, status: "used" }, 410);
     }
-    return htmlResponse(
-      joinLandingHtml({
-        ok: true,
-        message:
-          "註冊邀請有效。請使用 GitHub 或 Google 領取：綁定帳號、建立後台 session，並取得一把場用 API key（寫入場內密鑰庫）。",
-        expiresAt: inv.expiresAt,
-        token,
-      })
-    );
+    return json({
+      ok: true,
+      status: "valid",
+      expires_at: inv.expiresAt,
+      token,
+    });
   }
 
   if (request.method === "GET" && pathname === "/health") {
@@ -631,6 +642,107 @@ async function route(
       key: key
         ? { prefix: key.prefix, created_at: key.createdAt }
         : null,
+    });
+  }
+
+  // Delete own account
+  if (request.method === "DELETE" && pathname === "/v1/me") {
+    const auth = await requireAccessToken(env, request);
+    if (!auth.ok) return auth.res;
+    const result = await deleteUserAccount(env.STORE, auth.userId);
+    if (!result.ok) {
+      const status = result.error === "last_admin" ? 409 : 404;
+      return json({ error: result.error }, status);
+    }
+    return json(
+      { ok: true },
+      200,
+      { "Set-Cookie": clearSessionCookieHeader(request) }
+    );
+  }
+
+  // Unlink Social SSO (keep ≥1)
+  const unlinkSsoMatch = /^\/v1\/me\/sso\/(github|google)$/.exec(pathname);
+  if (request.method === "DELETE" && unlinkSsoMatch) {
+    const auth = await requireAccessToken(env, request);
+    if (!auth.ok) return auth.res;
+    const provider = unlinkSsoMatch[1]!;
+    const result =
+      provider === "github"
+        ? await unlinkGithub(env.STORE, auth.userId)
+        : await unlinkGoogle(env.STORE, auth.userId);
+    if (!result.ok) {
+      const status =
+        result.error === "last_sso"
+          ? 409
+          : result.error === "not_linked"
+            ? 404
+            : 400;
+      return json({ error: result.error }, status);
+    }
+    return json({ ok: true });
+  }
+
+  // Admin: list registered users
+  if (request.method === "GET" && pathname === "/v1/admin/users") {
+    const auth = await requireAccessToken(env, request);
+    if (!auth.ok) return auth.res;
+    if (auth.role !== "admin") {
+      return json({ error: "forbidden" }, 403);
+    }
+    const users = await listUsers(env.STORE);
+    const items = await Promise.all(
+      users.map(async (u) => {
+        const key = await getApiKeyForUser(env.STORE, u.userId);
+        return {
+          user_id: u.userId,
+          role: u.role,
+          disabled: Boolean(u.disabled),
+          created_at: u.createdAt,
+          github: u.github
+            ? { id: u.github.id, login: u.github.login }
+            : null,
+          google: u.google
+            ? { id: u.google.id, email: u.google.email }
+            : null,
+          key: key
+            ? { prefix: key.prefix, created_at: key.createdAt }
+            : null,
+        };
+      })
+    );
+    return json({ users: items });
+  }
+
+  // Admin: disable / enable user
+  const adminUserAction = /^\/v1\/admin\/users\/([^/]+)\/(disable|enable)$/.exec(
+    pathname
+  );
+  if (request.method === "POST" && adminUserAction) {
+    const auth = await requireAccessToken(env, request);
+    if (!auth.ok) return auth.res;
+    if (auth.role !== "admin") {
+      return json({ error: "forbidden" }, 403);
+    }
+    const targetId = decodeURIComponent(adminUserAction[1]!);
+    const disable = adminUserAction[2] === "disable";
+    const result = await setUserDisabled(
+      env.STORE,
+      targetId,
+      disable,
+      auth.userId
+    );
+    if (!result.ok) {
+      const status =
+        result.error === "last_admin" || result.error === "cannot_disable_self"
+          ? 409
+          : 404;
+      return json({ error: result.error }, status);
+    }
+    return json({
+      ok: true,
+      user_id: result.user.userId,
+      disabled: Boolean(result.user.disabled),
     });
   }
 

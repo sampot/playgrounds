@@ -5,12 +5,18 @@
   "private": true,
   "description": "Playgrounds Platform API (Invite / thin signaling) — DEC-047",
   "scripts": {
+    "dash:install": "npm install --prefix dash",
+    "dash:build": "npm run build --prefix dash",
+    "predev": "npm run dash:build",
     "dev": "wrangler dev",
+    "predeploy": "npm run dash:build",
     "deploy": "wrangler deploy",
+    "predeploy:dry": "npm run dash:build",
     "deploy:dry": "wrangler deploy --dry-run",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "postinstall": "npm run dash:install"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260801.1",

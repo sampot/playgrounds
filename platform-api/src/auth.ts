@@ -26,12 +26,17 @@ export type EnvStore = {
   get(key: string, type?: "text"): Promise<string | null>;
   put(key: string, value: string): Promise<void>;
   delete(key: string): Promise<void>;
+  list?(options: {
+    prefix: string;
+  }): Promise<{ keys: { name: string }[] }>;
 };
 
 const BOOTSTRAP_FLAG = "meta:bootstrap_done";
+const USER_INDEX = "meta:user_ids";
 const KEY_BY_USER = (userId: string) => `key:user:${userId}`;
 const KEY_BY_PREFIX = (prefix: string) => `key:prefix:${prefix}`;
 const AT_BY_HASH = (hash: string) => `at:hash:${hash}`;
+const AT_BY_USER = (userId: string) => `at:user:${userId}`;
 const USER_REC = (userId: string) => `user:${userId}`;
 const SSO_GITHUB = (subject: string) => `sso:github:${subject}`;
 const SSO_GOOGLE = (subject: string) => `sso:google:${subject}`;
@@ -62,20 +67,117 @@ export async function putUser(
   await store.put(USER_REC(user.userId), JSON.stringify(user));
 }
 
+async function readUserIndex(store: EnvStore): Promise<string[]> {
+  const raw = await store.get(USER_INDEX);
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed)
+      ? parsed.filter((x): x is string => typeof x === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+async function writeUserIndex(store: EnvStore, ids: string[]): Promise<void> {
+  const unique = [...new Set(ids)].sort();
+  await store.put(USER_INDEX, JSON.stringify(unique));
+}
+
+export async function addUserToIndex(
+  store: EnvStore,
+  userId: string
+): Promise<void> {
+  const ids = await readUserIndex(store);
+  if (ids.includes(userId)) return;
+  ids.push(userId);
+  await writeUserIndex(store, ids);
+}
+
+export async function removeUserFromIndex(
+  store: EnvStore,
+  userId: string
+): Promise<void> {
+  const ids = await readUserIndex(store);
+  const next = ids.filter((id) => id !== userId);
+  if (next.length === ids.length) return;
+  await writeUserIndex(store, next);
+}
+
+/** Rebuild index from KV list when missing (legacy rows). */
+async function ensureUserIndex(store: EnvStore): Promise<string[]> {
+  let ids = await readUserIndex(store);
+  if (ids.length > 0) return ids;
+  if (!store.list) return ids;
+  const listed = await store.list({ prefix: "user:" });
+  ids = listed.keys
+    .map((k) => k.name.slice("user:".length))
+    .filter((id) => id.length > 0 && !id.includes(":"));
+  if (ids.length > 0) await writeUserIndex(store, ids);
+  return ids;
+}
+
+export async function listUsers(store: EnvStore): Promise<PlatformUser[]> {
+  const ids = await ensureUserIndex(store);
+  const users: PlatformUser[] = [];
+  for (const id of ids) {
+    const u = await getUser(store, id);
+    if (u) users.push(u);
+  }
+  users.sort((a, b) => b.createdAt - a.createdAt);
+  return users;
+}
+
+export async function countActiveAdmins(store: EnvStore): Promise<number> {
+  const users = await listUsers(store);
+  return users.filter((u) => u.role === "admin" && !u.disabled).length;
+}
+
 export async function ensureUser(
   store: EnvStore,
   userId: string,
   role: "admin" | "user"
 ): Promise<PlatformUser> {
   const existing = await getUser(store, userId);
-  if (existing) return existing;
+  if (existing) {
+    await addUserToIndex(store, userId);
+    return existing;
+  }
   const user: PlatformUser = {
     userId,
     role,
     createdAt: Date.now(),
   };
   await putUser(store, user);
+  await addUserToIndex(store, userId);
   return user;
+}
+
+export async function setUserDisabled(
+  store: EnvStore,
+  userId: string,
+  disabled: boolean,
+  actorUserId: string
+): Promise<{ ok: true; user: PlatformUser } | { ok: false; error: string }> {
+  if (userId === actorUserId) {
+    return { ok: false, error: "cannot_disable_self" };
+  }
+  const user = await getUser(store, userId);
+  if (!user) return { ok: false, error: "user_not_found" };
+  if (disabled && user.role === "admin" && !user.disabled) {
+    if ((await countActiveAdmins(store)) <= 1) {
+      return { ok: false, error: "last_admin" };
+    }
+  }
+  if (disabled) user.disabled = true;
+  else delete user.disabled;
+  await putUser(store, user);
+  return { ok: true, user };
+}
+
+export function ssoLinkCount(user: PlatformUser): number {
+  return (user.github ? 1 : 0) + (user.google ? 1 : 0);
 }
 
 export async function getUserIdByGithub(
@@ -140,6 +242,34 @@ export async function linkGoogle(
   return { ok: true };
 }
 
+export async function unlinkGithub(
+  store: EnvStore,
+  userId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await getUser(store, userId);
+  if (!user) return { ok: false, error: "user_not_found" };
+  if (!user.github) return { ok: false, error: "not_linked" };
+  if (ssoLinkCount(user) <= 1) return { ok: false, error: "last_sso" };
+  await store.delete(SSO_GITHUB(user.github.id));
+  delete user.github;
+  await putUser(store, user);
+  return { ok: true };
+}
+
+export async function unlinkGoogle(
+  store: EnvStore,
+  userId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await getUser(store, userId);
+  if (!user) return { ok: false, error: "user_not_found" };
+  if (!user.google) return { ok: false, error: "not_linked" };
+  if (ssoLinkCount(user) <= 1) return { ok: false, error: "last_sso" };
+  await store.delete(SSO_GOOGLE(user.google.id));
+  delete user.google;
+  await putUser(store, user);
+  return { ok: true };
+}
+
 export async function isBootstrapped(store: EnvStore): Promise<boolean> {
   return (await store.get(BOOTSTRAP_FLAG)) === "1";
 }
@@ -195,6 +325,40 @@ export async function deleteApiKey(
   return true;
 }
 
+async function readAtUserIndex(store: EnvStore, userId: string): Promise<string[]> {
+  const raw = await store.get(AT_BY_USER(userId));
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed)
+      ? parsed.filter((x): x is string => typeof x === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+async function addAtToUserIndex(
+  store: EnvStore,
+  userId: string,
+  hash: string
+): Promise<void> {
+  const hashes = await readAtUserIndex(store, userId);
+  if (!hashes.includes(hash)) hashes.push(hash);
+  await store.put(AT_BY_USER(userId), JSON.stringify(hashes));
+}
+
+async function removeAtFromUserIndex(
+  store: EnvStore,
+  userId: string,
+  hash: string
+): Promise<void> {
+  const hashes = await readAtUserIndex(store, userId);
+  const next = hashes.filter((h) => h !== hash);
+  if (next.length === 0) await store.delete(AT_BY_USER(userId));
+  else await store.put(AT_BY_USER(userId), JSON.stringify(next));
+}
+
 export async function issueAccessToken(
   store: EnvStore,
   userId: string,
@@ -212,6 +376,7 @@ export async function issueAccessToken(
     expiresAt: createdAt + ttlMs,
   };
   await store.put(AT_BY_HASH(hash), JSON.stringify(record));
+  await addAtToUserIndex(store, userId, hash);
   return { plaintext, record };
 }
 
@@ -226,6 +391,7 @@ export async function lookupAccessToken(
   const record = JSON.parse(raw) as StoredAccessToken;
   if (Date.now() >= record.expiresAt) {
     await store.delete(AT_BY_HASH(hash));
+    await removeAtFromUserIndex(store, record.userId, hash);
     return null;
   }
   return record;
@@ -239,8 +405,42 @@ export async function revokeAccessToken(
   const hash = await sha256Hex(bearer);
   const raw = await store.get(AT_BY_HASH(hash));
   if (!raw) return false;
+  const record = JSON.parse(raw) as StoredAccessToken;
   await store.delete(AT_BY_HASH(hash));
+  await removeAtFromUserIndex(store, record.userId, hash);
   return true;
+}
+
+export async function revokeAllAccessTokensForUser(
+  store: EnvStore,
+  userId: string
+): Promise<void> {
+  const hashes = await readAtUserIndex(store, userId);
+  for (const hash of hashes) {
+    await store.delete(AT_BY_HASH(hash));
+  }
+  await store.delete(AT_BY_USER(userId));
+}
+
+/** Delete own account (or purge). Blocks last active admin. */
+export async function deleteUserAccount(
+  store: EnvStore,
+  userId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await getUser(store, userId);
+  if (!user) return { ok: false, error: "user_not_found" };
+  if (user.role === "admin" && !user.disabled) {
+    if ((await countActiveAdmins(store)) <= 1) {
+      return { ok: false, error: "last_admin" };
+    }
+  }
+  if (user.github) await store.delete(SSO_GITHUB(user.github.id));
+  if (user.google) await store.delete(SSO_GOOGLE(user.google.id));
+  await deleteApiKey(store, userId);
+  await revokeAllAccessTokensForUser(store, userId);
+  await store.delete(USER_REC(userId));
+  await removeUserFromIndex(store, userId);
+  return { ok: true };
 }
 
 const REG_INVITE = (token: string) => `reginv:${token}`;

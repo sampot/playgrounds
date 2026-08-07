@@ -1,12 +1,12 @@
 # Playgrounds Platform 後台 UI 規格（DEC-047）
 
-> **狀態：** Draft（2026-08-06）— 契約完整；實作：MVP＋GitHub／Google SSO／access token／HOST `createPlatformInvite` 已落地；MFA／停用使用者未落地  
+> **狀態：** Draft（2026-08-07）— 契約完整；實作：MVP＋SSO／access token／HOST invite＋**SvelteKit 5 後台**（`platform-api/dash`）＋**使用者管理／自刪／SSO 連結管理**已落地；MFA／用量未落地  
 
 > **權威決策：** [DECISIONS.md](./DECISIONS.md) **DEC-047**  
 > **實作計劃：** [PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)  
-> **相關：** DEC-004（敘事非產品）、DEC-029（SecretStore）、DEC-042（保留名 `api`／`dash`）、[GLOSSARY.md](./GLOSSARY.md)、場殼 `PlaygroundsLayout`／`global.css`
+> **相關：** DEC-004（敘事非產品）、DEC-005（Svelte 5 runes）、DEC-029（SecretStore）、DEC-042（保留名 `api`／`dash`）、DEC-048（場網宿主 Kit；**不**取代本筆後台套件）、[GLOSSARY.md](./GLOSSARY.md)、場殼 `PlaygroundsLayout`／`global.css`
 
-一句話：**`dash.samkuo.me` 是 Platform 帳號／金鑰／註冊營運後台——與場殼同一品牌辨識；**統一進入介面**，登入後依角色顯示（一般使用者不見營運）；後台呼叫 API 持 **access token**（非 API key）；**API key 專供遊樂場殼頁**（SecretStore）；場邀請短網址由 SAM 經場殼代理呼叫 Platform API 取得（非後台 UI）；登入權威最終為 Social SSO（邀請制）。**
+一句話：**`dash.samkuo.me` 是 Platform 帳號／金鑰／註冊營運後台（SvelteKit 5）——與場殼同一品牌辨識；**統一進入介面**，登入後依角色顯示（一般使用者不見營運）；註冊使用者可管理場用金鑰、**連結／解除 Social SSO**（至少保留一個）、**刪除自己的帳戶**；admin 另可核發註冊邀請並**管理已註冊使用者**；後台呼叫 API 持 **access token**（非 API key）；**API key 專供遊樂場殼頁**（SecretStore）；場邀請短網址由 SAM 經場殼代理呼叫 Platform API 取得（非後台 UI）；登入權威最終為 Social SSO（邀請制）。**
 
 ---
 
@@ -14,7 +14,8 @@
 
 ### 目標
 
-- 提供可對外公開的後台表面（非場殼內嵌），完成 **Platform 帳號生命週期**（SSO／API key 管理／註冊邀請）。
+- 提供可對外公開的後台表面（非場殼內嵌），完成 **Platform 帳號生命週期**（SSO 連結管理／自刪帳戶／API key 管理／註冊邀請／**註冊使用者管理**）。
+- 後台 UI 以 **SvelteKit 5**＋Svelte 5 **runes** 實作（與場殼同族工程；見 §10），部署仍掛 Platform Worker 的 `dash`／`api` 雙 origin。
 - 與 `play.samkuo.me`／`docs.samkuo.me` **同一站群辨識**（頂欄、標記、色票、語系）。
 - 信任域分離（硬）：
   - **後台：** SSO → **access token**（或同等 session）→ `Authorization: Bearer` 呼叫帳號／金鑰／營運 API。
@@ -31,6 +32,9 @@
 - 在後台中繼 WebRTC／session 資料面。
 - 把後台做成 Help Center 或行銷 landing。
 - 讓後台以 API key 當 Bearer／登入憑證。
+- Admin 營運面**硬刪他人**帳戶（營運對他人僅停用／復用；**自刪**見 §6.3）。
+- 刪除帳戶的「審核工單／延遲冷卻期」產品流（自刪＝頁內確認後立即生效；若需寬限期另修訂）。
+- 把 Platform **API** Worker 本體改寫成 SvelteKit SSR 應用伺服器（Kit 只承載 **dash UI**；`/v1/*` 仍為 Workers TypeScript）。
 
 ---
 
@@ -79,16 +83,30 @@
 | 區塊 | 角色 | 一職 |
 | --- | --- | --- |
 | 帳號列 | 全部 | 顯示 `user_id`／角色；登出 |
+| Tab：**帳號** | 全部 | Social SSO **連結／解除**（至少保留一個）；**刪除自己的帳戶** |
 | Tab：**金鑰** | 全部 | 檢視 prefix、輪替、撤銷；提示寫入場內密鑰庫 |
-| Tab：**營運** | **僅 admin** | Platform **註冊**邀請、停用使用者（後段）、用量／除錯（後段） |
+| Tab：**營運** | **僅 admin** | Platform **註冊**邀請、**管理註冊使用者**（列表／停用／復用）、用量／除錯（後段） |
 
 **無「鑄場邀請」tab。** 場 Invite／短網址由場內 SAM 經殼代理取得（§7）。
 
 未登入：bootstrap 收入摺疊，不進第一視線競爭。
 
-### 3.3 註冊頁 `/join/<token>`
+### 3.3 技術棧（硬）
 
-獨立 landing（同一視覺系統）：驗證邀請狀態 → **領取／SSO 綁定** → 顯示一次性 API key（或導回後台已登入）。
+| 項 | 規格 |
+| --- | --- |
+| 框架 | **SvelteKit 5**（後台 UI） |
+| 元件 | **Svelte 5 runes**（`$state`／`$derived`／`$effect`／`$props` 等）；**禁止** legacy `export let`、`$:`、隱式 `let` 反應性（DEC-005） |
+| 部署 | 仍為 Platform Worker：`dash.samkuo.me`／`api.samkuo.me`；Kit 產出由同 Worker 以 ASSETS（或 Cloudflare adapter 合併）服務 dash 頁 |
+| API | `/v1/*`、OAuth callback、短連結 `/i/*` **維持** Workers TypeScript（`platform-api/src/*.ts`）；**不**經 Kit 重寫業務邏輯 |
+| 汰除 | `platform-api/src/adminUi.ts` 字串模板 HTML／內嵌 JS（遷移完成後移除） |
+| 與場殼 | 視覺對齊場殼 token；**套件獨立**於根專案 DEC-048（勿把 dash 併進場殼 `src/routes/`） |
+
+**硬規則：** 禁止原生 `alert`／`confirm`／`prompt`（見 §4.2）；確認面用 Svelte 頁內元件。
+
+### 3.4 註冊頁 `/join/<token>`
+
+獨立 landing（同一視覺系統；Kit 路由）：驗證邀請狀態 → **領取／SSO 綁定** → 顯示一次性 API key（或導回後台已登入）。
 
 ---
 
@@ -159,8 +177,10 @@
 2. **不存密碼。**
 3. Bootstrap：`ADMIN_BOOTSTRAP_TOKEN` 一次性 → 綁**第一個** admin 的 SSO subject → 作廢；之後不得再用 bootstrap 鑄 key。
 4. 同一 Platform `user_id` 可連結多個 SSO provider（GitHub＋Google）；登入任一連結即可。
-5. SSO 成功 → 核發／刷新 **access token**（或 session cookie）；登出清 session；**不**自動撤銷 API key。
-6. MFA：政策可選（TOTP 或供應商 MFA）；未啟用不得阻擋既有 **場殼** API key 呼叫。
+5. **已註冊使用者可自助新增／移除 SSO 連結**（見 §6.3）：未連結的供應商可「連結」；已連結可「解除」。**硬：帳號上至少必須保留一個已連結的 SSO**；試圖解除最後一個 → 拒絕（可讀錯誤＋code，例：`last_sso`）。
+6. 連結衝突：該 SSO subject 已綁其他 `user_id` → 拒絕（既有 `*_already_linked` 類）。
+7. SSO 成功 → 核發／刷新 **access token**（或 session cookie）；登出清 session；**不**自動撤銷 API key。解除某個 SSO **不**撤銷 API key、**不**登出（除非解除後無法維持 session 契約——預設維持目前 access token 至登出／過期）。
+8. MFA：政策可選（TOTP 或供應商 MFA）；未啟用不得阻擋既有 **場殼** API key 呼叫。
 
 ### 5.3 進入路徑
 
@@ -173,11 +193,13 @@
 
 | 角色 | 後台可見 | 不可見 |
 | --- | --- | --- |
-| **user** | 統一進入後 → 帳號列＋**金鑰**（管理場用 key） | **營運**及一切 admin 專用表面 |
-| **admin** | 同上＋**營運** | — |
-| **未登入** | 統一進入／bootstrap（僅未 bootstrapped）／註冊 landing | 已登入殼（金鑰／營運） |
+| **user** | 統一進入後 → 帳號列＋**帳號**（SSO／自刪）＋**金鑰** | **營運**及一切 admin 專用表面（含註冊邀請、使用者列表） |
+| **admin** | 同上＋**營運**（註冊邀請＋**使用者管理**） | — |
+| **未登入** | 統一進入／bootstrap（僅未 bootstrapped）／註冊 landing | 已登入殼（帳號／金鑰／營運） |
 
-停用使用者（admin）：後台標「已停用」；其 **access token** 與 **API key** 驗證均失敗 `401`／`403`；既有場 Invite 不回溯撤銷（另操撤銷 Invite）。
+停用使用者（admin）：後台標「已停用」；其 **access token** 與 **API key** 驗證均失敗 `401`／`403`；既有場 Invite 不回溯撤銷（另操撤銷 Invite）。復用後可再登入／再持有效 key（若 key 未被撤銷，停用期間驗證失敗；復用後原 key 是否仍可用見 API 契約——預設：**停用不刪 key hash**，復用後原 key 恢復可用，除非另撤銷）。
+
+自刪帳戶（本人）：見 §6.3；刪除後該 `user_id` 記錄與 SSO 索引、場用 key、access token **不可再用於驗證**；既有場 Invite 不回溯撤銷。
 
 ---
 
@@ -190,7 +212,7 @@
 | 元素 | 規格 |
 | --- | --- |
 | 標題 | 「遊樂場」（品牌級） |
-| 副句 | 說明後台職能（帳號、管理場用 API key）；註冊邀請屬營運、僅 admin 登入後可見；場邀請在遊樂場內由小品經殼發出 |
+| 副句（對讀者） | 勿暴露內部契約用語。例：「管理帳號與金鑰的地方。用 GitHub 或 Google 進入即可。」進入區勿提 access token／API key／殼代理等 |
 | 主 CTA | 「使用 GitHub 進入」；次：「使用 Google 進入」（5.2）→ SSO → **access token** |
 | Bootstrap | **另頁** `GET /bootstrap/`（不在登入首屏）；token＋「以 GitHub 完成 bootstrap」 |
 
@@ -211,24 +233,100 @@
 | 尚無金鑰 | 顯示「尚無金鑰」；主按鈕改「建立金鑰」；撤銷不可用 |
 | 場內提示 | 文案指向 SecretStore 保留名 **`PLAYGROUNDS_API_KEY`**；不代寫入場 |
 
-### 6.3 （刪除）場 Invite 鑄造
+### 6.3 帳號（**全部已登入角色**）
+
+**職：** 管理自己的 Social SSO 連結，以及**刪除自己的帳戶**。
+
+**可見性：** `user` 與 `admin` 皆可見（非營運）。
+
+#### 6.3.1 Social SSO 連結
+
+| 元素 | 規格 |
+| --- | --- |
+| 列表 | 每個支援的供應商一列（初版：GitHub、Google）：狀態＝已連結（顯示 `login`／email）或未連結 |
+| 新增連結 | 未連結列：「連結 GitHub／Google」→ 走既有 OAuth link 流程 → 成功後列更新為已連結 |
+| 移除連結 | 已連結列：「解除連結」→ 頁內確認 → 解除該 provider |
+| **至少一個** | 當帳號僅剩**一個**已連結 SSO 時，該列「解除連結」**不可操作**（或確認後 API 拒）；文案說明「至少須保留一個登入方式」；錯誤 code 例：`last_sso` |
+| 衝突 | subject 已綁其他帳號 → 可讀錯誤（既有 `*_already_linked`） |
+| 與金鑰 | 連結／解除**不**輪替或撤銷場用 API key |
+
+**對應 API（持 access token；細節以 API 計劃對齊）：**
+
+| 方法 | 路徑 | 行為 |
+| --- | --- | --- |
+| （既有）OAuth link | `/auth/github`、`/auth/google`（已登入＋link 意圖） | 新增連結 |
+| `DELETE` | `/v1/me/sso/github` 或 `/v1/me/sso/google` | 解除該 provider；若為最後一個 → `400`／`409`＋`last_sso` |
+
+（路徑名可微調；契約語意＝本人解除＋至少保留一個。）
+
+#### 6.3.2 刪除自己的帳戶
+
+| 元素 | 規格 |
+| --- | --- |
+| 入口 | 帳號 tab 底部危險區：「刪除我的帳戶」 |
+| 確認 | **頁內確認面**（非原生 dialog）：說明後果（無法再以此帳號進入後台；場用 API key 失效；須新註冊邀請才能再來）；需明確確認動作（例：勾選「我了解」或輸入固定提示語——**勿**用 `prompt`） |
+| 成功 | 清 session／access token；導回未登入進入頁；flash 可選「帳戶已刪除」 |
+| 效果 | 刪除（或等效不可恢復之標記）`user` 記錄、SSO 索引、場用 API key、該使用者 access token；**不**回溯撤銷已鑄場 Invite |
+| 最後 admin | **不可**自刪「目前唯一未停用的 admin」（與停用對稱）；→ 可讀錯誤＋`last_admin`；須先有其他 admin 或完成交接 |
+| 與營運停用 | 自刪 ≠ admin 停用；自刪後列表中**不再出現**該使用者（或僅短暫 tombstone，初版以不再列出為準） |
+| Admin 營運 | **不**提供「代刪他人」按鈕（見 §6.5.1） |
+
+**對應 API：**
+
+| 方法 | 路徑 | 行為 |
+| --- | --- | --- |
+| `DELETE` | `/v1/me` | 刪除目前使用者帳戶；`last_admin` 時拒絕 |
+
+### 6.4 （刪除）場 Invite 鑄造
 
 **不在後台。** 見 §7。
 
-### 6.4 營運（**僅 admin**）
+### 6.5 營運（**僅 admin**）
 
 **職：** Platform **註冊**與營運（≠ 場 Invite）。
 
-**可見性：** 僅 `role === admin`。一般使用者：tab 不渲染／`hidden`＋不可選；panel 不得露出。API：`POST /v1/admin/*` 對非 admin → `403`。
+**可見性：** 僅 `role === admin`。一般使用者：tab 不渲染／`hidden`＋不可選；panel 不得露出。API：`/v1/admin/*` 對非 admin → `403`。
+
+營運 panel 內分兩塊（同一 tab；可為小標分段，**不**另開「使用者」頂層 tab）：
+
+1. **註冊邀請**（核發）
+2. **註冊使用者**（列表與停用／復用）
 
 | 能力 | 優先 | 規格 |
 | --- | --- | --- |
-| 核發註冊邀請 | **MVP** | 回 `join_url`（dash）、到期；複製 |
-| 停用／復用使用者 | 後段 | 列表＋動作；不可刪除自己 |
+| 核發註冊邀請 | **MVP**（已落地） | 回 `join_url`（dash）、到期；複製 |
+| **管理註冊使用者** | **必做** | 見 §6.5.1 |
 | Invite／隊列除錯 | 後段 | 只讀除錯（營運）；**非**使用者鑄鏈入口 |
 | 用量 | 後段 | 每 user／日 join 與 invite 計數摘要 |
 
-### 6.5 註冊 landing `/join/<token>`
+#### 6.5.1 管理註冊使用者
+
+**職：** admin 檢視已註冊 Platform 帳號並停用／復用（邀請制帳號面的營運把手）。
+
+| 元素 | 規格 |
+| --- | --- |
+| 列表 | 顯示已註冊使用者；每列至少：`user_id`、`role`、狀態（使用中／已停用）、SSO 摘要（GitHub `login` 與／或 Google email；未綁則「未連結」）、場用 key `prefix…` 或「尚無金鑰」、建立時間 |
+| 排序 | 預設依 `createdAt` 新→舊（或 `user_id`）；無需分頁直到列表過長（後段可加） |
+| 篩選 | 初版可無；後段可加「僅已停用／僅 admin」 |
+| 停用 | 頁內確認面（非原生 dialog）：確認後該使用者 **access token** 與 **API key** 驗證失敗；列表標「已停用」 |
+| 復用 | 頁內確認；清 `disabled`；列表恢復「使用中」 |
+| 不可對自己 | 對**目前登入**的 `user_id`，停用／復用按鈕不可操作；文案說明「不可停用自己」（本人若要離開→走 §6.3.2 自刪） |
+| 最後 admin | **不可**停用「目前唯一未停用的 admin」（避免鎖死後台）；嘗試 → 可讀錯誤＋技術 code（例：`last_admin`） |
+| 無代刪 | **不**提供「刪除使用者」按鈕（他人僅停用；本人自刪見 §6.3.2） |
+| 空態 | 「尚無其他註冊使用者」或僅自己時仍顯示自己那一列（動作不可用） |
+| 錯誤 | `403`／`404`／`last_admin` 等 → flash／`role="status"` |
+
+**對應 API（後台持 access token＋admin；細節以 API 計劃對齊）：**
+
+| 方法 | 路徑 | 行為 |
+| --- | --- | --- |
+| `GET` | `/v1/admin/users` | 列出註冊使用者（含上表欄位所需欄位） |
+| `POST` | `/v1/admin/users/:userId/disable` | 停用 |
+| `POST` | `/v1/admin/users/:userId/enable` | 復用 |
+
+（等價：單一 `PATCH` 設 `disabled` 亦可；UI 語意仍為停用／復用兩動作。）
+
+### 6.6 註冊 landing `/join/<token>`
 
 | 狀態 | UI |
 | --- | --- |
@@ -265,10 +363,13 @@ SAM（現行 Agent／會議小品等）
 | --- | --- | --- | --- |
 | 登入（SSO → access token） | ✅ | ❌ | ❌ |
 | 管 API key（輪替／撤銷／揭示一次） | ✅（持 access token） | ❌（只讀／寫入 SecretStore 複本由使用者） | ❌ |
+| **SSO 連結／解除**（至少保留一個） | ✅（本人；持 access token） | ❌ | ❌ |
+| **刪除自己的帳戶** | ✅（本人；持 access token） | ❌ | ❌ |
 | **鑄場 Invite／短網址** | ❌ | 代理呼叫（持 **API key**） | ✅ 發起 |
 | Host 作答循環 | ❌ | ✅（持 API key） | 可驅動／觀測 |
 | `#pg=` 兌換／compose | ❌ | ✅ | 可參與 UX |
 | Platform **註冊**邀請 | ✅（admin；持 access token）／landing | ❌ | ❌ |
+| **管理註冊使用者**（列表／停用／復用） | ✅（admin；持 access token） | ❌ | ❌ |
 
 ### 7.3 過渡實作
 
@@ -280,7 +381,7 @@ SAM（現行 Agent／會議小品等）
 
 | 用 | 不用 |
 | --- | --- |
-| 後台、進入、金鑰（場用）、輪替、撤銷、註冊邀請、營運、access token／工作階段 | 控制台、Dashboard 當品牌名、方案、席位、Team、Billing；**勿**把「短網址邀請」當後台主職；**勿**暗示後台用 API key 登入 |
+| 後台、進入、帳號、金鑰（場用）、輪替、撤銷、連結／解除（SSO）、刪除我的帳戶、註冊邀請、**註冊使用者**、停用／復用、營運、access token／工作階段 | 控制台、Dashboard 當品牌名、方案、席位、Team、Billing、User management／Close account 產品腔；**勿**把「短網址邀請」當後台主職；**勿**暗示後台用 API key 登入 |
 | 遊樂場、我是山姆鍋 | Playgrounds Cloud、平台產品名單獨 hero 蓋過山姆鍋 |
 | 密鑰庫／`PLAYGROUNDS_API_KEY`（給場殼） | 「雲端 API 金鑰倉」行銷稱；「後台金鑰＝登入密碼」 |
 | （場內）邀請連結／短網址 | 後台「一鍵發會議連結」 |
@@ -302,14 +403,17 @@ SAM（現行 Agent／會議小品等）
 - [x] **後台 API 僅 access token**（GitHub SSO／session cookie；場 API 拒 access token）
 - [x] HOST／殼代理 `createPlatformInvite`（或同等）供 SAM 呼叫
 
-### 9.2 Phase 5
+### 9.2 Phase 5＋後台 Kit／使用者管理
 
 - [x] GitHub OAuth 登入／綁定（邀請制）→ 核發 access token（程式落地；正式域 secrets／callback 需驗證）
 - [x] Google OAuth
 - [x] Access token／session cookie 為後台進入；API key 僅場殼
 - [x] 汰除「貼 API key 登入」過渡（改純 SSO）
+- [x] **後台 UI 遷 SvelteKit 5**（runes；汰除 `adminUi.ts`）
+- [x] **管理註冊使用者**：`GET/POST /v1/admin/users…`＋營運 UI（列表／停用／復用；不可停用自己／最後 admin）
+- [x] **帳號 tab**：SSO 新增／移除連結（至少保留一個；`last_sso`）
+- [x] **自刪帳戶**：`DELETE /v1/me`＋頁內確認（`last_admin` 不可自刪）
 - [ ] MFA 政策開關
-- [ ] 停用使用者
 - [ ] （可選）隊列／用量只讀
 
 ### 9.3 完成檢查（SSO 後）
@@ -320,6 +424,12 @@ SAM（現行 Agent／會議小品等）
 - [ ] 頂欄與場殼品牌測試通過
 - [ ] 短網址域名永遠為 `api.samkuo.me`
 - [x] 場邀請僅能經 SAM→殼代理取得（後台無鑄入口）
+- [ ] `role !== admin` 時網路／UI 皆無法觸及使用者列表與停用 API
+- [ ] 停用後該使用者無法再以 access token／API key 通過驗證；復用後恢復（未另撤銷 key 時）
+- [ ] 解除最後一個 SSO 被拒；僅一個連結時 UI 不可解除
+- [ ] 自刪後無法再以原 SSO／key 進入；session 已清；營運列表不再出現（或等效）
+- [ ] 唯一 admin 不可自刪／被停用
+- [ ] 後台頁為 Kit 路由／元件；無 `adminUi.ts` 字串模板
 - [ ] DEC-004 文案複核無產品腔
 
 ---
@@ -328,11 +438,14 @@ SAM（現行 Agent／會議小品等）
 
 | 區域 | 路徑 |
 | --- | --- |
-| 後台 HTML／CSS／JS | `platform-api/src/adminUi.ts` |
-| 路由／claim／bootstrap | `platform-api/src/index.ts` |
-| 帳號／key／註冊邀請 | `platform-api/src/auth.ts` |
+| 後台 UI（**SvelteKit 5**） | `platform-api/` 內獨立 Kit 套件或子目錄（建議 `platform-api/dash/`；路由：`/`、`/admin`、`/bootstrap/`、`/join/[token]`）；產出掛同 Worker ASSETS／adapter |
+| Worker 入口／API／OAuth／短連結 | `platform-api/src/index.ts` 等 |
+| 帳號／key／SSO 連結解除／自刪／註冊邀請／**使用者列表與停用** | `platform-api/src/auth.ts`（＋`/v1/me`、`/v1/me/sso/*`、admin users 端點） |
+| （已刪）舊字串模板 UI | ~~`platform-api/src/adminUi.ts`~~ — 已汰除 |
 | 場內 Platform 客戶端 | `src/components/playgrounds/platform/*` |
 | 保留名 | `src/worker.ts`、`src/utils/playgroundsUrls.ts` |
+
+**建置／指令（落地時對齊 `platform-api/package.json`／根 scripts）：** Kit `check`／build；Platform `deploy` 須同時帶上 API Worker 與 dash 靜態（或 adapter）產出。
 
 ---
 
@@ -350,3 +463,7 @@ SAM（現行 Agent／會議小品等）
 | 2026-08-06 | 禁止原生 `alert`／`confirm`／`prompt`；後台改頁內確認面 |
 | 2026-08-06 | HOST `createPlatformInvite`／`revokePlatformInvite`（SecretStore 殼代理） |
 | 2026-08-06 | Google OAuth：`/auth/google`＋callback；與 GitHub 並存連結同一 `user_id` |
+| 2026-08-07 | **後台 UI 改 SvelteKit 5**（runes；汰除 `adminUi.ts`）；**管理註冊使用者**納入營運必做（§6.5.1＋admin users API） |
+| 2026-08-07 | 註冊使用者：**自刪帳戶**（§6.3.2）；**新增／移除 Social SSO** 且至少保留一個（§6.3.1／`last_sso`）；新增「帳號」tab |
+| 2026-08-07 | **實作落地：** `platform-api/dash` SvelteKit 5；API `admin/users`／`DELETE /v1/me`／`me/sso/*`；汰除 `adminUi.ts` |
+| 2026-08-07 | 後台對讀者文案：勿暴露 access token／API key／殼代理等內部用語 |

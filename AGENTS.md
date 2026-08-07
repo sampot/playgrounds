@@ -27,7 +27,7 @@ Reader-facing narrative stays personal／non-product (blog DEC-004).
 - `npm run deploy` — `wrangler deploy` (self-host / Deploy to Cloudflare button; root `wrangler.jsonc`)
 - `npm run deploy:official` — build + official field-net (`wrangler.official.jsonc` → `play.samkuo.me`)
 - `npm run docs:dev` / `docs:build` / `docs:deploy` — Starlight docs (`docs.samkuo.me`)
-- `npm run platform:dev` / `platform:test` / `platform:deploy` — Platform API／dashboard (`api.samkuo.me`／`dash.samkuo.me`；`platform-api/`)
+- `npm run platform:dev` / `platform:test` / `platform:deploy` — Platform API／dashboard (`api.samkuo.me`／`dash.samkuo.me`；`platform-api/`；dash UI＝`platform-api/dash` SvelteKit 5)
 
 ## Layout
 

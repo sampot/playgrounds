@@ -256,8 +256,13 @@ Auth：`Authorization: Bearer <access_token|api_key|join_cap|…>`（依端點�
 | 方法 | 路徑 | 憑證 | 行為 |
 | --- | --- | --- | --- |
 | `GET` | `/me` | access token | 目前使用者／角色／key prefix |
+| `DELETE` | `/me` | access token | 刪除自己的帳戶（`last_admin` → 409） |
+| `DELETE` | `/me/sso/github`／`/me/sso/google` | access token | 解除 SSO（至少保留一個；`last_sso` → 409） |
 | `POST`／`DELETE` | `/keys` | access token | 輪替／撤銷場用 API key |
+| `GET` | `/admin/users` | access token＋admin | 列出註冊使用者 |
+| `POST` | `/admin/users/:id/disable`／`enable` | access token＋admin | 停用／復用（不可對自己；`last_admin`） |
 | `POST` | `/admin/registration-invites` | access token＋admin | 核發註冊邀請 |
+| `GET` | `/join/:token` | 無 | 註冊邀請狀態（dash landing） |
 | `POST` | `/invites` | **API key**（場殼） | 鑄 Invite（`kind`＋`intent`；**無 offer**）；回傳 `short_url`＋深鏈 |
 | `GET` | `/i/:short_id` | 無 | **302** → `#pg=<invite_secret>` |
 | `GET` | `/invites/:secret` | 公開持鏈或 key | 預覽 intent（可限流） |
@@ -286,7 +291,7 @@ Auth：`Authorization: Bearer <access_token|api_key|join_cap|…>`（依端點�
 1. Social SSO：**GitHub 必做、Google 次做**；（政策）MFA → **access token**。
 2. 後台登入後 API：**僅 access token**；**API key 專供場殼**。
 3. **我的 API key：** 輪替／撤銷；硬頂 1；明文僅建立／輪替／claim 時顯示；提示寫入 `PLAYGROUNDS_API_KEY`。
-4. **Admin：** Platform **註冊**邀請（`/join/<token>`）；後段停用使用者／用量。
+4. **Admin：** Platform **註冊**邀請（`/join/<token>`）；**管理註冊使用者**（列表／停用／復用）；用量後段。帳號 tab：SSO 連結／解除（≥1）、自刪帳戶。
 5. **不鑄場 Invite**——短網址由 **SAM → 殼代理 → API**（持 API key；見 DASH-SPEC §7）。
 6. 品牌與場殼同一色票／頂欄族；DEC-004 非產品腔。
 

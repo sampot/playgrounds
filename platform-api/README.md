@@ -10,12 +10,15 @@ Independent Cloudflare Worker for Invite / thin WebRTC signaling + dashboard (DE
 
 ```bash
 cd platform-api
-npm install
+npm install          # also installs dash/ (SvelteKit 5 UI)
+npm run dash:build   # or rely on predev / predeploy
 # set secret once for local:
 # echo 'dev-bootstrap-token' | npx wrangler secret put ADMIN_BOOTSTRAP_TOKEN
 npx wrangler kv namespace create STORE   # paste id into wrangler.jsonc
 npm run dev
 ```
+
+Dashboard UI is **SvelteKit 5** under `dash/`（ASSETS binding；Worker 仍處理 `/v1/*`／`/auth/*`）。
 
 Open `http://127.0.0.1:8787/` for the dashboard (local). Bootstrap (once):
 
@@ -69,6 +72,14 @@ Flows: `GET /auth/{github|google}?intent=login|join|link|bootstrap` → provider
 Admin bootstrap UI: **`https://dash.samkuo.me/bootstrap/`** (not on the login page).
 
 Logout: `POST /v1/auth/logout`. **No** API-key login for the dashboard.
+
+Account APIs (access token):
+
+- `DELETE /v1/me` — delete own account（`last_admin` → 409）
+- `DELETE /v1/me/sso/github|google` — unlink SSO（`last_sso` → 409）
+- `GET /v1/admin/users` — list users（admin）
+- `POST /v1/admin/users/:id/disable|enable` — disable／enable（admin）
+- `GET /v1/join/:token` — registration invite status（public；dash landing）
 
 ## Test
 
