@@ -131,6 +131,15 @@
       "license": "MIT"
     },
     {
+      "id": "pg-chengyu",
+      "title": "成語接龍",
+      "kind": "game",
+      "series": "精緻可玩",
+      "blurb": "末字起頭接龍、挑戰計分與人機對戰；適配手機，自製音效。",
+      "source": "sampot/pg-chengyu",
+      "license": "MIT"
+    },
+    {
       "id": "pg-chmod",
       "title": "Unix 權限",
       "kind": "tool",
