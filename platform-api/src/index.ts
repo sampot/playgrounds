@@ -76,7 +76,7 @@ import {
   randomId,
   requestHostname,
   shortId,
-  shortLinkOrigin,
+  goPublicOrigin,
   shortUrl,
 } from "./ids.js";
 import { InviteDurableObject } from "./inviteDo.js";
@@ -97,6 +97,8 @@ export type Env = {
   TURN_KEY_ID?: string;
   /** Cloudflare Realtime TURN API token (secret). */
   TURN_API_TOKEN?: string;
+  /** Pure-play Guest origin for invite short_url (DEC-050). Default go.samkuo.me. */
+  GO_PUBLIC_ORIGIN?: string;
 };
 
 function json(
@@ -379,7 +381,7 @@ async function route(
 ): Promise<Response> {
   const { pathname } = url;
 
-  // Short link
+  // Short link → pure-play client (DEC-050)
   const shortMatch = /^\/i\/([A-Za-z0-9_-]+)$/.exec(pathname);
   if (request.method === "GET" && shortMatch) {
     const id = shortMatch[1]!;
@@ -388,10 +390,28 @@ async function route(
     if (map.revoked || Date.now() >= map.expiresAt) {
       return json({ error: "gone" }, 410);
     }
-    const loc = fieldDeepLink(map.targetField, map.secret);
+    const loc = `${goPublicOrigin(env)}/i/${encodeURIComponent(id)}`;
     return new Response(null, {
       status: 302,
       headers: { Location: loc },
+    });
+  }
+
+  // Public short → secret resolve for go-client (SPA cannot read 302 Location alone)
+  const shortResolve = /^\/v1\/shorts\/([A-Za-z0-9_-]+)$/.exec(pathname);
+  if (request.method === "GET" && shortResolve) {
+    const id = shortResolve[1]!;
+    const map = await getShortMapping(env.STORE, id);
+    if (!map) return json({ error: "not_found" }, 404);
+    if (map.revoked || Date.now() >= map.expiresAt) {
+      return json({ error: "gone" }, 410);
+    }
+    return json({
+      short_id: id,
+      secret: map.secret,
+      invite_id: map.inviteId,
+      target_field: map.targetField,
+      expires_at: map.expiresAt,
     });
   }
 
@@ -1170,12 +1190,11 @@ async function route(
       created.expiresAt
     );
     await env.STORE.put(`secret:${secret}`, inviteId);
-    const origin = shortLinkOrigin(request);
     return json({
       invite_id: inviteId,
       kind,
       expires_at: created.expiresAt,
-      short_url: shortUrl(origin, sid),
+      short_url: shortUrl(sid, goPublicOrigin(env)),
       deep_link: fieldDeepLink(targetField, secret),
       secret,
     });

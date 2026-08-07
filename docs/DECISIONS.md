@@ -1,6 +1,6 @@
 # 我是山姆鍋 — 架構與工程決策
 
-> **最後更新：** 2026-08-06（DEC-048 Accepted：場網宿主 SvelteKit Phase 1–6）
+> **最後更新：** 2026-08-07（DEC-050 Proposed：純玩版 `go.samkuo.me`）
 > **對象：** 作者、AI agents；必要時給之後的自己讀
 
 本文件以輕量 **ADR**（Architecture Decision Record）記錄本站**顯著且耐久**的架構／工程選擇：選了什麼、為何不選其他、後續工作不可踩破的後果。細節規格仍以 [AGENTS.md](./AGENTS.md)、[TOOLS-PLAN.md](./TOOLS-PLAN.md) 等為準；此檔是可掃讀的決策索引，避免只活在 PR 與聊天裡。
@@ -88,6 +88,7 @@
 | [DEC-046](#dec-046-playgrounds-型錄結構化資料與查詢面) | Playgrounds 型錄結構化資料與查詢面 | Draft |
 | [DEC-047](#dec-047-playgrounds-platform-api) | Playgrounds Platform API（Invite／薄 signaling／後台） | Draft |
 | [DEC-048](#dec-048-playgrounds-宿主-sveltekit-靜態-pwa) | Playgrounds 宿主：SvelteKit 靜態 PWA（卸根 Astro） | Accepted |
+| [DEC-050](#dec-050-playgrounds-純玩版客戶端-gosamkuome) | Playgrounds 純玩版客戶端＠`go.samkuo.me` | Proposed |
 
 ---
 
@@ -938,7 +939,7 @@
   2. **設計中心＝Invite：** 一條短連結／深鏈；**多人可經同一連結加入**。每次加入＝短命 join＋可選 handshake 槽。近程 kind＝`invite.compose`（開 SAM、放大畫布、完整 protocol、consent；可選 signal）。
   3. **Ticket 路徑 signaling（僅 Platform）：** 鑄 Invite 時**不**帶 offer。**加入者**提交 offer，**同一邏輯回合** long-poll 等 answer；**邀請者（session host）**排隊串行作答。同時僅一筆 WebRTC handshake；忙線＝**排隊**。Host 離線 → 需新連線者超時（預期）。**若雙方已有可用 PeerConnection → 重用該連線，不跑 signaling**（signaling **僅**尚未連線或既有 peer 不可用時）。OOB `#roster=`／QR／文字 **不變**（仍發起者 offer）。Wire／非 trickle／每輪 1× O／A 不變；禁止對已連線 peer 經 Platform renegotiation。
   4. **與 Roster：** Platform **串行發握手**（僅未連線）；連上後 Roster **並行持多 peer**（見 DEC-045）。
-  5. **深鏈與短連結：** `#pg=<invite>`（hash）；**`/i/<short_id>`** → 302（canonical 在 `api`）；**QR 預設短連結**。
+  5. **深鏈與短連結：** `#pg=<invite>`（hash；場殼／相容）；**`/i/<short_id>`** canonical 在 **`go.samkuo.me`**（見 DEC-050）；`api` 上 `/i/` 可 302→go；**QR 預設短連結＠go**。
   6. **身分：** 註冊邀請制；Social SSO（**GitHub 必做、Google 次做**；見 [PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md)）；不存密碼；可 MFA。SSO → **access token**（後台 session）。Bootstrap：一次性 **`ADMIN_BOOTSTRAP_TOKEN`**。**不做場內 SSO** 發放場憑證。
   7. **API key／Host 入場：** 每帳號最多 1 把場用 API key；**僅遊樂場殼頁記憶體**（經 dash「登入我的遊樂場」→ 短命 **provision** redeem；**URL 永不帶 `pg_sk_`**）。每次入場 **輪替**（單席，避免共用）。**∉ SecretStore**（DEC-029 專供 BYOK）。**後台 UI 登入後呼叫 API 使用 access token，不用 API key。**
   8. **呈現：** 放大＝**`maximizePreview`（放大畫布）**，非瀏覽器全螢幕。
@@ -952,7 +953,7 @@
   - 勿對已連線的 peer 再走 Platform O／A／renegotiation；已連線則重用。
   - 勿把「同時僅一 handshake」誤寫成「Roster 只能一 peer」。
   - 勿把完整深鏈當 QR 預設；勿用 Fullscreen API 冒充放大畫布。
-  - `dash`／`api` 為場網保留名；短連結 canonical 在 api，後台在 dash。
+  - `dash`／`api`／**`go`** 為場網保留名；邀請短連結 canonical 在 **go**（DEC-050）；後台在 dash；API 在 api。
   - 後台勿用產品／SaaS 控制台腔（DEC-004）；SSO 供應商以 DASH-SPEC 為準，勿默認任意 IdP。
   - **勿**把使用者場邀請入口做在 `dash`；勿讓 SAM 繞過殼代理直接暴露 API key。
   - **勿**以後台 access token 當場殼憑證；**勿**以 API key 當後台常態 session。
@@ -972,6 +973,7 @@
 - **Revision（2026-08-06）：** 移除後台 API key 登入過渡；進入僅 GitHub SSO。
 - **Revision（2026-08-07）：** Host 入場＝dash provision → 場殼記憶體 API key；∉ SecretStore；單席輪替；不做場內 SSO。
 - **Revision（2026-08-07）：** 非目標明示**自備 TURN**（與 DEC-045 對齊）；官方 TURN／點數指向 CREDITS 計劃。
+- **Revision（2026-08-07）：** 場 Invite 短連結 canonical 改 **`go.samkuo.me/i/…`**（DEC-050／[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)）；api `/i/` 降為相容 302。
 
 ### DEC-048: Playgrounds 宿主 SvelteKit 靜態 PWA
 
@@ -994,6 +996,30 @@
 - **Revision（2026-08-06）：** 初版 Draft。
 - **Revision（2026-08-06）：** 明示 Svelte 5 runes（DEC-005）；Kit 必須 `runes: true`。
 - **Revision（2026-08-06）：** Phase 1–6 落地；Status → Accepted。
+
+### DEC-050: Playgrounds 純玩版客戶端＠`go.samkuo.me`
+
+- **Status:** Proposed（2026-08-07；契約草案；見 [PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)）
+- **Context:** 場邀請 Guest 掃 QR／相機開連結常落在受限瀏覽情境，場殼 `install_if_missing`→OPFS 寫入失敗；無法可靠自動改開標準 Safari。Guest 本來只需參與**當下 Invite 的 SAM／session**（無編輯環境）；同 session 可多局，由 SAM 決定。`view=canvas` 藏 IDE 仍是同份場殼與 OPFS 假設。
+- **Decision:**
+  1. **獨立客戶端：** **`https://go.samkuo.me`**＝純玩版權威 origin（獨立 Cloudflare Worker＋Static Assets；**不是**場）。無 Files／編輯器／SecretStore／鑄邀請／provision。**必須**露出山姆鍋 logo／mark，並可見可點 **`https://play.samkuo.me/`**（遊樂場主網址；**可行時**優先外開系統瀏覽器／標準 Safari 以跳出 WebView——盡力而為，非保證）。
+  2. **短網址 canonical：** 場 Invite 的 `short_url`／QR＝**`https://go.samkuo.me/i/<short_id>`**。Invite 權威與 short map 仍在 Platform；`api.samkuo.me/i/…` 可 302 → go（相容）。
+  3. **儲存：** 不依賴持久 OPFS；compose SAM 以記憶體／session FileMap（或等價）載入；入座 reuse 本頁實例。
+  4. **範圍首刀：** `#pg=`／`invite.compose`／五子棋 E2E（[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)）；Host 與一般 `?open=` 仍走場殼＋OPFS。
+  5. **保留名：** `go` ∈ 場網保留表（與 `api`／`docs`／`dash` 同級）。
+  6. **TURN／點數：** Guest 仍經 `join_cap` 取官方 TURN（記 Host）；對人透明（對齊 [PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)）。
+  - 階段見 [PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)。
+- **Consequences:**
+  - 勿把 go 做成無主匿名對戰頁；須可辨識山姆鍋／遊樂場並鏈到 `play.samkuo.me`。
+  - 勿把 go 當成另一個遊樂場場（無 OPFS 場語意）；勿在 go 做 IDE。
+  - 勿再以 `api…/i/…` 當邀請 QR 權威；鑄邀請回傳短鏈須組在 go。
+  - 勿要求 Guest 開 Safari／寫 OPFS 才能完成 go 快樂路徑。
+  - 勿 fork 整份 `PlaygroundsApp`；抽共用 library。
+  - 同步 GLOSSARY、保留名表、[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)、DEC-047 短鏈敘事。
+- **Revision（2026-08-07）：** 初版 Proposed。
+- **Revision（2026-08-07）：** 用語：純玩＝Invite／session 範圍（可多局，SAM 定）；非「只能一局」。
+- **Revision（2026-08-07）：** chrome：山姆鍋 logo＋露出 `play.samkuo.me`。
+- **Revision（2026-08-07）：** `play` 鏈：可行時外開系統瀏覽器／Safari（跳出 WebView）；非保證。
 
 ---
 
@@ -1038,6 +1064,7 @@
 | [PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md) | Platform 後台 UI 規格（`dash.samkuo.me`；DEC-047） |
 | [PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md) | Platform 點數制與官方 TURN（Draft；非訂閱；**否決**自備 TURN） |
 | [PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md) | 場邀請 E2E MVP（載體五子棋／`gomoku.v1`；DEC-047／045／023） |
+| [PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md) | 純玩版客戶端＠`go.samkuo.me`（短網址 canonical；DEC-050） |
 | [PG-STANDALONE-PLAN.md](./PG-STANDALONE-PLAN.md) | 場網／Workers／開源／舊場暫留（DEC-041／042） |
 | [PG-CATALOG-PLAN.md](./PG-CATALOG-PLAN.md) | 小品型錄 YAML／PR 投稿（`catalog/entries/`） |
 | [PG-CATALOG-QUERY-PLAN.md](./PG-CATALOG-QUERY-PLAN.md) | 型錄結構化 JSON＋Playgrounds 查詢／lazy install（DEC-046 Draft） |

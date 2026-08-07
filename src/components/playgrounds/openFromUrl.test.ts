@@ -254,8 +254,9 @@ describe("explainOpenFromUrlError", () => {
       "The operation failed for an unknown transient reason (e.g. out of memory).",
       "UnknownError"
     );
-    expect(explainOpenFromUrlError(err, "github")).toMatch(/本機沙盒儲存/);
-    expect(explainOpenFromUrlError(err, "github")).toMatch(/無痕|掃碼|Safari/);
+    expect(explainOpenFromUrlError(err, "github")).toMatch(/無法存本機沙盒/);
+    expect(explainOpenFromUrlError(err, "github")).toMatch(/Safari/);
+    expect(explainOpenFromUrlError(err, "github")).not.toMatch(/out of memory/);
   });
 });
 

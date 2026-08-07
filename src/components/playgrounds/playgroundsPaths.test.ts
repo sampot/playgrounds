@@ -66,6 +66,8 @@ describe("detectPlaygroundsBasePath", () => {
     expect(isPlaygroundsFieldHost("blog.samkuo.me")).toBe(false);
     expect(isPlaygroundsFieldHost("api.samkuo.me")).toBe(false);
     expect(isPlaygroundsFieldHost("docs.samkuo.me")).toBe(false);
+    expect(isPlaygroundsFieldHost("dash.samkuo.me")).toBe(false);
+    expect(isPlaygroundsFieldHost("go.samkuo.me")).toBe(false);
     expect(isPlaygroundsFieldHost("old-blog.samkuo.me")).toBe(false);
     expect(isPlaygroundsFieldHost("play.samkuo.me")).toBe(true);
   });

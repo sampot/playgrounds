@@ -1,12 +1,18 @@
 <script lang="ts">
   import type { PlatformInviteJoinPayload } from "./platformInviteJoinShell";
   import { composeSessionProtocol } from "./platformCompose";
+  import {
+    INVITE_STORAGE_RESTRICTED_LEAD,
+    INVITE_STORAGE_RESTRICTED_TITLE,
+  } from "../storageErrors";
 
   let {
     open = $bindable(false),
     payload = $bindable<PlatformInviteJoinPayload | null>(null),
     pending = $bindable(false),
     error = $bindable<string | null>(null),
+    recovery = $bindable<"open_in_safari" | null>(null),
+    copyUrl = $bindable<string | null>(null),
     busy = $bindable(false),
     status = $bindable<string | null>(null),
     onAccept,
@@ -16,6 +22,8 @@
     payload?: PlatformInviteJoinPayload | null;
     pending?: boolean;
     error?: string | null;
+    recovery?: "open_in_safari" | null;
+    copyUrl?: string | null;
     busy?: boolean;
     status?: string | null;
     onAccept?: (opts: { displayName: string }) => void | Promise<void>;
@@ -24,6 +32,7 @@
 
   let dialogEl = $state<HTMLDialogElement | null>(null);
   let displayName = $state("對手");
+  let copyStatus = $state<string | null>(null);
 
   const kind = $derived(payload?.meta.kind ?? "");
   const protocolId = $derived.by(() => {
@@ -47,6 +56,10 @@
       return "";
     }
   });
+  const showSafariRecovery = $derived(
+    Boolean(recovery === "open_in_safari" && !payload)
+  );
+  const canCopy = $derived(Boolean(copyUrl?.trim()));
 
   $effect(() => {
     if (open && payload?.displayName?.trim()) {
@@ -63,6 +76,10 @@
     }
   });
 
+  $effect(() => {
+    if (!open || !showSafariRecovery) copyStatus = null;
+  });
+
   function onDialogClose(): void {
     if (busy) return;
     open = false;
@@ -72,6 +89,22 @@
     if (busy) return;
     onDecline?.();
     open = false;
+  }
+
+  async function copyInviteLink(): Promise<void> {
+    const url = copyUrl?.trim();
+    if (!url) return;
+    copyStatus = null;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        throw new Error("clipboard unavailable");
+      }
+      copyStatus = "已複製連結";
+    } catch {
+      copyStatus = "無法自動複製，請手動選取下方連結";
+    }
   }
 </script>
 
@@ -84,7 +117,7 @@
   <div class="playgrounds-dialog-head">
     <div class="playgrounds-dialog-title-row">
       <h2 id="pg-invite-join-title" class="m-0 text-base font-semibold">
-        加入對弈
+        {showSafariRecovery ? "無法開始" : "加入對弈"}
       </h2>
     </div>
     <button
@@ -98,12 +131,52 @@
   </div>
 
   <div class="flex flex-col gap-3 px-4 py-3">
-    {#if pending && !payload}
+    {#if pending && !payload && !error && !showSafariRecovery}
       <p class="text-skin-base/55 m-0 text-[12px]" role="status">
         正在讀取邀請…
       </p>
+    {:else if showSafariRecovery}
+      <p class="text-skin-base m-0 text-sm font-medium" role="alert">
+        {error?.trim() || INVITE_STORAGE_RESTRICTED_TITLE}
+      </p>
+      <p class="text-skin-base/70 m-0 text-sm">
+        {INVITE_STORAGE_RESTRICTED_LEAD}
+      </p>
+      <ol
+        class="text-skin-base/55 m-0 list-decimal space-y-1.5 py-0 pl-5 text-[12px] leading-relaxed"
+      >
+        <li>點分享按鈕（或右上角 ···）</li>
+        <li>選擇「用 Safari 開啟」</li>
+        <li>或複製連結後，貼到 Safari 網址列</li>
+      </ol>
+      {#if canCopy}
+        <button
+          type="button"
+          class="bg-skin-accent text-skin-inverted min-h-11 w-full rounded-md px-3 text-sm font-semibold"
+          onclick={() => void copyInviteLink()}
+        >
+          複製邀請連結
+        </button>
+        {#if copyStatus}
+          <p class="text-skin-base/55 m-0 text-[11px]" role="status">{copyStatus}</p>
+        {/if}
+        {#if copyStatus?.includes("手動")}
+          <p
+            class="border-skin-line bg-skin-card text-skin-base/70 m-0 break-all rounded-md border px-2.5 py-2 text-[11px]"
+          >
+            {copyUrl}
+          </p>
+        {/if}
+      {/if}
+      <button
+        type="button"
+        class="border-skin-line bg-skin-card text-skin-base min-h-11 rounded-md border px-3 text-sm"
+        onclick={decline}
+      >
+        關閉
+      </button>
     {:else if error && !payload}
-      <p class="text-skin-accent m-0 text-[12px]" role="alert">{error}</p>
+      <p class="text-skin-accent m-0 text-sm" role="alert">{error}</p>
       <button
         type="button"
         class="border-skin-line bg-skin-card text-skin-base min-h-11 rounded-md border px-3 text-sm"

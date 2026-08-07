@@ -1,0 +1,136 @@
+:root {
+  color-scheme: light;
+  --fill: 248 250 249;
+  --ink: 28 35 33;
+  --accent: 15 118 110;
+  --card: 226 232 230;
+  --line: 214 222 219;
+  --muted: 100 116 112;
+  --sans: ui-sans-serif, system-ui, "PingFang TC", "Helvetica Neue",
+    "Microsoft JhengHei", "Noto Sans TC", sans-serif;
+  --radius: 0.5rem;
+}
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --fill: 18 28 26;
+  --ink: 226 232 230;
+  --accent: 45 212 191;
+  --card: 30 41 38;
+  --line: 45 74 68;
+  --muted: 148 163 158;
+}
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+body {
+  font-family: var(--sans);
+  background:
+    radial-gradient(
+      900px 420px at 8% -8%,
+      color-mix(in oklab, rgb(var(--accent)) 12%, transparent),
+      transparent 60%
+    ),
+    rgb(var(--fill));
+  color: rgb(var(--ink));
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+a {
+  color: rgb(var(--accent));
+  text-underline-offset: 0.15em;
+}
+.site {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+.chrome {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid rgb(var(--line));
+  background: color-mix(in oklab, rgb(var(--fill)) 90%, transparent);
+  backdrop-filter: blur(10px);
+}
+.chrome a.mark-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  text-decoration: none;
+}
+.chrome .mark {
+  display: block;
+  width: 1.35rem;
+  height: 1.35rem;
+}
+.chrome a.play-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0 0.35rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: rgb(var(--ink));
+  text-decoration: none;
+}
+.chrome a.play-link:hover {
+  color: rgb(var(--accent));
+}
+.chrome .host {
+  font-size: 0.7rem;
+  color: rgb(var(--muted));
+  word-break: break-all;
+}
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 1.25rem 1rem 2rem;
+  max-width: 40rem;
+  width: 100%;
+  margin: 0 auto;
+}
+h1 {
+  margin: 0 0 0.5rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+.lead {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  color: color-mix(in oklab, rgb(var(--ink)) 72%, transparent);
+}
+.status {
+  margin: 0;
+  font-size: 0.85rem;
+  color: rgb(var(--muted));
+}
+.err {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #b03e3e;
+}
+html[data-theme="dark"] .err {
+  color: #e87878;
+}
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+  word-break: break-all;
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}

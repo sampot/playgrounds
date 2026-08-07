@@ -46,6 +46,8 @@ ADMIN_BOOTSTRAP_TOKEN=…   # optional for first admin
 # Official TURN (Cloudflare Realtime) — required for cross-NAT relay
 TURN_KEY_ID=…
 TURN_API_TOKEN=…
+# Optional: override invite short_url origin (default https://go.samkuo.me)
+# GO_PUBLIC_ORIGIN=http://localhost:5174
 ```
 
 Production:
@@ -98,5 +100,5 @@ npm test
 ```
 
 Invite default TTL is **5 minutes** (session already started; not a reservation).
-Short links (`/i/…`) are canonical on `api.samkuo.me`.
+Short links (`/i/…`) are **canonical on `go.samkuo.me`** (DEC-050); `api.samkuo.me/i/…` 302s to go.
 Field invites are minted by the playground shell (in-memory API key after dash provision), not the dashboard.

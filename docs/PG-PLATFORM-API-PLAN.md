@@ -3,7 +3,7 @@
 > **狀態：** Phase 0 **完成**；Phase 1–4 **完成**（Signal／`#pg=`／後台／compose 場殼兌換）；Phase 5 **進行中**（GitHub＋Google SSO／access token／HOST 殼代理／**field provision＋記憶體通行證**已落地；MFA 未）  
 > **權威決策：** [DECISIONS.md](./DECISIONS.md) **DEC-047**  
 > **後台 UI 規格：** [PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md)  
-> **相關：** DEC-023（session 邀請＋完整 protocol）、DEC-025（`?open=`／放大畫布）、DEC-029（SecretStore＝**BYOK**；**不含** Platform API key）、DEC-042（場網／保留名 `api`）、DEC-045（Roster／薄 signaling）、DEC-046（型錄查詢）、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)、[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（點數／官方 TURN Draft）、[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)（代表性 E2E＝五子棋）、[GLOSSARY.md](./GLOSSARY.md)
+> **相關：** DEC-023（session 邀請＋完整 protocol）、DEC-025（`?open=`／放大畫布）、DEC-029（SecretStore＝**BYOK**；**不含** Platform API key）、DEC-042（場網／保留名 `api`）、DEC-045（Roster／薄 signaling）、DEC-046（型錄查詢）、DEC-050（純玩版 `go.samkuo.me`；短鏈 canonical）、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)、[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（點數／官方 TURN Draft）、[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)（代表性 E2E＝五子棋）、[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)、[GLOSSARY.md](./GLOSSARY.md)
 
 一句話：**獨立 Cloudflare Workers 上的 Platform API＋後台——以 Invite（一連結多人加入）＋短命 join capability 為中心；已有 PeerConnection 則重用；僅尚未連線時走 Ticket 路徑 signaling（加入者 offer、long-poll 等 answer、握手排隊）。Invite 預設 TTL＝5m（session 已開始後的初始動作，非預約）。近程 `invite.compose`（開 SAM、放大畫布、詢問入座）。短連結為 QR 預設。註冊邀請制＋Social SSO；後台＝access token；**Host 入場＝dash「登入我的遊樂場」→ 短命 provision → 場殼記憶體持 API key（每帳號一把、每次輪替、∉ SecretStore）**。**
 
@@ -24,7 +24,7 @@
 - **Ticket 路徑 signaling**：邀請者**不**預產 offer；加入者提交 offer，**同一邏輯回合**等待 answer；邀請者**排隊串行**作答（同時僅一筆 handshake）。**若雙方已有 PeerConnection → 重用，不跑 signaling。**
 - 連上後 **Roster 可同時持有多 peer**（Platform 只負責串行發握手；見 DEC-045）。
 - 近程：`invite.compose`（SAM＋放大畫布＋完整 protocol＋consent）。
-- **短連結** `/i/<short_id>`：正式支援；**邀請 QR 預設**。
+- **短連結** `/i/<short_id>`：正式支援；**邀請 QR 預設＠`go.samkuo.me`**（DEC-050）。
 - 身分：邀請制註冊、Social SSO、不存密碼、可要求 MFA；後台 **access token**；每帳號 API key **1** 把（僅場殼**記憶體**；經 dash provision）。
 
 ## 非目標
@@ -44,7 +44,7 @@
 | --- | --- |
 | Host | **獨立** Worker（勿併進場殼 `dist`） |
 | 公開 URL | **`https://api.samkuo.me`**（API）；**`https://dash.samkuo.me`**（後台 UI，同 Worker 別名；DEC-042 保留名 `api`／`dash`） |
-| 路徑 | `/v1/...`、後台 `/`（dash）、**`/i/<id>` 短連結**（canonical 在 api） |
+| 路徑 | `/v1/...`、後台 `/`（dash）、**`/i/<id>` 短連結**（**canonical 在 go**；api 上可 302→go，見 DEC-050） |
 | 場殼設定 | 可選 `PUBLIC_PLATFORM_API_URL` |
 | 資料面 | **永不**經 Platform；連上後只走 WebRTC／本機 session |
 
@@ -139,13 +139,15 @@
 
 | 形狀 | 角色 |
 | --- | --- |
-| `https://<field>/#pg=<invite_secret>` | 場內權威深鏈；處理後清除 hash |
-| `https://api.samkuo.me/i/<short_id>` | **短連結**；302 → `#pg=`；**QR 預設** |
+| `https://go.samkuo.me/i/<short_id>` | **短連結 canonical**；純玩版入口（QR 預設）；見 [PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)／DEC-050 |
+| `https://api.samkuo.me/i/<short_id>` | 相容；**302** → go 同 id（舊鏈） |
+| `https://<field>/#pg=<invite_secret>` | 場內深鏈（除錯／相容）；處理後清除 hash |
+| `https://go.samkuo.me/#pg=<invite_secret>` | go 深鏈相容（非 QR 預設） |
 
-- 鑄 Invite 回傳 `short_url`＋場深鏈。
+- 鑄 Invite 回傳 `short_url`（**組在 go**）＋可選場／go 深鏈。
 - `short_id`：高熵、URL-safe；與 Invite 同壽命；非可列舉序號。
 - 短連結視同 secret；不另做公開預覽頁洩漏 intent。
-- 並存：`?open=`、`#roster=<wire>`（OOB）、`#pg=`／`/i/`（Platform）。
+- 並存：`?open=`、`#roster=<wire>`（OOB）、`#pg=`／`/i/`（Platform／go）。
 
 ---
 
@@ -269,8 +271,9 @@ Auth：`Authorization: Bearer <access_token|api_key|join_cap|…>`（依端點�
 | `POST` | `/admin/users/:id/disable`／`enable` | access token＋admin | 停用／復用（不可對自己；`last_admin`） |
 | `POST` | `/admin/registration-invites` | access token＋admin | 核發註冊邀請 |
 | `GET` | `/join/:token` | 無 | 註冊邀請狀態（dash landing） |
-| `POST` | `/invites` | **API key**（場殼） | 鑄 Invite（`kind`＋`intent`；**無 offer**）；回傳 `short_url`＋深鏈 |
-| `GET` | `/i/:short_id` | 無 | **302** → `#pg=<invite_secret>` |
+| `POST` | `/invites` | **API key**（場殼） | 鑄 Invite（`kind`＋`intent`；**無 offer**）；回傳 `short_url`（**go**）＋深鏈 |
+| `GET` | `/i/:short_id` | 無 | **302** → `https://go.samkuo.me/i/:short_id`（相容；canonical 在 go） |
+| `GET` | `/v1/shorts/:short_id` | 無 | 回 `{ secret, invite_id, … }`（go SPA 解短碼；過期／撤銷 410） |
 | `GET` | `/invites/:secret` | 公開持鏈或 key | 預覽 intent（可限流） |
 | `POST` | `/invites/:secret/joins` | 持鏈 | 開一次 join；回傳短命 `join_cap` |
 | `POST` | `/invites/:id/signal/offer` | join_cap | 寫入 offer；**long-poll** 直到 answer／超時／取消 |
@@ -360,3 +363,4 @@ Auth：`Authorization: Bearer <access_token|api_key|join_cap|…>`（依端點�
 | 2026-08-06 | 實作 access token（`pg_at_`）；帳號面／場 API 憑證分離 |
 | 2026-08-06 | 移除後台 API key 登入（`/v1/auth/token`） |
 | 2026-08-07 | **Host provision：** dash「登入我的遊樂場」→ 短命 token → 場殼記憶體 API key；∉ SecretStore；單席輪替；預設場網址；不做場內 SSO |
+| 2026-08-07 | 場 Invite 短連結 canonical → **`go.samkuo.me/i/…`**（DEC-050）；api `/i/` 改 302→go |

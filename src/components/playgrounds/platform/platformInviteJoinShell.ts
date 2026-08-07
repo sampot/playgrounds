@@ -12,16 +12,27 @@ export type PlatformInviteJoinPayload = {
   displayName?: string;
 };
 
+/** Pending／error before consent payload is ready. */
+export type PlatformInviteJoinPendingOpts = {
+  error?: string | null;
+  /**
+   * Scanner／private context cannot write OPFS — show「請用 Safari 開啟」recovery.
+   */
+  recovery?: "open_in_safari";
+  /** Deep link to copy when recovery is shown. */
+  copyUrl?: string | null;
+};
+
 export type PlatformInviteJoinShell = {
   present: (payload: PlatformInviteJoinPayload) => void;
   /** Show load／error before meta is ready. */
-  presentPending?: (opts: { error?: string | null }) => void;
+  presentPending?: (opts: PlatformInviteJoinPendingOpts) => void;
   dismiss?: () => void;
 };
 
 let shell: PlatformInviteJoinShell | null = null;
 let queued: PlatformInviteJoinPayload | null = null;
-let queuedPending: { error?: string | null } | null = null;
+let queuedPending: PlatformInviteJoinPendingOpts | null = null;
 
 export function registerPlatformInviteJoinShell(
   next: PlatformInviteJoinShell | null
@@ -52,9 +63,9 @@ export function presentPlatformInviteJoin(
   queued = payload;
 }
 
-export function presentPlatformInviteJoinPending(opts: {
-  error?: string | null;
-}): void {
+export function presentPlatformInviteJoinPending(
+  opts: PlatformInviteJoinPendingOpts
+): void {
   if (shell?.presentPending) {
     shell.presentPending(opts);
     return;

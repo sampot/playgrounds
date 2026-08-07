@@ -64,3 +64,20 @@ export function clearPgInviteHashFromLocation(): void {
     /* ignore */
   }
 }
+
+/** Build a same-origin `#pg=` deep link for copy／「用 Safari 開啟」. */
+export function buildPgInviteDeepLink(opts: {
+  origin: string;
+  pathname?: string;
+  secret: string;
+}): string {
+  const origin = opts.origin.replace(/\/$/, "");
+  const pathname = opts.pathname?.startsWith("/")
+    ? opts.pathname
+    : opts.pathname
+      ? `/${opts.pathname}`
+      : "/";
+  const secret = opts.secret.trim();
+  if (!secret) throw new Error("invite secret required");
+  return `${origin}${pathname}#${PG_INVITE_HASH_KEY}=${encodeURIComponent(secret)}`;
+}

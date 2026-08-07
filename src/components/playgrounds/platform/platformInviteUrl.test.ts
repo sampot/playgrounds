@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildPgInviteDeepLink,
   clearPgInviteHashFromLocation,
   parsePgInviteFromLocation,
   PG_INVITE_HASH_KEY,
@@ -16,6 +17,16 @@ describe("platformInviteUrl", () => {
       hash: `#${PG_INVITE_HASH_KEY}=abcXYZ`,
     });
     expect(parsed?.secret).toBe("abcXYZ");
+  });
+
+  it("builds deep link for Safari copy", () => {
+    expect(
+      buildPgInviteDeepLink({
+        origin: "https://play.samkuo.me",
+        pathname: "/",
+        secret: "sec/1",
+      })
+    ).toBe("https://play.samkuo.me/#pg=sec%2F1");
   });
 
   it("clears hash when present", () => {

@@ -7,6 +7,7 @@ This repo is the **Playgrounds** browser host ([sampot/playgrounds](https://gith
 - **DEC-043:** docs site **Starlight** at **`docs.samkuo.me`** (separate Worker; not a field) — see `docs/PG-DOCS-PLAN.md`
 - **DEC-047:** Platform API（Invite／薄 signaling）at **`api.samkuo.me`**；dashboard **`dash.samkuo.me`**（same Worker；`platform-api/`）— see `docs/PG-PLATFORM-API-PLAN.md`、`docs/PG-PLATFORM-DASH-SPEC.md`
 - **DEC-048：** 場網宿主＝**SvelteKit** 靜態 PWA（`adapter-static`；Workers ASSETS）— see `docs/PG-SVELTEKIT-PLAN.md`；型錄人機 UX Draft — `docs/PG-CATALOG-UX-PLAN.md`
+- **DEC-050（Proposed）：** 純玩版 Guest＠**`go.samkuo.me`**（無編輯環境；邀請短網址 canonical；參與當下 Invite／session）— see `docs/PG-GO-CLIENT-PLAN.md`
 
 This repo is the **authoritative** host codebase. Do not push feature parity back into the blog mount.
 
@@ -29,6 +30,7 @@ Reader-facing narrative stays personal／non-product (blog DEC-004).
 - `npm run deploy:official` — build + official field-net (`wrangler.official.jsonc` → `play.samkuo.me`)
 - `npm run docs:dev` / `docs:build` / `docs:deploy` — Starlight docs (`docs.samkuo.me`)
 - `npm run platform:dev` / `platform:test` / `platform:deploy` — Platform API／dashboard (`api.samkuo.me`／`dash.samkuo.me`；`platform-api/`；dash UI＝`platform-api/dash` SvelteKit 5)
+- `npm run go:dev` / `go:build` / `go:deploy` — 純玩版 Guest（`go.samkuo.me`；`go-client/`；DEC-050）
 
 ## Layout
 
@@ -43,8 +45,10 @@ Reader-facing narrative stays personal／non-product (blog DEC-004).
 - `public/sw.js` — canvas SW + offline shell
 - `docs-site/` — Starlight docs (DEC-043; separate Worker; **not** SvelteKit)
 - `platform-api/` — Platform API Invite／signaling (DEC-047; separate Worker)
+- `go-client/` — 純玩版 Guest SPA（DEC-050；`go.samkuo.me`；無編輯環境）
 - `docs/PG-SVELTEKIT-PLAN.md` — 宿主 Astro→SvelteKit（Phase 1–6 landed）
 - `docs/PG-CATALOG-UX-PLAN.md` — 型錄人機 UX（Phase 2–5 landed）
+- `docs/PG-GO-CLIENT-PLAN.md` — 純玩版 Guest（DEC-050）
 - `wrangler.jsonc` — single-site self-host (README Deploy to Cloudflare)
 - `wrangler.official.jsonc` — author field-net
 - `vercel.json` / `netlify.toml` — README one-click Vercel / Netlify
@@ -56,7 +60,8 @@ Reader-facing narrative stays personal／non-product (blog DEC-004).
 - SAM catalog: `https://play.samkuo.me/sam/` (same Worker; per-field opens use same origin)
 - Docs (Starlight): `https://docs.samkuo.me` (reserved; separate Worker — DEC-043)
 - Platform API: `https://api.samkuo.me`；dashboard: `https://dash.samkuo.me` (same Worker — DEC-047；Invite TTL 預設 5m)
-- Any field: `https://<name>.samkuo.me` (reserved names e.g. `www`, `blog`, `api`, `docs`, `dash`, `old-blog`; `play` = official default)
+- 純玩版（Guest）：`https://go.samkuo.me`（DEC-050；邀請短網址 canonical `go…/i/…`；**不是**場）— see `docs/PG-GO-CLIENT-PLAN.md`
+- Any field: `https://<name>.samkuo.me` (reserved names e.g. `www`, `blog`, `api`, `docs`, `dash`, `go`, `old-blog`; `play` = official default)
 - One-click self-host: single origin on Cloudflare Workers Static Assets / Vercel / Netlify (not wildcard)
 - In-app share links: prefer `location.origin`; docs examples use `play`
 

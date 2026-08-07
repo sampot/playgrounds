@@ -1,0 +1,20 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "playgrounds-go",
+  "compatibility_date": "2026-08-07",
+  "workers_dev": true,
+  "preview_urls": true,
+  // Pure-play Guest SPA (DEC-050) — not a field shell.
+  "assets": {
+    "directory": "./build",
+    "not_found_handling": "single-page-application"
+  },
+  "routes": [
+    {
+      "pattern": "go.samkuo.me",
+      "custom_domain": true
+    }
+    // Zone route `go.samkuo.me/*` → this Worker may need dashboard setup
+    // so field-net `*.samkuo.me/*` does not swallow go.
+  ]
+}

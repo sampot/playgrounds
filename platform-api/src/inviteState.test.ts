@@ -77,8 +77,9 @@ describe("ids", () => {
     expect(fieldDeepLink("localhost:5173", "sec")).toBe(
       "http://localhost:5173/#pg=sec"
     );
-    expect(shortUrl("https://api.samkuo.me", "abc")).toBe(
-      "https://api.samkuo.me/i/abc"
+    expect(shortUrl("abc")).toBe("https://go.samkuo.me/i/abc");
+    expect(shortUrl("abc", "http://localhost:5174")).toBe(
+      "http://localhost:5174/i/abc"
     );
   });
 

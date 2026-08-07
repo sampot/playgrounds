@@ -72,8 +72,12 @@ export const FIELD_RESERVED_SUBDOMAINS = [
   "api",
   "docs",
   "dash",
+  "go",
   "old-blog",
 ] as const;
+
+/** Pure-play Guest client (DEC-050); invite short_url canonical origin. */
+export const DEFAULT_GO_ORIGIN = "https://go.samkuo.me";
 
 export function shortId(): string {
   return randomId(10);
@@ -126,8 +130,21 @@ export function fieldProvisionDeepLink(
   return `${origin}/#pg_provision=${encodeURIComponent(provisionToken)}`;
 }
 
-export function shortUrl(origin: string, id: string): string {
+/**
+ * Invite short URL — always on the go client origin (DEC-050).
+ * `origin` override is for local go-client / tests only.
+ */
+export function shortUrl(id: string, origin: string = DEFAULT_GO_ORIGIN): string {
   return `${origin.replace(/\/$/, "")}/i/${id}`;
+}
+
+/** Resolve go public origin from env (wrangler vars) or default. */
+export function goPublicOrigin(env?: {
+  GO_PUBLIC_ORIGIN?: string;
+}): string {
+  const raw = env?.GO_PUBLIC_ORIGIN?.trim();
+  if (raw) return raw.replace(/\/$/, "");
+  return DEFAULT_GO_ORIGIN;
 }
 
 /**

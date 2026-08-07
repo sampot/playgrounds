@@ -1,0 +1,250 @@
+<script lang="ts">
+  import { page } from "$app/state";
+  import { onMount } from "svelte";
+  import { openPlaygroundHome, PLAY_ORIGIN } from "$lib/openPlayground";
+  import {
+    createGuestRuntime,
+    type GuestStatus,
+  } from "$lib/guestRuntime";
+  import {
+    composeSamSource,
+    composeSessionProtocol,
+  } from "@pg/platform/platformCompose";
+
+  const shortId = $derived(page.params.shortId?.trim() || "");
+  let status = $state<GuestStatus | null>(null);
+  let nameInput = $state("對手");
+  let busy = $state(false);
+  const runtime = createGuestRuntime();
+
+  const protocolLabel = $derived.by(() => {
+    const meta = status?.meta;
+    if (!meta) return null;
+    const p = composeSessionProtocol(meta.intent);
+    if (p && typeof p === "object" && "protocolId" in p) {
+      return String((p as { protocolId: string }).protocolId);
+    }
+    return meta.kind;
+  });
+
+  const samSource = $derived(
+    status?.meta ? composeSamSource(status.meta.intent) : null
+  );
+
+  onMount(() => {
+    const unsub = runtime.subscribe(s => {
+      status = s;
+      if (s.displayName) nameInput = s.displayName;
+    });
+    if (shortId) void runtime.bootFromShortId(shortId);
+    return unsub;
+  });
+
+  async function onAccept() {
+    busy = true;
+    try {
+      await runtime.consentAndPlay(nameInput);
+    } finally {
+      busy = false;
+    }
+  }
+
+  function onDecline() {
+    runtime.decline();
+  }
+</script>
+
+<svelte:head>
+  <title>加入 · 山姆鍋遊樂場</title>
+</svelte:head>
+
+{#if !shortId}
+  <h1>無法開始</h1>
+  <p class="err" role="alert">邀請連結不完整</p>
+{:else if !status || status.phase === "resolving" || status.phase === "idle"}
+  <h1>加入</h1>
+  <p class="status" role="status">{status?.message || "正在讀取邀請…"}</p>
+{:else if status.phase === "error"}
+  <h1>無法開始</h1>
+  <p class="err" role="alert">{status.error}</p>
+  <p class="status" style="margin-top: 1rem">
+    可請主持重新邀請，或開啟
+    <a href={`${PLAY_ORIGIN}/`} onclick={openPlaygroundHome}>遊樂場主頁</a>
+  </p>
+{:else if status.phase === "consent"}
+  <h1>加入對弈</h1>
+  <p class="lead">
+    {#if protocolLabel}
+      協定 <span class="mono">{protocolLabel}</span>
+    {/if}
+    {#if samSource}
+      · 來源 <span class="mono">{samSource}</span>
+    {/if}
+  </p>
+  <label class="field">
+    <span>顯示名稱</span>
+    <input
+      class="input"
+      type="text"
+      maxlength="32"
+      bind:value={nameInput}
+      disabled={busy}
+      autocomplete="nickname"
+    />
+  </label>
+  <div class="actions">
+    <button
+      type="button"
+      class="btn primary"
+      disabled={busy}
+      onclick={() => void onAccept()}
+    >
+      {busy ? "處理中…" : "同意加入"}
+    </button>
+    <button type="button" class="btn" disabled={busy} onclick={onDecline}>
+      取消
+    </button>
+  </div>
+{:else}
+  <h1 class="sr-only">對弈</h1>
+  <p class="status bar" role="status">
+    {status.message || (status.phase === "ready" ? "已就緒" : "進行中…")}
+  </p>
+  {#if status.error}
+    <p class="err" role="alert">{status.error}</p>
+  {/if}
+  {#if status.phase === "ready" && status.canvasUrl}
+    <div class="stage">
+      {#key status.canvasUrl}
+        <iframe
+          class="play"
+          title="小品畫布"
+          src={status.canvasUrl}
+          allow="autoplay"
+        ></iframe>
+      {/key}
+    </div>
+  {:else}
+    <div class="wait" role="status" aria-live="polite">
+      <p class="wait-title">
+        {#if status.phase === "loading_sam"}
+          正在載入小品
+        {:else if status.phase === "connecting"}
+          正在與主持握手
+        {:else if status.phase === "waiting_invite"}
+          已連線，等待入座
+        {:else if status.phase === "seating"}
+          正在進入對玩
+        {:else}
+          請稍候
+        {/if}
+      </p>
+      <p class="wait-hint">對弈畫面會在入座完成後出現，請勿關閉此頁。</p>
+    </div>
+  {/if}
+{/if}
+
+<style>
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin: 0.75rem 0 1rem;
+    font-size: 0.85rem;
+  }
+  .input {
+    min-height: 2.75rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid rgb(var(--line));
+    border-radius: var(--radius);
+    background: rgb(var(--fill));
+    color: rgb(var(--ink));
+    font: inherit;
+  }
+  .actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .btn {
+    min-height: 2.75rem;
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius);
+    border: 1px solid rgb(var(--line));
+    background: rgb(var(--card));
+    color: rgb(var(--ink));
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn.primary {
+    border-color: transparent;
+    background: rgb(var(--accent));
+    color: #fff;
+  }
+  :global(html[data-theme="dark"]) .btn.primary {
+    color: #042f2e;
+  }
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .bar {
+    margin: 0 0 0.5rem;
+  }
+  .wait {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: min(50vh, 20rem);
+    padding: 1.25rem 1rem;
+    border: 1px solid rgb(var(--line));
+    border-radius: var(--radius);
+    background: rgb(var(--card));
+    text-align: center;
+  }
+  .wait-title {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+  }
+  .wait-hint {
+    margin: 0;
+    color: rgb(var(--muted));
+    font-size: 0.9rem;
+  }
+  .stage {
+    flex: 1;
+    min-height: min(70vh, 36rem);
+    border: 1px solid rgb(var(--line));
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: #0a1210;
+  }
+  .play {
+    display: block;
+    width: 100%;
+    height: min(70vh, 36rem);
+    border: 0;
+    background: #fff;
+  }
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
+  }
+  @media (min-width: 40rem) {
+    .actions {
+      flex-direction: row;
+    }
+    .btn {
+      flex: 1;
+    }
+  }
+</style>

@@ -2,7 +2,7 @@
 
 > **狀態：** Draft（2026-08-07）— Phase 0 完成；Phase 1–3 **進行中**（SAM `gomoku.v1`＋場殼 invite／入座銜接已開工）；Phase 4 手測未完  
 > **權威決策：** [DECISIONS.md](./DECISIONS.md) **DEC-047**（Invite／provision）、**DEC-045**（Roster／signal）、**DEC-023**（session／protocol）  
-> **相關：** [PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)、[PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md)、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)、[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（點數／官方 TURN；有權 Host 跨網對玩／路徑透明）、DEC-025（`?open=`／放大畫布）、DEC-046（型錄／lazy install）、[GLOSSARY.md](./GLOSSARY.md)  
+> **相關：** [PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)、[PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md)、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)、[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（點數／官方 TURN；有權 Host 跨網對玩／路徑透明）、[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)（純玩版 Guest＠`go.samkuo.me`；短網址 canonical）、DEC-025（`?open=`／放大畫布）、DEC-046（型錄／lazy install）、[GLOSSARY.md](./GLOSSARY.md)  
 > **載體 SAM：** 型錄 [`pg-gomoku`](../catalog/entries/pg-gomoku.yaml)（source [`sampot/pg-gomoku`](https://github.com/sampot/pg-gomoku)）— **不是**殼內 brainstorm／coding-orch 狗糧
 
 一句話：**用型錄五子棋跑通「註冊 Host 開 session → 鑄場 Invite → 未註冊 Guest 短連結入座 → Host 按「開始」開局 → 對弈」的完整端到端路徑；證明 Platform／場殼／Roster／session 對真人可玩小品成立，而非僅 dogfood protocol。**
@@ -86,7 +86,7 @@
 | `joinPolicy` | `invite_only` |
 | roles（權限類） | `host`（恰好 1；兼執一方）、`player`（恰好 1；對手） |
 | 棋盤 | 15×15；標準五連勝（與現有 SAM 規則對齊；禁手若現有未做則 MVP 不做） |
-| 執子 | Host 預設黑（先手）；Guest 白。MVP 可不做選色 UI |
+| 執子 | **先手固定黑**；Host 在「開始／再來一局」時以 `firstRole: host|player` 決定誰先 |
 | `act` | **`start`**（僅 `host`；見下）— 無 payload；**`place`** — `{ row: 0..14, col: 0..14 }`；非 `active`／非己回合／佔格／終局後 → 拒絕 |
 | 狀態投影 | `board`、`turn`（`black`｜`white`）、`status`（`waiting`｜`ready`｜`active`｜`ended`）、`winner`（可選）、座位／顯示名摘要 |
 | 事件 | 狀態變更 fanout（對齊 DEC-023 通道；經 Roster 時走既有隧道） |
@@ -103,8 +103,8 @@
 | `ended` | 五連或無子可下（若實作和局） | 拒 `place`／`start`；Host 可 `reset` |
 
 - Guest 入座 **只**把狀態推到 `ready`，**不**自動 `active`。  
-- Host UI 在 `ready` 顯示主 CTA「**開始**」→ `act: start` → `active`（黑先手）。席未滿或非 Host → 拒絕 `start`。  
-- **再來一局（硬）：** 同 session／同席位；Host `act: reset`（僅 `ended`）→ 清空棋盤 → **直接 `active`**（player 仍在；等同已開始，黑先手，**不必**再按「開始」）；對手已離則 `waiting`。**禁止**把「一局」等同「一 Session」或強制重鑄 Invite／重連 WebRTC。結束連線／session 另用「結束這一場」。  
+- Host UI 在 `ready` 顯示「誰先（執黑）」＋主 CTA「**開始**」→ `act: start`（`payload.firstRole`）→ `active`（黑先手）。席未滿或非 Host → 拒絕 `start`。
+- **再來一局（硬）：** 同 session／同席位；Host `act: reset`（僅 `ended`；可帶新 `firstRole`）→ 清空棋盤 → **直接 `active`**（player 仍在；等同已開始，黑先手，**不必**再按「開始」）；對手已離則 `waiting`。**禁止**把「一局」等同「一 Session」或強制重鑄 Invite／重連 WebRTC。結束連線／session 另用「結束這一場」。
 - **結束這一場：** 殼 `close` 前須 fanout `session.closed` 給遠端席；Guest UI 顯示主持已結束（不可無聲斷線）。
 
 ### 5.3 `invite.compose` intent（五子棋）
@@ -147,35 +147,47 @@ intent:
 dash SSO（已註冊）
   →「登入我的遊樂場」→ provision → 預設場 #pg_provision=…
   → 場殼 redeem → 記憶體持 API key → 清 hash
-  → 開啟 pg-gomoku（Host／黑）
+  → 開啟 pg-gomoku（Host）
   → 開 session（gomoku.v1；status=waiting）
+  → 邀請入座 → ready → 選先手 → start（先手執黑）
   →「邀請對手」→ createPlatformInvite(invite.compose)
-  → 顯示 short_url／QR；場殼作答循環保持在線
+  → 顯示 short_url／QR（目標＝`https://go.samkuo.me/i/…`）；場殼作答循環保持在線
   → Guest 入座後 status=ready → Host 按「開始」→ act:start → active
   → 輪流 place 至 ended
 ```
 
 ### 6.2 Guest
 
+**目標主路徑（純玩版；見 [PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)）：**
+
 ```text
-開 https://api.samkuo.me/i/<short_id>（無帳號）
-  → 302 → 場 #pg=<secret>
-  → 讀 intent；開 SAM（install_if_missing）→ maximizePreview()
-  → 殼頁共用同意 modal（protocol 摘要；可蓋在最大化畫布之上）
-  → 同意入座 → join＋protocol 閘（拒絕則不握手）
-  → 尚無 PeerConnection → Guest offer → Host answer → Roster／Avatar
+開 https://go.samkuo.me/i/<short_id>（無帳號；QR 預設）
+  → 純玩 SPA；解 Invite／compose（無編輯環境、不寫持久 OPFS）
+  → 記憶體載入 SAM player UI
+  → 頁內同意入座（protocol 摘要）
+  → 同意 → join＋protocol 閘（拒絕則不握手）
+  → 尚無 PeerConnection → Guest offer → Host answer → Roster
   → player 席入座 → status=ready（等待 Host「開始」；此時不可落子）
   → Host start 後 active → 輪流 place 至 ended
 ```
 
-**Guest UX 硬規則：** 受邀請方（消費者）**預設不看開發環境**——首屏即 play-first（同 `view=canvas` 試玩：maximize＋隱藏 Files／編輯器／站頭；載入中也不閃 IDE）。AvatarsPanel 只負責連線／作答等傳輸面；產品同意入座＝殼 modal（對齊 Host 分享 modal）。唯主動「看原始碼」才揭露完整殼。
+**過渡／相容（場殼；go 落地前或除錯）：**
+
+```text
+開 api…/i/… 或 場 #pg=<secret>
+  → （api 短鏈可 302 → go；舊行為曾 302 → 場 #pg=）
+  → 場殼：開 SAM（install_if_missing／OPFS）→ maximize／play-first
+  → 殼同意 modal → join…（同上）
+```
+
+**Guest UX 硬規則：** 受邀請方（消費者）**預設不看開發環境**。go 落地後＝根本無 IDE；場殼過渡路徑＝play-first（同 `view=canvas`：maximize＋隱藏 Files／編輯器／站頭；載入中也不閃 IDE）。AvatarsPanel 只負責連線／作答等傳輸面；產品同意入座＝頁內 modal。唯主動「看原始碼」才揭露完整殼（場殼路徑；非 go 主 CTA）。
 
 ### 6.3 失敗與粗暴恢復
 
 | 情況 | 預期 |
 | --- | --- |
 | Host 未 provision | 鑄邀請失敗；頁內文案導向 dash「登入我的遊樂場」（禁止教貼 SecretStore key） |
-| Invite 過期／撤銷 | Guest 可讀錯誤；可請 Host 重鑄 |
+| Invite 過期／撤銷 | Guest 可讀錯誤；可請 Host 重新邀請 |
 | Host 離線（需新握手） | Guest 等 answer 超時；已連上 peer 不受短連結失效影響（資料面已在 WebRTC） |
 | Guest 拒絕 consent | 不入座；不佔用成功 handshake |
 | 斷線中局 | MVP：提示連線中斷；可重開邀請另開一局（不做完美重連） |
@@ -215,7 +227,7 @@ dash SSO（已註冊）
 
 - [ ] Host 經 dash provision 後，於五子棋 UI 鑄出短網址（後台無鑄入口）
 - [ ] 無記憶體 key 時鑄邀請失敗，文案導向「登入我的遊樂場」
-- [ ] Guest **無** Platform 登入即可開短連結
+- [ ] Guest **無** Platform 登入即可開短連結（目標＝`go.samkuo.me/i/…`；見 [PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)）
 - [ ] Consent 前可辨識為五子棋／`gomoku.v1`；拒絕則不入座
 - [ ] Guest 入座後為 `ready`（不可落子）；僅 Host 按「開始」後才 `active`，雙方可交替落子至終局
 - [ ] 連線後 session／棋步**不**經 Platform 中繼
@@ -250,3 +262,4 @@ dash SSO（已註冊）
 | 2026-08-07 | Guest `#pg=`：開 SAM＋maximize 後以**殼同意 modal**入座；不再把同意流程放進 AvatarsPanel／先露開發殼 |
 | 2026-08-07 | 再來一局：同 session `act:reset`（`ended`→`active`，不必再按開始）；一局≠一 Session；禁強制重邀 |
 | 2026-08-07 | §3.1／§9：有權 Host＋官方 TURN 時無法直連仍須能對玩；Host／Guest 不分辨傳輸路徑（對齊點數計劃） |
+| 2026-08-07 | Guest 主路徑指向純玩版 `go.samkuo.me`（[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)）；場殼 `#pg=` 降為過渡／相容 |

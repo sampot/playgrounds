@@ -10,6 +10,7 @@ import {
 } from "./platformCompose";
 import { previewInvite } from "./platformClient";
 import {
+  buildPgInviteDeepLink,
   clearPgInviteHashFromLocation,
   parsePgInviteFromLocation,
 } from "./platformInviteUrl";
@@ -18,11 +19,28 @@ import {
   presentPlatformInviteJoinPending,
 } from "./platformInviteJoinShell";
 import { getPlatformComposeShell } from "./platformComposeShell";
+import {
+  INVITE_STORAGE_RESTRICTED_TITLE,
+  isInviteStorageRestrictedError,
+} from "../storageErrors";
 
 export type ConsumePgInviteResult =
   | { handled: false }
   | { handled: true; ok: true }
   | { handled: true; ok: false; error: string };
+
+function inviteDeepLinkForSecret(secret: string): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return buildPgInviteDeepLink({
+      origin: window.location.origin,
+      pathname: window.location.pathname || "/",
+      secret,
+    });
+  } catch {
+    return null;
+  }
+}
 
 export async function consumePgInviteFromLocation(opts?: {
   hash?: string;
@@ -36,6 +54,7 @@ export async function consumePgInviteFromLocation(opts?: {
   });
   if (!parsed) return { handled: false };
 
+  const copyUrl = inviteDeepLinkForSecret(parsed.secret);
   clearPgInviteHashFromLocation();
   presentPlatformInviteJoinPending({});
 
@@ -81,9 +100,18 @@ export async function consumePgInviteFromLocation(opts?: {
     void composeSessionProtocol(meta.intent);
     return { handled: true, ok: true };
   } catch (e) {
+    if (isInviteStorageRestrictedError(e)) {
+      presentPlatformInviteJoinPending({
+        error: INVITE_STORAGE_RESTRICTED_TITLE,
+        recovery: "open_in_safari",
+        copyUrl,
+      });
+      return { handled: true, ok: false, error: "storage_restricted" };
+    }
     const message = e instanceof Error ? e.message : String(e);
+    // Keep invite modal short — no tech stack traces／DOMException dumps.
     presentPlatformInviteJoinPending({
-      error: `無法讀取邀請：${message}`,
+      error: "無法讀取邀請，請稍後再試",
     });
     return { handled: true, ok: false, error: message };
   }

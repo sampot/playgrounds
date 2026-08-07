@@ -369,7 +369,7 @@
     if (!me?.key) return;
     askConfirm({
       title: "撤銷通行證",
-      message: "撤銷後，已登入的遊樂場將無法再鑄邀請，直到再次「登入我的遊樂場」。",
+      message: "撤銷後，已登入的遊樂場將無法再發出邀請，直到再次「登入我的遊樂場」。",
       action: async () => {
         const { res } = await api<{ error?: string }>("/v1/keys", {
           method: "DELETE",

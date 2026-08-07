@@ -2,7 +2,7 @@
 
 > **狀態：** Draft（2026-08-07）— 契約／階段草案；DEC-045／047 已否決自備 TURN；官方 TURN／點數實作未開始  
 > **權威決策：** [DECISIONS.md](./DECISIONS.md) **DEC-045**（否決自備 TURN；官方 TURN 另段）、**DEC-047**（非目標含自備 TURN）；點數帳本可另立 DEC（建議 **DEC-049** Draft）  
-> **相關：** [PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)、[PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md)、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)、[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)、DEC-004（非協作 SaaS）、DEC-029（SecretStore＝LLM 等 BYOK；**不含** TURN）、[GLOSSARY.md](./GLOSSARY.md)
+> **相關：** [PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)、[PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md)、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)、[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)、[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)（Guest 純玩／短鏈＠go）、DEC-004（非協作 SaaS）、DEC-029（SecretStore＝LLM 等 BYOK；**不含** TURN）、[GLOSSARY.md](./GLOSSARY.md)
 
 一句話：**Platform 註冊帳號採點數制（非訂閱）；跨網備援僅官方 TURN（按消耗扣點）；不支援自備 TURN；路徑對 Host／Guest 透明；有權 Host 的五子棋 E2E 在無法直連時仍須能連；扣點掛 Host。**
 

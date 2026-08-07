@@ -2,7 +2,7 @@
 
 > **狀態：** Phase 0–3 **已落地**；Phase 4.1–4.2 **已落地**（邀請連結＋相機掃 QR）；薄 CF rendezvous → [PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)／DEC-047；**否決自備 TURN**（DEC-045）；官方 TURN＋點數 → [PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（未做）  
 > **權威決策：** [DECISIONS.md](./DECISIONS.md) **DEC-045**  
-> **相關：** DEC-017（側欄 Files／總管）、DEC-023（本地 session；邀請＋protocol 規格＋型錄 lazy install）、DEC-031（peer／homePeer／virtual actor）、DEC-038（WebRTC 通道路線）、DEC-042（場網／無租戶）、DEC-046（型錄查詢）、DEC-047（Platform Invite／signal）、[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（點數／官方 TURN Draft；**無**自備 TURN）、[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)（場邀請 E2E＝五子棋）、[GLOSSARY.md](./GLOSSARY.md)
+> **相關：** DEC-017（側欄 Files／總管）、DEC-023（本地 session；邀請＋protocol 規格＋型錄 lazy install）、DEC-031（peer／homePeer／virtual actor）、DEC-038（WebRTC 通道路線）、DEC-042（場網／無租戶）、DEC-046（型錄查詢）、DEC-047（Platform Invite／signal）、DEC-050（純玩版 go）、[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（點數／官方 TURN Draft；**無**自備 TURN）、[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)（場邀請 E2E＝五子棋）、[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)、[GLOSSARY.md](./GLOSSARY.md)
 
 一句話：**薄 signaling 只完成每握手槽一次經樣板壓縮的 offer／answer；連上後只走 WebRTC；Roster＝本場連線使用者名冊（可同時多 peer）；每位連線者在本場自動出現一個 Avatar（薄投影 SAM／User agent），權威與執行仍在對方 `homePeer`，經 Roster DataChannel 轉。Session 入座不為 Avatar 特規——邀請附完整 protocol 規格，遊樂場以型錄為虛擬可用集合、lazy install 兌現相容 SAM。**
 

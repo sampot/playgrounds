@@ -2,14 +2,23 @@
  * Playgrounds field-net edge (DEC-042／043／047).
  * Serves Astro static assets; reserved subdomains must not run as fields.
  *
- * `docs.samkuo.me` / `api.samkuo.me` / `dash.samkuo.me` are served by their
- * own Workers via custom domain — never proxied from this Worker.
+ * `docs.samkuo.me` / `api.samkuo.me` / `dash.samkuo.me` / `go.samkuo.me`
+ * are served by their own Workers via custom domain — never proxied
+ * from this Worker.
  */
 
 const FIELD_SUFFIX = ".samkuo.me";
 
 /** Keep in sync with PLAYGROUNDS_FIELD_RESERVED_SUBDOMAINS (client). */
-const RESERVED = new Set(["www", "blog", "api", "docs", "dash", "old-blog"]);
+const RESERVED = new Set([
+  "www",
+  "blog",
+  "api",
+  "docs",
+  "dash",
+  "go",
+  "old-blog",
+]);
 
 type AssetsFetcher = {
   fetch(input: Request | URL | string, init?: RequestInit): Promise<Response>;

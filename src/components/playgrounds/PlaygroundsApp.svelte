@@ -24,7 +24,11 @@
   } from "./roster";
   import { consumePgProvisionFromLocation } from "./platform/consumePgProvision";
   import { consumePgInviteFromLocation } from "./platform/consumePgInvite";
-  import { hasPgInviteInLocation } from "./platform/platformInviteUrl";
+  import { hasPgInviteInLocation, buildPgInviteDeepLink, parsePgInviteFromLocation } from "./platform/platformInviteUrl";
+  import {
+    INVITE_STORAGE_RESTRICTED_TITLE,
+    isInviteStorageRestrictedError,
+  } from "./storageErrors";
   import {
     isConsumerPlayLanding,
     isPlatformInviteLanding,
@@ -671,6 +675,8 @@
   let inviteJoinPending = $state(false);
   let inviteJoinBusy = $state(false);
   let inviteJoinError = $state<string | null>(null);
+  let inviteJoinRecovery = $state<"open_in_safari" | null>(null);
+  let inviteJoinCopyUrl = $state<string | null>(null);
   let inviteJoinStatus = $state<string | null>(null);
   let unsubPlatformFieldCred: (() => void) | null = null;
   let agentIframeEl = $state<HTMLIFrameElement | null>(null);
@@ -5810,14 +5816,18 @@
         inviteJoinPayload = payload;
         inviteJoinPending = false;
         inviteJoinError = null;
+        inviteJoinRecovery = null;
+        inviteJoinCopyUrl = null;
         inviteJoinStatus = null;
         inviteJoinBusy = false;
         inviteJoinOpen = true;
       },
       presentPending: opts => {
         inviteJoinPayload = null;
-        inviteJoinPending = !opts.error;
+        inviteJoinPending = !opts.error && !opts.recovery;
         inviteJoinError = opts.error ?? null;
+        inviteJoinRecovery = opts.recovery ?? null;
+        inviteJoinCopyUrl = opts.copyUrl?.trim() || null;
         inviteJoinStatus = null;
         inviteJoinBusy = false;
         inviteJoinOpen = true;
@@ -6288,6 +6298,7 @@
       });
     }
     void (async () => {
+      let inviteBootBlocked = false;
       try {
         await refreshProjects();
         const savedAgent = readActiveAgentSandboxId();
@@ -6330,19 +6341,45 @@
         // Rehydrate Agent-form Controllers (DEC-031; not only 總管席).
         await ensureWorkingSetAgentControllers();
       } catch (e) {
-        error = explainOpenFromUrlError(e, "unknown");
+        if (landingPgInvite && isInviteStorageRestrictedError(e)) {
+          inviteBootBlocked = true;
+          error = null;
+          const parsed = parsePgInviteFromLocation({
+            hash: window.location.hash,
+            search: window.location.search,
+          });
+          let copyUrl: string | null = null;
+          if (parsed) {
+            try {
+              copyUrl = buildPgInviteDeepLink({
+                origin: window.location.origin,
+                pathname: window.location.pathname || "/",
+                secret: parsed.secret,
+              });
+            } catch {
+              copyUrl = null;
+            }
+          }
+          presentPlatformInviteJoinPending({
+            error: INVITE_STORAGE_RESTRICTED_TITLE,
+            recovery: "open_in_safari",
+            copyUrl,
+          });
+        } else if (landingPgInvite) {
+          inviteBootBlocked = true;
+          error = null;
+          presentPlatformInviteJoinPending({
+            error: "無法讀取邀請，請稍後再試",
+          });
+        } else {
+          error = explainOpenFromUrlError(e, "unknown");
+        }
       } finally {
         openFromUrlBootReady = true;
         shellBootReady = true;
         // After OPFS／open boot: Guest `#pg=` → SAM maximized + consent modal.
-        if (landingPgInvite) {
-          if (error) {
-            presentPlatformInviteJoinPending({
-              error: `無法讀取邀請：${error}`,
-            });
-          } else {
-            void consumePgInviteFromLocation();
-          }
+        if (landingPgInvite && !inviteBootBlocked) {
+          void consumePgInviteFromLocation();
         }
       }
     })();
@@ -6355,6 +6392,7 @@
     if (!payload) return;
     inviteJoinBusy = true;
     inviteJoinError = null;
+    inviteJoinRecovery = null;
     inviteJoinStatus = "正在與主持握手…";
     try {
       const proto = composeSessionProtocol(payload.meta.intent);
@@ -6390,6 +6428,8 @@
     inviteJoinPayload = null;
     inviteJoinPending = false;
     inviteJoinError = null;
+    inviteJoinRecovery = null;
+    inviteJoinCopyUrl = null;
     inviteJoinStatus = null;
     inviteJoinBusy = false;
   }
@@ -9692,6 +9732,8 @@
   bind:payload={inviteJoinPayload}
   bind:pending={inviteJoinPending}
   bind:error={inviteJoinError}
+  bind:recovery={inviteJoinRecovery}
+  bind:copyUrl={inviteJoinCopyUrl}
   bind:busy={inviteJoinBusy}
   bind:status={inviteJoinStatus}
   onAccept={onInviteJoinAccept}

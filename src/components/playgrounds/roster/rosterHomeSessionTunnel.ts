@@ -59,7 +59,9 @@ export function createRosterSessionTunnelBridge(opts: {
         participantId: binding.homeSandboxId,
         hostSandboxId: "remote-host",
         status: binding.status,
-      };
+        // Extra field consumed by SAMs that gate on seat.ready (e.g. pg-gomoku).
+        ready: true,
+      } as SessionSeatInfo;
     },
     async getState() {
       return {

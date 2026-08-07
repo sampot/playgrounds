@@ -23,10 +23,7 @@ import {
   readResponseBytes,
   type ByteProgress,
 } from "./transferProgress";
-import {
-  isTransientStorageError,
-  transientStorageHint,
-} from "./storageErrors";
+import { isTransientStorageError } from "./storageErrors";
 
 export type OpenRole = "work" | "tool" | "agent";
 
@@ -463,7 +460,7 @@ export function explainOpenFromUrlError(
   const lower = msg.toLowerCase();
 
   if (isTransientStorageError(error)) {
-    return `無法寫入本機沙盒儲存（${msg}）。${transientStorageHint()}`;
+    return "此開啟方式無法存本機沙盒。請用 Safari 開啟（分享選單 → Safari）。";
   }
 
   if (

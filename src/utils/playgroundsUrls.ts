@@ -30,6 +30,7 @@ export const PLAYGROUNDS_FIELD_RESERVED_SUBDOMAINS = [
   "api",
   "docs",
   "dash",
+  "go",
   "old-blog",
 ] as const;
 

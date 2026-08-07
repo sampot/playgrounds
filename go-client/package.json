@@ -1,0 +1,29 @@
+{
+  "name": "playgrounds-go-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Pure-play Guest client @ go.samkuo.me (DEC-050)",
+  "scripts": {
+    "dev": "vite dev --port 5174",
+    "build": "svelte-kit sync && vite build",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "prepare": "svelte-kit sync || echo ''",
+    "preview": "vite preview --port 5174",
+    "deploy": "npm run build && wrangler deploy",
+    "deploy:dry": "npm run build && wrangler deploy --dry-run"
+  },
+  "devDependencies": {
+    "@sveltejs/adapter-static": "^3.0.10",
+    "@sveltejs/kit": "^2.53.4",
+    "@sveltejs/vite-plugin-svelte": "^6.2.4",
+    "svelte": "^5.56.8",
+    "svelte-check": "^4.4.5",
+    "typescript": "^6.0.3",
+    "vite": "^7.3.1",
+    "wrangler": "^4.118.0"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
