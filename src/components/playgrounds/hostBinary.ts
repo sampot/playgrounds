@@ -4,8 +4,12 @@
 
 import { HostBridgeError } from "./hostBridge";
 
-/** Hard cap for a single HOST binary read/write (5 MiB). */
-export const HOST_BINARY_MAX_BYTES = 5 * 1024 * 1024;
+/**
+ * Hard cap for a single HOST binary read/write (32 MiB).
+ * Raised for `.git` packfiles via scoped HOST (DEC-051 §8.5); still use
+ * append chunks for larger objects.
+ */
+export const HOST_BINARY_MAX_BYTES = 32 * 1024 * 1024;
 
 export function bytesToBase64(bytes: Uint8Array): string {
   if (typeof Buffer !== "undefined") {

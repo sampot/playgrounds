@@ -843,8 +843,19 @@ export function createShellHostBridge(ctx: ShellHostContext): HostBridge {
       };
     },
 
-    async writeFileBase64(path: string, base64: string, sandboxId?: string) {
-      const id = await resolveTargetId(ctx, sandboxId);
+    async writeFileBase64(
+      path: string,
+      base64: string,
+      sandboxIdOrOptions?: string | { sandboxId?: string; append?: boolean }
+    ) {
+      const opts =
+        typeof sandboxIdOrOptions === "string"
+          ? { sandboxId: sandboxIdOrOptions, append: false }
+          : {
+              sandboxId: sandboxIdOrOptions?.sandboxId,
+              append: Boolean(sandboxIdOrOptions?.append),
+            };
+      const id = await resolveTargetId(ctx, opts.sandboxId);
       assertNotWritingActiveAgent(
         id,
         ctx.getActiveAgentId(),
@@ -863,8 +874,23 @@ export function createShellHostBridge(ctx: ShellHostContext): HostBridge {
       if (typeof base64 !== "string") {
         throw new HostBridgeError("bad_path", "需要 base64 字串");
       }
-      const bytes = base64ToBytes(base64);
-      assertBinarySize(bytes.byteLength, "writeFileBase64");
+      const chunk = base64ToBytes(base64);
+      assertBinarySize(chunk.byteLength, "writeFileBase64");
+      let bytes = chunk;
+      if (opts.append) {
+        const existing = await loadTargetFiles(ctx, id);
+        const prev = existing[norm];
+        if (prev !== undefined) {
+          const prevBytes =
+            typeof prev === "string"
+              ? new TextEncoder().encode(prev)
+              : prev;
+          const merged = new Uint8Array(prevBytes.byteLength + chunk.byteLength);
+          merged.set(prevBytes, 0);
+          merged.set(chunk, prevBytes.byteLength);
+          bytes = merged;
+        }
+      }
       if (id === ctx.getActiveId()) {
         await ctx.patchWorkFile(norm, bytes);
       } else {

@@ -130,17 +130,50 @@ export function createRuntimeLocalFsHandlers(opts: {
       return { path: norm, hash: await hashUtf8(text) };
     },
 
-    async writeFileBase64(path: unknown, base64: unknown, sandboxId?: unknown) {
+    async writeFileBase64(
+      path: unknown,
+      base64: unknown,
+      sandboxIdOrOptions?: unknown
+    ) {
       await gate();
-      const id = resolveId(
-        typeof sandboxId === "string" ? sandboxId : undefined
-      );
+      const opts =
+        typeof sandboxIdOrOptions === "string"
+          ? { sandboxId: sandboxIdOrOptions, append: false }
+          : sandboxIdOrOptions &&
+              typeof sandboxIdOrOptions === "object" &&
+              !Array.isArray(sandboxIdOrOptions)
+            ? {
+                sandboxId: (sandboxIdOrOptions as { sandboxId?: string })
+                  .sandboxId,
+                append: Boolean(
+                  (sandboxIdOrOptions as { append?: boolean }).append
+                ),
+              }
+            : { sandboxId: undefined as string | undefined, append: false };
+      const id = resolveId(opts.sandboxId);
       assertNotWritingActiveAgent(id, activeAgentSandboxId, "writeFileBase64");
       const norm = normalizeProjectPath(String(path ?? ""));
       if (!norm) {
         throw Object.assign(new Error("路徑無效"), { code: "bad_path" });
       }
-      const bytes = base64ToBytes(String(base64 ?? ""));
+      const chunk = base64ToBytes(String(base64 ?? ""));
+      let bytes = chunk;
+      if (opts.append) {
+        const prev = id === defaultId ? files[norm] : undefined;
+        const existing =
+          prev !== undefined
+            ? prev
+            : await loadProjectFiles(id).then(m => m[norm]);
+        if (existing !== undefined) {
+          const prevBytes = isTextContent(existing)
+            ? new TextEncoder().encode(existing)
+            : existing;
+          const merged = new Uint8Array(prevBytes.byteLength + chunk.byteLength);
+          merged.set(prevBytes, 0);
+          merged.set(chunk, prevBytes.byteLength);
+          bytes = merged;
+        }
+      }
       await saveFile(id, norm, bytes);
       touchSnapshot(id, norm, bytes);
       onFsChanged?.({ sandboxId: id, op: "write", path: norm });

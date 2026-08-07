@@ -1047,6 +1047,7 @@
 - **Revision（2026-08-07）：** 建立即自動 grant；納管＝明示 grant；一律 HOST 形子集。
 - **Revision（2026-08-07）：** 對口＝全目錄自動準入；自動 grant 不隨建立者刪而撤內容。
 - **Revision（2026-08-08）：** Accepted — Phase 1–3 ＋ §8.4 場殼義務落地；Phase 4 Git SAM 仍待。
+- **Revision（2026-08-08）：** Phase 4 — 型錄 `pg-git`／`sampot/pg-git`；HOST `writeFileBase64` 單檔上限 32 MiB＋append（packfile）。
 
 ---
 

@@ -280,7 +280,7 @@ export interface HostBridge {
   writeFileBase64(
     path: string,
     base64: string,
-    sandboxId?: string
+    sandboxIdOrOptions?: string | { sandboxId?: string; append?: boolean }
   ): Promise<{ path: string; byteLength: number; hash: string }>;
   /**
    * Open a path in the shell editor / media preview (DEC-038 terminal).

@@ -1,0 +1,7 @@
+title: Git 客戶端
+kind: tool
+series: 環境
+blurb: 瀏覽器內 clone／commit／push／pull；PAT 走密鑰庫；.git 進沙盒樹。不必當總管。
+source: sampot/pg-git
+license: MIT
+status: listed

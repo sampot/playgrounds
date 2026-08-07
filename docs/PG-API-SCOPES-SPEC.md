@@ -232,7 +232,7 @@ Scopes 決定「這顆 SAM **能不能**呼叫哪些 HOST 形方法」；**對�
 | **2. 投影擴充** | `sandbox:*`／`secrets:list`／`canvas:observe` 等進 HOST 形子集；grant：明示＋建立即自動 | ✅ 非總管經子集呼叫成功；新建沙盒自動可寫；無 grant 不可碰既有樹 |
 | **3. 對口席重述** | 對口＝全目錄 scopes 自動準入；卸任收回快捷 | ✅ host-api／DEC-017／036／051 對齊 |
 | **§8.4 場殼** | search／checkpoint／export／clone／畫布／Files 預設排除 `.git` | ✅（Phase 4 型錄前先落地） |
-| **4. Git SAM（§8）** | 型錄小品＋驗收；`.git` 進樹＋§8.4 排除表 | ⬜ §8.6 清單 |
+| **4. Git SAM（§8）** | 型錄小品＋驗收；`.git` 進樹＋§8.4 排除表 | ✅ `sampot/pg-git`（型錄 `pg-git`）；§8.6 人工驗收 |
 
 ---
 
@@ -300,16 +300,18 @@ Scopes 決定「這顆 SAM **能不能**呼叫哪些 HOST 形方法」；**對�
 
 ### 8.6 驗收（Phase 4）
 
+實作：`sampot/pg-git`（型錄 id `pg-git`）。場殼側 §8.4／scopes／grant 已落地；下列為產品路徑人工驗收：
+
 - [ ] 非總管沙盒僅宣告 §8.2 scopes，經 **HOST 形子集**準入後可完成「PAT＋公開或私有 GitHub repo → 新沙盒**樹內含 `.git`**」；新建後**無需**再核發 grant 即可寫入。  
-- [ ] 「納管既有沙盒」須明示 grant（同 Tool）；無 grant 時無法讀寫該樹。  
+- [ ] 「納管既有沙盒」須明示 grant（同 Tool／`grantSandboxAccess`）；無 grant 時無法讀寫該樹。  
 - [ ] 可對已 grant 之工作沙盒 init＋remote＋commit＋push；`.git` 落在該沙盒根下。  
 - [ ] 僅準入 `sandbox:write`、無 `list`／`read`／`edit` 時，無法完成需列舉／讀樹的 git 流程。  
 - [ ] 拒絕 `secrets:get` 時仍可開 SAM，但無法完成需 PAT 的私有流程；頁內可理解。  
 - [ ] 未準入 `sandbox:create` 時無法建新沙盒。  
-- [ ] 無場殼專用 Git 選單仍可完成上述路徑（型錄／`?open=` 安裝後使用）。
-- [ ] §8.4：search／checkpoint／export／畫布快照預設排除 `.git/**`（或文件註明之等價）。
+- [ ] 無場殼專用 Git 選單仍可完成上述路徑（型錄／`?open=sampot/pg-git`）。
+- [x] §8.4：search／checkpoint／export／畫布快照預設排除 `.git/**`（場殼已落地）。
 - [ ] 刪除 Git SAM（建立者）後，先前 clone 出的沙盒**仍在**（含 `.git`）；他工具再碰須明示 grant。
-- [ ] 無 `env.SANDBOX`／`env.OBSERVE` 平行頂層；SAM 只見 HOST 形（＋`env.secrets`）。
+- [x] 無 `env.SANDBOX`／`env.OBSERVE` 平行頂層；SAM 只見 HOST 形（＋`env.secrets`）。
 
 ---
 
