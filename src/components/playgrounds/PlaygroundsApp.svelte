@@ -8217,6 +8217,7 @@
                     title="下方：{panel.label ?? panel.sandboxId}"
                     class="min-h-0 w-full flex-1 border-0 bg-white dark:bg-black"
                     class:hidden={Boolean(rt?.error)}
+                    allow="autoplay; fullscreen"
                     use:bottomSamIframeAction={panel.sandboxId}
                     onload={() => {
                       const el = bottomSamIframeById.get(panel.sandboxId);
@@ -8341,6 +8342,7 @@
             bind:this={iframeEl}
             class="min-h-0 w-full flex-1 border-0 bg-transparent"
             title={canvasTitleLabel}
+            allow="autoplay; fullscreen"
             onload={onCanvasIframeLoad}
           ></iframe>
         </div>
