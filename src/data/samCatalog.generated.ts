@@ -82,6 +82,15 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     license: "MIT",
   },
   {
+    id: "pg-big2",
+    title: "大老二",
+    kind: "game",
+    series: "桌遊",
+    blurb: "四人出牌人機對戰：單對三條與五張牌型；適配手機，自製音效。",
+    source: "sampot/pg-big2",
+    license: "MIT",
+  },
+  {
     id: "pg-bingolite",
     title: "賓果閃燈",
     kind: "game",
