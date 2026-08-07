@@ -579,6 +579,15 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     license: "MIT",
   },
   {
+    id: "pg-sokoban",
+    title: "推箱子",
+    kind: "game",
+    series: "精緻可玩",
+    blurb: "十二關推箱子、復原一步、滑動操作；適配手機，自製音效。",
+    source: "sampot/pg-sokoban",
+    license: "MIT",
+  },
+  {
     id: "pg-sqlfmt",
     title: "SQL 整形",
     kind: "tool",
@@ -630,6 +639,15 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "街機",
     blurb: "俯視坦克：人機或 AI 觀戰、履帶炮塔、重低音爆炸；適配手機搖桿，自製音效。",
     source: "sampot/pg-tankduel",
+    license: "MIT",
+  },
+  {
+    id: "pg-tetris",
+    title: "俄羅斯方塊",
+    kind: "game",
+    series: "街機",
+    blurb: "輕量七種方塊、消行升級、幽靈影與觸控按鍵；適配手機，自製音效。",
+    source: "sampot/pg-tetris",
     license: "MIT",
   },
   {

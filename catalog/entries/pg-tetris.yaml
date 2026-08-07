@@ -1,0 +1,7 @@
+title: 俄羅斯方塊
+kind: game
+series: 街機
+blurb: 輕量七種方塊、消行升級、幽靈影與觸控按鍵；適配手機，自製音效。
+source: sampot/pg-tetris
+license: MIT
+status: listed
