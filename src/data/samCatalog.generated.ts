@@ -664,7 +664,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     title: "迷你塔防",
     kind: "game",
     series: "街機",
-    blurb: "單一路徑防守：箭塔／炮塔／冰塔、十二波；適配手機點建，自製音效。",
+    blurb: "戰役／無盡塔防：三塔五級、多敵種首領、加速連殺；適配手機，自製音效。",
     source: "sampot/pg-towerdef",
     license: "MIT",
   },
