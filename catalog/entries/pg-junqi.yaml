@@ -1,0 +1,7 @@
+title: 軍棋
+kind: game
+series: 桌遊
+blurb: 陸戰棋暗棋對 AI：行營鐵路、工兵掃雷、搶旗；適配手機，自製音效。
+source: sampot/pg-junqi
+license: MIT
+status: listed

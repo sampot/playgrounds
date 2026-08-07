@@ -230,6 +230,15 @@
       "license": "MIT"
     },
     {
+      "id": "pg-fruitcut",
+      "title": "切水果",
+      "kind": "game",
+      "series": "懷舊",
+      "blurb": "滑動切菜：連切特效、炸彈躲閃、限時三命；適配手機，自製音效。",
+      "source": "sampot/pg-fruitcut",
+      "license": "MIT"
+    },
+    {
       "id": "pg-gomoku",
       "title": "五子棋",
       "kind": "game",
@@ -354,6 +363,15 @@
       "series": "懷舊",
       "blurb": "獸穴、陷阱、河界跳躍，簡易人機。",
       "source": "sampot/pg-jungle",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-junqi",
+      "title": "軍棋",
+      "kind": "game",
+      "series": "桌遊",
+      "blurb": "陸戰棋暗棋對 AI：行營鐵路、工兵掃雷、搶旗；適配手機，自製音效。",
+      "source": "sampot/pg-junqi",
       "license": "MIT"
     },
     {
@@ -696,6 +714,15 @@
       "series": "聲音",
       "blurb": "瀏覽器 TTS／STT：念文字、聽說話、回聲一句。",
       "source": "sampot/pg-voicelab",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-wanzai",
+      "title": "尪仔標",
+      "kind": "game",
+      "series": "懷舊",
+      "blurb": "拍尪仔標：選牌對拍、節奏力道、翻牌收穫；適配手機，自製音效。",
+      "source": "sampot/pg-wanzai",
       "license": "MIT"
     },
     {
