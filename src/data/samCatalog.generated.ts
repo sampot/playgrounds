@@ -217,6 +217,15 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     license: "MIT",
   },
   {
+    id: "pg-dancepad",
+    title: "節奏踏墊",
+    kind: "game",
+    series: "街機",
+    blurb: "四軌箭頭下落、踩拍判定連擊；致敬跳舞機類型，適配手機踏墊。",
+    source: "sampot/pg-dancepad",
+    license: "MIT",
+  },
+  {
     id: "pg-dbtool",
     title: "SQLite 資料庫",
     kind: "tool",
