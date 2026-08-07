@@ -570,6 +570,15 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     license: "MIT",
   },
   {
+    id: "pg-sudoku",
+    title: "數獨",
+    kind: "game",
+    series: "桌遊",
+    blurb: "九宮填數：簡單／中等／困難、筆記與提示；適配手機，自製音效。",
+    source: "sampot/pg-sudoku",
+    license: "MIT",
+  },
+  {
     id: "pg-svglook",
     title: "SVG 檢視",
     kind: "tool",
