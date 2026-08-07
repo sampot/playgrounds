@@ -390,6 +390,15 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     license: "MIT",
   },
   {
+    id: "pg-match3",
+    title: "消消樂",
+    kind: "game",
+    series: "桌遊",
+    blurb: "三消對對碰：連消倍率、關卡目標、粒子特效；適配手機，自製音效。",
+    source: "sampot/pg-match3",
+    license: "MIT",
+  },
+  {
     id: "pg-mazeglow",
     title: "迴廊拾光",
     kind: "game",
