@@ -1938,6 +1938,9 @@
       if (meta?.id === sandboxId) {
         meta = { ...meta, admittedCapabilities: pruned };
       }
+      projects = projects.map(p =>
+        p.id === sandboxId ? { ...p, admittedCapabilities: pruned } : p
+      );
     }
     const pending = pendingCapabilities(declared, admitted);
     if (!pending.length) return;
@@ -1952,6 +1955,9 @@
     if (meta?.id === sandboxId) {
       meta = { ...meta, admittedCapabilities: next };
     }
+    projects = projects.map(p =>
+      p.id === sandboxId ? { ...p, admittedCapabilities: next } : p
+    );
   }
 
   /** Match working-set name/id by case-insensitive substring (DEC-028). */

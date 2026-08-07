@@ -56,16 +56,55 @@ import {
   createRpcSessionBinding,
   createSplitHostBinding,
 } from "./backendRuntimeRpc";
-import { createComputeBinding } from "./computeBridge";
 import { admitsHostBinding } from "./hostScopeMap";
 import type { FsChangedEvent } from "./runtimeLocalHostFs";
 import {
   admitsCompute,
   admitsSecretsGet,
   effectiveCapabilities,
+  filterKnownCapabilities,
+  type KnownCapability,
 } from "./samCapabilities";
 import { createScopedHostBinding } from "./scopedHostBinding";
 import { grantAllowsBinding } from "./toolGrant";
+
+type EnvRpcFn = (
+  binding: "HOST" | "DELEGATE" | "SESSION",
+  method: string,
+  args: unknown[]
+) => Promise<unknown>;
+
+/**
+ * COMPUTE in Backend Runtime must RPC to shell HOST (shared Pyodide／WASI).
+ * Do not call createComputeBinding here — that spawns nested workers in Runtime.
+ */
+function createRpcComputeBinding(
+  call: EnvRpcFn,
+  effective: readonly string[]
+): Record<string, unknown> {
+  const caps = filterKnownCapabilities(effective).filter(
+    (t): t is KnownCapability =>
+      t === "compute:python" || t === "compute:cmd"
+  );
+  const has = new Set(caps);
+  const binding: Record<string, unknown> = {
+    async apiVersion() {
+      return "1";
+    },
+    async capabilities() {
+      return [...caps];
+    },
+  };
+  if (has.has("compute:python")) {
+    binding.runPython = (options: unknown) =>
+      call("HOST", "runPython", [options]);
+  }
+  if (has.has("compute:cmd")) {
+    binding.runCmd = (options: unknown) => call("HOST", "runCmd", [options]);
+    binding.listCmds = () => call("HOST", "listCmds", []);
+  }
+  return binding;
+}
 
 declare const self: DedicatedWorkerGlobalScope;
 
@@ -389,7 +428,7 @@ function buildEnv(
     env.SESSION = createRpcSessionBinding(call);
   }
   if (admitsCompute(effective)) {
-    env.COMPUTE = createComputeBinding(sandboxId, effective);
+    env.COMPUTE = createRpcComputeBinding(call, effective);
   }
   if (!msg.injectDelegate && admitsSecretsGet(effective)) {
     env.secrets = Object.freeze(
@@ -442,7 +481,7 @@ function buildControllerEnv(
     env.SESSION = createRpcSessionBinding(call);
   }
   if (admitsCompute(effective)) {
-    env.COMPUTE = createComputeBinding(sandboxId, effective);
+    env.COMPUTE = createRpcComputeBinding(call, effective);
   }
   if (admitsSecretsGet(effective)) {
     env.secrets = Object.freeze(

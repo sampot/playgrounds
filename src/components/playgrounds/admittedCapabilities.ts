@@ -31,11 +31,40 @@ export function clearAdmittedCapabilities(sandboxId: string): void {
 export function hydrateAdmittedFromMeta(
   meta: Pick<ProjectMeta, "id" | "admittedCapabilities">
 ): void {
-  setAdmittedCapabilities(meta.id, meta.admittedCapabilities);
+  const fromDisk = filterKnownCapabilities(meta.admittedCapabilities);
+  // Avoid clobbering a fresher in-memory admit with a stale empty snapshot
+  // (listProjects raced ahead of updateProjectMeta write).
+  if (fromDisk.length === 0 && getAdmittedCapabilities(meta.id).length > 0) {
+    return;
+  }
+  setAdmittedCapabilities(meta.id, fromDisk);
 }
 
 export function hydrateAdmittedFromMetas(
   metas: readonly Pick<ProjectMeta, "id" | "admittedCapabilities">[]
 ): void {
   for (const m of metas) hydrateAdmittedFromMeta(m);
+}
+
+/**
+ * Resolve admitted scopes for API／Runtime: memory first; if empty, reload from
+ * OPFS ProjectMeta (authority) and re-hydrate. Covers races where a stale
+ * hydrate wiped the in-memory set after the user agreed.
+ */
+export async function resolveAdmittedCapabilities(
+  sandboxId: string,
+  readMeta: (id: string) => Promise<Pick<ProjectMeta, "admittedCapabilities">>
+): Promise<readonly string[]> {
+  const mem = getAdmittedCapabilities(sandboxId);
+  if (mem.length > 0) return mem;
+  try {
+    const meta = await readMeta(sandboxId);
+    const fromDisk = filterKnownCapabilities(meta.admittedCapabilities);
+    if (fromDisk.length > 0) {
+      setAdmittedCapabilities(sandboxId, fromDisk);
+    }
+    return getAdmittedCapabilities(sandboxId);
+  } catch {
+    return mem;
+  }
 }

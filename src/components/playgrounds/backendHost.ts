@@ -3,7 +3,11 @@
  * Owns the Dedicated Worker lifecycle and env RPC to shell bridges.
  */
 
-import { getAdmittedCapabilities } from "./admittedCapabilities";
+import {
+  getAdmittedCapabilities,
+  resolveAdmittedCapabilities,
+} from "./admittedCapabilities";
+import { readMeta } from "./sandboxAuthority";
 import {
   deserializeResponse,
   serializeRequest,
@@ -156,8 +160,12 @@ async function handleEnvRpc(
             ).getActiveAgent()
           : null;
       const isSteward = Boolean(agentId && msg.sandboxId === agentId);
+      const admitted = await resolveAdmittedCapabilities(
+        msg.sandboxId,
+        readMeta
+      );
       const effective = effectiveCapabilities({
-        admitted: getAdmittedCapabilities(msg.sandboxId),
+        admitted,
         isSteward,
       });
       if (!isSteward && !methodAllowedByScopes(msg.method, effective)) {
@@ -731,6 +739,11 @@ export async function backendRuntimeFunctionsFetch(options: {
             : {}),
         }
       : null);
+  // Persist authority may be ahead of in-memory registry (stale hydrate race).
+  const admitted = await resolveAdmittedCapabilities(
+    options.sandboxId,
+    readMeta
+  );
   const flags = injectFlags(
     options.sandboxId,
     agentId,
@@ -740,7 +753,6 @@ export async function backendRuntimeFunctionsFetch(options: {
   const requestId = nextId("fetch");
   const serialized = await serializeRequest(options.request);
   const dotenvText = readDotEnvTextFromFiles(options.files);
-  const admitted = getAdmittedCapabilities(options.sandboxId);
 
   const result = await new Promise<FetchResult>((resolve, reject) => {
     const timer = setTimeout(() => {
