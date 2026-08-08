@@ -6,6 +6,7 @@
   "description": "Pure-play Guest client @ go.samkuo.me (DEC-050)",
   "scripts": {
     "dev": "vite dev --port 5174",
+    "prebuild": "npm run catalog:gen --prefix ..",
     "build": "svelte-kit sync && vite build",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "prepare": "svelte-kit sync || echo ''",

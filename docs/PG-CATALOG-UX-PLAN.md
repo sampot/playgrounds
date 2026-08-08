@@ -1,9 +1,9 @@
 # SAM 小品型錄人機 UX（Draft）
 
-> **狀態：** Phase 2–5 **已落地**（2026-08-06）；Phase 0 契約仍適用  
-> **相關：** DEC-041（`/sam/` 入場網）、DEC-004（敘事）、DEC-025（`?open=`）、DEC-046／[PG-CATALOG-QUERY-PLAN.md](./PG-CATALOG-QUERY-PLAN.md)（機器查詢）、[PG-CATALOG-PLAN.md](./PG-CATALOG-PLAN.md)（YAML 權威）、[PG-SVELTEKIT-PLAN.md](./PG-SVELTEKIT-PLAN.md)（宿主改 SvelteKit；載體）
+> **狀態：** Phase 2–5 **已落地**（2026-08-06）；**2026-08-08** 列「分享」契約改 go `/s/<id>`（實作見 DEC-050／go 計劃 Phase 5）  
+> **相關：** DEC-041（`/sam/` 入場網）、DEC-004（敘事）、DEC-025（`?open=`／一鍵開）、DEC-050／[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)（型錄分享→go）、DEC-046／[PG-CATALOG-QUERY-PLAN.md](./PG-CATALOG-QUERY-PLAN.md)（機器查詢）、[PG-CATALOG-PLAN.md](./PG-CATALOG-PLAN.md)（YAML 權威）、[PG-SVELTEKIT-PLAN.md](./PG-SVELTEKIT-PLAN.md)（宿主改 SvelteKit；載體）
 
-一句話：**`/sam/` 是場網 PWA 的「找 SAM、一鍵開進本場」面——脫離部落格散文 layout 與「必用 Astro 靜態頁」假設；規模成長靠搜尋／filter／密度，資料權威仍 YAML＋gen。**
+一句話：**`/sam/` 是場網 PWA 的「找 SAM、一鍵開進本場」面；列「分享」傳閱走純玩 **`go.samkuo.me/s/<id>`**——脫離部落格散文 layout；規模成長靠搜尋／filter／密度，資料權威仍 YAML＋gen。**
 
 ---
 
@@ -57,8 +57,8 @@
 2. **找得到 > 分得細** — 即時搜尋（`title`／`id`／`blurb`／`series`／`kind`）；kind／series 作 filter chips（可多選），tab 互斥面板可降級或移除。  
 3. **版面脫離散文欄** — 寬欄或近全寬；寬螢幕可左 filter／系列、右結果。  
 4. **密度預設 compact** — icon＋名＋常駐「一鍵開」；blurb 次級／展開。禁止僅靠 hover 露出主 CTA。  
-5. **一鍵開走本場路徑** — 優先殼內直接 open／install；外鏈 `/?open=` 僅相容／深鏈。開發／編輯預設（不加 `view=`）。  
-6. **可分享 URL** — 至少 `/sam/`；建議 `?q=`／`?kind=`（及既有 series hash 若保留）。列上「分享」仍 Web Share API（否則拷貝）；**分享出去的開啟連結**加 `view=canvas`，接收者進場後放大畫布（試玩）。試玩頂列＝「換一個／型錄／看原始碼」；型錄與隨機**不**還原工作區，唯「看原始碼」揭露完整殼。  
+5. **一鍵開走本場路徑** — 優先殼內直接 open／install；外鏈 `/?open=` 僅相容／深鏈。開發／編輯預設（不加 `view=`）。**給作者／實驗者**，不是傳閱主路徑。  
+6. **列「分享」→ 純玩 go** — Web Share API（否則拷貝）；網址＝**`https://go.samkuo.me/s/<catalog_id>`**（只認型錄 `id`；見 [PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)／DEC-050）。接收者只跑該 SAM、無編輯、不依賴 OPFS。**不是**場 `?open=&view=canvas`、**不是** Invite `/i/`。篩選／型錄頁「分享」仍可為 `/sam/?…`（瀏覽意圖）。  
 7. **原生 dialog 禁止** — 確認／輸入一律頁內 UI（repo 硬規則）。
 
 ### 載體（與 SvelteKit）
@@ -80,7 +80,8 @@
   ├─ 精選貨架 ← picks.yaml（顯示順序）
   ├─ 搜尋框 + kind／series filters
   └─ 結果列表（compact；可切 density）
-       └─ 一鍵開 → 本場 open 管線（DEC-025）
+       ├─ 一鍵開 → 本場 open 管線（DEC-025；編輯面）
+       └─ 分享 → https://go.samkuo.me/s/<id>（DEC-050；純玩）
 ```
 
 系列仍是策展軸（`series.yaml`），但是「逛」的輔助，不是唯一導覽。
@@ -123,3 +124,4 @@
 | 2026-08-06 | 分享：Web Share API（支援時）＋剪貼簿 fallback；列／篩選／殼開啟連結 |
 | 2026-08-06 | 列「分享」開啟連結加 `view=canvas`（接收者畫布最大化）；「一鍵開」維持預設殼面 |
 | 2026-08-06 | 試玩 session：`view=canvas` 進場後畫布可常駐最大化；頂列「換一個／型錄／看原始碼」；型錄 dialog 與隨機換片不 `restorePreview`；唯「看原始碼」揭露工作區 |
+| 2026-08-08 | **契約修訂：** 列「分享」改 **`go.samkuo.me/s/<id>`**（DEC-050）；廢止以 `view=canvas` 為傳閱主形；「一鍵開」仍場編輯面。實作見 go 計劃 Phase 5 |

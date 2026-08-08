@@ -17,6 +17,8 @@ const config = {
     }),
     alias: {
       "@pg": "../src/components/playgrounds",
+      "@data": "../src/data",
+      "@utils": "../src/utils",
     },
     prerender: {
       handleHttpError: "warn",

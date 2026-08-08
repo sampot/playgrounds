@@ -529,7 +529,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     title: "Python 筆記本",
     kind: "tool",
     series: "環境",
-    blurb: "nbformat 4／.ipynb 相容；Shift+Enter、%pip；經場殼 Pyodide（非 Jupyter 伺服器）。",
+    blurb: "nbformat 4／.ipynb 相容；Shift+Enter、%pip、matplotlib 圖；經場殼 Pyodide（非 Jupyter 伺服器）。",
     source: "sampot/pg-notebook",
     license: "MIT",
   },

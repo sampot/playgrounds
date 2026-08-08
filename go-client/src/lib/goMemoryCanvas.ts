@@ -209,6 +209,7 @@ export function installGoMemorySessionListener(
           );
           return;
         }
+        if (!data.request) return;
         const response = await handleGoSessionApi(sandboxId, data.request);
         source.postMessage(
           {

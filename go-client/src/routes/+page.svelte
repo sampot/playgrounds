@@ -1,6 +1,8 @@
 <script lang="ts">
-  import { PLAY_ORIGIN } from "$lib/openPlayground";
-  import { openPlaygroundHome } from "$lib/openPlayground";
+  import { recommendHome, type GoCatalogEntry } from "$lib/goCatalog";
+  import { openPlaygroundHome, PLAY_ORIGIN } from "$lib/openPlayground";
+
+  const recs: GoCatalogEntry[] = recommendHome(3);
 </script>
 
 <svelte:head>
@@ -8,11 +10,28 @@
 </svelte:head>
 
 <h1>純玩</h1>
-<p class="lead">
-  受邀加入時請開啟邀請短網址（<span class="mono">go.samkuo.me/i/…</span>）。此頁不提供編輯環境。
-</p>
+<p class="lead">選一個小品直接玩。</p>
+
+{#if recs.length}
+  <section class="home-rec" aria-label="推薦試試">
+    <h2 class="home-rec-title">推薦試試</h2>
+    <ul class="home-rec-list">
+      {#each recs as entry (entry.id)}
+        <li>
+          <a class="home-rec-card" href={`/s/${encodeURIComponent(entry.id)}`}>
+            <span class="home-rec-name">{entry.title}</span>
+            {#if entry.blurb}
+              <span class="home-rec-blurb">{entry.blurb}</span>
+            {/if}
+          </a>
+        </li>
+      {/each}
+    </ul>
+  </section>
+{/if}
+
 <p class="status">
-  完整遊樂場（開發／本機沙盒）在
+  完整遊樂場在
   <a
     href={`${PLAY_ORIGIN}/`}
     target="_blank"
@@ -20,3 +39,58 @@
     onclick={openPlaygroundHome}>{PLAY_ORIGIN}</a
   >
 </p>
+
+<style>
+  .home-rec {
+    margin: 0 0 1.25rem;
+  }
+  .home-rec-title {
+    margin: 0 0 0.65rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+  }
+  .home-rec-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .home-rec-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-height: 2.75rem;
+    padding: 0.75rem 0.9rem;
+    border: 1px solid rgb(var(--line));
+    border-radius: var(--radius);
+    background: rgb(var(--card));
+    color: rgb(var(--ink));
+    text-decoration: none;
+    -webkit-tap-highlight-color: color-mix(
+      in oklab,
+      rgb(var(--accent)) 18%,
+      transparent
+    );
+  }
+  .home-rec-card:hover,
+  .home-rec-card:focus-visible {
+    border-color: rgb(var(--accent));
+    outline: none;
+  }
+  .home-rec-name {
+    font-weight: 650;
+    font-size: 0.95rem;
+  }
+  .home-rec-blurb {
+    font-size: 0.8rem;
+    color: rgb(var(--muted));
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+</style>

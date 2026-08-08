@@ -3,7 +3,12 @@
  * Authority: `catalog/entries/*.yaml` (see `npm run catalog:gen`).
  */
 
-import { buildCanonicalOpenUrl, fieldShareOrigin } from "../utils/playgroundsUrls";
+import {
+  buildCanonicalOpenUrl,
+  fieldShareOrigin,
+  goSamShareHref,
+  PLAYGROUNDS_GO_ORIGIN,
+} from "../utils/playgroundsUrls";
 import {
   GENERATED_SAM_CATALOG,
   GENERATED_SAM_KIND_LABEL,
@@ -419,18 +424,14 @@ export function samOpenCanonicalHref(
 }
 
 /**
- * Absolute open URL for sharing to casual recipients (DEC-042 origin).
- * Includes `view=canvas` so the peer lands in maximized canvas (試玩).
+ * Absolute URL for sharing a catalog entry to casual recipients (DEC-050).
+ * Lands on pure-play go `/s/<id>` — not field `?open=` / `view=canvas`.
  */
 export function samOpenShareHref(
-  entry: Pick<SamEntry, "title" | "source">,
-  origin: string = fieldShareOrigin()
+  entry: Pick<SamEntry, "id">,
+  goOrigin: string = PLAYGROUNDS_GO_ORIGIN
 ): string {
-  return buildCanonicalOpenUrl(samEntryOpenSource(entry), {
-    origin,
-    name: entry.title,
-    view: "canvas",
-  });
+  return goSamShareHref(entry.id, goOrigin);
 }
 
 /** Absolute `/sam/` browse URL for the current filter (shareable). */

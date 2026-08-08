@@ -9,6 +9,12 @@ export const PLAYGROUNDS_DEFAULT_FIELD_HOST = "play.samkuo.me";
 /** Formal default field origin after cutover. */
 export const PLAYGROUNDS_CANONICAL_ORIGIN = `https://${PLAYGROUNDS_DEFAULT_FIELD_HOST}`;
 
+/** Pure-play Guest origin (DEC-050). */
+export const PLAYGROUNDS_GO_DEFAULT_HOST = "go.samkuo.me";
+
+/** Canonical go origin for catalog share / `/s/<id>` (DEC-050). */
+export const PLAYGROUNDS_GO_ORIGIN = `https://${PLAYGROUNDS_GO_DEFAULT_HOST}`;
+
 /**
  * Origin for in-field share links (DEC-042): `location.origin` when in a
  * browser; otherwise the canonical default field.
@@ -18,6 +24,20 @@ export function fieldShareOrigin(): string {
     return location.origin;
   }
   return PLAYGROUNDS_CANONICAL_ORIGIN;
+}
+
+/**
+ * Absolute go catalog share URL: `https://go.samkuo.me/s/<catalog_id>`.
+ * Not an Invite short link (`/i/…`).
+ */
+export function goSamShareHref(
+  catalogId: string,
+  origin: string = PLAYGROUNDS_GO_ORIGIN
+): string {
+  const id = catalogId.trim();
+  if (!id) throw new Error("型錄 id 為空");
+  const base = origin.replace(/\/$/, "");
+  return `${base}/s/${encodeURIComponent(id)}`;
 }
 
 /**

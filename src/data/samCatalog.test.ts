@@ -419,8 +419,11 @@ describe("catalog human filter (UX)", () => {
 
   it("builds absolute share hrefs for open and browse", () => {
     const entry = getCatalogEntry("pg-breakout")!;
-    expect(samOpenShareHref(entry, PLAYGROUNDS_CANONICAL_ORIGIN)).toBe(
-      "https://play.samkuo.me/?open=sampot%2Fpg-breakout&name=%E6%89%93%E7%A3%9A%E5%A1%8A&view=canvas"
+    expect(samOpenShareHref(entry)).toBe(
+      "https://go.samkuo.me/s/pg-breakout"
+    );
+    expect(samOpenShareHref(entry, "https://go.example.test")).toBe(
+      "https://go.example.test/s/pg-breakout"
     );
     expect(
       catalogBrowseShareHref(

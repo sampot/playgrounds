@@ -1,6 +1,8 @@
 <script lang="ts">
   import { page } from "$app/state";
   import { onMount } from "svelte";
+  import { chromeSession } from "$lib/chromeSession.svelte";
+  import { findGoCatalogBySource } from "$lib/goCatalog";
   import { openPlaygroundHome, PLAY_ORIGIN } from "$lib/openPlayground";
   import {
     createGuestRuntime,
@@ -37,6 +39,16 @@
     status?.meta ? composeSamSource(status.meta.intent) : null
   );
 
+  $effect(() => {
+    const source = samSource;
+    if (!status || status.phase === "idle") {
+      chromeSession.clear();
+      return;
+    }
+    const entry = source ? findGoCatalogBySource(source) : null;
+    chromeSession.setInvite(entry ?? null);
+  });
+
   const showCanvas = $derived(
     status?.phase === "ready" &&
       (Boolean(status.canvasUrl) || Boolean(status.canvasSrcdoc))
@@ -47,13 +59,21 @@
     setGoMemoryCanvasWindow(el.contentWindow);
   }
 
+  $effect(() => {
+    chromeSession.setCanvasActive(showCanvas);
+    return () => chromeSession.setCanvasActive(false);
+  });
+
   onMount(() => {
     const unsub = runtime.subscribe(s => {
       status = s;
       if (s.displayName) nameInput = s.displayName;
     });
     if (shortId) void runtime.bootFromShortId(shortId);
-    return unsub;
+    return () => {
+      unsub();
+      chromeSession.clear();
+    };
   });
 
   async function onAccept() {
@@ -151,55 +171,54 @@
       取消
     </button>
   </div>
+{:else if showCanvas}
+  <h1 class="sr-only">對弈</h1>
+  <div class="stage stage--fill">
+    {#if status.canvasMode === "memory" && status.canvasSrcdoc}
+      {#key status.canvasGeneration}
+        <iframe
+          class="play"
+          title="小品畫布"
+          srcdoc={status.canvasSrcdoc}
+          allow="autoplay"
+          onload={onMemoryFrameLoad}
+        ></iframe>
+      {/key}
+    {:else if status.canvasUrl}
+      {#key status.canvasUrl}
+        <iframe
+          class="play"
+          title="小品畫布"
+          src={status.canvasUrl}
+          allow="autoplay"
+        ></iframe>
+      {/key}
+    {/if}
+  </div>
 {:else}
   <h1 class="sr-only">對弈</h1>
   <p class="status bar" role="status">
-    {status.message || (status.phase === "ready" ? "已就緒" : "進行中…")}
+    {status.message || "進行中…"}
   </p>
   {#if status.error}
     <p class="err" role="alert">{status.error}</p>
   {/if}
-  {#if showCanvas}
-    <div class="stage">
-      {#if status.canvasMode === "memory" && status.canvasSrcdoc}
-        {#key status.canvasGeneration}
-          <iframe
-            class="play"
-            title="小品畫布"
-            srcdoc={status.canvasSrcdoc}
-            allow="autoplay"
-            onload={onMemoryFrameLoad}
-          ></iframe>
-        {/key}
-      {:else if status.canvasUrl}
-        {#key status.canvasUrl}
-          <iframe
-            class="play"
-            title="小品畫布"
-            src={status.canvasUrl}
-            allow="autoplay"
-          ></iframe>
-        {/key}
+  <div class="wait" role="status" aria-live="polite">
+    <p class="wait-title">
+      {#if status.phase === "loading_sam"}
+        正在載入小品
+      {:else if status.phase === "connecting"}
+        正在與主持握手
+      {:else if status.phase === "waiting_invite"}
+        已連線，等待入座
+      {:else if status.phase === "seating"}
+        正在進入對玩
+      {:else}
+        請稍候
       {/if}
-    </div>
-  {:else}
-    <div class="wait" role="status" aria-live="polite">
-      <p class="wait-title">
-        {#if status.phase === "loading_sam"}
-          正在載入小品
-        {:else if status.phase === "connecting"}
-          正在與主持握手
-        {:else if status.phase === "waiting_invite"}
-          已連線，等待入座
-        {:else if status.phase === "seating"}
-          正在進入對玩
-        {:else}
-          請稍候
-        {/if}
-      </p>
-      <p class="wait-hint">對弈畫面會在入座完成後出現，請勿關閉此頁。</p>
-    </div>
-  {/if}
+    </p>
+    <p class="wait-hint">對弈畫面會在入座完成後出現，請勿關閉此頁。</p>
+  </div>
 {/if}
 
 <style>
@@ -290,12 +309,22 @@
     overflow: hidden;
     background: #0a1210;
   }
+  .stage--fill {
+    min-height: 0;
+    height: 100%;
+    border: none;
+    border-radius: 0;
+  }
   .play {
     display: block;
     width: 100%;
     height: min(70vh, 36rem);
     border: 0;
     background: #fff;
+  }
+  .stage--fill .play {
+    height: 100%;
+    min-height: 0;
   }
   .sr-only {
     position: absolute;

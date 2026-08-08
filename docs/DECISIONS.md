@@ -472,7 +472,7 @@
 - **Decision:**
   - **方案 A：** query 契約固定 **`?open=<url-encoded 來源>`**（**不**另設 `/sam` 短鏈）；遊樂場 boot 時解析一次，成功後清除 `open`／`as`／`name`／`state`／`fresh`／`view`。**文件預設絕對 URL**＝`https://play.samkuo.me/?open=…`（根路徑；DEC-042）；任意場為 `https://<name>.samkuo.me/?open=…`；過渡舊場仍為 `/playgrounds/?open=…`。
   - **辨型：** 路徑以 **`.sam`** 結尾的 http(s) URL → 沙盒包裹 `fetch`（GitHub／GitLab blob／raw 改寫為 raw）；GitHub URL 或 `owner/repo` → GitHub 複製；**GitLab.com** URL → GitLab 複製；無法辨型則錯誤提示。
-  - **選用參數：** `as=work|tool|agent`（預設 work）；`state=ask|none`；`name=`；`fresh=1` 強制新建（略過衝突詢問）；**`view=canvas`**＝開啟後放大畫布（`maximizePreview`；型錄「分享」連結用；一鍵開不加此參數）。
+  - **選用參數：** `as=work|tool|agent`（預設 work）；`state=ask|none`；`name=`；`fresh=1` 強制新建（略過衝突詢問）；**`view=canvas`**＝開啟後放大畫布（`maximizePreview`；場殼 play-first／過渡相容）。**型錄列「分享」主形改 go **`/s/<catalog_id>`**（DEC-050）；一鍵開仍本決策 `?open=`、不加 `view=`。
   - **同源衝突：** 正規化 `meta.source` 與本次來源；命中則以頁內對話詢問「取代」或「保留」（取消則中止）。**取代**＝先完整清空既有沙盒（等同刪除：OPFS 遞迴移除＋該沙盒 KV／DB／checkpoint），再以**相同沙盒 id**重新安裝（非單純檔案覆蓋）；**保留**＝另建新沙盒 id、既有不動。`fresh=1` 略過詢問、一律新建。
   - **角色：** `agent` 需 `controller.js`，否則降級為工作沙盒並提示；`tool` 另確保 host 工作沙盒後掛 Editor 槽（不把 toolId 當 `openProject`）。
   - **網路：** 瀏覽器直連；**.sam 宿主須開放 CORS**；**不**做站內通用 proxy（對齊 DEC-016）。
@@ -486,6 +486,7 @@
 - **Revision（2026-08-05）：** 文件預設改 `play.samkuo.me/?open=`；場網 `*.samkuo.me`（DEC-042）；query 契約不變。
 - **Revision（2026-08-06）：** 選用 `view=canvas`：分享給一般接收者時放大畫布；型錄「一鍵開」仍為預設殼面。
 - **Revision（2026-08-07）：** 同源已安裝改為詢問「取代／保留」，不再靜默重用；`fresh=1` 略過詢問。**取代**＝完整清空後同 id 重裝（非檔案覆蓋）。
+- **Revision（2026-08-08）：** 型錄「分享」主形改 **`go.samkuo.me/s/<id>`**（DEC-050）；`view=canvas` 不再當型錄傳閱契約（可留場殼過渡）。
 
 ### DEC-026: Playgrounds Agent context hygiene
 
@@ -1006,26 +1007,34 @@
 ### DEC-050: Playgrounds 純玩版客戶端＠`go.samkuo.me`
 
 - **Status:** Proposed（2026-08-07；契約草案；見 [PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)）
-- **Context:** 場邀請 Guest 掃 QR／相機開連結常落在受限瀏覽情境，場殼 `install_if_missing`→OPFS 寫入失敗；無法可靠自動改開標準 Safari。Guest 本來只需參與**當下 Invite 的 SAM／session**（無編輯環境）；同 session 可多局，由 SAM 決定。`view=canvas` 藏 IDE 仍是同份場殼與 OPFS 假設。
+- **Context:** 場邀請 Guest 掃 QR／相機開連結常落在受限瀏覽情境，場殼 `install_if_missing`→OPFS 寫入失敗；無法可靠自動改開標準 Safari。型錄「分享」若仍走場殼 `view=canvas`，接收者同樣扛 OPFS／完整殼，卻不期望立刻成為作者。需要獨立純玩 origin：同時一 SAM、無編輯；Invite 入座與型錄傳閱並列、URL 分開。
 - **Decision:**
-  1. **獨立客戶端：** **`https://go.samkuo.me`**＝純玩版權威 origin（獨立 Cloudflare Worker＋Static Assets；**不是**場）。無 Files／編輯器／SecretStore／鑄邀請／provision。**必須**露出山姆鍋 logo／mark，並可見可點 **`https://play.samkuo.me/`**（遊樂場主網址；**可行時**優先外開系統瀏覽器／標準 Safari 以跳出 WebView——盡力而為，非保證）。
-  2. **短網址 canonical：** 場 Invite 的 `short_url`／QR＝**`https://go.samkuo.me/i/<short_id>`**。Invite 權威與 short map 仍在 Platform；`api.samkuo.me/i/…` 可 302 → go（相容）。
-  3. **儲存：** 不依賴持久 OPFS；compose SAM 以記憶體／session FileMap（或等價）載入；入座 reuse 本頁實例。
-  4. **範圍首刀：** `#pg=`／`invite.compose`／五子棋 E2E（[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)）；Host 與一般 `?open=` 仍走場殼＋OPFS。
-  5. **保留名：** `go` ∈ 場網保留表（與 `api`／`docs`／`dash` 同級）。
-  6. **TURN／點數：** Guest 仍經 `join_cap` 取官方 TURN（記 Host）；對人透明（對齊 [PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)）。
-  - 階段見 [PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)。
+  1. **獨立客戶端：** **`https://go.samkuo.me`**＝純玩版權威 origin（獨立 Cloudflare Worker＋Static Assets；**不是**場）。無 Files／編輯器／SecretStore／鑄邀請／provision。**同時只跑一個 SAM**。**必須**露出山姆鍋 logo／mark，並可見可點 **`https://play.samkuo.me/`**（遊樂場主網址；**可行時**優先外開系統瀏覽器／標準 Safari——盡力而為，非保證）。
+  2. **Invite 短網址：** 場 Invite 的 `short_url`／QR＝**`https://go.samkuo.me/i/<short_id>`**。Invite 權威與 short map 仍在 Platform；`api.samkuo.me/i/…` 可 302 → go（相容）。
+  3. **型錄傳閱：** **`https://go.samkuo.me/s/<catalog_id>`**——**只認型錄 `id`**；go **建置內嵌** catalog（與 `catalog:gen` 同產線）。型錄列「分享」與 go Header「分享」只出此形；**不是** `/i/`、不是場 `?open=`／`view=canvas`。非型錄 SAM 不產生 `/s/`。型錄「一鍵開」仍進場殼編輯面。
+  4. **Header 分享：** 頂列右；Web Share API 優先、否則複製；網址＝當前 SAM 的 `/s/<id>`（能對上嵌入型錄時），**永不**＝當前 Invite 短鏈。
+  5. **`/s/` 換片：** 僅單機傳閱模式。提供「下一個」與隨機推薦 **≤3**；候選**必須**與當前同一型錄 **`kind`**（遊戲不得推工具等）；不足不跨 kind 湊。**不**提供型錄形式選擇（搜尋／filter／貨架）。取代當前唯一 SAM slot。**Invite `/i/` 不換片。**
+  6. **儲存：** 不依賴持久 OPFS；SAM 以記憶體／session FileMap（或等價）載入；Invite 入座 reuse 本頁實例。
+  7. **範圍：** Invite 首刀＝`invite.compose`／五子棋 E2E（[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)）；`/s/`＝型錄傳閱＋換片 Phase（見計劃 Phase 5）。Host 與「一鍵開」仍走場殼＋OPFS。
+  8. **保留名：** `go` ∈ 場網保留表（與 `api`／`docs`／`dash` 同級）。
+  9. **TURN／點數：** Invite Guest 仍經 `join_cap` 取官方 TURN（記 Host）；對人透明。`/s/` 不經 Platform／TURN。
+  - 細節／階段見 [PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)。
 - **Consequences:**
   - 勿把 go 做成無主匿名對戰頁；須可辨識山姆鍋／遊樂場並鏈到 `play.samkuo.me`。
-  - 勿把 go 當成另一個遊樂場場（無 OPFS 場語意）；勿在 go 做 IDE。
+  - 勿把 go 當成另一個遊樂場場（無 OPFS 場語意）；勿在 go 做 IDE；勿多 SAM 庫；勿在 go 複製完整型錄 UX。
+  - 勿跨 kind 換片；勿在 Invite 局中提供換小品。
   - 勿再以 `api…/i/…` 當邀請 QR 權威；鑄邀請回傳短鏈須組在 go。
-  - 勿要求 Guest 開 Safari／寫 OPFS 才能完成 go 快樂路徑。
-  - 勿 fork 整份 `PlaygroundsApp`；抽共用 library。
-  - 同步 GLOSSARY、保留名表、[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)、DEC-047 短鏈敘事。
+  - 勿用 `/i/` 或 Platform short 服務型錄傳閱；勿用 `source`／`?open=` 當 go 傳閱主形。
+  - 勿要求接收者開 Safari／寫 OPFS 才能完成 go 快樂路徑（Invite 或 `/s/`）。
+  - 勿 fork 整份 `PlaygroundsApp`；抽共用 library（含 `goSamShareHref`／`shareOrCopy`）。
+  - 同步 GLOSSARY、[PG-CATALOG-UX-PLAN.md](./PG-CATALOG-UX-PLAN.md)、[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)、DEC-047 短鏈敘事。
 - **Revision（2026-08-07）：** 初版 Proposed。
 - **Revision（2026-08-07）：** 用語：純玩＝Invite／session 範圍（可多局，SAM 定）；非「只能一局」。
 - **Revision（2026-08-07）：** chrome：山姆鍋 logo＋露出 `play.samkuo.me`。
 - **Revision（2026-08-07）：** `play` 鏈：可行時外開系統瀏覽器／Safari（跳出 WebView）；非保證。
+- **Revision（2026-08-08）：** 啟動不限 Invite；`/s/<catalog_id>`＋內嵌 catalog；型錄分享→go；Header 分享＝`/s/`≠`/i/`；同時一 SAM。
+- **Revision（2026-08-08）：** `/s/` 換片：同 kind「下一個」＋推薦≤3；無型錄選擇；`/i/` 不換片。
+- **Revision（2026-08-08）：** 首頁 `/`：至多 3 則推薦（picks 優先、可跨 kind）→ `/s/<id>`。
 
 ### DEC-051: Playgrounds API scopes（環境能力準入）
 
