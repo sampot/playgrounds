@@ -113,7 +113,8 @@ async function resolveShortSecret(shortId: string): Promise<string> {
   if (!res.ok) {
     if (res.status === 410) throw new Error("邀請已關閉或過期");
     if (res.status === 404) throw new Error("邀請不存在");
-    throw new Error(data.error || "無法解析邀請短碼");
+    // Never surface API status／English codes — friendlyInviteError maps the rest.
+    throw new Error("無法解析邀請短碼");
   }
   if (!data.secret?.trim()) throw new Error("邀請短碼無效");
   return data.secret.trim();
@@ -258,7 +259,11 @@ export function createGuestRuntime() {
         peerId
       );
       pendingInvite = null;
-      set({ phase: "error", error: `入座失敗：${message}`, message: "" });
+      set({
+        phase: "error",
+        error: friendlyInviteError(e, "入座失敗"),
+        message: "",
+      });
     }
   }
 
@@ -305,10 +310,9 @@ export function createGuestRuntime() {
           });
         })
         .catch(e => {
-          const message = e instanceof Error ? e.message : String(e);
           set({
             phase: "error",
-            error: `入座後重載畫布失敗：${message}`,
+            error: friendlyInviteError(e, "入座後畫面打不開"),
             message: "",
           });
         });
@@ -545,7 +549,7 @@ export function createGuestRuntime() {
           onError: (err: Error) => {
             set({
               phase: "error",
-              error: err.message,
+              error: friendlyInviteError(err, "連線失敗"),
               message: "",
             });
           },
