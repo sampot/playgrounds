@@ -99,10 +99,10 @@
         {disabled}
         onclick={() => onOpen(entry)}
       >
-        一鍵開
+        開啟編輯
       </button>
     {:else}
-      <a class="catalog-row-open" href={samOpenHref(entry)}>一鍵開</a>
+      <a class="catalog-row-open" href={samOpenHref(entry)}>開啟編輯</a>
     {/if}
   </div>
 
