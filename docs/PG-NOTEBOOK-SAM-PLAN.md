@@ -1,49 +1,51 @@
 # Playgrounds Python 筆記本 SAM（`pg-notebook`）
 
-> **狀態：** Implemented（MVP，2026-08-08）  
+> **狀態：** In progress（2026-08-08）— MVP 已上；**目標轉向 nbformat 4／`.ipynb` 相容**  
 > **相關：** DEC-015／016／019／027／036／051、[PG-API-SCOPES-SPEC.md](./PG-API-SCOPES-SPEC.md)、[playgrounds-host-api.md](./playgrounds-host-api.md)、型錄 `catalog/entries/pg-notebook.yaml`  
-> **程式庫：** [sampot/pg-notebook](https://github.com/sampot/pg-notebook)（場外 SAM；本文件為宿主側計劃／契約）
+> **程式庫：** [sampot/pg-notebook](https://github.com/sampot/pg-notebook)
 
-一句話：**輕量 Python cell 筆記本（Markdown＋code）——經場殼 `compute:python`／Pyodide 執行；不是完整 Jupyter。**
+一句話：**以 Jupyter `.ipynb`（nbformat 4）相容為目標的瀏覽器 Python 筆記本——操作／指令盡量對齊；執行仍走場殼 Pyodide（非站端 Jupyter 伺服器）。**
 
 ---
 
 ## 1. 目標
 
-- Catalog **tool** SAM：多 cell 文件、單格／全部執行、本機持久化。
-- 執行走既有場殼 Python（`env.COMPUTE.runPython`；與 dock Python REPL **同 kernel**）。
-- Mobile-first；破壞性操作用頁內 confirm（禁止 `alert`／`confirm`／`prompt`）。
+- Catalog **tool** SAM；權威文件＝**nbformat 4**（下載／開啟 `.ipynb`；KV 持久化同形）。
+- 操作對齊常見 Notebook 習慣：`Shift+Enter`／`Ctrl+Enter`、指令／編輯模式、`Y`／`M`、`A`／`B`、`In`／`Out`、Run All、Restart Kernel。
+- 指令：至少 `%pip install`（映射場殼套件白名單）；其餘 magic 明確提示不支援。
+- 執行：`compute:python`／`env.COMPUTE.runPython`；與 dock Python REPL **同 kernel**。
+- Mobile-first；破壞性操作用頁內 confirm。
 
-## 2. 非目標
+## 2. 非目標（對齊 DEC-015 精神）
 
-- 完整 Jupyter、`.ipynb` 權威、ipywidgets、nbformat 匯入匯出。
-- JavaScript／其他語言 cell（刻意不做；若再開另刀）。
-- 場殼內建 notebook 面板；文章內嵌自動跑 code block（DEC-015）。
-- 本站後端 Python。
+- **不**在場殼或本站跑完整 JupyterServer／JupyterLab。
+- **不**做文章內嵌自動跑 code block。
+- 不承諾完整 IPython／ipywidgets／所有 magics／協作即時編輯。
+- JavaScript cells（另刀）。
+- 場殼內建 notebook 面板（維持為可搬 SAM）。
 
 ## 3. 契約
 
 | 面 | 選擇 |
 | --- | --- |
 | 宣告 | `sam:capabilities` = `compute:python` |
-| 執行 | `functions.js` `POST /api/run` → `env.COMPUTE.runPython`（或 HOST 同形子集） |
-| 文件 | JSON `version:1`；`title`＋`cells[{id,kind:md\|code,source}]` |
-| 持久化 | `env.KV` 鍵 `notebook:v1`；種子檔 `notebook.json` |
-| 套件 | 場白名單：`numpy`／`pandas`／`scipy`／`matplotlib` |
+| 執行 | `POST /api/run`；`POST /api/kernel/restart`（best-effort 清全域） |
+| 文件 | **nbformat 4**；種子 `notebook.ipynb`；legacy `version:1` 可遷移 |
+| 持久化 | `env.KV` 鍵 `notebook:ipynb`（讀時相容舊 `notebook:v1`） |
+| 套件 | `numpy`／`pandas`／`scipy`／`matplotlib` |
 
 ## 4. 階段
 
 | Phase | 內容 | 狀態 |
 | --- | --- | --- |
-| 0 | repo＋計劃＋catalog draft／listed | Done |
-| 1 | UI：cell CRUD、md 預覽、標題、儲存 | Done |
-| 2 | Python run／run all；準入提示 | Done |
-| 3 | （可選）分享 deep-link、圖輸出強化、`.ipynb` 單向匯入 | 未做 |
+| 0–2 | MVP cell UI＋Python run＋catalog | Done |
+| 3 | nbformat 4 權威、`.ipynb` 下載／開啟、In／Out、快捷鍵、`%pip`、Restart | **Done（本刀）** |
+| 4 | 圖輸出（matplotlib → display_data）、更多 magics、與 OPFS 檔案樹雙寫 `*.ipynb` | 未做 |
+| 5 | （可選）HOST 級 kernel recreate API，取代 best-effort `del globals` | 未做 |
 
 ## 5. 驗收
 
-1. `/?open=sampot/pg-notebook` 可開；準入後可跑範例格。  
-2. 窄螢幕可編／跑／看輸出，無橫向捲主 chrome。  
-3. 拒絕準入時仍可編輯；執行有清楚引導。  
-4. 重整後 KV 文件還原。  
-5. 文案不宣稱「完整 Jupyter」。
+1. 可下載／再開同一份 `.ipynb`（nbformat 4），cells／outputs 合理保留。  
+2. `Shift+Enter`／`Y`／`M`／`%pip install numpy` 行為符合上表。  
+3. 準入後可跑；與 dock REPL 變數互通；Restart 有確認。  
+4. 文案宣稱「`.ipynb` 相容」而非「完整 Jupyter」。
