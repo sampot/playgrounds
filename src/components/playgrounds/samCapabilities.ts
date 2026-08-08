@@ -50,12 +50,12 @@ const LABELS: Record<KnownCapability, string> = {
   "sandbox:delete-managed": "刪除標為 agentManaged 的沙盒",
   "canvas:observe": "觀察工作畫布（console／網路／DOM／截圖／reload）",
   "secrets:list": "列出密鑰庫名稱與 meta（無值）",
-  "secrets:get": "經 env.secrets.<NAME>.get() 讀密鑰值",
-  "platform:invite": "鑄／撤場 Invite（殼代理；須已 provision）",
+  "secrets:get": "讀取密鑰庫中的密鑰值",
+  "platform:invite": "鑄造與撤銷場 Invite（須已 provision）",
   "session:host": "開／關／編排本機 multi-agent session",
   "agent:fleet": "艦隊只讀摘要與顯示標註",
   "ui:tabs": "主內容 tabs／掛載 plain 或 Tool",
-  checkpoint: "target 沙盒 checkpoint 列舉／建立／還原",
+  checkpoint: "目標沙盒的 checkpoint 列舉／建立／還原",
 };
 
 /** sandbox:edit implies list + read + write at gate-check time. */
@@ -189,15 +189,15 @@ export function effectiveCapabilities(opts: {
 export function formatCapabilitiesMessage(tokens: readonly string[]): string {
   const lines = filterKnownCapabilities(tokens).map(t => {
     const note =
-      t === "sandbox:edit" ? "（含 list＋read＋write）" : "";
+      t === "sandbox:edit" ? "（含列舉、讀取、寫入）" : "";
     return `• ${capabilityLabel(t)}（${t}）${note}`;
   });
   if (!lines.length) return "";
   return [
-    "此沙盒宣告需要下列環境能力。同意後，其 functions.js／controller 可經 env.HOST（子集）使用；compute 遷移期仍可兼 env.COMPUTE：",
+    "此沙盒需要下列能力。同意後才會授權使用：",
     "",
     ...lines,
     "",
-    "可拒絕；沙盒仍可開啟，但呼叫未授權能力會失敗。",
+    "可拒絕；沙盒仍可開啟，但未授權的能力無法使用。",
   ].join("\n");
 }

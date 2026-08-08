@@ -133,7 +133,7 @@ API 面 (A)  ──投影──►  env 綁定 (C)
 | `sandbox:delete-managed` | 刪除標為 agentManaged 的沙盒 | `deleteProject`（既有約束：僅 agentManaged、不可刪現行對口） | HOST 形子集 |
 | `canvas:observe` | 觀察工作畫布（console／網路／DOM／截圖／reload） | `reloadCanvas`／`getConsole`／`clearConsole`／`waitConsole`／`getCanvasStatus`／`getNetworkLog`／`clearNetworkLog`／`getDomSnapshot`／`captureCanvas` | HOST 形子集 |
 | `secrets:list` | 列出密鑰庫名稱與 meta（無值） | `getSecretStoreStatus`／`listSecrets`／`listSecretNames` | HOST 形子集 |
-| `secrets:get` | 經 `env.secrets.<NAME>.get()` 讀密鑰值 | 注入具名 secret binding（仍須 unlock；HOST **永不**回傳值） | `env.secrets.*`（非 HOST 形；DEC-029） |
+| `secrets:get` | 讀取密鑰庫中的密鑰值 | 注入具名 secret binding（仍須 unlock；HOST **永不**回傳值） | `env.secrets.*`（非 HOST 形；DEC-029） |
 | `platform:invite` | 鑄／撤場 Invite（殼代理；須已 provision） | `createPlatformInvite`／`revokePlatformInvite` | HOST 形子集 |
 | `session:host` | 開／關／編排本機 multi-agent session | `openSession`／`closeSession`／pause／resume／`getSession`／seats／spawn／`hostSessionFetch`… | HOST 形子集 |
 | `agent:fleet` | 艦隊只讀摘要與顯示標註 | `listFleetSummary`／`getAgentUi`／`setAgentUi` | HOST 形子集 |
@@ -349,3 +349,4 @@ Scopes 決定「這顆 SAM **能不能**呼叫哪些 HOST 形方法」；**對�
 | 2026-08-07 | 決：建立即自動 grant；納管既有＝明示 grant；一律 HOST 形子集 |
 | 2026-08-07 | 決：對口＝全目錄自動準入；自動 grant 不隨建立者刪而撤內容 |
 | 2026-08-08 | Phase 1–3 ＋ §8.4 落地；DEC-051 Accepted；Phase 4 Git SAM 仍待 |
+| 2026-08-08 | 準入同意文案只述能力需求，不述存取路徑（`env.HOST`／binding 名） |

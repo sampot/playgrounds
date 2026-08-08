@@ -6,6 +6,7 @@ import {
   effectiveCapabilities,
   expandEffectiveCapabilities,
   filterKnownCapabilities,
+  formatCapabilitiesMessage,
   hasCapability,
   pendingCapabilities,
   pruneAdmittedToDeclared,
@@ -77,6 +78,18 @@ describe("samCapabilities", () => {
   it("labels known tokens", () => {
     expect(capabilityLabel("runPython")).toContain("Python");
     expect(capabilityLabel("sandbox:edit")).toContain("讀寫");
+    expect(capabilityLabel("secrets:get")).toContain("密鑰");
+    expect(capabilityLabel("secrets:get")).not.toMatch(/env\./);
+  });
+
+  it("consent copy lists capabilities without access paths", () => {
+    const msg = formatCapabilitiesMessage([
+      "sandbox:create",
+      "secrets:get",
+    ]);
+    expect(msg).toContain("需要下列能力");
+    expect(msg).toContain("sandbox:create");
+    expect(msg).not.toMatch(/env\.HOST|env\.COMPUTE|functions\.js/);
   });
 });
 
