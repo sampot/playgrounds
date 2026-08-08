@@ -11,6 +11,8 @@ export interface GeneratedSamProtocol {
   roles?: string[];
 }
 
+export type GeneratedSamEntryStatus = "listed" | "unlisted";
+
 export interface GeneratedSamEntry {
   id: string;
   title: string;
@@ -18,6 +20,8 @@ export interface GeneratedSamEntry {
   series: string;
   blurb: string;
   source: string;
+  /** listed = /sam/ browse; unlisted = registered only (go／JSON resolve). */
+  status: GeneratedSamEntryStatus;
   license?: string;
   protocols?: GeneratedSamProtocol[];
 }
@@ -70,6 +74,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "街機",
     blurb: "拖曳球拍彈盤進門、人機對戰先得七分；適配手機，自製音效。",
     source: "sampot/pg-airhockey",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -79,6 +84,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "懷舊",
     blurb: "翻子吃子，簡易人機；華語圈暗棋小品。",
     source: "sampot/pg-banqi",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -88,6 +94,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "協定",
     blurb: "Base64／URL-safe／Base32／Base58；資料不離開瀏覽器。",
     source: "sampot/pg-basecodec",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -97,6 +104,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "桌遊",
     blurb: "四人出牌人機對戰：單對三條與五張牌型；適配手機，自製音效。",
     source: "sampot/pg-big2",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -106,6 +114,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "機台",
     blurb: "五五賓果燈板：抽號亮格、連線結算；純娛樂。",
     source: "sampot/pg-bingolite",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -115,6 +124,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "模擬",
     blurb: "點按加球，簡易重力與彈跳；不是物理引擎。",
     source: "sampot/pg-bounceland",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -124,6 +134,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "街機",
     blurb: "擋板反彈清磚，過關加速；致敬打磚塊玩法類型。",
     source: "sampot/pg-breakout",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -133,6 +144,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "模擬",
     blurb: "康威生命遊戲：點畫細胞、演化、隨機與清空。",
     source: "sampot/pg-cellife",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -142,6 +154,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "精緻可玩",
     blurb: "末字起頭接龍、挑戰計分與人機對戰；適配手機，自製音效。",
     source: "sampot/pg-chengyu",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -151,6 +164,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "環境",
     blurb: "rwx ↔ 八進位、umask 提示。",
     source: "sampot/pg-chmod",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -160,6 +174,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "機台",
     blurb: "搖爪落下夾取，差一點就夾到；致敬夾娃娃機玩法類型。",
     source: "sampot/pg-clawgrab",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -169,6 +184,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "機台",
     blurb: "落幣堆疊、推板擠落得分；致敬推幣機玩法類型。",
     source: "sampot/pg-coinpush",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -178,6 +194,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "日常",
     blurb: "hex／rgb／oklch 互轉與取色。",
     source: "sampot/pg-colorcast",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -187,6 +204,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "前端",
     blurb: "前景／背景色票，WCAG AA／AAA（一般與大字）。",
     source: "sampot/pg-contrast",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -196,6 +214,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "環境",
     blurb: "五／六欄表達式解讀與接下來觸發時間。",
     source: "sampot/pg-cronread",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -205,6 +224,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "前端",
     blurb: "px↔rem、clamp() 字串與視窗寬預覽。",
     source: "sampot/pg-cssunits",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -214,6 +234,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "資料",
     blurb: "分隔符／標頭互轉；可掛成工具開 .csv。",
     source: "sampot/pg-csvjson",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -223,6 +244,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "街機",
     blurb: "四軌箭頭下落、踩拍判定連擊、合成 BGM；致敬跳舞機類型，適配手機踏墊。",
     source: "sampot/pg-dancepad",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -232,6 +254,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "資料",
     blurb: "檢視與修改工作沙盒 env.DB；grant .bindings/db，表列／分頁／SQL 主控台。",
     source: "sampot/pg-dbtool",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -241,6 +264,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "模擬",
     blurb: "手寫數字走小型神經網路：訊號粒子、節點呼吸、機率條與權重熱圖。",
     source: "sampot/pg-diginet",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -250,6 +274,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "環境",
     blurb: "解析、遮罩、匯出；非密鑰庫。可掛工具開 .env。",
     source: "sampot/pg-envkit",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -259,6 +284,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "街機",
     blurb: "過馬路躲車、踩木筏過河、進巢穴；適配手機方向鍵與滑動，自製 BGM／音效。",
     source: "sampot/pg-frogcross",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -268,6 +294,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "懷舊",
     blurb: "滑動切菜：連切特效、炸彈躲閃、限時三命；適配手機，自製音效。",
     source: "sampot/pg-fruitcut",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -277,6 +304,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "環境",
     blurb: "瀏覽器內 clone／commit／push／pull；PAT 走密鑰庫；.git 進沙盒樹。不必當總管。",
     source: "sampot/pg-git",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -286,6 +314,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "桌遊",
     blurb: "15×15 雙人／人機／AI 對 AI；可邀請遠端對手（gomoku.v1）。",
     source: "sampot/pg-gomoku",
+    status: "listed",
     license: "MIT",
     protocols: [{"protocolId":"gomoku.v1","apiVersion":"1","roles":["host","player"]}],
   },
@@ -296,6 +325,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "協定",
     blurb: "SHA／MD5／可選 HMAC；文字或檔案，資料不離開瀏覽器。",
     source: "sampot/pg-hashlab",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -305,6 +335,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "精緻可玩",
     blurb: "跳房子節拍點格與踢毽子連擊兩模式；適配手機觸控。",
     source: "sampot/pg-hopkick",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -314,6 +345,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "機台",
     blurb: "六軌燈光賽馬：押注、開跑、結算；純娛樂。",
     source: "sampot/pg-horselit",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -323,6 +355,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "前端",
     blurb: "片段即時預覽；可掛成工具檢視工作沙盒的 .html。",
     source: "sampot/pg-htmlpreview",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -332,6 +365,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "協定",
     blurb: "貼 raw request／response，拆 headers 與 body。",
     source: "sampot/pg-httpmsg",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -341,6 +375,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "協定",
     blurb: "常見狀態碼與 MIME 速查。",
     source: "sampot/pg-httpref",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -350,6 +385,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "環境",
     blurb: "UUID v4／NanoID 批量產生。",
     source: "sampot/pg-idmint",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -359,6 +395,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "環境",
     blurb: "勾選常見堆疊產 .gitignore 片段。",
     source: "sampot/pg-ignoregen",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -368,6 +405,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "前端",
     blurb: "尺寸、MIME、複製 data URL；可掛成工具開工作沙盒圖檔。",
     source: "sampot/pg-imglook",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -377,6 +415,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "生成",
     blurb: "點按拖曳留下粒子墨跡，看流紋慢慢長出來。",
     source: "sampot/pg-inkbloom",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -386,6 +425,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "資料",
     blurb: "路徑級新增／刪除／變更；可掛成工具對照工作沙盒 .json。",
     source: "sampot/pg-jsondiff",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -395,6 +435,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "資料",
     blurb: "pretty／minify、簡易路徑查詢、錯誤定位。",
     source: "sampot/pg-jsonfmt",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -404,6 +445,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "懷舊",
     blurb: "獸穴、陷阱、河界跳躍，簡易人機。",
     source: "sampot/pg-jungle",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -413,6 +455,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "桌遊",
     blurb: "陸戰棋暗棋對 AI：行營鐵路、工兵掃雷、搶旗；適配手機，自製音效。",
     source: "sampot/pg-junqi",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -422,6 +465,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "協定",
     blurb: "解碼 header／payload、過期提示；可選本機 HMAC 驗證。",
     source: "sampot/pg-jwtpeek",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -431,6 +475,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "街機",
     blurb: "短關平台跳躍：撿星、踩敵、抵達旗幟。",
     source: "sampot/pg-leaptrail",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -440,6 +485,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "子代理",
     blurb: "BYOK coding agent（編排子代理）。改 .agent/system.md 調人格；密鑰走密鑰庫；可多份 clone。",
     source: "sampot/pg-llm-agent",
+    status: "listed",
     license: "MIT",
     protocols: [{"protocolId":"coding-orchestration.v1","apiVersion":"1","roles":["worker"]}],
   },
@@ -450,6 +496,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "模擬",
     blurb: "開關、AND／OR／NOT、LED 接線；半加器範例，看 0／1 沿線流動。",
     source: "sampot/pg-logigate",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -459,6 +506,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "機台",
     blurb: "復古燈圈跑燈：押注、跑燈、結算；純娛樂。",
     source: "sampot/pg-mali",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -468,6 +516,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "街機",
     blurb: "凹坑對撞彈珠、撥彈進洞比分；與沙盒／釘雨不同玩法，適配手機。",
     source: "sampot/pg-marblepit",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -477,6 +526,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "桌遊",
     blurb: "三消對對碰：連消倍率、關卡目標、粒子特效；適配手機，自製音效。",
     source: "sampot/pg-match3",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -486,6 +536,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "街機",
     blurb: "迷宮撿光點、躲開或反制追逐者。",
     source: "sampot/pg-mazeglow",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -495,6 +546,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "前端",
     blurb: "GFM、Mermaid、數學公式；可掛成工具檢視工作沙盒的 .md。",
     source: "sampot/pg-mdpreview",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -504,6 +556,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "資料",
     blurb: "依簡易 schema 產 JSON；可選種子重現。",
     source: "sampot/pg-mockdata",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -513,6 +566,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "懷舊",
     blurb: "夜市節奏敲擊，連擊加分；致敬打地鼠玩法類型。",
     source: "sampot/pg-moletap",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -522,6 +576,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "協定",
     blurb: "IPv4 網段、廣播、可用主機數。",
     source: "sampot/pg-netcid",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -531,6 +586,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "環境",
     blurb: "nbformat 4／.ipynb 相容；Shift+Enter、%pip、matplotlib 圖；經場殼 Pyodide（非 Jupyter 伺服器）。",
     source: "sampot/pg-notebook",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -540,6 +596,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "前端",
     blurb: "從 HTML head 模擬社群分享卡；可掛工具看 index.html。",
     source: "sampot/pg-ogpreview",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -549,6 +606,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "協定",
     blurb: "憑證 subject／SAN／效期；不做信任鏈驗證。",
     source: "sampot/pg-pempeek",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -558,6 +616,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "機台",
     blurb: "發射、撞釘、入洞得分；致敬小鋼珠玩法類型。",
     source: "sampot/pg-pinfall",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -567,6 +626,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "懷舊",
     blurb: "夜市射靶破球，限彈連擊；致敬射氣球玩法類型。",
     source: "sampot/pg-popshot",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -576,6 +636,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "環境",
     blurb: "Pyodide 執行 Python、micropip 套件、可分享連結。",
     source: "sampot/pg-pyrun",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -585,6 +646,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "前端",
     blurb: "文字／URL 產碼、下載 PNG。",
     source: "sampot/pg-qrcode",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -594,6 +656,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "桌遊",
     blurb: "對點數撿牌，連撿／清桌加成；四人人機、手機適配與自製音效。",
     source: "sampot/pg-redpick",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -603,6 +666,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "資料",
     blurb: "JavaScript RegExp：旗標、相符列表、取代。",
     source: "sampot/pg-regexlab",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -612,6 +676,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "懷舊",
     blurb: "夜市拋環套瓶，遠近分值；致敬套圈玩法類型。",
     source: "sampot/pg-ringtoss",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -621,6 +686,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "精緻可玩",
     blurb: "3×3 立體方塊：拖曳轉看、轉層、打亂與計時；本機記錄最佳。適配手機。",
     source: "sampot/pg-rubik",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -630,6 +696,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "環境",
     blurb: "比較與 ^／~ 範圍；可掛工具讀 package.json。",
     source: "sampot/pg-semver",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -639,6 +706,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "繪圖",
     blurb: "顏色、筆粗、復原與匯出 PNG；極簡畫布。",
     source: "sampot/pg-sketchpad",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -648,6 +716,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "精緻可玩",
     blurb: "垂直捲軸射擊：三戰區、武裝升級、爆散與首領彈幕。",
     source: "sampot/pg-skyburst",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -657,6 +726,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "精緻可玩",
     blurb: "十二關推箱子、復原一步、滑動操作；適配手機，自製音效。",
     source: "sampot/pg-sokoban",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -666,6 +736,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "資料",
     blurb: "pretty（不執行）；可掛成工具開 .sql。",
     source: "sampot/pg-sqlfmt",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -675,6 +746,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "街機",
     blurb: "固定畫面太空射擊，幾何機體與波次敵人。",
     source: "sampot/pg-starshot",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -684,6 +756,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "精緻可玩",
     blurb: "移動／定格賽跑、簡易人機裁判回頭抓人；適配手機長按前進。",
     source: "sampot/pg-statue",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -693,6 +766,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "總管",
     blurb: "總管遊樂場的專屬 Agent，負責執行你交辦的任務，包括開發單頁小程式。需要自備 LLM API Key。",
     source: "sampot/pg-steward",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -702,6 +776,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "桌遊",
     blurb: "九宮填數：簡單／中等／困難、筆記與提示；適配手機，自製音效。",
     source: "sampot/pg-sudoku",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -711,6 +786,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "前端",
     blurb: "縮放、viewBox、data URL；可掛成工具檢視工作沙盒的 .svg。",
     source: "sampot/pg-svglook",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -720,6 +796,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "街機",
     blurb: "俯視坦克：人機或 AI 觀戰、履帶炮塔、重低音爆炸；適配手機搖桿，自製音效。",
     source: "sampot/pg-tankduel",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -729,6 +806,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "街機",
     blurb: "輕量七種方塊、消行升級、幽靈影與觸控按鍵；適配手機，自製音效。",
     source: "sampot/pg-tetris",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -738,6 +816,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "資料",
     blurb: "左右貼上，行級 diff。",
     source: "sampot/pg-textdiff",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -747,6 +826,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "前端",
     blurb: "HTML entity 編解碼、slug。",
     source: "sampot/pg-textkit",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -756,6 +836,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "桌遊",
     blurb: "3×3 雙人、人機與 AI 對 AI（Minimax）。",
     source: "sampot/pg-tictactoe",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -765,6 +846,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "資料",
     blurb: "驗證與 pretty；可掛成工具編輯工作沙盒的 .toml。",
     source: "sampot/pg-tomlfmt",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -774,6 +856,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "街機",
     blurb: "蓄力發射、轉速碰撞短局對戰；適配手機，自製音效。",
     source: "sampot/pg-topduel",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -783,6 +866,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "街機",
     blurb: "三地圖戰役星等、成就、新手引導、無盡模式；適配手機，自製音效。",
     source: "sampot/pg-towerdef",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -792,6 +876,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "桌遊",
     blurb: "台灣版紙本規則：買地蓋房、機會命運、熱座 2–4 人／AI 託管；忠孝東路等路名。",
     source: "sampot/pg-twland",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -801,6 +886,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "日常",
     blurb: "Unix epoch／ISO 與多個 IANA 時區。",
     source: "sampot/pg-tzlook",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -810,6 +896,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "環境",
     blurb: "code point、UTF-8 bytes、BOM／換行偵測。",
     source: "sampot/pg-unilook",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -819,6 +906,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "協定",
     blurb: "解析／組裝 URL、編輯 query、encodeURIComponent。",
     source: "sampot/pg-urlkit",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -828,6 +916,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "聲音",
     blurb: "瀏覽器 TTS／STT：念文字、聽說話、回聲一句。",
     source: "sampot/pg-voicelab",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -837,6 +926,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "懷舊",
     blurb: "拍尪仔標：選牌對拍、節奏力道、翻牌收穫；適配手機，自製音效。",
     source: "sampot/pg-wanzai",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -846,6 +936,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "聲音",
     blurb: "Web Audio 振盪器與即時波形；點播放才發聲。",
     source: "sampot/pg-wavepad",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -855,6 +946,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "流程",
     blurb: "垂直主軸編輯 workflow.yaml（workflow.v1）；掛成工具寫宿主定義，不跑引擎。",
     source: "sampot/pg-wfedit",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -864,6 +956,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "懷舊",
     blurb: "簡化飛行棋：擲骰起飛、撞回、終點跑道。",
     source: "sampot/pg-wingrace",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -873,6 +966,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "流程",
     blurb: "有狀態多步驟 workflow（workflow.v1）；狗糧為內容審核，實例活在 Agent 沙盒。",
     source: "sampot/pg-workflow",
+    status: "listed",
     license: "MIT",
   },
   {
@@ -882,6 +976,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "資料",
     blurb: "驗證與 pretty；可掛成工具編輯工作沙盒的 .yml／.yaml。",
     source: "sampot/pg-yamlfmt",
+    status: "listed",
     license: "MIT",
   },
 ];

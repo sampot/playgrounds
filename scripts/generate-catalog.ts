@@ -142,6 +142,9 @@ type GenProtocol = {
   roles?: string[];
 };
 
+/** listed = public browse; unlisted = registered (JSON／go resolve) but hidden from /sam/; draft = omit. */
+type EntryStatus = "listed" | "unlisted";
+
 type GenEntry = {
   id: string;
   title: string;
@@ -149,6 +152,7 @@ type GenEntry = {
   series: string;
   blurb: string;
   source: string;
+  status: EntryStatus;
   license?: string;
   protocols?: GenProtocol[];
 };
@@ -211,10 +215,17 @@ for (const file of files) {
     doc.status === undefined || doc.status === null
       ? "listed"
       : asString(doc.status, "status", where);
-  if (statusRaw !== "listed" && statusRaw !== "draft") {
-    fail(`${where}: status must be listed|draft (got "${statusRaw}")`);
+  if (
+    statusRaw !== "listed" &&
+    statusRaw !== "unlisted" &&
+    statusRaw !== "draft"
+  ) {
+    fail(
+      `${where}: status must be listed|unlisted|draft (got "${statusRaw}")`
+    );
   }
   if (statusRaw === "draft") continue;
+  const status = statusRaw as EntryStatus;
 
   const kindStr = asString(doc.kind, "kind", where);
   if (!isKind(kindStr)) fail(`${where}: unknown kind "${kindStr}"`);
@@ -226,6 +237,7 @@ for (const file of files) {
     series: asString(doc.series, "series", where),
     blurb: asString(doc.blurb, "blurb", where),
     source: asString(doc.source, "source", where),
+    status,
   };
   if (doc.license !== undefined && doc.license !== null) {
     entry.license = asString(doc.license, "license", where);
@@ -243,10 +255,14 @@ for (const pid of pickIds) {
   }
 }
 
-const listedIds = new Set(entries.map(e => e.id));
+const listedIds = new Set(
+  entries.filter(e => e.status === "listed").map(e => e.id)
+);
 for (const pid of pickIds) {
   if (!listedIds.has(pid)) {
-    fail(`picks.yaml: id "${pid}" is missing or draft (not listed)`);
+    fail(
+      `picks.yaml: id "${pid}" must be status: listed (missing, draft, or unlisted)`
+    );
   }
 }
 
@@ -272,6 +288,7 @@ const entryLines = entries
       series: e.series,
       blurb: e.blurb,
       source: e.source,
+      status: e.status,
     };
     if (e.license) obj.license = e.license;
     if (e.protocols) obj.protocols = e.protocols;
@@ -301,6 +318,8 @@ export interface GeneratedSamProtocol {
   roles?: string[];
 }
 
+export type GeneratedSamEntryStatus = "listed" | "unlisted";
+
 export interface GeneratedSamEntry {
   id: string;
   title: string;
@@ -308,6 +327,8 @@ export interface GeneratedSamEntry {
   series: string;
   blurb: string;
   source: string;
+  /** listed = /sam/ browse; unlisted = registered only (go／JSON resolve). */
+  status: GeneratedSamEntryStatus;
   license?: string;
   protocols?: GeneratedSamProtocol[];
 }
@@ -356,6 +377,7 @@ const catalogJson = {
       series: e.series,
       blurb: e.blurb,
       source: e.source,
+      status: e.status,
     };
     if (e.license) row.license = e.license;
     if (e.protocols) row.protocols = e.protocols;
@@ -366,7 +388,11 @@ const catalogJson = {
 mkdirSync(dirname(jsonOutPath), { recursive: true });
 writeFileSync(jsonOutPath, `${JSON.stringify(catalogJson, null, 2)}\n`);
 
+const listedCount = entries.filter(e => e.status === "listed").length;
+const unlistedCount = entries.length - listedCount;
 console.log(
-  `[catalog:gen] wrote ${entries.length} listed entries → ${outPath}`
+  `[catalog:gen] wrote ${entries.length} registered entries (${listedCount} listed` +
+    (unlistedCount ? `, ${unlistedCount} unlisted` : "") +
+    `) → ${outPath}`
 );
 console.log(`[catalog:gen] wrote ${jsonOutPath}`);

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   GO_CATALOG,
+  GO_LISTED_CATALOG,
   GO_RECOMMEND_KIND,
   getGoCatalogEntry,
   nextSameKind,
@@ -13,10 +14,22 @@ import { GENERATED_SAM_PLAYGROUNDS_PICK_IDS } from "@data/samCatalog.generated";
 describe("goCatalog game-kind swap", () => {
   it("embeds published catalog with kind", () => {
     expect(GO_CATALOG.length).toBeGreaterThan(10);
+    expect(GO_LISTED_CATALOG.length).toBeLessThanOrEqual(GO_CATALOG.length);
+    expect(GO_LISTED_CATALOG.every(e => e.status === "listed")).toBe(true);
     const breakout = getGoCatalogEntry("pg-breakout");
     expect(breakout?.kind).toBe("game");
+    expect(breakout?.status).toBe("listed");
     expect(breakout?.source).toBeTruthy();
     expect(GO_RECOMMEND_KIND).toBe("game");
+  });
+
+  it("home and swap pools never include unlisted", () => {
+    expect(recommendHome(5, () => 0.2).every(e => e.status === "listed")).toBe(
+      true
+    );
+    expect(
+      sameKindPeers("pg-breakout").every(e => e.status === "listed")
+    ).toBe(true);
   });
 
   it("next stays among games", () => {

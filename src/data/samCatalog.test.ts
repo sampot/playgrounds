@@ -8,6 +8,8 @@ import {
   catalogProtocolMatches,
   catalogSeriesOptions,
   catalogUrlSearchParams,
+  listRegisteredCatalogEntries,
+  samCatalogRegistered,
   entryMatchesCatalogQuery,
   entrySupportsProtocol,
   filterCatalogEntries,
@@ -15,6 +17,7 @@ import {
   getCatalogEntry,
   isSampotCatalogSource,
   listCatalogEntries,
+  listRegisteredCatalogEntries,
   matchCatalogForProtocol,
   matchInstalledForProtocol,
   normalizeCatalogSource,
@@ -22,6 +25,7 @@ import {
   resolveCatalogInviteCandidates,
   resolveInviteCandidates,
   samCatalog,
+  samCatalogRegistered,
   samEntryOpenSource,
   samOpenHref,
   samOpenShareHref,
@@ -100,12 +104,50 @@ describe("catalog query API", () => {
   it("listCatalogEntries returns listed catalog", () => {
     expect(listCatalogEntries().length).toBe(samCatalog.length);
     expect(listCatalogEntries()[0]?.id).toBeTruthy();
+    expect(samCatalog.every(e => e.status === "listed")).toBe(true);
+  });
+
+  it("registered includes listed and is the resolve universe", () => {
+    expect(listRegisteredCatalogEntries().length).toBe(
+      samCatalogRegistered.length
+    );
+    expect(samCatalogRegistered.length).toBeGreaterThanOrEqual(
+      samCatalog.length
+    );
+    expect(
+      samCatalogRegistered.every(
+        e => e.status === "listed" || e.status === "unlisted"
+      )
+    ).toBe(true);
   });
 
   it("getCatalogEntry by id", () => {
     expect(getCatalogEntry("pg-breakout")?.source).toBe("sampot/pg-breakout");
+    expect(getCatalogEntry("pg-breakout")?.status).toBe("listed");
     expect(getCatalogEntry("nope")).toBeUndefined();
     expect(getCatalogEntry("  ")).toBeUndefined();
+  });
+
+  it("unlisted is registered but not in public browse list", () => {
+    const unlisted: SamEntry = {
+      id: "pg-secret-egg",
+      repo: "pg-secret-egg",
+      title: "隱藏彩蛋",
+      kind: "game",
+      series: "精緻可玩",
+      blurb: "測試用",
+      source: "sampot/pg-secret-egg",
+      status: "unlisted",
+    };
+    const registered = [...samCatalogRegistered, unlisted];
+    const listed = registered.filter(e => e.status === "listed");
+    expect(listed.some(e => e.id === "pg-secret-egg")).toBe(false);
+    expect(getCatalogEntry("pg-secret-egg", registered)?.title).toBe(
+      "隱藏彩蛋"
+    );
+    expect(
+      findCatalogBySource("sampot/pg-secret-egg", registered)?.id
+    ).toBe("pg-secret-egg");
   });
 
   it("normalizeCatalogSource collapses github URLs", () => {
@@ -169,6 +211,7 @@ describe("matchCatalogForProtocol", () => {
       series: "子代理",
       blurb: "t",
       source: "acme/toy",
+      status: "listed",
       protocols: [
         {
           protocolId: "coding-orchestration.v1",
@@ -306,11 +349,17 @@ describe("public/catalog/v1.json", () => {
     expect(doc.v).toBe(1);
     expect(SAM_CATALOG_JSON_PATH).toBe("/catalog/v1.json");
     expect(doc.entries.map(e => e.id).sort()).toEqual(
-      samCatalog.map(e => e.id).sort()
+      samCatalogRegistered.map(e => e.id).sort()
     );
+    expect(
+      doc.entries.filter(e => (e as { status?: string }).status === "listed")
+        .map(e => e.id)
+        .sort()
+    ).toEqual(samCatalog.map(e => e.id).sort());
     expect(doc.picks).toEqual([...SAM_PLAYGROUNDS_PICK_REPOS]);
     const llm = doc.entries.find(e => e.id === "pg-llm-agent");
     expect(llm?.protocols?.[0]?.protocolId).toBe("coding-orchestration.v1");
+    expect((llm as { status?: string })?.status).toBe("listed");
   });
 });
 

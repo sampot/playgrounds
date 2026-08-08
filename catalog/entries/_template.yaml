@@ -1,6 +1,9 @@
 # Copy this file to <id>.yaml (filename = stable catalog id, e.g. pg-mytoy.yaml).
 # Required fields: title, kind, series, blurb, source
-# Optional: status (listed|draft; draft omitted from site), license, protocols
+# Optional: status, license, protocols
+#   listed   — public /sam/ browse + go resolve (default)
+#   unlisted — in catalog JSON／go `/s/<id>` resolve, hidden from /sam/＆推薦
+#   draft    — omitted from gen entirely
 
 title: 顯示名稱
 kind: toy # tool | agent | game | toy | media
@@ -8,7 +11,7 @@ series: 生成 # must match a series under that kind in ../series.yaml (or gen a
 blurb: 一句話說明這款 SAM 做什麼、怎麼玩。
 source: owner/repo # or https://github.com/owner/repo / https://gitlab.com/owner/repo
 license: MIT
-status: listed # listed | draft
+status: listed # listed | unlisted | draft
 # Optional — session protocols this SAM can join (for invite / lazy-install match):
 # protocols:
 #   - protocolId: coding-orchestration.v1

@@ -60,7 +60,7 @@
 ```
 
 （可選 `generatedAt` **不**寫入 committed 產物，避免每次 gen 時間戳造成 CI drift。）
-`entries[]` 每筆（與現 YAML／GeneratedSamEntry 對齊；僅 `listed`）：
+`entries[]` 每筆（與現 YAML／GeneratedSamEntry 對齊；`draft` 不進產物）：
 
 | 欄位 | 必填 | 說明 |
 | --- | --- | --- |
@@ -70,8 +70,11 @@
 | `series` | 是 | 系列字串 |
 | `blurb` | 是 | 一句話 |
 | `source` | 是 | `owner/repo` 或 GitHub／GitLab URL（`?open=`） |
+| `status` | 是 | `listed`（預設）｜`unlisted`（登錄／可 resolve，不進 `/sam/` 瀏覽） |
 | `license` | 否 | 如 MIT |
 | `protocols` | 否 | 此 SAM 宣告可參與的 session protocol 摘要；省略＝不參與 protocol 匹配 |
+
+**`status`：** `listed`＝人機型錄與推薦；`unlisted`＝機器登錄（`/catalog/v1.json`、go `/s/<id>`、protocol 匹配）但不出現在 `/sam/`／go 首頁推薦。YAML `draft` 不寫入產物。
 
 **`protocols`：** 陣列，元素至少含 `protocolId`、`apiVersion`；可含 `roles[]`。用於邀請附完整規格時的型錄匹配。未宣告則 **不**假裝支援任意 protocol——匹配只能靠明確 id／source，或本機已安裝 SAM 的 **`sam:protocol` head**（Phase 4）。
 
@@ -89,9 +92,10 @@
 
 | 方法（名稱可調） | 行為 |
 | --- | --- |
-| `listCatalogEntries()` | 全部 listed |
-| `getCatalogEntry(id)` | 依 id |
-| `findCatalogBySource(source)` | 正規化後比對 `source` |
+| `listCatalogEntries()` | 公開 listed（`/sam/`） |
+| `listRegisteredCatalogEntries()` | listed＋unlisted |
+| `getCatalogEntry(id)` | 依 id（含 unlisted） |
+| `findCatalogBySource(source)` | 正規化後比對 `source`（含 unlisted） |
 | `matchCatalogForProtocol(spec)` | 依邀請 protocol 規格對 `entries[].protocols` 做相容匹配；回傳 0..n 候選（`catalogId`／`source` hint 僅排序） |
 | `resolveCatalogInviteCandidates(spec)` | 僅型錄（＝`matchCatalogForProtocol`）；不安裝 |
 | `matchInstalledForProtocol`／`resolveInviteCandidates` | 合併型錄＋本機 head 探測結果（`sandboxId` 已安裝優先） |
@@ -121,11 +125,11 @@
 
 | | `/sam/` 人機面 | `/catalog/v1.json`＋查詢 API |
 | --- | --- | --- |
-| 讀者 | 人類 | Playgrounds／機器 |
-| 資料 | 同 gen | 同 gen |
-| UX | 一鍵開、搜尋／陳列（見 [PG-CATALOG-UX-PLAN.md](./PG-CATALOG-UX-PLAN.md)） | 解析、匹配、lazy install |
+| 讀者 | 人類 | Playgrounds／機器／go |
+| 資料 | 同 gen 的 **listed** | 同 gen 的 **listed＋unlisted** |
+| UX | 一鍵開、搜尋／陳列（見 [PG-CATALOG-UX-PLAN.md](./PG-CATALOG-UX-PLAN.md)） | 解析、匹配、lazy install、go `/s/<id>` |
 
-頁面 **不**再當機器權威（勿 scrape HTML）。
+頁面 **不**再當機器權威（勿 scrape HTML）。`unlisted` 僅深鏈／機器解析可見。
 
 ---
 

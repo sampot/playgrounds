@@ -17,11 +17,15 @@ import {
   GENERATED_SAM_PLAYGROUNDS_PICK_IDS,
   GENERATED_SAM_SERIES_ORDER,
   type GeneratedSamEntry,
+  type GeneratedSamEntryStatus,
   type GeneratedSamKind,
   type GeneratedSamProtocol,
 } from "./samCatalog.generated";
 
 export type SamKind = GeneratedSamKind;
+
+/** listed = public /sam/ browse; unlisted = registered only (resolve／go／JSON). */
+export type SamEntryStatus = GeneratedSamEntryStatus;
 
 /** Catalog-declared session protocol support (DEC-046 Phase 3). */
 export type SamCatalogProtocol = GeneratedSamProtocol;
@@ -48,6 +52,11 @@ export interface SamEntry {
    * Used for `?open=` and repository links.
    */
   source: string;
+  /**
+   * Visibility: `listed` on /sam/; `unlisted` in catalog JSON／resolve only
+   * (go `/s/<id>`, easter eggs, pre-release). Draft YAML never reaches here.
+   */
+  status: SamEntryStatus;
   license?: string;
   /** Optional session protocols this SAM can join (catalog declaration). */
   protocols?: readonly SamCatalogProtocol[];
@@ -76,9 +85,14 @@ function toSamEntry(e: GeneratedSamEntry): SamEntry {
     series: e.series,
     blurb: e.blurb,
     source: e.source,
+    status: e.status ?? "listed",
     ...(e.license ? { license: e.license } : {}),
     ...(e.protocols?.length ? { protocols: e.protocols } : {}),
   };
+}
+
+function isListed(e: Pick<SamEntry, "status">): boolean {
+  return e.status === "listed";
 }
 
 /** Tab order on `/sam/`. */
@@ -104,8 +118,15 @@ export const SAM_AGENT_SERIES_ORDER: string[] = [
   ...GENERATED_SAM_SERIES_ORDER.agent,
 ];
 
-/** Listed catalog entries (draft YAML omitted at gen time). */
-export const samCatalog: SamEntry[] = GENERATED_SAM_CATALOG.map(toSamEntry);
+/**
+ * All registered entries (`listed` + `unlisted`; draft omitted at gen).
+ * Prefer {@link samCatalog} for public browse UI.
+ */
+export const samCatalogRegistered: SamEntry[] =
+  GENERATED_SAM_CATALOG.map(toSamEntry);
+
+/** Public browse entries only (`status: listed`). Used by `/sam/`. */
+export const samCatalog: SamEntry[] = samCatalogRegistered.filter(isListed);
 
 /** Hero / SEO / footnote copy for `/sam/`. */
 export const samCatalogPage = GENERATED_SAM_PAGE;
@@ -139,17 +160,24 @@ export function normalizeCatalogSource(source: string): string {
   return s.replace(/\/+$/, "").toLowerCase();
 }
 
-/** All listed catalog entries (same authority as `/catalog/v1.json`). */
+/** Public listed entries (default for /sam/ browse helpers). */
 export function listCatalogEntries(
   catalog: readonly SamEntry[] = samCatalog
 ): readonly SamEntry[] {
   return catalog;
 }
 
-/** Lookup by stable catalog id. */
+/** Registered entries including unlisted (machine resolve／go). */
+export function listRegisteredCatalogEntries(
+  catalog: readonly SamEntry[] = samCatalogRegistered
+): readonly SamEntry[] {
+  return catalog;
+}
+
+/** Lookup by stable catalog id (includes unlisted). */
 export function getCatalogEntry(
   id: string,
-  catalog: readonly SamEntry[] = samCatalog
+  catalog: readonly SamEntry[] = samCatalogRegistered
 ): SamEntry | undefined {
   const key = id.trim();
   if (!key) return undefined;
@@ -159,10 +187,11 @@ export function getCatalogEntry(
 /**
  * Find entry whose `source` matches (after {@link normalizeCatalogSource}).
  * Also matches when `source` equals catalog `id` or `sampot/<id>`.
+ * Includes unlisted.
  */
 export function findCatalogBySource(
   source: string,
-  catalog: readonly SamEntry[] = samCatalog
+  catalog: readonly SamEntry[] = samCatalogRegistered
 ): SamEntry | undefined {
   const want = normalizeCatalogSource(source);
   if (!want) return undefined;
@@ -207,7 +236,7 @@ export function entrySupportsProtocol(
  */
 export function matchCatalogForProtocol(
   spec: SessionProtocolSpec,
-  catalog: readonly SamEntry[] = samCatalog
+  catalog: readonly SamEntry[] = samCatalogRegistered
 ): SamEntry[] {
   const protocolId = spec.protocolId?.trim();
   const apiVersion = spec.apiVersion?.trim();
@@ -237,7 +266,7 @@ export function matchCatalogForProtocol(
  */
 export function resolveCatalogInviteCandidates(
   spec: SessionProtocolSpec,
-  catalog: readonly SamEntry[] = samCatalog
+  catalog: readonly SamEntry[] = samCatalogRegistered
 ): SamEntry[] {
   return matchCatalogForProtocol(spec, catalog);
 }
@@ -309,7 +338,7 @@ export function resolveInviteCandidates(
     installed?: readonly InstalledSamProbe[];
   }
 ): InviteCandidate[] {
-  const catalog = options?.catalog ?? samCatalog;
+  const catalog = options?.catalog ?? samCatalogRegistered;
   const installedHits = matchInstalledForProtocol(spec, options?.installed ?? []);
   const catalogHits = matchCatalogForProtocol(spec, catalog);
 
