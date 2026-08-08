@@ -1,6 +1,6 @@
 /**
  * SW-less canvas for in-app browsers (LINE scanner / WKWebView).
- * Uses composePreview srcdoc + postMessage session API bridge.
+ * Uses composePreview srcdoc + postMessage `/api` bridge (session＋functions).
  */
 
 import {
@@ -8,26 +8,32 @@ import {
   revokePreviewBlobs,
 } from "@pg/composePreview";
 import type { FileMap } from "@pg/projectTypes";
-import { handleGoSessionApi } from "./goCanvas";
+import {
+  handleGoSessionApi,
+  type GoCanvasApiListenerOptions,
+} from "./goCanvas";
+import { handleGoFunctionsApi } from "./goFunctionsRuntime";
 
 export const GO_MEMORY_SESSION_TYPE = "playgrounds-go-memory-session" as const;
 export const GO_MEMORY_SESSION_RESULT = "playgrounds-go-memory-session-result" as const;
 export const GO_MEMORY_BC_TYPE = "playgrounds-go-memory-bc" as const;
 
-const SESSION_BRIDGE = `<script data-go-memory-session>
+const API_BRIDGE = `<script data-go-memory-session>
 (function () {
   var MSG = ${JSON.stringify(GO_MEMORY_SESSION_TYPE)};
   var RES = ${JSON.stringify(GO_MEMORY_SESSION_RESULT)};
   var BC = ${JSON.stringify(GO_MEMORY_BC_TYPE)};
   var _fetch = window.fetch.bind(window);
-  function isSessionPath(u) {
+  function isApiPath(u) {
     try {
       var s = typeof u === "string" ? u : (u && u.url) ? String(u.url) : "";
-      return s.indexOf("/api/session") !== -1;
+      if (!s) return false;
+      if (s === "/api" || s.indexOf("/api/") === 0 || s.indexOf("/api?") === 0) return true;
+      return s.indexOf("/api/") !== -1 || /\\/api(?:\\?|$)/.test(s);
     } catch (_) { return false; }
   }
   window.fetch = function (input, init) {
-    if (!isSessionPath(input)) return _fetch(input, init);
+    if (!isApiPath(input)) return _fetch(input, init);
     var method = (init && init.method) || (input && input.method) || "GET";
     var url = typeof input === "string" ? input : String(input.url || "");
     var bodyPromise = Promise.resolve(null);
@@ -74,7 +80,7 @@ const SESSION_BRIDGE = `<script data-go-memory-session>
         }, "*");
         setTimeout(function () {
           window.removeEventListener("message", onMsg);
-          reject(new Error("session_api_timeout"));
+          reject(new Error("go_api_timeout"));
         }, 30000);
       });
     });
@@ -154,9 +160,9 @@ export function buildGoMemoryCanvas(
   const { srcdoc: base, blobUrls } = composePreview(files, "index.html");
   let srcdoc = base;
   if (/<head[\s>]/iu.test(srcdoc)) {
-    srcdoc = srcdoc.replace(/<head([^>]*)>/iu, `<head$1>${SESSION_BRIDGE}`);
+    srcdoc = srcdoc.replace(/<head([^>]*)>/iu, `<head$1>${API_BRIDGE}`);
   } else {
-    srcdoc = `${SESSION_BRIDGE}${srcdoc}`;
+    srcdoc = `${API_BRIDGE}${srcdoc}`;
   }
   // Bust iframe remounts when generation changes.
   srcdoc = srcdoc.replace(
@@ -166,8 +172,41 @@ export function buildGoMemoryCanvas(
   return { srcdoc, blobUrls, generation };
 }
 
+async function dispatchMemoryApi(
+  ctx: GoCanvasApiListenerOptions,
+  sandboxId: string,
+  request: { method: string; url: string; body: ArrayBuffer | null }
+) {
+  let path = "/";
+  try {
+    path = new URL(request.url, "https://go.local").pathname;
+  } catch {
+    path = String(request.url || "");
+  }
+  if (path.includes("/api/session")) {
+    return handleGoSessionApi(sandboxId, request);
+  }
+  return handleGoFunctionsApi(ctx, {
+    method: request.method,
+    url: request.url,
+    headers: [],
+    body: request.body,
+  });
+}
+
+/** @deprecated Use installGoMemoryApiListener */
 export function installGoMemorySessionListener(
   getSandboxId: () => string | null
+): () => void {
+  return installGoMemoryApiListener({
+    getSandboxId,
+    getFiles: () => null,
+  });
+}
+
+/** Parent listener for srcdoc canvas `/api` (session＋functions.js). */
+export function installGoMemoryApiListener(
+  ctx: GoCanvasApiListenerOptions
 ): () => void {
   const onMessage = (ev: MessageEvent) => {
     const data = ev.data as
@@ -184,7 +223,7 @@ export function installGoMemorySessionListener(
     if (!data || data.type !== GO_MEMORY_SESSION_TYPE) return;
     const source = ev.source as Window | null;
     if (!source || typeof data.requestId !== "string" || !data.request) return;
-    const sandboxId = getSandboxId();
+    const sandboxId = ctx.getSandboxId();
     void (async () => {
       try {
         if (!sandboxId) {
@@ -210,7 +249,7 @@ export function installGoMemorySessionListener(
           return;
         }
         if (!data.request) return;
-        const response = await handleGoSessionApi(sandboxId, data.request);
+        const response = await dispatchMemoryApi(ctx, sandboxId, data.request);
         source.postMessage(
           {
             type: GO_MEMORY_SESSION_RESULT,

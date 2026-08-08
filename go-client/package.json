@@ -5,8 +5,9 @@
   "type": "module",
   "description": "Pure-play Guest client @ go.samkuo.me (DEC-050)",
   "scripts": {
-    "dev": "vite dev --port 5174",
-    "prebuild": "npm run catalog:gen --prefix ..",
+    "vendor:sqljs": "node scripts/vendor-sqljs.mjs",
+    "dev": "npm run vendor:sqljs && vite dev --port 5174",
+    "prebuild": "npm run vendor:sqljs && npm run catalog:gen --prefix ..",
     "build": "svelte-kit sync && vite build",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "prepare": "svelte-kit sync || echo ''",
@@ -15,7 +16,8 @@
     "deploy:dry": "npm run build && wrangler deploy --dry-run"
   },
   "dependencies": {
-    "qr": "^0.6.0"
+    "qr": "^0.6.0",
+    "sql.js": "^1.14.1"
   },
   "devDependencies": {
     "@sveltejs/adapter-static": "^3.0.10",

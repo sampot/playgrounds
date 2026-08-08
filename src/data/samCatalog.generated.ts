@@ -615,6 +615,15 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     license: "MIT",
   },
   {
+    id: "pg-rubik",
+    title: "魔術方塊",
+    kind: "game",
+    series: "精緻可玩",
+    blurb: "3×3 立體方塊：拖曳轉看、轉層、打亂與計時；本機記錄最佳。適配手機。",
+    source: "sampot/pg-rubik",
+    license: "MIT",
+  },
+  {
     id: "pg-semver",
     title: "Semver 對照",
     kind: "tool",

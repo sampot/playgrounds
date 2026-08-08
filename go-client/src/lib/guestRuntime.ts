@@ -58,7 +58,7 @@ import {
 import { isGoCanvasSwUsable } from "./goCanvasSupport";
 import {
   buildGoMemoryCanvas,
-  installGoMemorySessionListener,
+  installGoMemoryApiListener,
   publishGoMemoryBroadcast,
   revokeGoMemoryBlobs,
 } from "./goMemoryCanvas";
@@ -431,10 +431,15 @@ export function createGuestRuntime() {
       unlistenApi?.();
       clearMemoryBlobs();
 
+      const apiCtx = {
+        getSandboxId: () => sandboxId,
+        getFiles: () => samFiles,
+        getCatalogId: () => null as string | null,
+      };
       const preferSw = isGoCanvasSwUsable();
       if (preferSw) {
         try {
-          unlistenApi = installGoCanvasApiListener(() => sandboxId);
+          unlistenApi = installGoCanvasApiListener(apiCtx);
           await syncGoCanvasSnapshot(sandboxId, generation, files);
           canvasMode = "sw";
         } catch {
@@ -445,7 +450,7 @@ export function createGuestRuntime() {
         }
       }
       if (!canvasMode) {
-        unlistenApi = installGoMemorySessionListener(() => sandboxId);
+        unlistenApi = installGoMemoryApiListener(apiCtx);
         buildMemorySrcdoc(); // validate build; show only after ready
         canvasMode = "memory";
       }

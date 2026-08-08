@@ -67,18 +67,48 @@ export function formatGithubSource(ref: GithubRef): string {
   return base;
 }
 
+const GH_JSON = {
+  Accept: "application/vnd.github+json",
+} as const;
+
 async function resolveDefaultBranch(
   owner: string,
-  repo: string
+  repo: string,
+  signal?: AbortSignal
 ): Promise<string> {
   const res = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
-    headers: { Accept: "application/vnd.github+json" },
+    headers: GH_JSON,
+    cache: "no-store",
+    signal,
   });
   if (!res.ok) {
     throw new Error(`無法讀取儲存庫（HTTP ${res.status}）`);
   }
   const data = (await res.json()) as { default_branch?: string };
   return data.default_branch || "main";
+}
+
+/** Tip commit for a branch／tag／SHA — used in raw URLs so HTTP caches cannot stick to an old `main`. */
+async function resolveCommitSha(
+  owner: string,
+  repo: string,
+  ref: string,
+  signal?: AbortSignal
+): Promise<string> {
+  const res = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/commits/${encodeURIComponent(ref)}`,
+    {
+      headers: GH_JSON,
+      cache: "no-store",
+      signal,
+    }
+  );
+  if (!res.ok) {
+    throw new Error(`無法解析提交（HTTP ${res.status}）`);
+  }
+  const data = (await res.json()) as { sha?: string };
+  if (!data.sha) throw new Error("無法解析提交 SHA");
+  return data.sha;
 }
 
 /**
@@ -94,12 +124,21 @@ export async function fetchGithubProject(
   }
 ): Promise<FileMap> {
   const maxFiles = options?.maxFiles ?? 200;
-  const branch = ref.ref || (await resolveDefaultBranch(ref.owner, ref.repo));
+  const branch =
+    ref.ref ||
+    (await resolveDefaultBranch(ref.owner, ref.repo, options?.signal));
+  const commitSha = await resolveCommitSha(
+    ref.owner,
+    ref.repo,
+    branch,
+    options?.signal
+  );
   const rootPrefix = ref.path ? normalizeProjectPath(ref.path) : "";
 
-  const treeUrl = `https://api.github.com/repos/${ref.owner}/${ref.repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`;
+  const treeUrl = `https://api.github.com/repos/${ref.owner}/${ref.repo}/git/trees/${encodeURIComponent(commitSha)}?recursive=1`;
   const treeRes = await fetch(treeUrl, {
-    headers: { Accept: "application/vnd.github+json" },
+    headers: GH_JSON,
+    cache: "no-store",
     signal: options?.signal,
   });
   if (!treeRes.ok) {
@@ -136,11 +175,15 @@ export async function fetchGithubProject(
     const item = candidates[i]!;
     const repoPath = item.path!;
     const projectPath = repoBlobToProjectPath(repoPath, rootPrefix);
-    const rawUrl = `https://raw.githubusercontent.com/${ref.owner}/${ref.repo}/${encodeURIComponent(branch)}/${repoPath
+    // Pin raw URL to commit SHA (not branch name) so tip updates are not stuck in HTTP cache.
+    const rawUrl = `https://raw.githubusercontent.com/${ref.owner}/${ref.repo}/${commitSha}/${repoPath
       .split("/")
       .map(encodeURIComponent)
       .join("/")}`;
-    const fileRes = await fetch(rawUrl, { signal: options?.signal });
+    const fileRes = await fetch(rawUrl, {
+      cache: "no-store",
+      signal: options?.signal,
+    });
     if (!fileRes.ok) {
       throw new Error(`下載失敗：${repoPath}（HTTP ${fileRes.status}）`);
     }

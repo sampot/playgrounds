@@ -5,7 +5,7 @@
  *
  * Must stay aligned with field public/sw.js for canvas-bridge + API forward.
  */
-const GO_SW_REV = 4;
+const GO_SW_REV = 5;
 const CANVAS_PREFIX = "/canvas/";
 const SYNC_TYPE = "playgrounds-canvas-sync";
 const SYNC_ACK = "playgrounds-canvas-sync-ack";
@@ -284,7 +284,13 @@ function isShellCacheablePath(pathname) {
   ) {
     return true;
   }
-  return /\.(?:js|css|woff2?|ttf|otf|png|svg|webp|ico|json)$/i.test(pathname);
+  // Host infra (sql.js WASM／glue) — network-first; cached after first successful fetch.
+  if (pathname.startsWith("/vendor/")) {
+    return true;
+  }
+  return /\.(?:js|css|woff2?|ttf|otf|png|svg|webp|ico|json|wasm)$/i.test(
+    pathname
+  );
 }
 
 function extractShellAssetUrls(html, origin) {

@@ -4,11 +4,12 @@ import {
   canvasEntryUrl,
   installGoCanvasApiListener,
   syncGoCanvasSnapshot,
+  type GoCanvasApiListenerOptions,
 } from "./goCanvas";
 import { isGoCanvasSwUsable } from "./goCanvasSupport";
 import {
   buildGoMemoryCanvas,
-  installGoMemorySessionListener,
+  installGoMemoryApiListener,
   revokeGoMemoryBlobs,
 } from "./goMemoryCanvas";
 import { injectGoScoreStorage } from "./goScoreStorage";
@@ -16,7 +17,7 @@ import { injectGoScoreStorage } from "./goScoreStorage";
 export type GoCanvasMode = "sw" | "memory";
 
 export type MountGoCanvasOptions = {
-  /** Solo `/s/<id>` — namespace canvas localStorage for stable scores. */
+  /** Solo `/s/<id>` — durable KV／DB ns＋legacy score localStorage shim. */
   catalogId?: string | null;
 };
 
@@ -42,8 +43,22 @@ function withSoloScoreNs(files: FileMap, catalogId: string | null | undefined): 
   return out;
 }
 
+function apiCtx(
+  sandboxId: string,
+  files: FileMap,
+  catalogId: string | null | undefined
+): GoCanvasApiListenerOptions {
+  const id = catalogId?.trim() || null;
+  return {
+    getSandboxId: () => sandboxId,
+    getFiles: () => files,
+    getCatalogId: () => id,
+  };
+}
+
 /**
  * Materialize SAM files into SW canvas or memory srcdoc (no OPFS).
+ * Runs functions.js for non-session `/api` with IndexedDB／localStorage KV／DB.
  */
 export async function mountGoCanvas(
   files: FileMap,
@@ -67,7 +82,9 @@ export async function mountGoCanvas(
   const preferSw = isGoCanvasSwUsable();
   if (preferSw) {
     try {
-      unlisten = installGoCanvasApiListener(() => sandboxId);
+      unlisten = installGoCanvasApiListener(
+        apiCtx(sandboxId, prepared, options.catalogId)
+      );
       await syncGoCanvasSnapshot(sandboxId, generation, prepared);
       return {
         sandboxId,
@@ -83,7 +100,9 @@ export async function mountGoCanvas(
     }
   }
 
-  unlisten = installGoMemorySessionListener(() => sandboxId);
+  unlisten = installGoMemoryApiListener(
+    apiCtx(sandboxId, prepared, options.catalogId)
+  );
   const built = buildGoMemoryCanvas(prepared, generation);
   memoryBlobUrls = built.blobUrls;
   return {

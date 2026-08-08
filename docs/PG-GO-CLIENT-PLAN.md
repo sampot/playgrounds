@@ -305,12 +305,14 @@ GET go.samkuo.me/i/<short_id>
 | **範圍** | **僅**模式 B（`/s/<id>`）與為其服務的殼（首頁 `/` 可作安裝／回訪入口）。**模式 A（`/i/`）排除。** |
 | **加到主畫面** | go origin 提供 Web App Manifest＋圖示（含 iOS `apple-touch-icon`／必要 meta），使標準 Safari／Chrome 可「加入主畫面」／安裝。start_url 宜為 **`/`** 或穩定 `/s/<id>`（實作可定預設 `/`；深鏈開啟仍尊重 path）。**勿**引導使用者把 **`/i/<short_id>`** 釘成主畫面圖示當永久遊戲（短鏈會過期）。 |
 | **離線可玩** | **造訪過才離線**（對齊場殼 DEC-009 精神；非全型錄預先下載）：曾成功載入之 `/s/<id>` 的殼資產＋該 SAM FileMap（或等價 Cache）在網路失敗時仍可再開同 id。嵌入 catalog 已可離線 resolve；差在小品本體與殼 bundle 的 Cache。策略傾向 **network-first**（線上更新優先；失敗才 Cache）——細節可對齊場 `swOfflineStrategy`，但 go SW 須與畫布 snapshot 職責共存、勿 cache-first 釘死舊包。 |
-| **分數保留** | **本機、本 origin**。鍵穩定綁 **`catalog_id`**（及 SAM 自訂子鍵），**不**綁每次隨機 `sandboxId`。同源 SW canvas 下 SAM 可用 `localStorage`／等價；`srcdoc`（opaque origin）路徑須由殼橋接或避免當成分數快樂路徑。**無**雲端、**無**跨 `play`↔`go` 自動搬。使用者可經 §6.6 分層清除；亦可清瀏覽器網站資料。 |
+| **分數／實例狀態** | **本機、本 origin**。權威＝SAM 應用模型：`UI → /api → functions.js → env.KV／env.DB`。go 注入同形 bindings，後端為 **IndexedDB（主）＋ localStorage（後備）**，命名空間穩定綁 **`catalog_id`**（`catalog:<id>`），**不**綁每次隨機 `sandboxId`、**不**用 OPFS。Invite 畫布用 ephemeral／非 durable 記憶體 ns。舊 UI 直寫 `localStorage` 的 shim（`injectGoScoreStorage`）僅相容尚未遷移的小品。**無**雲端、**無**跨 `play`↔`go` 自動搬。§6.6 分層清除含 KV／DB＋舊 shim。 |
 | **Invite 排除（硬）** | `/i/`：**不能**離線入座／對弈；不承諾該局分數長期保留；短鏈失效後重開＝頁內錯誤（請 Host 重新邀請）。可保留非局偏好（例：Roster 顯示名）。 |
 | **敘事** | 對讀者：「傳閱連結可留在手機、沒網路也能玩過的那幾顆」——**不是**「邀請 QR 離線也能加入」。 |
-| **否決** | Invite 離線；預先打包全型錄離線；雲排行榜／帳號存檔；把 go 做成第二個 OPFS 沙盒庫。 |
+| **否決** | Invite 離線；預先打包全型錄離線；雲排行榜／帳號存檔；把 go 做成第二個 OPFS 沙盒庫；UI 直寫 IndexedDB／OPFS 當權威狀態（runtime 無法匯出／清除）。 |
 
-**與「無持久 OPFS」：** §6.5 允許 Cache API／`localStorage`（或薄 keyed store）服務**單機小品**；仍**禁止**場殼式 OPFS 專案庫、`createProject` 快樂路徑、多沙盒管理面。
+**與「無持久 OPFS」：** §6.5 允許 Cache API（離線 FileMap）＋ **IndexedDB／localStorage 實作的 `env.KV`／`env.DB`**；仍**禁止**場殼式 OPFS 專案庫、`createProject` 快樂路徑、多沙盒管理面。長遠（含 Tauri）SAM 只依賴 bindings，不依賴瀏覽器 storage 方言。
+
+**`env.DB`／sql.js（宿主 infra）：** 動態 `import("sql.js")`（不擋 KV-only 開玩）；WASM／glue 同源 **`/vendor/sql.js/*`**（`scripts/vendor-sqljs.mjs`）；go SW 對 `/vendor/**` 與 `.wasm` **network-first**（首次成功 fetch 後可離線）。**禁止** CDN 載 sql.js WASM。不在進 `/s/` 時預抓——僅當小品真的使用 `env.DB` 才下載。
 
 ### 6.6 Header「更多」＝本機溢流（定案）
 
@@ -505,7 +507,7 @@ dash provision → 場殼記憶體 API key
 | **3. Compose 可玩** | 記憶體載入 SAM；consent；join／WebRTC；gomoku player | 兩瀏覽器：場殼 Host＋**go Guest** 入座 | **進行中**（guestRuntime＋canvas SW） |
 | **4. E2E** | 開始→對弈→終局；TURN 有權路徑；窄屏 | [PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md) §9 以 go 為 Guest | 手測 |
 | **5. 型錄 `/s/`** | 嵌入 catalog（含 kind）；`/s/:id` 單機可玩；型錄分享改 go；Header **分享面**（系統分享／QR／複製；§5.5）；同 kind「下一個」＋推薦≤3；**每 id 分享／OG title**（§5.5.1） | 開 `/s/pg-*` 可玩；分享＝`/s/<id>`＋小品名 title；現場可掃 QR；換片不跨 kind；社群預覽可分辨小品；`/i/` 無換片 | **進行中**（prerender＋OG／title＋分享面／QR 已落地；手測預覽／掃碼待） |
-| **6. `/s/` 可安裝／離線／分數** | Manifest＋主畫面；造訪後離線再開 `/s/<id>`；本機分數鍵＝`catalog_id`；SW 與畫布職責共存（§6.5／§7.4） | 標準瀏覽器可加主畫面；曾開過的 `/s/pg-*` 斷網可再玩且高分／分數仍在；`/i/` 斷網不可入座；無雲存檔 | **進行中**（manifest／SW shell cache／FileMap offline cache／score localStorage ns） |
+| **6. `/s/` 可安裝／離線／分數** | Manifest＋主畫面；造訪後離線再開 `/s/<id>`；**functions.js＋env.KV／DB**（IDB／localStorage；鍵＝`catalog_id`）；SW 與畫布職責共存（§6.5／§7.4） | 標準瀏覽器可加主畫面；曾開過的 `/s/pg-*` 斷網可再玩且 KV 分數仍在；`/i/` 斷網不可入座；無雲存檔／無 OPFS | **進行中**（manifest／SW／FileMap offline；**functions＋goWebKv／goWebDb**；舊 score shim 相容） |
 | **6b. 「更多」本機溢流** | Header「更多」＝已下載列表＋分層清除；試試這些可選第二段；Invite 不露（§6.6） | `/`／`/s/` 可開已下載面板；清除分層＋頁內確認；`/i/` 無本機選單；非迷你型錄 | **已落地**（`GoMorePanel`） |
 | **7.（可選）** | short 不進 hash（B）；文件站導讀；場殼 `#pg=`／`view=canvas` 標「進階／除錯」或汰除 | 另議 | — |
 
@@ -557,8 +559,9 @@ dash provision → 場殼記憶體 API key
 
 - [x] go 有 Web App Manifest＋圖示（`manifest.webmanifest`／favicon；start_url＝`/`）
 - [x] 線上成功玩過某 `/s/<id>` 後可 Cache FileMap；殼 SW network-first（`/i/` 不進 shell offline）
-- [x] 畫布 localStorage 以 `catalog_id` 命名空間（`injectGoScoreStorage`）；不綁隨機 `sandboxId`
-- [ ] 手測：Safari／Chrome 加入主畫面；斷網再開曾訪 `/s/`；有寫分的 SAM 跨重整分數仍在
+- [x] 畫布 `/api`→`functions.js`＋`env.KV`／`env.DB`（IndexedDB／localStorage；ns＝`catalog:<id>`）；不綁隨機 `sandboxId`；無 OPFS
+- [x] 舊 UI `localStorage` 分數 shim（`injectGoScoreStorage`）仍相容；§6.6 清除含 KV／DB＋shim
+- [ ] 手測：`/s/pg-rubik` 打亂→還原→重整後最佳仍在；Safari／Chrome 主畫面／離線
 - [x] `/i/` 不進 shell offline cache；文件敘事不暗示 Invite 可離線
 - [x] 無雲存檔、無跨 `play`↔`go` 自動搬分、無 OPFS 沙盒庫 UI
 
@@ -618,3 +621,5 @@ dash provision → 場殼記憶體 API key
 | 2026-08-08 | `/s/`／`/i/` 下載 SAM 顯示頁內進度條（FileList `done/total`；接 `fetchGithubProject` onProgress） |
 | 2026-08-08 | §6.4：頂列「山姆鍋遊樂場」改連 **`play…/sam/?kind=game`**（遊戲分類）；mark 仍 → play `/` |
 | 2026-08-08 | **§6.6：** Header「更多」改＝**本機溢流**（已下載／分層清除）；試試這些＝換片第二段；與「只有推薦」脫鉤；`/i/` 不露本機；Phase 6b |
+| 2026-08-08 | **§6.5／runtime：** go 與場同一應用模型——`/api`→`functions.js`→`env.KV`／`env.DB`；實作＝IndexedDB＋localStorage（非 OPFS）；驗收小品 `pg-rubik` |
+| 2026-08-08 | **sql.js：** 動態 import；WASM 同源 `/vendor/sql.js`＋SW network-first 離線 cache（非 CDN、非進 `/s/` 預載） |

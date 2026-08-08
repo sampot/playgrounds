@@ -1,7 +1,10 @@
 /**
- * Namespace localStorage inside SW canvas so solo scores key by catalog_id
- * (DEC-050 §6.5) — not by ephemeral sandboxId.
+ * Legacy UI localStorage score shim (pre–env.KV games)＋§6.6 clear helpers.
+ * New SAMs should persist via functions.js → env.KV／env.DB (goWebKv／goWebDb).
  */
+
+import { clearGoWebDbForCatalog } from "./goWebDb";
+import { clearGoWebKvForCatalog } from "./goWebKv";
 
 const MARK = "data-go-score-ns";
 
@@ -59,14 +62,134 @@ function removeLocalStorageByPrefix(prefix: string): number {
   return n;
 }
 
-/** Clear progress／scores for one catalog id (§6.6.3 layer 1). */
+/** Legacy sync clear (localStorage shim only). Prefer clearGoProgressForCatalog. */
 export function clearGoScoresForCatalog(catalogId: string): number {
   const id = catalogId.trim();
   if (!id) return 0;
   return removeLocalStorageByPrefix(goScorePrefixFor(id));
 }
 
-/** Clear all go solo score namespaces (§6.6.3 layer 3) — not theme／display name. */
+/** Legacy sync clear all score shims. Prefer clearAllGoProgress. */
 export function clearAllGoScores(): number {
   return removeLocalStorageByPrefix(GO_SCORE_KEY_ROOT);
+}
+
+/**
+ * §6.6.3 layer 1: legacy score localStorage＋env.KV／DB for catalog id.
+ */
+export async function clearGoProgressForCatalog(
+  catalogId: string
+): Promise<number> {
+  const id = catalogId.trim();
+  if (!id) return 0;
+  let n = clearGoScoresForCatalog(id);
+  n += await clearGoWebKvForCatalog(id);
+  n += await clearGoWebDbForCatalog(id);
+  return n;
+}
+
+/**
+ * §6.6.3 layer 3: all legacy score shims＋all durable go KV／DB namespaces
+ * that use `catalog:` prefix (via listing localStorage＋known idb — best-effort).
+ */
+export async function clearAllGoProgress(): Promise<number> {
+  let n = clearAllGoScores();
+  // Clear every catalog:* KV／DB we can discover from localStorage kv／db prefixes
+  // plus in-memory; IDB catalog keys require iteration.
+  try {
+    if (typeof indexedDB !== "undefined") {
+      n += await clearAllCatalogIdbKv();
+      n += await clearAllCatalogIdbDb();
+    }
+  } catch {
+    /* ignore */
+  }
+  // localStorage-backed go KV／DB leftovers
+  n += removeLocalStorageByPrefix("pg-go-kv:");
+  n += removeLocalStorageByPrefix("pg-go-db:");
+  return n;
+}
+
+async function clearAllCatalogIdbKv(): Promise<number> {
+  return new Promise(resolve => {
+    const req = indexedDB.open("go-sam-kv-v1", 1);
+    req.onerror = () => resolve(0);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains("entries")) {
+        db.createObjectStore("entries");
+      }
+    };
+    req.onsuccess = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains("entries")) {
+        db.close();
+        resolve(0);
+        return;
+      }
+      const tx = db.transaction("entries", "readwrite");
+      const store = tx.objectStore("entries");
+      const getKeys = store.getAllKeys();
+      getKeys.onsuccess = () => {
+        const keys = (getKeys.result as IDBValidKey[]).map(String);
+        let n = 0;
+        for (const k of keys) {
+          if (k.startsWith("catalog:")) {
+            store.delete(k);
+            n += 1;
+          }
+        }
+        tx.oncomplete = () => {
+          db.close();
+          resolve(n);
+        };
+      };
+      getKeys.onerror = () => {
+        db.close();
+        resolve(0);
+      };
+    };
+  });
+}
+
+async function clearAllCatalogIdbDb(): Promise<number> {
+  return new Promise(resolve => {
+    const req = indexedDB.open("go-sam-db-v1", 1);
+    req.onerror = () => resolve(0);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains("sqlite")) {
+        db.createObjectStore("sqlite");
+      }
+    };
+    req.onsuccess = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains("sqlite")) {
+        db.close();
+        resolve(0);
+        return;
+      }
+      const tx = db.transaction("sqlite", "readwrite");
+      const store = tx.objectStore("sqlite");
+      const getKeys = store.getAllKeys();
+      getKeys.onsuccess = () => {
+        const keys = (getKeys.result as IDBValidKey[]).map(String);
+        let n = 0;
+        for (const k of keys) {
+          if (k.startsWith("catalog:")) {
+            store.delete(k);
+            n += 1;
+          }
+        }
+        tx.oncomplete = () => {
+          db.close();
+          resolve(n);
+        };
+      };
+      getKeys.onerror = () => {
+        db.close();
+        resolve(0);
+      };
+    };
+  });
 }

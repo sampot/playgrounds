@@ -11,6 +11,7 @@ import {
   CANVAS_SYNC_TYPE,
   injectCanvasBridge,
   type CanvasApiMessage,
+  type SerializedRequest,
   type SerializedResponse,
 } from "@pg/canvasSwProtocol";
 import type { FileMap } from "@pg/projectTypes";
@@ -21,6 +22,10 @@ import {
 } from "@pg/sessionBridge";
 import { configurePlaygroundsPaths } from "@pg/playgroundsPaths";
 import { isGoCanvasSwUsable } from "./goCanvasSupport";
+import {
+  handleGoFunctionsApi,
+  type GoFunctionsApiContext,
+} from "./goFunctionsRuntime";
 
 configurePlaygroundsPaths({ basePath: "", mode: "standalone" });
 
@@ -30,7 +35,7 @@ function isGoCanvasSwUsableSync(): boolean {
 }
 
 /** Bump with go-client/static/sw.js GO_SW_REV so phones pick up bridge fixes. */
-const SW_URL = "/sw.js?v=4";
+const SW_URL = "/sw.js?v=5";
 
 function withCanvasBridge(files: FileMap): FileMap {
   const out: FileMap = { ...files };
@@ -199,25 +204,50 @@ export async function handleGoSessionApi(
   }
 }
 
-async function handleSessionApi(
+export type GoCanvasApiListenerOptions = GoFunctionsApiContext;
+
+async function dispatchGoCanvasApi(
+  ctx: GoCanvasApiListenerOptions,
   sandboxId: string,
-  request: { method: string; url: string; body: ArrayBuffer | null }
+  request: SerializedRequest
 ): Promise<SerializedResponse> {
-  return handleGoSessionApi(sandboxId, request);
+  let path = "/";
+  try {
+    path = new URL(request.url, "https://go.local").pathname;
+  } catch {
+    path = String(request.url || "");
+  }
+  if (path.includes("/api/session")) {
+    return handleGoSessionApi(sandboxId, request);
+  }
+  return handleGoFunctionsApi(ctx, request);
 }
 
-/** Listen for SW canvas API forwards; handle /api/session/* via SessionBridge. */
-export function installGoCanvasApiListener(getSandboxId: () => string | null): () => void {
+/**
+ * Listen for SW canvas API forwards:
+ * `/api/session/*` → SessionBridge；其餘 → functions.js＋env.KV／DB.
+ */
+export function installGoCanvasApiListener(
+  getSandboxIdOrOpts: (() => string | null) | GoCanvasApiListenerOptions
+): () => void {
   if (!isGoCanvasSwUsableSync()) {
     return () => {};
   }
+  const ctx: GoCanvasApiListenerOptions =
+    typeof getSandboxIdOrOpts === "function"
+      ? {
+          getSandboxId: getSandboxIdOrOpts,
+          getFiles: () => null,
+        }
+      : getSandboxIdOrOpts;
+
   const onMessage = (ev: MessageEvent) => {
     const data = ev.data as CanvasApiMessage | undefined;
     if (!data || data.type !== CANVAS_API_TYPE) return;
     const port = ev.ports?.[0];
     if (!port) return;
     const sandboxId = data.sandboxId;
-    const active = getSandboxId();
+    const active = ctx.getSandboxId();
     void (async () => {
       try {
         if (active && sandboxId !== active) {
@@ -228,20 +258,15 @@ export function installGoCanvasApiListener(getSandboxId: () => string | null): (
           });
           return;
         }
-        const reqUrl = new URL(data.request.url);
-        if (reqUrl.pathname.includes("/api/session")) {
-          const response = await handleSessionApi(sandboxId, data.request);
-          port.postMessage({
-            type: CANVAS_API_RESULT_TYPE,
-            requestId: data.requestId,
-            response,
-          });
-          return;
-        }
+        const response = await dispatchGoCanvasApi(
+          ctx,
+          sandboxId,
+          data.request
+        );
         port.postMessage({
           type: CANVAS_API_RESULT_TYPE,
           requestId: data.requestId,
-          response: jsonResponse({ error: "not_found" }, 404),
+          response,
         });
       } catch (e) {
         port.postMessage({

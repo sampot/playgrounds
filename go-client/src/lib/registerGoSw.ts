@@ -2,7 +2,7 @@
 
 import { isGoCanvasSwUsable } from "./goCanvasSupport";
 
-const SW_URL = "/sw.js?v=4";
+const SW_URL = "/sw.js?v=5";
 
 export function registerGoServiceWorker(): void {
   if (typeof window === "undefined") return;

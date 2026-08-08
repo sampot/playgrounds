@@ -7,8 +7,8 @@
     listGoSamOfflineCatalogIds,
   } from "$lib/goSamOfflineCache";
   import {
-    clearAllGoScores,
-    clearGoScoresForCatalog,
+    clearAllGoProgress,
+    clearGoProgressForCatalog,
   } from "$lib/goScoreStorage";
 
   type Props = {
@@ -131,7 +131,7 @@
     const c = confirm;
     try {
       if (c.kind === "scores" && c.id) {
-        const n = clearGoScoresForCatalog(c.id);
+        const n = await clearGoProgressForCatalog(c.id);
         onFlash(
           n > 0
             ? `已清除「${c.title}」的進度／分數`
@@ -146,7 +146,7 @@
         );
         await refreshDownloaded();
       } else if (c.kind === "all") {
-        const scores = clearAllGoScores();
+        const scores = await clearAllGoProgress();
         const packs = await clearAllGoSamOfflineCache();
         const flash = `已清除全部本機遊戲資料（分數 ${scores} 筆、離線包 ${packs} 個）`;
         confirm = null;
