@@ -279,6 +279,7 @@ function isShellCacheablePath(pathname) {
     pathname === "/icons/apple-touch-icon.png" ||
     pathname === "/icon-192.png" ||
     pathname === "/icon-512.png" ||
+    pathname === "/icon-512-maskable.png" ||
     pathname.startsWith("/icons/")
   ) {
     return true;
@@ -308,6 +309,7 @@ function extractShellAssetUrls(html, origin) {
   add("/icons/apple-touch-icon.png");
   add("/icon-192.png");
   add("/icon-512.png");
+  add("/icon-512-maskable.png");
   return [...urls];
 }
 

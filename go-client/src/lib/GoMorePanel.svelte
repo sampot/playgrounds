@@ -274,13 +274,31 @@
           {:else}
             <ul class="go-more-list">
               {#each downloaded as row (row.id)}
-                <li>
+                <li class="go-more-row">
                   <button
                     type="button"
-                    class="go-more-btn"
+                    class="go-more-row-main"
                     onclick={() => onPick(row.id)}
                   >
                     {row.title}
+                  </button>
+                  <button
+                    type="button"
+                    class="go-more-row-act"
+                    title={`清除「${row.title}」進度／分數`}
+                    aria-label={`清除「${row.title}」進度／分數`}
+                    onclick={() => askClearScores(row.id, row.title)}
+                  >
+                    清分
+                  </button>
+                  <button
+                    type="button"
+                    class="go-more-row-act"
+                    title={`移除「${row.title}」離線下載`}
+                    aria-label={`移除「${row.title}」離線下載`}
+                    onclick={() => askRemoveOffline(row.id, row.title)}
+                  >
+                    卸包
                   </button>
                 </li>
               {/each}
@@ -471,6 +489,56 @@
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
+  }
+  .go-more-row {
+    display: flex;
+    align-items: stretch;
+    gap: 0.25rem;
+    min-width: 0;
+  }
+  .go-more-row-main {
+    flex: 1;
+    min-width: 0;
+    min-height: 2.75rem;
+    padding: 0.45rem 0.75rem;
+    border: 1px solid rgb(var(--gm-line));
+    border-radius: var(--gm-radius);
+    background: rgb(var(--gm-fill));
+    color: rgb(var(--gm-ink));
+    font: inherit;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-align: start;
+    cursor: pointer;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .go-more-row-main:hover,
+  .go-more-row-main:focus-visible {
+    border-color: rgb(var(--gm-accent));
+    color: rgb(var(--gm-accent));
+    outline: none;
+  }
+  .go-more-row-act {
+    flex-shrink: 0;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    padding: 0.25rem 0.45rem;
+    border: 1px solid rgb(var(--gm-line));
+    border-radius: var(--gm-radius);
+    background: transparent;
+    color: rgb(var(--gm-muted));
+    font: inherit;
+    font-size: 0.7rem;
+    font-weight: 650;
+    cursor: pointer;
+  }
+  .go-more-row-act:hover,
+  .go-more-row-act:focus-visible {
+    border-color: rgb(var(--gm-accent));
+    color: rgb(var(--gm-accent));
+    outline: none;
   }
   .go-more-stack {
     display: flex;
