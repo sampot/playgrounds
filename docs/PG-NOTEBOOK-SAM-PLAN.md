@@ -39,13 +39,15 @@
 | Phase | 內容 | 狀態 |
 | --- | --- | --- |
 | 0–2 | MVP cell UI＋Python run＋catalog | Done |
-| 3 | nbformat 4 權威、`.ipynb` 下載／開啟、In／Out、快捷鍵、`%pip`、Restart | **Done（本刀）** |
-| 4 | 圖輸出（matplotlib → display_data）、更多 magics、與 OPFS 檔案樹雙寫 `*.ipynb` | 未做 |
+| 3 | nbformat 4 權威、`.ipynb` 下載／開啟、In／Out、快捷鍵、`%pip`、Restart | Done |
+| 4a | 圖輸出（matplotlib Agg → PNG `display_data`） | **Done** |
+| 4b | 更多 magics、與 OPFS 檔案樹雙寫 `*.ipynb` | 未做 |
 | 5 | （可選）HOST 級 kernel recreate API，取代 best-effort `del globals` | 未做 |
 
 ## 5. 驗收
 
 1. 可下載／再開同一份 `.ipynb`（nbformat 4），cells／outputs 合理保留。  
 2. `Shift+Enter`／`Y`／`M`／`%pip install numpy` 行為符合上表。  
-3. 準入後可跑；與 dock REPL 變數互通；Restart 有確認。  
-4. 文案宣稱「`.ipynb` 相容」而非「完整 Jupyter」。
+3. `matplotlib` 畫圖後 cell 輸出可見 PNG（寫入 `.ipynb` 的 `display_data`）。  
+4. 準入後可跑；與 dock REPL 變數互通；Restart 有確認。  
+5. 文案宣稱「`.ipynb` 相容」而非「完整 Jupyter」。
