@@ -16,6 +16,10 @@ import {
   wantsRosterSignal,
 } from "@pg/platform/platformCompose";
 import type { FileMap } from "@pg/projectTypes";
+import {
+  goLoadProgressFromFiles,
+  type GoLoadProgress,
+} from "./goLoadProgress";
 import { assertSamHasIndex, loadSamFiles } from "./samLoad";
 import {
   applyRosterAnswer,
@@ -83,6 +87,8 @@ export type GuestStatus = {
   /** Remount key for memory iframe. */
   canvasGeneration: number;
   displayName: string;
+  /** File download progress while `phase === "loading_sam"`. */
+  loadProgress: GoLoadProgress | null;
 };
 
 type Listener = (s: GuestStatus) => void;
@@ -121,6 +127,7 @@ export function createGuestRuntime() {
     canvasMode: null,
     canvasGeneration: 0,
     displayName: "對手",
+    loadProgress: null,
   };
   const listeners = new Set<Listener>();
   let localAgentId = newAgentId();
@@ -394,10 +401,26 @@ export function createGuestRuntime() {
         ? (proto as { protocolId: string }).protocolId.trim()
         : null;
 
-    set({ phase: "loading_sam", message: "正在載入小品…" });
+    set({
+      phase: "loading_sam",
+      message: "正在下載小品…",
+      loadProgress: { ratio: null, detail: "準備中…" },
+    });
     try {
-      const files = await loadSamFiles(source);
+      const files = await loadSamFiles(source, {
+        onProgress: p => {
+          const loadProgress = goLoadProgressFromFiles(p);
+          set({
+            loadProgress,
+            message: `正在下載小品… ${loadProgress.detail}`,
+          });
+        },
+      });
       assertSamHasIndex(files);
+      set({
+        loadProgress: { ratio: 1, detail: "下載完成" },
+        message: "小品已下載，正在準備…",
+      });
       sandboxId = `go-guest-${crypto.randomUUID().slice(0, 8)}`;
       samFiles = files;
       generation += 1;
@@ -428,6 +451,7 @@ export function createGuestRuntime() {
         canvasSrcdoc: null,
         canvasMode,
         canvasGeneration: generation,
+        loadProgress: null,
         message:
           canvasMode === "memory"
             ? "小品已載入（相容模式），正在連線…"
@@ -441,6 +465,7 @@ export function createGuestRuntime() {
             ? `載入小品失敗：${e.message}`
             : `載入小品失敗：${String(e)}`,
         message: "",
+        loadProgress: null,
       });
       return;
     }
@@ -562,6 +587,7 @@ export function createGuestRuntime() {
       canvasSrcdoc: null,
       canvasMode: null,
       canvasGeneration: 0,
+      loadProgress: null,
     });
   }
 

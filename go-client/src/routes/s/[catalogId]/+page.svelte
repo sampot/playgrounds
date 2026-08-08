@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { chromeSession } from "$lib/chromeSession.svelte";
+  import GoSamLoadBar from "$lib/GoSamLoadBar.svelte";
   import { openPlaygroundHome, PLAY_ORIGIN } from "$lib/openPlayground";
   import {
     goSamCanonicalUrl,
@@ -105,6 +106,10 @@
 {:else if !status || status.phase === "idle" || status.phase === "loading"}
   <h1>{entry?.title || status?.entry?.title || "開啟小品"}</h1>
   <p class="status" role="status">{status?.message || "正在載入…"}</p>
+  <GoSamLoadBar
+    progress={status?.loadProgress ?? { ratio: null, detail: "準備中…" }}
+    label="小品下載進度"
+  />
 {:else if status.phase === "error"}
   <h1>無法開啟</h1>
   <p class="err" role="alert">{status.error}</p>

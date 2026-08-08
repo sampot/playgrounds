@@ -20,6 +20,7 @@ const config = {
     }),
     alias: {
       "@pg": "../src/components/playgrounds",
+      "@components": "../src/components",
       "@data": "../src/data",
       "@utils": "../src/utils",
     },

@@ -5,7 +5,7 @@
 > **權威決策：** 建議 [DECISIONS.md](./DECISIONS.md) **DEC-050**（Proposed）  
 > **相關：** [PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)（五子棋 E2E；Invite Guest 主路徑）、[PG-CATALOG-UX-PLAN.md](./PG-CATALOG-UX-PLAN.md)（型錄「分享」→ go）、[PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)、[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（官方 TURN；Guest 經 `join_cap`）、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)、DEC-004／009／023／025／042／045／047／048、[GLOSSARY.md](./GLOSSARY.md)
 
-一句話：**獨立於場殼的純玩客戶端＠`go.samkuo.me`——同時只跑一個 SAM、無編輯環境、不依賴持久 OPFS；啟動不限 Invite（型錄 id 傳閱與 Invite 短鏈並列）；傳閱網址 `/s/<catalog_id>`（內嵌 catalog）；`/s/` 可同 kind 換片，並可安裝至主畫面、造訪後離線再玩、本機保留分數；Invite `/i/`＝臨時 session（先天不能離線、不換片）。**
+一句話：**獨立於場殼的純玩客戶端＠`go.samkuo.me`——同時只跑一個 SAM、無編輯環境、不依賴持久 OPFS；啟動不限 Invite（型錄 id 傳閱與 Invite 短鏈並列）；傳閱網址 `/s/<catalog_id>`（內嵌 catalog）；`/s/` 當前為 **game** 時可換片（只推其他 game），並可安裝至主畫面、造訪後離線再玩、本機保留分數；Invite `/i/`＝臨時 session（先天不能離線、不換片）。**
 
 ---
 
@@ -70,7 +70,7 @@
 | `go.samkuo.me/s/<id>` | Invite 短鏈、場 `?open=`、通用縮址 |
 | 型錄「分享」→ go `/s/` | 型錄「一鍵開」→ 場編輯面 |
 | go Header「分享」→ `/s/<id>` | Host 邀請 modal 的 `/i/<short_id>` |
-| `/s/` 同 kind 換片（下一個／推薦≤3） | go 上型錄瀏覽；Invite 中換小品；跨 kind 推薦 |
+| `/s/` game 換片（下一個／推薦≤3；僅 `kind: game`） | go 上型錄瀏覽；Invite 中換小品；對非 game 推換片；跨 kind 推薦 |
 | `/s/` 造訪後離線＋本機分數（§6.5） | Invite 離線對弈；雲存檔；跨 `play`↔`go` 自動搬分 |
 | 純玩「當下 Invite／session」（臨時） | 「只能一局」；跨邀請雲存檔；把短鏈當永久書籤遊戲 |
 | `#pg=`／shortId 入 go | `#pg_provision=`、`/join/<token>`、`#roster=` OOB |
@@ -124,7 +124,7 @@ GET go.samkuo.me/i/<short_id>
 | 形狀 | **`https://go.samkuo.me/s/<catalog_id>`** 僅此；**無** query 必要參數；**不**帶 `name`／`source`／`open` |
 | `catalog_id` | 型錄 YAML／codegen 的穩定 **`id`**（例：`pg-breakout`、`pg-gomoku`）；與 `catalog/entries/<id>.yaml` 檔名一致 |
 | Resolve | go **建置內嵌**型錄資料（與場 `catalog:gen` → `public/catalog/v1.json`／typed module **同一產線**）；runtime **不**依賴抓 `play…/catalog/v1.json` 才能開 |
-| 載入 | 嵌入表查 `id` → 取 `source`（及 title 等）→ 記憶體 fetch／FileMap → 跑 player UI |
+| 載入 | 嵌入表查 `id` → 取 `source`（及 title 等）→ 記憶體 fetch／FileMap（**頁內進度條**：檔案數 `done/total`）→ 跑 player UI |
 | 未命中 | 頁內錯誤（下架／draft／未知 id）；**禁止** silent fallback 猜 `source` |
 | 非型錄 SAM | **不產生** `/s/` 連；go Header 分享禁用或隱藏 |
 | 否決 | `/?open=`、`/o?open=`、完整 Git URL、`source` path、`#open=`、Platform 非 Invite 短碼、占用 `/i/` |
@@ -151,7 +151,7 @@ GET go.samkuo.me/i/<short_id>
 
 | 項 | 規格 |
 | --- | --- |
-| 位置 | 頂列 chrome：**左**＝山姆鍋 mark＋遊樂場名／`play.samkuo.me`；**右**＝「分享」 |
+| 位置 | 頂列 chrome：**左**＝山姆鍋 mark（→ play `/`）＋「山姆鍋遊樂場」（→ `/sam/?kind=game`）；**右**＝「分享」 |
 | **觸發** | 點「分享」→ 開**頁內分享面**（bottom sheet／modal；禁止 `alert`／`confirm`／`prompt`）。**否決**僅靜默 Web Share→複製、無 QR 的舊快樂路徑當唯一機制 |
 | **網址** | **固定＝當前 SAM 的** `https://go.samkuo.me/s/<catalog_id>`（與面內三種動作同一 url） |
 | **分享 title（硬）** | **必須**依小品而異：權威＝嵌入型錄該筆的 **`entry.title`**（例：打磚塊、五子棋）。系統分享／`navigator.share({ title })` 用此字串；面內可顯示小品名。**禁止**所有 `/s/` 共用同一個泛稱（如一律「純玩」「遊樂場」）。型錄列「分享」與 go Header **同一 title 來源**（皆＝該 `id` 的 `entry.title`） |
@@ -164,12 +164,12 @@ GET go.samkuo.me/i/<short_id>
 | 何時可用 | 當前已載入之 SAM **能對上嵌入型錄的 `id`**（含：經 `/s/` 進入；或 Invite compose 的 source／協定能唯一對上型錄項）。對不上 → 按鈕 disabled／隱藏 |
 | 尚無 SAM | 空態／short 失效／載入失敗 → 不分享 |
 | 窄屏 | 熱區約 ≥44×44px；按鈕文案固定「分享」（開分享面）；QR 在窄屏須幾乎可掃（建議約半屏寬級） |
-| 對弈中 | 往下捲／滑＝自動收起 chrome；往上＝自動展開；分享隨 chrome 可視即可；開分享面時 chrome／面須可互動關閉 |
+| 對弈中 | 往下捲／滑＝自動收起 chrome；往上／下拉＝自動展開；展開後 3s 無點擊頂列→再收起；分享隨 chrome 可視即可；開分享面時不自動收起、chrome／面須可互動關閉 |
 | **否決** | NFC／Nearby／自建區網 discovery 當主路徑；為 `/s/` 另鑄 Platform short／TTL；go 內建相機掃 `/s/` QR 當接收快樂路徑；只靠「看網址列」當現場主路徑 |
 
 **語意：** 即使人在 Invite 對弈中按分享，傳出的仍是「打開這顆型錄小品」（單機 `/s/`），**不是**「加入這一場」。Host 邀請 modal **繼續只出** `/i/`（邀請 QR ≠ 型錄傳閱 QR）。
 
-**與 play 型錄列：** 場網型錄列「分享」可維持 Web Share／複製（見 [PG-CATALOG-UX-PLAN.md](./PG-CATALOG-UX-PLAN.md)）；**現場 QR 以 go Header 分享面為準**（接收者已在 go，或分享者開著 `/s/`）。型錄列不強制做 QR。
+**與 play 型錄列：** 場網型錄列「分享」亦用同源**頁內分享面**（系統分享／QR／複製；見 [PG-CATALOG-UX-PLAN.md](./PG-CATALOG-UX-PLAN.md)）；網址仍為 `/s/<id>`。與 go 差別：型錄分享面內網址**可點擊開新分頁**。
 
 #### 5.5.1 分享連結預覽 title（社群／聊天室；硬）
 
@@ -189,18 +189,18 @@ GET go.samkuo.me/i/<short_id>
 
 ### 5.6 `/s/` 換片（下一個／推薦；本節定案）
 
-僅 **模式 B（`/s/<id>` 單機傳閱）**提供；**模式 A（`/i/` Invite）不提供**換片（對弈綁 Host session，中途換小品＝拆局）。
+僅 **模式 B（`/s/<id>` 單機傳閱）**且當前小品 **`kind === game`** 時提供；**模式 A（`/i/` Invite）不提供**換片。非 game 的 `/s/<id>`（工具等）仍可單機玩，**不**露換片／推薦。
 
 | 項 | 規格 |
 | --- | --- |
-| 語意 | **換片**＝取代當前唯一 SAM slot → 導向／載入另一個 `/s/<id>`；分享網址跟著新 id |
-| **下一個** | 嵌入 catalog 中與當前 **同一 `kind`** 的穩定序，取當前之後下一筆（末端繞回首筆）。同 kind 僅自己 → 控件 disabled／隱藏 |
-| **推薦** | 隨機（或洗牌）抽出 **至多 3** 個**其他**小品；**必須**與當前同一 `kind`；不足 3 就少於 3，**禁止**用其他 kind 湊數 |
-| 候選池 | `entry.kind === current.kind && entry.id !== current.id`（下一個繞回時下一筆可為池內任一；推薦永遠不含當前） |
-| UI | 極簡：「下一個」鈕＋可選最多 3 個推薦名／圖；窄屏可點；**不**搶過 mark／遊樂場／分享 |
-| **否決** | go 上型錄形式選擇（搜尋、filter chips、貨架、完整列表、跨 kind 瀏覽）。完整挑選留在 `play…/sam/` |
+| 語意 | **換片**＝取代當前唯一 SAM slot → 導向／載入另一個 **game** `/s/<id>`；分享網址跟著新 id |
+| **下一個** | 嵌入 catalog 中 **`kind: game`** 的穩定序，取當前之後下一筆（末端繞回首筆）。game 僅自己 → 控件 disabled／隱藏 |
+| **推薦** | 隨機（或洗牌）抽出 **至多 3** 個**其他 game**；不足 3 就少於 3，**禁止**用其他 kind 湊數 |
+| 候選池 | `entry.kind === "game" && entry.id !== current.id`（當前亦必須為 game） |
+| UI | 當前為 game 時：「下一個」＋至多 3 則推薦（畫布就緒時在頂列；載入中可在換片列）；窄屏可點；**不**搶過 mark／遊樂場／分享。非 game／Invite／首頁換片控件不出現 |
+| **否決** | go 上型錄形式選擇（搜尋、filter chips、貨架、完整列表）；對 tool／agent 等推換片；跨 kind 推薦。完整挑選留在 `play…/sam/` |
 
-**硬規則：** 遊戲不得出現工具（或其他 kind）於「下一個」或推薦；跨 kind **一律禁止**。`kind` 取值對齊型錄（`tool`｜`agent`｜`game`｜`toy`｜`media` 等）。
+**硬規則：** go 換片／推薦**只推 `kind: game`**（遊戲種類的 SAM）；跨 kind **一律禁止**。
 
 嵌入表須含 **`kind`**（及 `id`／`source`／`title`）才能換片。
 
@@ -211,10 +211,10 @@ GET go.samkuo.me/i/<short_id>
 | 項 | 規格 |
 | --- | --- |
 | 點擊 | → `/s/<id>` 單機純玩 |
-| 來源 | 嵌入 catalog；**優先**場 picks（`GENERATED_SAM_PLAYGROUNDS_PICK_IDS`）洗牌取用，不足再從全庫補 |
-| kind | **可跨 kind**（首頁無「當前 SAM」；≠ §5.6 換片） |
+| 來源 | 嵌入 catalog；**優先**場 picks 中的 **game** 洗牌取用，不足再從其他 **game** 補 |
+| kind | **僅 `game`**（與 §5.6 一致；不推工具／代理等） |
 | chrome | mark＋遊樂場；分享 disabled；**無**「下一個」 |
-| 否決 | 搜尋／filter／完整型錄列表 |
+| 否決 | 搜尋／filter／完整型錄列表；首頁跨 kind 湊數 |
 
 ---
 
@@ -229,7 +229,7 @@ GET go.samkuo.me/i/<short_id>
 
 **模式 0 — 首頁 `/`**
 
-- 至多 3 則推薦（§5.7；picks 優先；可跨 kind）→ `/s/<id>`。
+- 至多 3 則**game**推薦（§5.7；picks 優先）→ `/s/<id>`。
 
 **模式 A — Invite／session**
 
@@ -243,8 +243,8 @@ GET go.samkuo.me/i/<short_id>
 
 **模式 B — 型錄 `/s/<id>`**
 
-- 嵌入表 resolve → 記憶體載入 → 跑該 SAM player UI（單機；無 consent／join／TURN）。
-- **同 kind 換片**（§5.6）：下一個＋至多 3 則推薦；無型錄選擇 UI。
+- 嵌入表 resolve → 記憶體載入（下載中顯示進度條）→ 跑該 SAM player UI（單機；無 consent／join／TURN）。
+- **game 換片**（§5.6）：當前為 game 時，下一個＋至多 3 則其他 game；無型錄選擇 UI。
 - **可安裝／造訪後離線／本機分數**（§6.5）。
 - 無編輯、無「一鍵變作者」主 CTA；次要出口＝chrome 上的遊樂場主網址。
 
@@ -273,18 +273,18 @@ GET go.samkuo.me/i/<short_id>
 
 | 項 | 規格 |
 | --- | --- |
-| **Logo／mark** | 露出**山姆鍋標誌**（與場殼／dash／docs 同源 mark；例：站群 `favicon.svg`／`logo.svg`）。可點 → **`https://play.samkuo.me/`**（遊樂場主入口；與「遊樂場」文案同目標；可行時優先外開系統瀏覽器／Safari）。 |
-| **遊樂場主網址** | **必須可見**並可點：`https://play.samkuo.me/`（文件預設場／遊樂場主入口；DEC-042）。文案可用「遊樂場」；**勿**只寫程式名 Playgrounds 當品牌。 |
-| **開啟意圖（主網址）** | 點 `play.samkuo.me` 時，**在可行範圍內**優先讓使用者進**系統瀏覽器／標準 Safari**（跳出相機／App 內嵌 WebView），以便需要完整遊樂場（OPFS／編輯）時有一條出路。實作採盡力而為（例：新分頁／外開、平台允許的外部瀏覽器 intent）；**不**宣稱、也**無法**保證所有 in-app WebView 都能自動跳出。 |
+| **Logo／mark** | 露出**山姆鍋標誌**（與場殼／dash／docs 同源 mark；例：站群 `favicon.svg`／`logo.svg`）。可點 → **`https://play.samkuo.me/`**（遊樂場主入口；可行時優先外開系統瀏覽器／Safari）。 |
+| **「山姆鍋遊樂場」文案** | 頂列文案可點 → **`https://play.samkuo.me/sam/?kind=game`**（小品型錄**遊戲**分類；query 契約見型錄 UX）。副標可露同路徑。**勿**只寫程式名 Playgrounds 當品牌。 |
+| **開啟意圖** | 點 mark／型錄鏈時，**在可行範圍內**優先讓使用者進**系統瀏覽器／標準 Safari**（跳出相機／App 內嵌 WebView）。實作採盡力而為（例：新分頁／外開）；**不**宣稱、也**無法**保證所有 in-app WebView 都能自動跳出。 |
 | **分享** | 頂列右側（§5.5）；與 mark／遊樂場並列為 chrome 一等元件。 |
-| **換片（僅 `/s/`）** | 「下一個」與至多 3 則同 kind 推薦（§5.6）；次於 mark／遊樂場／分享，勿做成迷你型錄。Invite 模式不出現。 |
-| **呈現** | 極簡 chrome：**logo＋連到 play＋分享**（＋`/s/` 時換片控件）；勿堆滿場相關導覽搶主視線。對弈中：往下捲／滑自動收起頂列、往上自動展開（盡力監聽同 origin iframe 內手勢；跨域 canvas 僅父頁手勢）。收起時可暫時不占視線，展開後仍須露出身分與主網址。 |
-| **窄屏** | logo／「遊樂場」／分享／換片觸控可點（約 ≥44×44px 熱區）；勿裁成無法辨識的無文案小點且無替代文字。 |
+| **換片（僅 `/s/` 且 `kind: game`）** | 「下一個」與至多 3 則**其他 game**（§5.6）；次於 mark／遊樂場／分享，勿做成迷你型錄。非 game／Invite／首頁不出現。 |
+| **呈現** | 極簡 chrome：**logo（→ play `/`）＋「山姆鍋遊樂場」（→ `/sam/?kind=game`）＋分享**（＋`/s/` game 換片控件）；勿堆滿場相關導覽搶主視線。對弈中：往下捲／滑自動收起頂列（含 logo）、往上／下拉自動展開（盡力監聽同 origin iframe 內手勢；跨域 canvas 僅父頁手勢）。**展開後若 3 秒內未點擊頂列 → 自動再收起**（點頂列則重計時；分享面開啟期間不自動收起）。收起時**不**留單獨 logo／角標；展開後仍須露出身分與型錄鏈。 |
+| **窄屏** | logo／「山姆鍋遊樂場」／分享／換片觸控可點（約 ≥44×44px 熱區）；勿裁成無法辨識的無文案小點且無替代文字。 |
 | **敘事** | 對齊 DEC-004：個人遊樂場站群，非產品／SaaS 品牌腔。 |
 
-**品牌測試：** 拿掉對弈／小品 UI 後，仍須讀出「山姆鍋／遊樂場」與可點的 `play.samkuo.me`；不可看成無主的通用 game lobby。
+**品牌測試：** 拿掉對弈／小品 UI 後，仍須讀出「山姆鍋／遊樂場」與可點的型錄／場入口；不可看成無主的通用 game lobby。
 
-**與「請用 Safari 開啟」的關係：** go 快樂路徑**不**依賴跳出 WebView 才能玩（無持久 OPFS）。`play` 鏈＝站群身分＋**可選**進完整遊樂場／系統瀏覽器的出口。若某 WebView 點了仍留在內嵌殼，可輔以短提示（分享選單 → Safari／複製連結）——頁內 UI，禁止 `alert`；**勿**把此提示當 go 入座或 `/s/` 主流程。
+**與「請用 Safari 開啟」的關係：** go 快樂路徑**不**依賴跳出 WebView 才能玩（無持久 OPFS）。`play`／`/sam/` 鏈＝站群身分＋**可選**進完整遊樂場／型錄／系統瀏覽器的出口。若某 WebView 點了仍留在內嵌殼，可輔以短提示（分享選單 → Safari／複製連結）——頁內 UI，禁止 `alert`；**勿**把此提示當 go 入座或 `/s/` 主流程。
 
 **與 dash／docs 頂欄的關係：** 視覺 token／mark 同族即可；**不要求** go 複製完整「我是山姆鍋 · 遊樂場 · 小品 · 文件 · 後台」導覽列。若加次要鏈，優先 `play`；文件／後台可選、非硬。
 
@@ -477,7 +477,7 @@ dash provision → 場殼記憶體 API key
 **共通／chrome**
 
 - [ ] `go` 在場網保留名表；不當場殼
-- [ ] 露出山姆鍋 logo／mark，並可見可點 **`https://play.samkuo.me/`**（§6.4；可行時優先外開系統瀏覽器／Safari）
+- [x] 露出山姆鍋 logo／mark（→ **`https://play.samkuo.me/`**）與「山姆鍋遊樂場」（→ **`https://play.samkuo.me/sam/?kind=game`**）（§6.4；可行時優先外開系統瀏覽器／Safari）
 - [ ] 無編輯環境／Files／鑄邀請入口
 - [ ] 無原生 `alert`／`confirm`／`prompt`；窄屏可完成
 - [ ] 同時只跑一個 SAM
@@ -496,11 +496,12 @@ dash provision → 場殼記憶體 API key
 - [x] **分享 title／預覽（§5.5／§5.5.1）：** 系統分享 title＝該筆 `entry.title`；不同 id 不同 `<title>`／`og:title`／`twitter:title`（含 blurb→description）；listed `/s/<id>` 建置 prerender 首包 HTML（`go-client`）
 - [ ] 手測：兩條不同 `/s/` 貼聊天室，預覽標題可分辨小品名
 - [ ] 手測：兩支手機面對面——A 開分享面 QR，B 系統相機掃碼進同一 `/s/<id>`
-- [x] `/s/`：「下一個」與推薦均同 `kind`；推薦 ≤3；不足不跨 kind 湊
+- [x] `/s/` 換片／推薦**僅 `kind: game`**；推薦 ≤3；不足不跨 kind 湊
+- [x] 非 game 的 `/s/<id>` 不露「下一個」／推薦
 - [x] 無搜尋／filter／貨架等型錄選擇 UI
 - [x] `/i/` 不出現換片控件
 - [ ] 手測：`go:dev` 開 `/s/pg-breakout` 可玩；型錄分享連指向 go
-- [x] 首頁 `/` 呈現至多 3 則推薦（picks 優先）；點進 `/s/<id>`
+- [x] 首頁 `/` 呈現至多 3 則**game**推薦（picks 優先）；點進 `/s/<id>`
 
 **`/s/` 可安裝／離線／本機分數（§6.5；Phase 6）**
 
@@ -523,9 +524,9 @@ dash provision → 場殼記憶體 API key
 | 傳閱、分享（＝`/s/<id>`）；分享 title＝小品 `entry.title`；分享面＝系統分享／QR／複製 | 把 Header 分享說成「轉發邀請／這場對戰」；所有 `/s/` 同一預覽標題；現場只靠看網址列 |
 | 每 `/s/<id>` 不同 `og:title`（爬蟲可見） | 只改 client `<title>`、社群預覽仍是站級泛稱 |
 | 型錄傳閱 QR（`/s/<id>`）vs 邀請 QR（`/i/<short_id>`） | 兩者混成同一碼或同一 modal |
-| 換片、下一個、同 kind 推薦 | go 上「型錄」「逛小品」「換一個任意類」 |
+| 換片、下一個、**僅 game** 推薦 | go 上「型錄」「逛小品」「換一個任意類」；對 tool 推換片 |
 | 一鍵開（場／作者）vs 分享（go／接收者） | 兩者混成同一深鏈 |
-| 山姆鍋 mark、遊樂場、`play.samkuo.me` | 無標匿名 lobby；Playgrounds 當對外品牌名 |
+| 山姆鍋 mark（→ play `/`）、「山姆鍋遊樂場」（→ `/sam/?kind=game`） | 無標匿名 lobby；Playgrounds 當對外品牌名 |
 | 請 Host 重新邀請 | 教 Guest 開 Safari 才能玩（go 快樂路徑）；教把邀請短鏈釘主畫面當永久遊戲 |
 
 ---
@@ -550,3 +551,8 @@ dash provision → 場殼記憶體 API key
 | 2026-08-08 | **實作：** go prerender `/s/<id>`＋OG；manifest／SW shell＋SAM FileMap offline cache；canvas score localStorage ns＝`catalog_id` |
 | 2026-08-08 | **§5.5：** Header「分享」改**頁內分享面**——系統分享／QR／複製並列；現場面對面快樂路徑＝掃 `/s/<id>` QR（非只靠 Web Share→複製）；邀請 QR 仍僅 `/i/` |
 | 2026-08-08 | **實作：** go `GoShareSheet`（QR＝Roster 編碼／`/s/<id>`）；`shareViaWebShare`／`copyShareUrl`；Header 開分享面 |
+| 2026-08-08 | §6.4：對弈中 chrome 收起時**不**留單獨 logo（隨頂列一起隱藏） |
+| 2026-08-08 | §6.4：展開頂列後 3s 無點擊 → 自動收起（分享面開啟時暫停） |
+| 2026-08-08 | §5.6／§5.7：**更正**——推薦／換片只推 **`kind: game`**（非「僅畫布就緒才推薦」）；非 game 的 `/s/` 不換片；首頁亦不跨 kind |
+| 2026-08-08 | `/s/`／`/i/` 下載 SAM 顯示頁內進度條（FileList `done/total`；接 `fetchGithubProject` onProgress） |
+| 2026-08-08 | §6.4：頂列「山姆鍋遊樂場」改連 **`play…/sam/?kind=game`**（遊戲分類）；mark 仍 → play `/` |

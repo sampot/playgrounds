@@ -17,6 +17,12 @@ export type GoCatalogEntry = Pick<
 
 export type GoSamKind = GeneratedSamKind;
 
+/**
+ * go 換片／首頁推薦只推這個 kind（§5.6／§5.7）。
+ * 非 game 的 `/s/<id>` 仍可玩，但不露「下一個」／推薦。
+ */
+export const GO_RECOMMEND_KIND: GoSamKind = "game";
+
 /** Build-time embedded catalog (published entries only). */
 export const GO_CATALOG: readonly GoCatalogEntry[] = GENERATED_SAM_CATALOG.map(
   e => ({
@@ -69,22 +75,24 @@ export function findGoCatalogBySource(
   return undefined;
 }
 
-/** Same-kind pool excluding current id (stable catalog order). */
+/** Game-kind peers excluding current id (stable catalog order). Empty if not game. */
 export function sameKindPeers(
   catalogId: string
 ): readonly GoCatalogEntry[] {
   const cur = getGoCatalogEntry(catalogId);
-  if (!cur) return [];
-  return GO_CATALOG.filter(e => e.kind === cur.kind && e.id !== cur.id);
+  if (!cur || cur.kind !== GO_RECOMMEND_KIND) return [];
+  return GO_CATALOG.filter(
+    e => e.kind === GO_RECOMMEND_KIND && e.id !== cur.id
+  );
 }
 
 /**
- * Next entry in same-kind stable order (wraps). Null if no peers.
+ * Next game in stable order (wraps). Null if current is not game or no peers.
  */
 export function nextSameKind(catalogId: string): GoCatalogEntry | null {
   const cur = getGoCatalogEntry(catalogId);
-  if (!cur) return null;
-  const same = GO_CATALOG.filter(e => e.kind === cur.kind);
+  if (!cur || cur.kind !== GO_RECOMMEND_KIND) return null;
+  const same = GO_CATALOG.filter(e => e.kind === GO_RECOMMEND_KIND);
   if (same.length < 2) return null;
   const idx = same.findIndex(e => e.id === cur.id);
   if (idx < 0) return null;
@@ -92,7 +100,8 @@ export function nextSameKind(catalogId: string): GoCatalogEntry | null {
 }
 
 /**
- * Up to `limit` random same-kind recommendations (never cross kind; never pad).
+ * Up to `limit` random other **game** recommendations (never cross kind; never pad).
+ * Non-game current → [].
  */
 export function recommendSameKind(
   catalogId: string,
@@ -122,9 +131,8 @@ function shuffleInPlace<T>(arr: T[], rng: () => number): T[] {
 }
 
 /**
- * Home `/` recommendations (DEC-050): up to `limit` entries.
- * Prefer field picks order (shuffled), then pad from full catalog.
- * May cross kind — unlike {@link recommendSameKind}.
+ * Home `/` recommendations (DEC-050): up to `limit` **game** entries.
+ * Prefer field picks (shuffled, games only), then pad from other games.
  */
 export function recommendHome(
   limit = 3,
@@ -137,7 +145,8 @@ export function recommendHome(
 
   const pickPool = shuffleInPlace(
     GENERATED_SAM_PLAYGROUNDS_PICK_IDS.map(id => byId.get(id)).filter(
-      (e): e is GoCatalogEntry => Boolean(e)
+      (e): e is GoCatalogEntry =>
+        e != null && e.kind === GO_RECOMMEND_KIND
     ),
     rng
   );
@@ -149,7 +158,9 @@ export function recommendHome(
 
   if (picked.length < limit) {
     const rest = shuffleInPlace(
-      GO_CATALOG.filter(e => !seen.has(e.id)),
+      GO_CATALOG.filter(
+        e => e.kind === GO_RECOMMEND_KIND && !seen.has(e.id)
+      ),
       rng
     );
     for (const e of rest) {

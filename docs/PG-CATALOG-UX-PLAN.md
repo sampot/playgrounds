@@ -58,7 +58,7 @@
 3. **版面脫離散文欄** — 寬欄或近全寬；寬螢幕可左 filter／系列、右結果。  
 4. **密度預設 compact** — icon＋名＋常駐「一鍵開」；blurb 次級／展開。禁止僅靠 hover 露出主 CTA。  
 5. **一鍵開走本場路徑** — 優先殼內直接 open／install；外鏈 `/?open=` 僅相容／深鏈。開發／編輯預設（不加 `view=`）。**給作者／實驗者**，不是傳閱主路徑。  
-6. **列「分享」→ 純玩 go** — Web Share API（否則拷貝）；網址＝**`https://go.samkuo.me/s/<catalog_id>`**（只認型錄 `id`；見 [PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)／DEC-050）。接收者只跑該 SAM、無編輯、不依賴 OPFS。**不是**場 `?open=&view=canvas`、**不是** Invite `/i/`。篩選／型錄頁「分享」仍可為 `/sam/?…`（瀏覽意圖）。**現場 QR**（面對面掃碼）以 **go Header 分享面**為準（計劃 §5.5）；型錄列不強制做 QR。  
+6. **列「分享」→ 純玩 go** — 頁內**分享面**（對齊 go §5.5：系統分享／QR／複製）；網址＝**`https://go.samkuo.me/s/<catalog_id>`**（只認型錄 `id`；見 [PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)／DEC-050）。與 go 差別：分享面內網址**可點擊**，`target=_blank` 開新分頁。接收者只跑該 SAM、無編輯、不依賴 OPFS。**不是**場 `?open=&view=canvas`、**不是** Invite `/i/`。篩選／型錄頁「分享」仍可為 `/sam/?…`（瀏覽意圖；維持 Web Share／複製即可）。  
 7. **原生 dialog 禁止** — 確認／輸入一律頁內 UI（repo 硬規則）。
 
 ### 載體（與 SvelteKit）
@@ -126,3 +126,4 @@
 | 2026-08-06 | 試玩 session：`view=canvas` 進場後畫布可常駐最大化；頂列「換一個／型錄／看原始碼」；型錄 dialog 與隨機換片不 `restorePreview`；唯「看原始碼」揭露工作區 |
 | 2026-08-08 | **契約修訂：** 列「分享」改 **`go.samkuo.me/s/<id>`**（DEC-050）；廢止以 `view=canvas` 為傳閱主形；「一鍵開」仍場編輯面。實作見 go 計劃 Phase 5 |
 | 2026-08-08 | 現場 QR：以 go Header 分享面為準（計劃 §5.5）；型錄列維持 Web Share／複製、不強制 QR |
+| 2026-08-08 | 列「分享」改頁內分享面（系統分享／QR／複製；網址可點開新分頁）；共用 `ShareSheet` |

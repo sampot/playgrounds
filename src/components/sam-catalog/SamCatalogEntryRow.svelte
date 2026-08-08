@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { onMount } from "svelte";
   import SamCatalogIcon from "@components/SamCatalogIcon.svelte";
+  import ShareSheet from "@components/ShareSheet.svelte";
   import {
     SAM_KIND_LABEL,
     samOpenHref,
@@ -9,11 +9,6 @@
     type CatalogDensity,
     type SamEntry,
   } from "../../data/samCatalog";
-  import {
-    canUseWebShare,
-    isShareAbort,
-    shareOrCopy,
-  } from "../../utils/shareOrCopy";
 
   let {
     entry,
@@ -31,34 +26,22 @@
   } = $props();
 
   let blurbOpen = $state(false);
-  let shareBusy = $state(false);
-  let canShare = $state(false);
+  let shareOpen = $state(false);
   let showBlurb = $derived(density === "comfortable" || blurbOpen);
-  let shareLabel = $derived(canShare ? "分享" : "複製連結");
 
-  onMount(() => {
-    canShare = canUseWebShare();
+  const shareUrl = $derived(samOpenShareHref(entry));
+  const shareSpoken = $derived.by(() => {
+    try {
+      const u = new URL(shareUrl);
+      return `${u.host}${u.pathname}`;
+    } catch {
+      return shareUrl.replace(/^https?:\/\//, "");
+    }
   });
 
-  async function handleShare() {
-    if (shareBusy || disabled) return;
-    shareBusy = true;
-    try {
-      const result = await shareOrCopy({
-        title: entry.title,
-        url: samOpenShareHref(entry),
-      });
-      onShareResult?.(
-        result === "shared"
-          ? `已分享「${entry.title}」`
-          : `已複製開啟連結（${entry.title}）`
-      );
-    } catch (e) {
-      if (isShareAbort(e)) return;
-      onShareResult?.(e instanceof Error ? e.message : String(e));
-    } finally {
-      shareBusy = false;
-    }
+  function openShare() {
+    if (disabled) return;
+    shareOpen = true;
   }
 </script>
 
@@ -103,11 +86,11 @@
     <button
       type="button"
       class="catalog-row-share"
-      disabled={disabled || shareBusy}
-      title={canShare ? "分享開啟連結" : "複製開啟連結"}
-      onclick={() => void handleShare()}
+      {disabled}
+      title="分享此小品"
+      onclick={openShare}
     >
-      {shareLabel}
+      分享
     </button>
     {#if onOpen}
       <button
@@ -122,6 +105,19 @@
       <a class="catalog-row-open" href={samOpenHref(entry)}>一鍵開</a>
     {/if}
   </div>
+
+  {#if !disabled}
+    <ShareSheet
+      open={shareOpen}
+      title={entry.title}
+      url={shareUrl}
+      spoken={shareSpoken}
+      urlAsLink={true}
+      hint="請對方用相機掃碼開玩；或點連結在新分頁開啟"
+      onClose={() => (shareOpen = false)}
+      onFlash={msg => onShareResult?.(msg)}
+    />
+  {/if}
 </li>
 
 <style>
@@ -237,6 +233,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    min-height: 2.75rem;
     border: 1px solid rgb(var(--color-border));
     border-radius: 0.375rem;
     background: transparent;
@@ -262,6 +259,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    min-height: 2.75rem;
     border: 0;
     border-radius: 0.375rem;
     background: rgb(var(--color-accent));

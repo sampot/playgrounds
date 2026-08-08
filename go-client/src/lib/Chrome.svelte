@@ -3,12 +3,18 @@
   import { chromeSession } from "$lib/chromeSession.svelte";
   import GoShareSheet from "$lib/GoShareSheet.svelte";
   import { nextSameKind, recommendSameKind } from "$lib/goCatalog";
-  import { openPlaygroundHome, PLAY_ORIGIN } from "$lib/openPlayground";
+  import {
+    openPlaygroundCatalog,
+    openPlaygroundHome,
+    PLAY_CATALOG_HREF,
+    PLAY_ORIGIN,
+  } from "$lib/openPlayground";
   import { goSamShareHref, PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
   import { goSamShareTitle } from "$lib/goShareMeta";
   import { getGoCatalogEntry } from "$lib/goCatalog";
 
   const playHost = PLAY_ORIGIN.replace(/^https:\/\//, "");
+  const catalogHostLabel = `${playHost}/sam/?kind=game`;
 
   function goOrigin(): string {
     if (typeof location !== "undefined" && location.origin) {
@@ -23,17 +29,48 @@
     return PLAYGROUNDS_GO_ORIGIN;
   }
 
+  const CHROME_AUTO_HIDE_MS = 3000;
+
   let shareOpen = $state(false);
   let recommends = $state<ReturnType<typeof recommendSameKind>>([]);
   let moreOpen = $state(false);
   /** Canvas play: hide chrome on scroll-down, show on scroll-up. */
   let chromeHidden = $state(false);
+  let chromeAutoHideTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function clearChromeAutoHide() {
+    if (chromeAutoHideTimer != null) {
+      clearTimeout(chromeAutoHideTimer);
+      chromeAutoHideTimer = null;
+    }
+  }
+
+  /** After reveal: hide again if header idle for 3s (paused while share sheet open). */
+  function scheduleChromeAutoHide() {
+    clearChromeAutoHide();
+    if (!canvasActive || chromeHidden || shareOpen) return;
+    chromeAutoHideTimer = setTimeout(() => {
+      chromeAutoHideTimer = null;
+      if (shareOpen) return;
+      moreOpen = false;
+      chromeHidden = true;
+    }, CHROME_AUTO_HIDE_MS);
+  }
+
+  function onChromeInteract() {
+    if (canvasActive && !chromeHidden) scheduleChromeAutoHide();
+  }
 
   const catalogId = $derived(chromeSession.catalogId);
   const mode = $derived(chromeSession.mode);
   const canvasActive = $derived(chromeSession.canvasActive);
   const shareEnabled = $derived(Boolean(catalogId));
-  const showSwap = $derived(mode === "solo" && Boolean(catalogId));
+  /** §5.6：僅當前小品為 `kind: game` 時露出換片／遊戲推薦。 */
+  const showSwap = $derived(
+    mode === "solo" &&
+      Boolean(catalogId) &&
+      chromeSession.kind === "game"
+  );
   const nextEntry = $derived(catalogId ? nextSameKind(catalogId) : null);
 
   const shareTitle = $derived.by(() => {
@@ -75,7 +112,16 @@
   });
 
   $effect(() => {
+    if (shareOpen) {
+      clearChromeAutoHide();
+      return;
+    }
+    if (canvasActive && !chromeHidden) scheduleChromeAutoHide();
+  });
+
+  $effect(() => {
     if (!canvasActive) {
+      clearChromeAutoHide();
       chromeHidden = false;
       moreOpen = false;
       return;
@@ -83,6 +129,7 @@
 
     chromeHidden = false;
     moreOpen = false;
+    clearChromeAutoHide();
 
     let acc = 0;
     let touchY = 0;
@@ -92,8 +139,15 @@
     const cleanups: Array<() => void> = [];
 
     function setHidden(hidden: boolean) {
+      const wasHidden = chromeHidden;
       chromeHidden = hidden;
-      if (hidden) moreOpen = false;
+      if (hidden) {
+        moreOpen = false;
+        clearChromeAutoHide();
+      } else if (wasHidden) {
+        // Revealed by scroll-up／pull — auto-hide if idle.
+        scheduleChromeAutoHide();
+      }
       acc = 0;
     }
 
@@ -176,6 +230,7 @@
 
     return () => {
       for (const c of cleanups) c();
+      clearChromeAutoHide();
       chromeHidden = false;
     };
   });
@@ -183,6 +238,7 @@
   function openShare() {
     if (!catalogId || !shareUrl) return;
     moreOpen = false;
+    clearChromeAutoHide();
     chromeHidden = false;
     shareOpen = true;
   }
@@ -199,24 +255,6 @@
     .filter(Boolean)
     .join(" ")}
 >
-  {#if canvasActive}
-    <!-- Pinned: stays top-left while the rest of chrome slides away. -->
-    <a
-      class={[
-        "chrome-mark-pin",
-        chromeHidden && "chrome-mark-pin--alone",
-      ]
-        .filter(Boolean)
-        .join(" ")}
-      href={`${PLAY_ORIGIN}/`}
-      title={`山姆鍋遊樂場（${playHost}）`}
-      target="_blank"
-      rel="noopener noreferrer"
-      onclick={openPlaygroundHome}
-    >
-      <img class="mark" src="/favicon.svg" width="22" height="22" alt="山姆鍋" />
-    </a>
-  {/if}
   <header
     class={[
       "chrome",
@@ -227,38 +265,35 @@
       .join(" ")}
     aria-label="站群"
     aria-hidden={canvasActive && chromeHidden ? "true" : undefined}
+    onpointerdown={onChromeInteract}
   >
-    {#if !canvasActive}
-      <a
-        class="mark-link"
-        href={`${PLAY_ORIGIN}/`}
-        title={`山姆鍋遊樂場（${playHost}）`}
-        target="_blank"
-        rel="noopener noreferrer"
-        onclick={openPlaygroundHome}
-      >
-        <img
-          class="mark"
-          src="/favicon.svg"
-          width="22"
-          height="22"
-          alt="山姆鍋"
-        />
-      </a>
-    {:else}
-      <span class="mark-spacer" aria-hidden="true"></span>
-    {/if}
     <a
-      class="play-link"
+      class="mark-link"
       href={`${PLAY_ORIGIN}/`}
       title={`山姆鍋遊樂場（${playHost}）`}
       target="_blank"
       rel="noopener noreferrer"
       onclick={openPlaygroundHome}
     >
+      <img
+        class="mark"
+        src="/favicon.svg"
+        width="22"
+        height="22"
+        alt="山姆鍋"
+      />
+    </a>
+    <a
+      class="play-link"
+      href={PLAY_CATALOG_HREF}
+      title={`山姆鍋遊樂場 · 遊戲小品（${catalogHostLabel}）`}
+      target="_blank"
+      rel="noopener noreferrer"
+      onclick={openPlaygroundCatalog}
+    >
       <span class="play-label">山姆鍋遊樂場</span>
       {#if !canvasActive}
-        <span class="host">{playHost}</span>
+        <span class="host">{catalogHostLabel}</span>
       {/if}
     </a>
     {#if showSwap && canvasActive}

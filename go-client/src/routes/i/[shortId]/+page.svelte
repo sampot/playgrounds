@@ -3,6 +3,7 @@
   import { onMount } from "svelte";
   import { chromeSession } from "$lib/chromeSession.svelte";
   import { findGoCatalogBySource } from "$lib/goCatalog";
+  import GoSamLoadBar from "$lib/GoSamLoadBar.svelte";
   import { openPlaygroundHome, PLAY_ORIGIN } from "$lib/openPlayground";
   import {
     createGuestRuntime,
@@ -206,7 +207,7 @@
   <div class="wait" role="status" aria-live="polite">
     <p class="wait-title">
       {#if status.phase === "loading_sam"}
-        正在載入小品
+        正在下載小品
       {:else if status.phase === "connecting"}
         正在與主持握手
       {:else if status.phase === "waiting_invite"}
@@ -217,6 +218,12 @@
         請稍候
       {/if}
     </p>
+    {#if status.phase === "loading_sam"}
+      <GoSamLoadBar
+        progress={status.loadProgress ?? { ratio: null, detail: "準備中…" }}
+        label="小品下載進度"
+      />
+    {/if}
     <p class="wait-hint">對弈畫面會在入座完成後出現，請勿關閉此頁。</p>
   </div>
 {/if}

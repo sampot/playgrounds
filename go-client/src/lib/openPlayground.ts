@@ -8,6 +8,12 @@
  */
 export const PLAY_ORIGIN = "https://play.samkuo.me";
 
+/**
+ * Field SAM catalog filtered to games — chrome「山姆鍋遊樂場」主連.
+ * Query 契約：`?kind=`（見 PG-CATALOG-UX-PLAN／`catalogUrlSearchParams`）。
+ */
+export const PLAY_CATALOG_HREF = `${PLAY_ORIGIN}/sam/?kind=game`;
+
 function popupLooksReal(w: Window | null): boolean {
   if (!w || w === window) return false;
   try {
@@ -21,12 +27,13 @@ function popupLooksReal(w: Window | null): boolean {
 }
 
 /**
- * Click handler for play links. Only suppress default navigation when a
+ * Click handler for external play links. Only suppress default navigation when a
  * real popup opened; otherwise let the `<a href>` navigate normally.
  */
-export function openPlaygroundHome(event?: MouseEvent): void {
+export function openPlaygroundUrl(href: string, event?: MouseEvent): void {
+  const target = href.trim() || `${PLAY_ORIGIN}/`;
   if (!event) {
-    window.location.assign(`${PLAY_ORIGIN}/`);
+    window.location.assign(target);
     return;
   }
   // Let modified clicks use native browser behaviour.
@@ -34,10 +41,9 @@ export function openPlaygroundHome(event?: MouseEvent): void {
   if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
   if (event.button != null && event.button !== 0) return;
 
-  const href = `${PLAY_ORIGIN}/`;
   let opened: Window | null = null;
   try {
-    opened = window.open(href, "_blank", "noopener,noreferrer");
+    opened = window.open(target, "_blank", "noopener,noreferrer");
   } catch {
     opened = null;
   }
@@ -46,4 +52,14 @@ export function openPlaygroundHome(event?: MouseEvent): void {
     return;
   }
   // Do not preventDefault — follow href (same tab or WebView's own handling).
+}
+
+/** Field home `/`. */
+export function openPlaygroundHome(event?: MouseEvent): void {
+  openPlaygroundUrl(`${PLAY_ORIGIN}/`, event);
+}
+
+/** Field catalog `/sam/`（小品型錄）. */
+export function openPlaygroundCatalog(event?: MouseEvent): void {
+  openPlaygroundUrl(PLAY_CATALOG_HREF, event);
 }

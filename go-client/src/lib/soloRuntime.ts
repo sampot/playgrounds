@@ -7,6 +7,10 @@ import {
   getGoSamOfflineCache,
   putGoSamOfflineCache,
 } from "./goSamOfflineCache";
+import {
+  goLoadProgressFromFiles,
+  type GoLoadProgress,
+} from "./goLoadProgress";
 import { mountGoCanvas, type GoCanvasMode } from "./mountGoCanvas";
 import { assertSamHasIndex, loadSamFiles } from "./samLoad";
 import type { FileMap } from "@pg/projectTypes";
@@ -22,6 +26,8 @@ export type SoloStatus = {
   canvasSrcdoc: string | null;
   canvasMode: GoCanvasMode | null;
   canvasGeneration: number;
+  /** File download progress while `phase === "loading"`. */
+  loadProgress: GoLoadProgress | null;
 };
 
 type Listener = (s: SoloStatus) => void;
@@ -36,6 +42,7 @@ export function createSoloRuntime() {
     canvasSrcdoc: null,
     canvasMode: null,
     canvasGeneration: 0,
+    loadProgress: null,
   };
   const listeners = new Set<Listener>();
   let generation = 0;
@@ -70,6 +77,7 @@ export function createSoloRuntime() {
         canvasSrcdoc: null,
         canvasMode: null,
         canvasGeneration: 0,
+        loadProgress: null,
       });
       return;
     }
@@ -83,13 +91,23 @@ export function createSoloRuntime() {
       canvasSrcdoc: null,
       canvasMode: null,
       canvasGeneration: 0,
+      loadProgress: { ratio: null, detail: "準備中…" },
     });
 
     try {
       let files: FileMap;
       let fromCache = false;
       try {
-        files = await loadSamFiles(entry.source);
+        files = await loadSamFiles(entry.source, {
+          onProgress: p => {
+            if (seq !== bootSeq) return;
+            const loadProgress = goLoadProgressFromFiles(p);
+            set({
+              loadProgress,
+              message: `正在下載「${entry.title}」… ${loadProgress.detail}`,
+            });
+          },
+        });
         if (seq !== bootSeq) return;
         assertSamHasIndex(files);
         void putGoSamOfflineCache(entry.id, entry.source, files);
@@ -99,8 +117,20 @@ export function createSoloRuntime() {
         files = cached.files;
         fromCache = true;
         assertSamHasIndex(files);
+        if (seq !== bootSeq) return;
+        set({
+          loadProgress: { ratio: 1, detail: "離線快取" },
+          message: `正在開啟「${entry.title}」（離線）…`,
+        });
       }
       if (seq !== bootSeq) return;
+      set({
+        loadProgress: {
+          ratio: 1,
+          detail: fromCache ? "離線快取" : "下載完成",
+        },
+        message: `正在開啟「${entry.title}」…`,
+      });
       generation += 1;
       const mounted = await mountGoCanvas(files, generation, {
         catalogId: entry.id,
@@ -119,6 +149,7 @@ export function createSoloRuntime() {
         canvasSrcdoc: mounted.canvasSrcdoc,
         canvasMode: mounted.canvasMode,
         canvasGeneration: mounted.canvasGeneration,
+        loadProgress: null,
       });
     } catch (e) {
       if (seq !== bootSeq) return;
@@ -135,6 +166,7 @@ export function createSoloRuntime() {
         canvasSrcdoc: null,
         canvasMode: null,
         canvasGeneration: 0,
+        loadProgress: null,
       });
     }
   }
@@ -151,6 +183,7 @@ export function createSoloRuntime() {
       canvasSrcdoc: null,
       canvasMode: null,
       canvasGeneration: 0,
+      loadProgress: null,
     });
   }
 
