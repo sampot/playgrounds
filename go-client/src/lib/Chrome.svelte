@@ -1,22 +1,29 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
-  import { onMount } from "svelte";
   import { chromeSession } from "$lib/chromeSession.svelte";
+  import GoShareSheet from "$lib/GoShareSheet.svelte";
   import { nextSameKind, recommendSameKind } from "$lib/goCatalog";
   import { openPlaygroundHome, PLAY_ORIGIN } from "$lib/openPlayground";
-  import {
-    canUseWebShare,
-    isShareAbort,
-    shareOrCopy,
-  } from "@utils/shareOrCopy";
   import { goSamShareHref, PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
   import { goSamShareTitle } from "$lib/goShareMeta";
   import { getGoCatalogEntry } from "$lib/goCatalog";
 
   const playHost = PLAY_ORIGIN.replace(/^https:\/\//, "");
 
-  let shareBusy = $state(false);
-  let canShare = $state(false);
+  function goOrigin(): string {
+    if (typeof location !== "undefined" && location.origin) {
+      if (
+        location.hostname === "localhost" ||
+        location.hostname === "127.0.0.1" ||
+        location.hostname.endsWith(".localhost")
+      ) {
+        return location.origin;
+      }
+    }
+    return PLAYGROUNDS_GO_ORIGIN;
+  }
+
+  let shareOpen = $state(false);
   let recommends = $state<ReturnType<typeof recommendSameKind>>([]);
   let moreOpen = $state(false);
   /** Canvas play: hide chrome on scroll-down, show on scroll-up. */
@@ -26,9 +33,32 @@
   const mode = $derived(chromeSession.mode);
   const canvasActive = $derived(chromeSession.canvasActive);
   const shareEnabled = $derived(Boolean(catalogId));
-  const shareLabel = $derived(canShare ? "分享" : "複製連結");
   const showSwap = $derived(mode === "solo" && Boolean(catalogId));
   const nextEntry = $derived(catalogId ? nextSameKind(catalogId) : null);
+
+  const shareTitle = $derived.by(() => {
+    if (!catalogId) return "";
+    const entry =
+      getGoCatalogEntry(catalogId) ||
+      (chromeSession.title
+        ? { title: chromeSession.title }
+        : { title: catalogId });
+    return goSamShareTitle(entry);
+  });
+
+  const shareUrl = $derived(
+    catalogId ? goSamShareHref(catalogId, goOrigin()) : ""
+  );
+
+  const shareSpoken = $derived.by(() => {
+    if (!shareUrl) return "";
+    try {
+      const u = new URL(shareUrl);
+      return `${u.host}${u.pathname}`;
+    } catch {
+      return shareUrl.replace(/^https?:\/\//, "");
+    }
+  });
 
   $effect(() => {
     if (mode === "solo" && catalogId) {
@@ -38,6 +68,10 @@
       recommends = [];
       moreOpen = false;
     }
+  });
+
+  $effect(() => {
+    if (!catalogId) shareOpen = false;
   });
 
   $effect(() => {
@@ -146,48 +180,16 @@
     };
   });
 
-  onMount(() => {
-    canShare = canUseWebShare();
-  });
-
-  function goOrigin(): string {
-    if (typeof location !== "undefined" && location.origin) {
-      if (
-        location.hostname === "localhost" ||
-        location.hostname === "127.0.0.1" ||
-        location.hostname.endsWith(".localhost")
-      ) {
-        return location.origin;
-      }
-    }
-    return PLAYGROUNDS_GO_ORIGIN;
-  }
-
-  async function onShare() {
-    if (!catalogId || shareBusy) return;
-    shareBusy = true;
-    try {
-      const url = goSamShareHref(catalogId, goOrigin());
-      const entry =
-        getGoCatalogEntry(catalogId) ||
-        (chromeSession.title
-          ? { title: chromeSession.title }
-          : { title: catalogId });
-      const title = goSamShareTitle(entry);
-      const result = await shareOrCopy({ title, url });
-      chromeSession.setFlash(
-        result === "shared" ? `已分享「${title}」` : `已複製連結（${title}）`
-      );
-    } catch (e) {
-      if (isShareAbort(e)) return;
-      chromeSession.setFlash(e instanceof Error ? e.message : String(e));
-    } finally {
-      shareBusy = false;
-    }
+  function openShare() {
+    if (!catalogId || !shareUrl) return;
+    moreOpen = false;
+    chromeHidden = false;
+    shareOpen = true;
   }
 
   function goToId(id: string) {
     moreOpen = false;
+    shareOpen = false;
     void goto(`/s/${encodeURIComponent(id)}`);
   }
 </script>
@@ -299,15 +301,15 @@
     <button
       type="button"
       class="share-btn"
-      disabled={!shareEnabled || shareBusy}
+      disabled={!shareEnabled}
       title={shareEnabled ? "分享此小品" : "尚無可分享的小品"}
-      onclick={() => void onShare()}
+      onclick={openShare}
     >
-      {shareLabel}
+      分享
     </button>
   </header>
 
-  {#if chromeSession.flash && !(canvasActive && chromeHidden)}
+  {#if chromeSession.flash && !(canvasActive && chromeHidden && !shareOpen)}
     <p
       class={["chrome-flash", canvasActive && "chrome-flash--toast"]
         .filter(Boolean)
@@ -344,3 +346,14 @@
     </nav>
   {/if}
 </div>
+
+{#if shareEnabled && shareUrl}
+  <GoShareSheet
+    open={shareOpen}
+    title={shareTitle}
+    url={shareUrl}
+    spoken={shareSpoken}
+    onClose={() => (shareOpen = false)}
+    onFlash={msg => chromeSession.setFlash(msg)}
+  />
+{/if}

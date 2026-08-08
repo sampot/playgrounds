@@ -40,6 +40,32 @@ async function copyTextToClipboard(text: string): Promise<void> {
   throw new Error("無法寫入剪貼簿");
 }
 
+/** Clipboard-only: copy absolute `url` (share-sheet「複製連結」). */
+export async function copyShareUrl(url: string): Promise<void> {
+  const trimmed = url.trim();
+  if (!trimmed) throw new Error("分享網址為空");
+  await copyTextToClipboard(trimmed);
+}
+
+/**
+ * Web Share only (`title`＋`url`). Throws `AbortError` on cancel; throws if
+ * share unavailable or fails — callers keep a QR／copy fallback (go §5.5).
+ */
+export async function shareViaWebShare(payload: SharePayload): Promise<void> {
+  const url = payload.url.trim();
+  if (!url) throw new Error("分享網址為空");
+  if (!canUseWebShare()) throw new Error("此瀏覽器不支援系統分享");
+
+  const data: ShareData = {
+    title: payload.title.trim() || url,
+    url,
+  };
+  if (typeof navigator.canShare === "function" && !navigator.canShare(data)) {
+    throw new Error("此內容無法透過系統分享");
+  }
+  await navigator.share(data);
+}
+
 /**
  * Prefer Web Share; on failure (except abort) or missing API, copy `url` only.
  */
@@ -49,26 +75,16 @@ export async function shareOrCopy(
   const url = payload.url.trim();
   if (!url) throw new Error("分享網址為空");
 
-  // title + url only — never pair text with url (broken concatenation on many UAs).
-  const data: ShareData = {
-    title: payload.title.trim() || url,
-    url,
-  };
-
   if (canUseWebShare()) {
-    const okToShare =
-      typeof navigator.canShare !== "function" || navigator.canShare(data);
-    if (okToShare) {
-      try {
-        await navigator.share(data);
-        return "shared";
-      } catch (e) {
-        if (isShareAbort(e)) throw e;
-        // Fall through to clipboard.
-      }
+    try {
+      await shareViaWebShare(payload);
+      return "shared";
+    } catch (e) {
+      if (isShareAbort(e)) throw e;
+      // Fall through to clipboard.
     }
   }
 
-  await copyTextToClipboard(url);
+  await copyShareUrl(url);
   return "copied";
 }

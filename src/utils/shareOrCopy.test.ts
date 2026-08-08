@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   canUseWebShare,
+  copyShareUrl,
   isShareAbort,
   shareOrCopy,
+  shareViaWebShare,
 } from "./shareOrCopy";
 
 afterEach(() => {
@@ -98,6 +100,42 @@ describe("shareOrCopy", () => {
     });
     await expect(shareOrCopy({ title: "x", url: "  " })).rejects.toThrow(
       /網址為空/
+    );
+  });
+});
+
+describe("shareViaWebShare", () => {
+  it("shares title＋url only", async () => {
+    const share = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("navigator", {
+      share,
+      canShare: () => true,
+    });
+    await shareViaWebShare({
+      title: "打磚塊",
+      url: "https://go.samkuo.me/s/pg-breakout",
+    });
+    expect(share).toHaveBeenCalledWith({
+      title: "打磚塊",
+      url: "https://go.samkuo.me/s/pg-breakout",
+    });
+  });
+
+  it("throws when Web Share missing", async () => {
+    vi.stubGlobal("navigator", {});
+    await expect(
+      shareViaWebShare({ title: "x", url: "https://go.samkuo.me/s/pg-x" })
+    ).rejects.toThrow(/不支援系統分享/);
+  });
+});
+
+describe("copyShareUrl", () => {
+  it("copies trimmed url", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("navigator", { clipboard: { writeText } });
+    await copyShareUrl("  https://go.samkuo.me/s/pg-breakout  ");
+    expect(writeText).toHaveBeenCalledWith(
+      "https://go.samkuo.me/s/pg-breakout"
     );
   });
 });

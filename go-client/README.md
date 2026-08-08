@@ -42,4 +42,4 @@ Build prerenders listed `/s/<id>` HTML so chat／social crawlers see distinct `o
 
 1. Host (play) mints `invite.compose` → `short_url` = `go…/i/…`
 2. Guest opens short link → resolve secret → consent → memory-load SAM → WebRTC → play
-3. Catalog share → `go…/s/<id>` with that SAM’s title in Web Share + link preview
+3. Catalog share → `go…/s/<id>` with that SAM’s title；go Header share sheet = system share / QR / copy + link preview

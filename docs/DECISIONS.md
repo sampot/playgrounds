@@ -1012,7 +1012,7 @@
   1. **獨立客戶端：** **`https://go.samkuo.me`**＝純玩版權威 origin（獨立 Cloudflare Worker＋Static Assets；**不是**場）。無 Files／編輯器／SecretStore／鑄邀請／provision。**同時只跑一個 SAM**。**必須**露出山姆鍋 logo／mark，並可見可點 **`https://play.samkuo.me/`**（遊樂場主網址；**可行時**優先外開系統瀏覽器／標準 Safari——盡力而為，非保證）。
   2. **Invite 短網址：** 場 Invite 的 `short_url`／QR＝**`https://go.samkuo.me/i/<short_id>`**。Invite 權威與 short map 仍在 Platform；`api.samkuo.me/i/…` 可 302 → go（相容）。**臨時生命週期**（TTL／撤銷／Host session）；**先天不能離線**——不承諾以 `/i/` 加主畫面後離線重玩或該局長期存檔。
   3. **型錄傳閱：** **`https://go.samkuo.me/s/<catalog_id>`**——**只認型錄 `id`**；go **建置內嵌** catalog（與 `catalog:gen` 同產線）。型錄列「分享」與 go Header「分享」只出此形；**不是** `/i/`、不是場 `?open=`／`view=canvas`。非型錄 SAM 不產生 `/s/`。型錄「一鍵開」仍進場殼編輯面。
-  4. **Header 分享：** 頂列右；Web Share API 優先、否則複製；網址＝當前 SAM 的 `/s/<id>`（能對上嵌入型錄時），**永不**＝當前 Invite 短鏈。**分享 title／社群預覽**依該筆型錄 **`entry.title`**（及 blurb）而異——每個 `/s/<id>` 不同；首包 HTML 須爬蟲可見（見計劃 §5.5.1）。
+  4. **Header 分享：** 頂列右「分享」→ **頁內分享面**（系統分享／QR／複製並列；非僅靜默 Web Share→複製）。網址＝當前 SAM 的 `/s/<id>`（能對上嵌入型錄時），**永不**＝當前 Invite 短鏈。QR 載荷＝同一 `/s/<id>` HTTPS（現場面對面快樂路徑；接收端用系統相機即可）。**分享 title／社群預覽**依該筆型錄 **`entry.title`**（及 blurb）而異——每個 `/s/<id>` 不同；首包 HTML 須爬蟲可見（見計劃 §5.5／§5.5.1）。Host 邀請 QR 仍只出 `/i/`。
   5. **`/s/` 換片：** 僅單機傳閱模式。提供「下一個」與隨機推薦 **≤3**；候選**必須**與當前同一型錄 **`kind`**（遊戲不得推工具等）；不足不跨 kind 湊。**不**提供型錄形式選擇（搜尋／filter／貨架）。取代當前唯一 SAM slot。**Invite `/i/` 不換片。**
   6. **儲存：** 不依賴持久 OPFS／沙盒庫；SAM 以記憶體／session FileMap（或等價）載入；Invite 入座 reuse 本頁實例。**`/s/` 另可：** 可安裝至主畫面、造訪後離線再玩、本機分數（鍵綁 `catalog_id`）——見計劃 §6.5；≠ 雲存檔、≠ 跨 `play`↔`go` 搬分。
   7. **範圍：** Invite 首刀＝`invite.compose`／五子棋 E2E（[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)）；`/s/`＝型錄傳閱＋換片（Phase 5）＋可安裝／離線／本機分數（Phase 6）。Host 與「一鍵開」仍走場殼＋OPFS。
@@ -1028,7 +1028,9 @@
   - 勿要求接收者開 Safari／寫 OPFS 才能完成 go 快樂路徑（Invite 或 `/s/`）。
   - 勿承諾 Invite `/i/` 離線可玩或把短鏈當永久離線遊戲入口；離線／主畫面／本機分數快樂路徑僅 `/s/`（及為其服務的 `/`）。
   - 勿讓所有 `/s/<id>` 共用同一社群預覽 title；分享／`og:title` 須依小品 `entry.title`，且爬蟲可見。
-  - 勿 fork 整份 `PlaygroundsApp`；抽共用 library（含 `goSamShareHref`／`shareOrCopy`）。
+  - 勿把 Header「分享」做成僅 Web Share→複製而無現場 QR；勿把型錄傳閱 QR 與邀請 `/i/` QR 混成同一碼。
+  - 勿以 NFC／Nearby／自建區網 discovery 當 `/s/` 現場主路徑；勿為 `/s/` 另鑄 Platform short。
+  - 勿 fork 整份 `PlaygroundsApp`；抽共用 library（含 `goSamShareHref`／`shareOrCopy`／QR 編碼）。
   - 同步 GLOSSARY、[PG-CATALOG-UX-PLAN.md](./PG-CATALOG-UX-PLAN.md)、[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)、DEC-047 短鏈敘事。
 - **Revision（2026-08-07）：** 初版 Proposed。
 - **Revision（2026-08-07）：** 用語：純玩＝Invite／session 範圍（可多局，SAM 定）；非「只能一局」。
@@ -1039,6 +1041,7 @@
 - **Revision（2026-08-08）：** 首頁 `/`：至多 3 則推薦（picks 優先、可跨 kind）→ `/s/<id>`。
 - **Revision（2026-08-08）：** `/s/` 可安裝＋造訪後離線＋本機分數；Invite＝臨時、不能離線。
 - **Revision（2026-08-08）：** `/s/<id>` 分享／OG title 依小品 `entry.title` 而異（社群預覽）。
+- **Revision（2026-08-08）：** Header「分享」＝頁內分享面（系統分享／QR／複製）；現場快樂路徑＝掃 `/s/<id>` QR。
 
 ### DEC-051: Playgrounds API scopes（環境能力準入）
 
