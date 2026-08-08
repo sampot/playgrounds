@@ -27,7 +27,7 @@
 </svelte:head>
 
 <h1>純玩</h1>
-<p class="lead">選一個小品直接玩。可加入主畫面；造訪過的小品離線也能再開。</p>
+<p class="lead">選一個遊戲直接玩。造訪過的離線也能再開。</p>
 
 {#if recs.length}
   <section class="home-rec" aria-label="推薦試試">

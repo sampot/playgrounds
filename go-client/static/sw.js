@@ -264,10 +264,21 @@ function isShellCacheablePath(pathname) {
   if (pathname.startsWith("/__go_offline_sam__/")) return false;
   if (isInvitePath(pathname)) return false;
   if (pathname.startsWith("/_app/")) return true;
-  if (pathname === "/" || pathname.startsWith("/s/")) return true;
+  if (
+    pathname === "/" ||
+    pathname === "/help" ||
+    pathname.startsWith("/help/") ||
+    pathname.startsWith("/s/")
+  ) {
+    return true;
+  }
   if (
     pathname === "/manifest.webmanifest" ||
     pathname === "/favicon.svg" ||
+    pathname === "/apple-touch-icon.png" ||
+    pathname === "/icons/apple-touch-icon.png" ||
+    pathname === "/icon-192.png" ||
+    pathname === "/icon-512.png" ||
     pathname.startsWith("/icons/")
   ) {
     return true;
@@ -293,6 +304,10 @@ function extractShellAssetUrls(html, origin) {
   }
   add("/manifest.webmanifest");
   add("/favicon.svg");
+  add("/apple-touch-icon.png");
+  add("/icons/apple-touch-icon.png");
+  add("/icon-192.png");
+  add("/icon-512.png");
   return [...urls];
 }
 
@@ -307,7 +322,10 @@ async function networkFirstShell(request) {
         if (
           (request.mode === "navigate" ||
             (fresh.headers.get("content-type") || "").includes("text/html")) &&
-          (url.pathname === "/" || url.pathname.startsWith("/s/"))
+          (url.pathname === "/" ||
+            url.pathname === "/help" ||
+            url.pathname.startsWith("/help/") ||
+            url.pathname.startsWith("/s/"))
         ) {
           try {
             const html = await fresh.clone().text();

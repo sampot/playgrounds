@@ -50,6 +50,8 @@
     id: string | null;
     title: string;
   } | null>(null);
+  /** Avoid re-entrant refresh／focus while panel stays open. */
+  let wasOpen = false;
 
   const currentTitle = $derived.by(() => {
     const id = currentCatalogId?.trim() ?? "";
@@ -65,6 +67,8 @@
         id,
         title: getGoCatalogEntry(id)?.title ?? id,
       }));
+    } catch {
+      downloaded = [];
     } finally {
       listBusy = false;
     }
@@ -73,17 +77,31 @@
   $effect(() => {
     const el = dialogEl;
     if (!el) return;
+
     if (open) {
-      if (!el.open) el.showModal();
-      void refreshDownloaded();
-      confirm = null;
-      queueMicrotask(() => {
-        el.querySelector<HTMLButtonElement>(".go-more-close")?.focus();
-      });
-    } else if (el.open) {
-      el.close();
-      confirm = null;
+      if (!el.open) {
+        try {
+          el.showModal();
+        } catch {
+          el.setAttribute("open", "");
+        }
+      }
+      if (!wasOpen) {
+        wasOpen = true;
+        confirm = null;
+        void refreshDownloaded();
+        queueMicrotask(() => {
+          el.querySelector<HTMLButtonElement>(".go-more-close")?.focus();
+        });
+      }
+      return;
     }
+
+    wasOpen = false;
+    if (el.open) {
+      el.close();
+    }
+    confirm = null;
   });
 
   function onDialogCancel(e: Event) {
@@ -192,133 +210,136 @@
       </button>
     </header>
 
-    {#if confirm}
-      <div class="go-more-confirm" role="alertdialog" aria-labelledby="go-more-confirm-title">
-        <h3 id="go-more-confirm-title" class="go-more-section-title">
-          {confirmCopy.title}
-        </h3>
-        <p class="go-more-confirm-body">{confirmCopy.body}</p>
-        <div class="go-more-confirm-actions">
-          <button
-            type="button"
-            class="go-more-btn"
-            disabled={actionBusy}
-            onclick={() => (confirm = null)}
-          >
-            取消
-          </button>
-          <button
-            type="button"
-            class="go-more-btn go-more-btn--danger"
-            disabled={actionBusy}
-            onclick={() => void runConfirm()}
-          >
-            {confirmCopy.ok}
-          </button>
-        </div>
-      </div>
-    {:else}
-      <section class="go-more-section" aria-labelledby="go-more-dl-title">
-        <h3 id="go-more-dl-title" class="go-more-section-title">可離線玩</h3>
-        {#if listBusy && !downloaded.length}
-          <p class="go-more-empty">載入中…</p>
-        {:else if !downloaded.length}
-          <p class="go-more-empty">連線玩過一次後會出現在這裡。</p>
-        {:else}
-          <ul class="go-more-list">
-            {#each downloaded as row (row.id)}
-              <li class="go-more-row">
-                <button
-                  type="button"
-                  class="go-more-row-main"
-                  onclick={() => onPick(row.id)}
-                >
-                  {row.title}
-                </button>
-                <button
-                  type="button"
-                  class="go-more-row-act"
-                  title={`清除「${row.title}」進度／分數`}
-                  aria-label={`清除「${row.title}」進度／分數`}
-                  onclick={() => askClearScores(row.id, row.title)}
-                >
-                  清分
-                </button>
-                <button
-                  type="button"
-                  class="go-more-row-act"
-                  title={`移除「${row.title}」離線下載`}
-                  aria-label={`移除「${row.title}」離線下載`}
-                  onclick={() => askRemoveOffline(row.id, row.title)}
-                >
-                  卸包
-                </button>
-              </li>
-            {/each}
-          </ul>
-        {/if}
-      </section>
-
-      {#if currentCatalogId}
-        <section class="go-more-section" aria-labelledby="go-more-cur-title">
-          <h3 id="go-more-cur-title" class="go-more-section-title">
-            這個遊戲
+    <div class="go-more-body">
+      {#if confirm}
+        <div
+          class="go-more-confirm"
+          role="alertdialog"
+          aria-labelledby="go-more-confirm-title"
+        >
+          <h3 id="go-more-confirm-title" class="go-more-section-title">
+            {confirmCopy.title}
           </h3>
-          <p class="go-more-hint">{currentTitle}</p>
-          <div class="go-more-stack">
+          <p class="go-more-confirm-body">{confirmCopy.body}</p>
+          <div class="go-more-confirm-actions">
             <button
               type="button"
               class="go-more-btn"
-              onclick={() =>
-                askClearScores(currentCatalogId, currentTitle || currentCatalogId)}
+              disabled={actionBusy}
+              onclick={() => (confirm = null)}
             >
-              清除進度／分數
+              取消
             </button>
             <button
               type="button"
-              class="go-more-btn"
-              onclick={() =>
-                askRemoveOffline(
-                  currentCatalogId,
-                  currentTitle || currentCatalogId
-                )}
+              class="go-more-btn go-more-btn--danger"
+              disabled={actionBusy}
+              onclick={() => void runConfirm()}
             >
-              移除離線下載
+              {confirmCopy.ok}
             </button>
           </div>
+        </div>
+      {:else}
+        {#if showTryThese && recommends.length}
+          <section
+            class="go-more-section"
+            aria-labelledby="go-more-try-title"
+          >
+            <h3 id="go-more-try-title" class="go-more-section-title">
+              試試這些
+            </h3>
+            <ul class="go-more-try">
+              {#each recommends as rec (rec.id)}
+                <li>
+                  <button
+                    type="button"
+                    class="go-more-btn"
+                    onclick={() => onPick(rec.id)}
+                  >
+                    {rec.title}
+                  </button>
+                </li>
+              {/each}
+            </ul>
+          </section>
+        {/if}
+
+        <section class="go-more-section" aria-labelledby="go-more-dl-title">
+          <h3 id="go-more-dl-title" class="go-more-section-title">可離線玩</h3>
+          {#if listBusy && !downloaded.length}
+            <p class="go-more-empty">載入中…</p>
+          {:else if !downloaded.length}
+            <p class="go-more-empty">連線玩過一次後會出現在這裡。</p>
+          {:else}
+            <ul class="go-more-list">
+              {#each downloaded as row (row.id)}
+                <li>
+                  <button
+                    type="button"
+                    class="go-more-btn"
+                    onclick={() => onPick(row.id)}
+                  >
+                    {row.title}
+                  </button>
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        </section>
+
+        {#if currentCatalogId}
+          <section class="go-more-section" aria-labelledby="go-more-cur-title">
+            <h3 id="go-more-cur-title" class="go-more-section-title">
+              這個遊戲
+            </h3>
+            <p class="go-more-hint">{currentTitle}</p>
+            <div class="go-more-stack">
+              <button
+                type="button"
+                class="go-more-btn"
+                onclick={() =>
+                  askClearScores(
+                    currentCatalogId,
+                    currentTitle || currentCatalogId
+                  )}
+              >
+                清除進度／分數
+              </button>
+              <button
+                type="button"
+                class="go-more-btn"
+                onclick={() =>
+                  askRemoveOffline(
+                    currentCatalogId,
+                    currentTitle || currentCatalogId
+                  )}
+              >
+                移除離線下載
+              </button>
+            </div>
+          </section>
+        {/if}
+
+        <section class="go-more-section" aria-labelledby="go-more-help-title">
+          <h3 id="go-more-help-title" class="go-more-section-title">說明</h3>
+          <a class="go-more-btn go-more-link" href="/help" onclick={onClose}>
+            使用說明
+          </a>
+        </section>
+
+        <section class="go-more-section" aria-labelledby="go-more-adv-title">
+          <h3 id="go-more-adv-title" class="go-more-section-title">進階</h3>
+          <button
+            type="button"
+            class="go-more-btn go-more-btn--danger-outline"
+            onclick={askClearAll}
+          >
+            清除全部本機遊戲資料…
+          </button>
         </section>
       {/if}
-
-      <section class="go-more-section" aria-labelledby="go-more-adv-title">
-        <h3 id="go-more-adv-title" class="go-more-section-title">進階</h3>
-        <button
-          type="button"
-          class="go-more-btn go-more-btn--danger-outline"
-          onclick={askClearAll}
-        >
-          清除全部本機遊戲資料…
-        </button>
-      </section>
-
-      {#if showTryThese && recommends.length}
-        <section class="go-more-section go-more-section--try" aria-labelledby="go-more-try-title">
-          <h3 id="go-more-try-title" class="go-more-section-title">試試這些</h3>
-          <ul class="go-more-try">
-            {#each recommends as rec (rec.id)}
-              <li>
-                <button
-                  type="button"
-                  class="go-more-btn"
-                  onclick={() => onPick(rec.id)}
-                >
-                  {rec.title}
-                </button>
-              </li>
-            {/each}
-          </ul>
-        </section>
-      {/if}
-    {/if}
+    </div>
   </div>
 </dialog>
 
@@ -349,29 +370,51 @@
     justify-content: flex-end;
     position: fixed;
     inset: 0;
+    width: 100%;
+    max-width: 100vw;
+    height: 100%;
+    max-height: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
   }
   .go-more-panel {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
     width: 100%;
     max-width: 28rem;
     margin: 0 auto;
-    max-height: min(92svh, 40rem);
-    overflow: auto;
-    padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px));
+    /* Cap height so body can scroll; min-height:0 is required for iOS flex overflow. */
+    flex: 0 1 auto;
+    min-height: 0;
+    max-height: min(88svh, 36rem);
     border: 1px solid rgb(var(--gm-line));
     border-bottom: none;
     border-radius: calc(var(--gm-radius) + 0.35rem)
       calc(var(--gm-radius) + 0.35rem) 0 0;
     background: rgb(var(--gm-fill));
     box-shadow: 0 -8px 28px color-mix(in oklab, rgb(var(--gm-ink)) 16%, transparent);
+    overflow: hidden;
   }
   .go-more-head {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    flex-shrink: 0;
     min-width: 0;
+    padding: 1rem 1rem 0.5rem;
+  }
+  .go-more-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    padding: 0.5rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px));
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
   }
   .go-more-title {
     margin: 0;
@@ -405,10 +448,6 @@
     flex-direction: column;
     gap: 0.5rem;
   }
-  .go-more-section--try {
-    padding-top: 0.75rem;
-    border-top: 1px solid rgb(var(--gm-line));
-  }
   .go-more-section-title {
     margin: 0;
     font-size: 0.8rem;
@@ -433,62 +472,13 @@
     flex-direction: column;
     gap: 0.35rem;
   }
-  .go-more-row {
-    display: flex;
-    align-items: stretch;
-    gap: 0.25rem;
-    min-width: 0;
-  }
-  .go-more-row-main {
-    flex: 1;
-    min-width: 0;
-    min-height: 2.75rem;
-    padding: 0.45rem 0.75rem;
-    border: 1px solid rgb(var(--gm-line));
-    border-radius: var(--gm-radius);
-    background: rgb(var(--gm-fill));
-    color: rgb(var(--gm-ink));
-    font: inherit;
-    font-size: 0.9rem;
-    font-weight: 600;
-    text-align: start;
-    cursor: pointer;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .go-more-row-main:hover,
-  .go-more-row-main:focus-visible {
-    border-color: rgb(var(--gm-accent));
-    color: rgb(var(--gm-accent));
-    outline: none;
-  }
-  .go-more-row-act {
-    flex-shrink: 0;
-    min-width: 2.75rem;
-    min-height: 2.75rem;
-    padding: 0.25rem 0.45rem;
-    border: 1px solid rgb(var(--gm-line));
-    border-radius: var(--gm-radius);
-    background: transparent;
-    color: rgb(var(--gm-muted));
-    font: inherit;
-    font-size: 0.7rem;
-    font-weight: 650;
-    cursor: pointer;
-  }
-  .go-more-row-act:hover,
-  .go-more-row-act:focus-visible {
-    border-color: rgb(var(--gm-accent));
-    color: rgb(var(--gm-accent));
-    outline: none;
-  }
   .go-more-stack {
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
   }
-  .go-more-btn {
+  .go-more-btn,
+  .go-more-link {
     min-height: 2.75rem;
     width: 100%;
     padding: 0.45rem 0.75rem;
@@ -501,9 +491,17 @@
     font-weight: 650;
     cursor: pointer;
     text-align: start;
+    box-sizing: border-box;
+  }
+  .go-more-link {
+    display: flex;
+    align-items: center;
+    text-decoration: none;
   }
   .go-more-btn:hover:not(:disabled),
-  .go-more-btn:focus-visible:not(:disabled) {
+  .go-more-btn:focus-visible:not(:disabled),
+  .go-more-link:hover,
+  .go-more-link:focus-visible {
     border-color: rgb(var(--gm-accent));
     color: rgb(var(--gm-accent));
     outline: none;
@@ -524,7 +522,11 @@
     color: #fff;
   }
   .go-more-btn--danger-outline {
-    border-color: color-mix(in oklab, rgb(var(--gm-danger)) 55%, rgb(var(--gm-line)));
+    border-color: color-mix(
+      in oklab,
+      rgb(var(--gm-danger)) 55%,
+      rgb(var(--gm-line))
+    );
     color: rgb(var(--gm-danger));
   }
   .go-more-confirm {
