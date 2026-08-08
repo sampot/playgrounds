@@ -1,15 +1,38 @@
 <script lang="ts">
-  import { page } from "$app/state";
   import { onMount } from "svelte";
   import { chromeSession } from "$lib/chromeSession.svelte";
   import { openPlaygroundHome, PLAY_ORIGIN } from "$lib/openPlayground";
+  import {
+    goSamCanonicalUrl,
+    goSamDescription,
+    goSamDocumentTitle,
+  } from "$lib/goShareMeta";
   import {
     createSoloRuntime,
     type SoloStatus,
   } from "$lib/soloRuntime";
   import { setGoMemoryCanvasWindow } from "$lib/goMemoryCanvas";
+  import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
+  import type { PageData } from "./$types";
 
-  const catalogId = $derived(page.params.catalogId?.trim() || "");
+  let { data }: { data: PageData } = $props();
+
+  const catalogId = $derived(data.catalogId);
+  const entry = $derived(data.entry);
+  const docTitle = $derived(
+    entry ? goSamDocumentTitle(entry) : "小品 · 遊樂場"
+  );
+  const description = $derived(
+    entry
+      ? goSamDescription(entry)
+      : "山姆鍋遊樂場 · 純玩小品。"
+  );
+  const canonical = $derived(
+    catalogId
+      ? goSamCanonicalUrl(catalogId, PLAYGROUNDS_GO_ORIGIN)
+      : PLAYGROUNDS_GO_ORIGIN
+  );
+
   let status = $state<SoloStatus | null>(null);
   const runtime = createSoloRuntime();
 
@@ -31,6 +54,7 @@
   }
 
   onMount(() => {
+    if (entry) chromeSession.setSolo(entry);
     return () => {
       stopRuntime();
       runtime.dispose();
@@ -51,18 +75,35 @@
 </script>
 
 <svelte:head>
-  <title
-    >{status?.entry?.title
-      ? `${status.entry.title} · 遊樂場`
-      : "小品 · 遊樂場"}</title
-  >
+  <title>{docTitle}</title>
+  <meta name="description" content={description} />
+  <link rel="canonical" href={canonical} />
+  <meta property="og:type" content="website" />
+  <meta property="og:locale" content="zh_TW" />
+  <meta property="og:site_name" content="山姆鍋遊樂場" />
+  <meta property="og:title" content={docTitle} />
+  <meta property="og:description" content={description} />
+  <meta property="og:url" content={canonical} />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content={docTitle} />
+  <meta name="twitter:description" content={description} />
 </svelte:head>
 
 {#if !catalogId}
   <h1>無法開啟</h1>
   <p class="err" role="alert">連結不完整</p>
+{:else if !entry && (!status || status.phase === "idle" || status.phase === "loading")}
+  <h1>無法開啟</h1>
+  <p class="err" role="alert">型錄沒有這項小品（可能已下架）</p>
+  <p class="lead">
+    可回
+    <a href={`${PLAY_ORIGIN}/sam/`} target="_blank" rel="noopener noreferrer"
+      >型錄</a
+    >
+    挑選其他小品。
+  </p>
 {:else if !status || status.phase === "idle" || status.phase === "loading"}
-  <h1>{status?.entry?.title || "開啟小品"}</h1>
+  <h1>{entry?.title || status?.entry?.title || "開啟小品"}</h1>
   <p class="status" role="status">{status?.message || "正在載入…"}</p>
 {:else if status.phase === "error"}
   <h1>無法開啟</h1>
@@ -82,7 +123,7 @@
     挑選其他小品。
   </p>
 {:else}
-  <h1 class="sr-only">{status.entry?.title || "小品"}</h1>
+  <h1 class="sr-only">{status.entry?.title || entry?.title || "小品"}</h1>
   {#if showCanvas}
     <div class="stage stage--fill">
       {#if status.canvasMode === "memory" && status.canvasSrcdoc}

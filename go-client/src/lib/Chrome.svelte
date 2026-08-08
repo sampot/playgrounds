@@ -10,6 +10,8 @@
     shareOrCopy,
   } from "@utils/shareOrCopy";
   import { goSamShareHref, PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
+  import { goSamShareTitle } from "$lib/goShareMeta";
+  import { getGoCatalogEntry } from "$lib/goCatalog";
 
   const playHost = PLAY_ORIGIN.replace(/^https:\/\//, "");
 
@@ -166,7 +168,12 @@
     shareBusy = true;
     try {
       const url = goSamShareHref(catalogId, goOrigin());
-      const title = chromeSession.title?.trim() || catalogId;
+      const entry =
+        getGoCatalogEntry(catalogId) ||
+        (chromeSession.title
+          ? { title: chromeSession.title }
+          : { title: catalogId });
+      const title = goSamShareTitle(entry);
       const result = await shareOrCopy({ title, url });
       chromeSession.setFlash(
         result === "shared" ? `已分享「${title}」` : `已複製連結（${title}）`

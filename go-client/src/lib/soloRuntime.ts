@@ -3,8 +3,13 @@
  */
 
 import { getGoCatalogEntry, type GoCatalogEntry } from "./goCatalog";
+import {
+  getGoSamOfflineCache,
+  putGoSamOfflineCache,
+} from "./goSamOfflineCache";
 import { mountGoCanvas, type GoCanvasMode } from "./mountGoCanvas";
 import { assertSamHasIndex, loadSamFiles } from "./samLoad";
+import type { FileMap } from "@pg/projectTypes";
 
 export type SoloPhase = "idle" | "loading" | "ready" | "error";
 
@@ -81,11 +86,25 @@ export function createSoloRuntime() {
     });
 
     try {
-      const files = await loadSamFiles(entry.source);
+      let files: FileMap;
+      let fromCache = false;
+      try {
+        files = await loadSamFiles(entry.source);
+        if (seq !== bootSeq) return;
+        assertSamHasIndex(files);
+        void putGoSamOfflineCache(entry.id, entry.source, files);
+      } catch (netErr) {
+        const cached = await getGoSamOfflineCache(entry.id);
+        if (!cached) throw netErr;
+        files = cached.files;
+        fromCache = true;
+        assertSamHasIndex(files);
+      }
       if (seq !== bootSeq) return;
-      assertSamHasIndex(files);
       generation += 1;
-      const mounted = await mountGoCanvas(files, generation);
+      const mounted = await mountGoCanvas(files, generation, {
+        catalogId: entry.id,
+      });
       if (seq !== bootSeq) {
         mounted.dispose();
         return;
@@ -94,7 +113,7 @@ export function createSoloRuntime() {
       set({
         phase: "ready",
         entry,
-        message: entry.title,
+        message: fromCache ? `${entry.title}（離線）` : entry.title,
         error: null,
         canvasUrl: mounted.canvasUrl,
         canvasSrcdoc: mounted.canvasSrcdoc,

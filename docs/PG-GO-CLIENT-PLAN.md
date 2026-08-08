@@ -1,10 +1,10 @@
 # Playgrounds 純玩版客戶端（`go.samkuo.me`）
 
-> **狀態：** Draft（2026-08-08）— 契約／階段草案；Invite 路徑實作進行中；型錄 `/s/<id>` 與 Header 分享為新增契約  
+> **狀態：** Draft（2026-08-08）— 契約／階段草案；Invite 路徑實作進行中；型錄 `/s/<id>`／分享／換片／§5.5.1 每 id 預覽 title／§6.5 可安裝離線分數已定案  
 > **權威決策：** 建議 [DECISIONS.md](./DECISIONS.md) **DEC-050**（Proposed）  
-> **相關：** [PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)（五子棋 E2E；Invite Guest 主路徑）、[PG-CATALOG-UX-PLAN.md](./PG-CATALOG-UX-PLAN.md)（型錄「分享」→ go）、[PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)、[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（官方 TURN；Guest 經 `join_cap`）、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)、DEC-004／023／025／042／045／047／048、[GLOSSARY.md](./GLOSSARY.md)
+> **相關：** [PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)（五子棋 E2E；Invite Guest 主路徑）、[PG-CATALOG-UX-PLAN.md](./PG-CATALOG-UX-PLAN.md)（型錄「分享」→ go）、[PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)、[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（官方 TURN；Guest 經 `join_cap`）、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)、DEC-004／009／023／025／042／045／047／048、[GLOSSARY.md](./GLOSSARY.md)
 
-一句話：**獨立於場殼的純玩客戶端＠`go.samkuo.me`——同時只跑一個 SAM、無編輯環境、不依賴持久 OPFS；啟動不限 Invite（型錄 id 傳閱與 Invite 短鏈並列）；傳閱網址 `/s/<catalog_id>`（內嵌 catalog）；`/s/` 可同 kind「下一個」與至多 3 則推薦換片（無型錄選擇 UI）；Invite `/i/` 不換片。**
+一句話：**獨立於場殼的純玩客戶端＠`go.samkuo.me`——同時只跑一個 SAM、無編輯環境、不依賴持久 OPFS；啟動不限 Invite（型錄 id 傳閱與 Invite 短鏈並列）；傳閱網址 `/s/<catalog_id>`（內嵌 catalog）；`/s/` 可同 kind 換片，並可安裝至主畫面、造訪後離線再玩、本機保留分數；Invite `/i/`＝臨時 session（先天不能離線、不換片）。**
 
 ---
 
@@ -24,8 +24,8 @@
 - **`https://go.samkuo.me`**＝純玩版權威 origin（站群一員；**不是**場）。
 - **同時一個 SAM：** 任一時刻只 materialize／執行一個 SAM；換源＝取代當前實例（無沙盒庫、無多專案）。
 - **啟動模式（並列）：**
-  1. **Invite／session：** `https://go.samkuo.me/i/<short_id>`（QR／Host 邀請 modal 只出這個）。
-  2. **型錄傳閱／單機純玩：** `https://go.samkuo.me/s/<catalog_id>`（型錄列「分享」、go Header「分享」只出這個）。
+  1. **Invite／session：** `https://go.samkuo.me/i/<short_id>`（QR／Host 邀請 modal 只出這個）——**臨時生命週期**（TTL／撤銷／Host session）；**先天不能離線**。
+  2. **型錄傳閱／單機純玩：** `https://go.samkuo.me/s/<catalog_id>`（型錄列「分享」、go Header「分享」只出這個）——可重訪；見 §6.5 可安裝／造訪後離線／本機分數。
 - **不包含編輯環境**；不依賴持久 OPFS；掃碼／傳閱受限情境為快樂路徑。
 - Host 仍在場殼（預設 `play.samkuo.me`）鑄邀請、開 session、作答；資料面仍只走 WebRTC（DEC-045／047）。
 - 型錄「一鍵開」仍進**場殼編輯面**（`/?open=`，無 `view=canvas`）——與「分享」刻意分流。
@@ -43,7 +43,8 @@
 - 在 go 上複製完整型錄 UX（搜尋／filter／貨架）；換片僅 §5.6。
 - 觀戰、完美斷線重連、多 peer 排隊當本刀主故事（對齊 E2E：鎖 1 Guest）。
 - 使用者自備 TURN；對人揭露直連 vs relay（對齊點數計劃）。
-- 跨 origin 自動搬 OPFS；純玩版持久化「我的沙盒庫」。
+- 跨 origin 自動搬 OPFS；純玩版持久化「我的沙盒庫」（多專案 OPFS 語意）。
+- **Invite `/i/` 離線可玩**、Invite 局分數／棋譜雲存、跨裝置同步分數、帳號排行榜。
 - 以 Cloudflare Pages 為場網主路徑的敘事延伸——本刀 **go** 可用 Workers Static Assets（與 docs／platform 一致）；若實作選 Pages，仍須同一 origin 契約。
 
 ---
@@ -63,12 +64,13 @@
 
 | 用 | 不用當成 |
 | --- | --- |
-| `go.samkuo.me/i/…` | 型錄傳閱、另一個遊樂場 OPFS origin |
+| `go.samkuo.me/i/…` | 型錄傳閱、另一個遊樂場 OPFS origin、可離線重玩的固定入口 |
 | `go.samkuo.me/s/<id>` | Invite 短鏈、場 `?open=`、通用縮址 |
 | 型錄「分享」→ go `/s/` | 型錄「一鍵開」→ 場編輯面 |
 | go Header「分享」→ `/s/<id>` | Host 邀請 modal 的 `/i/<short_id>` |
 | `/s/` 同 kind 換片（下一個／推薦≤3） | go 上型錄瀏覽；Invite 中換小品；跨 kind 推薦 |
-| 純玩「當下 Invite／session」 | 「只能一局」；跨邀請雲存檔 |
+| `/s/` 造訪後離線＋本機分數（§6.5） | Invite 離線對弈；雲存檔；跨 `play`↔`go` 自動搬分 |
+| 純玩「當下 Invite／session」（臨時） | 「只能一局」；跨邀請雲存檔；把短鏈當永久書籤遊戲 |
 | `#pg=`／shortId 入 go | `#pg_provision=`、`/join/<token>`、`#roster=` OOB |
 
 ---
@@ -79,12 +81,13 @@
 
 | 類 | URL | 誰產出 | 語意 |
 | --- | --- | --- | --- |
-| **Invite 短網址** | **`https://go.samkuo.me/i/<short_id>`** | 鑄 Invite 回傳 `short_url`；Host QR／邀請 modal | 入座當下 session（TTL／撤銷隨 Invite） |
-| **型錄 SAM 傳閱** | **`https://go.samkuo.me/s/<catalog_id>`** | 型錄列「分享」；go Header「分享」 | 只執行該型錄小品（單機；無該局 Invite） |
+| **Invite 短網址** | **`https://go.samkuo.me/i/<short_id>`** | 鑄 Invite 回傳 `short_url`；Host QR／邀請 modal | 入座**當下** session；**臨時生命週期**（TTL／撤銷隨 Invite；需 Host／網路）；**先天不能離線** |
+| **型錄 SAM 傳閱** | **`https://go.samkuo.me/s/<catalog_id>`** | 型錄列「分享」；go Header「分享」 | 只執行該型錄小品（單機；無該局 Invite；可重訪；§6.5） |
 
 - Invite 權威／TTL／map 仍在 Platform；go **不**自建第二套邀請庫。
 - **`/s/` 不經 Platform short map**；無 TTL、無 join、無點數。
 - 鑄邀請回傳 `short_url` 固定組在 **go** origin（**不**再用 `api` request host 組邀請短鏈）。
+- **勿**把 `/i/` 宣傳成可加主畫面後離線重玩的入口；主畫面／離線快樂路徑＝`/` 或 `/s/<id>`（§6.5）。
 
 ### 5.2 Invite 相容
 
@@ -145,16 +148,33 @@ GET go.samkuo.me/i/<short_id>
 | 項 | 規格 |
 | --- | --- |
 | 位置 | 頂列 chrome：**左**＝山姆鍋 mark＋遊樂場名／`play.samkuo.me`；**右**＝分享 |
-| 機制 | 優先 Web Share API（`navigator.share`）；不支援或 share 失敗 → 複製網址。使用者取消 share（`AbortError`）→ 不抄剪貼簿、不當錯誤。對齊場／型錄 `shareOrCopy` 語意（title＋url；不帶 text 與 url 並送） |
+| 機制 | 優先 Web Share API（`navigator.share`）；不支援或 share 失敗 → 複製網址。使用者取消 share（`AbortError`）→ 不抄剪貼簿、不當錯誤。對齊場／型錄 `shareOrCopy` 語意（**title＋url**；不帶 text 與 url 並送） |
 | 網址 | **固定＝當前 SAM 的** `https://go.samkuo.me/s/<catalog_id>` |
+| **分享 title（硬）** | **必須**依小品而異：權威＝嵌入型錄該筆的 **`entry.title`**（例：打磚塊、五子棋）。`shareOrCopy`／`navigator.share({ title })` 用此字串（或明確以其開頭的站群形，見下「預覽」）；**禁止**所有 `/s/` 共用同一個泛稱（如一律「純玩」「遊樂場」）。型錄列「分享」與 go Header **同一 title 來源**（皆＝該 `id` 的 `entry.title`）。 |
 | 明示排除 | **不是** `/i/<short_id>`、不是 `#pg=` secret、不是場 `?open=` |
 | 何時可用 | 當前已載入之 SAM **能對上嵌入型錄的 `id`**（含：經 `/s/` 進入；或 Invite compose 的 source／協定能唯一對上型錄項）。對不上 → 按鈕 disabled／隱藏 |
 | 尚無 SAM | 空態／short 失效／載入失敗 → 不分享 |
-| 回饋 | 頁內 flash／status（已分享／已複製）；禁止 `alert` |
+| 回饋 | 頁內 flash／status（已分享／已複製；可含小品名）；禁止 `alert` |
 | 窄屏 | 熱區約 ≥44×44px；無 Web Share 時文案可「複製連結」 |
 | 對弈中 | 往下捲／滑＝自動收起 chrome；往上＝自動展開；分享隨 chrome 可視即可 |
 
 **語意：** 即使人在 Invite 對弈中按分享，傳出的仍是「打開這顆型錄小品」（單機 `/s/`），**不是**「加入這一場」。Host 邀請 modal **繼續只出** `/i/`。
+
+#### 5.5.1 分享連結預覽 title（社群／聊天室；硬）
+
+貼上 `https://go.samkuo.me/s/<catalog_id>` 時，LINE／iMessage／Slack／Facebook 等**連結預覽**必須看得出是**哪一顆小品**——不可所有 id 都顯示同一個站級標題。
+
+| 項 | 規格 |
+| --- | --- |
+| **權威** | 型錄 **`entry.title`**（及可選 **`entry.blurb`** 作說明）；與 §5.5 分享 title 同源 |
+| **`<title>`／`og:title`／`twitter:title`** | **每個** listed `/s/<id>` **不同**；須含該筆 `entry.title`。建議形狀：`{title} · 遊樂場` 或 `{title} · 山姆鍋遊樂場`（全站同一後綴即可）。未知／下架 id → 錯誤頁泛稱，**勿**冒充某小品名 |
+| **`og:description`／`description`** | 優先 `entry.blurb`；無則短站群句＋小品名。不同小品宜可分辨 |
+| **`og:url`** | 對應該 `/s/<id>` canonical |
+| **爬蟲可見（硬）** | 預覽爬蟲多半**不執行**客戶端 JS。每個 listed `catalog_id` 的首包 HTML（或邊緣等價注入）就須帶上述 meta——**建置 prerender** `/s/<id>`（entries 來自嵌入 catalog）或 Worker／HTML rewrite 注入；**否決**只靠 SPA hydrate 後改 `<title>` 當社群預覽快樂路徑 |
+| **Invite `/i/`** | 短鏈預覽可用泛稱（例：加入／受邀）；**不**要求依局內 SAM 變 title（分享小品仍走 `/s/`＋本節） |
+| **否決** | 全站單一 `og:title`；複製連結有小品名但貼網址預覽卻是「純玩」；為預覽而把 secret 放進 `/i/` 公開 HTML |
+
+**驗收直覺：** 分享「打磚塊」與「五子棋」兩條 `/s/` 連到聊天室，未點開前預覽標題就應分別讀出打磚塊／五子棋。
 
 ### 5.6 `/s/` 換片（下一個／推薦；本節定案）
 
@@ -208,11 +228,13 @@ GET go.samkuo.me/i/<short_id>
 - 官方 TURN：既有 Guest `join_cap` → `/v1/invites/…/turn/credentials`（記 **Host** 點數）；路徑對人透明。
 - 連線態／入座態／Host「開始」後落子至終局；**再來一局**（同 session）由 SAM 決定（五子棋＝Host `reset`）；Host 結束場時可讀提示。
 - **不**提供「下一個」／推薦換片。
+- **臨時生命週期（硬）：** 短鏈隨 Invite TTL／撤銷失效；入座依賴 Platform＋Host＋WebRTC——**先天不能離線**。不承諾以 `/i/` 加主畫面後離線重玩；不承諾該局分數／棋譜長期本機或雲端保留（顯示名等非局狀態可本機記住，見 §6.5 排除項）。
 
 **模式 B — 型錄 `/s/<id>`**
 
 - 嵌入表 resolve → 記憶體載入 → 跑該 SAM player UI（單機；無 consent／join／TURN）。
 - **同 kind 換片**（§5.6）：下一個＋至多 3 則推薦；無型錄選擇 UI。
+- **可安裝／造訪後離線／本機分數**（§6.5）。
 - 無編輯、無「一鍵變作者」主 CTA；次要出口＝chrome 上的遊樂場主網址。
 
 ### 6.2 不能做（硬）
@@ -224,6 +246,8 @@ GET go.samkuo.me/i/<short_id>
 - 同時多 SAM／沙盒庫。
 - 將 Invite 短鏈當作 Header／型錄「分享」網址。
 - 在 go 上提供型錄形式瀏覽／跨 kind 換片；在 Invite 局中換小品。
+- 承諾 **Invite `/i/` 離線可玩**或把短鏈當永久離線遊戲入口。
+- 雲存檔、跨裝置同步分數、帳號排行榜；跨 origin（含 `play`↔`go`）自動搬分數／OPFS。
 
 ### 6.3 UX 硬規則
 
@@ -255,6 +279,22 @@ GET go.samkuo.me/i/<short_id>
 
 **否決：** 依賴私有／未文件化 URL scheme「強制開 Safari」當產品契約；否決因無法跳出 WebView 就阻擋 go 上的同意／對弈／`/s/` 試玩。
 
+### 6.5 可安裝／離線／本機分數（僅 `/s/`；本節定案）
+
+使用者對純玩的合理期望（加主畫面、離線再玩、分數留下）**只**落在**型錄單機**路徑；**不**落在 Invite。
+
+| 項 | 規格 |
+| --- | --- |
+| **範圍** | **僅**模式 B（`/s/<id>`）與為其服務的殼（首頁 `/` 可作安裝／回訪入口）。**模式 A（`/i/`）排除。** |
+| **加到主畫面** | go origin 提供 Web App Manifest＋圖示（含 iOS `apple-touch-icon`／必要 meta），使標準 Safari／Chrome 可「加入主畫面」／安裝。start_url 宜為 **`/`** 或穩定 `/s/<id>`（實作可定預設 `/`；深鏈開啟仍尊重 path）。**勿**引導使用者把 **`/i/<short_id>`** 釘成主畫面圖示當永久遊戲（短鏈會過期）。 |
+| **離線可玩** | **造訪過才離線**（對齊場殼 DEC-009 精神；非全型錄預先下載）：曾成功載入之 `/s/<id>` 的殼資產＋該 SAM FileMap（或等價 Cache）在網路失敗時仍可再開同 id。嵌入 catalog 已可離線 resolve；差在小品本體與殼 bundle 的 Cache。策略傾向 **network-first**（線上更新優先；失敗才 Cache）——細節可對齊場 `swOfflineStrategy`，但 go SW 須與畫布 snapshot 職責共存、勿 cache-first 釘死舊包。 |
+| **分數保留** | **本機、本 origin**。鍵穩定綁 **`catalog_id`**（及 SAM 自訂子鍵），**不**綁每次隨機 `sandboxId`。同源 SW canvas 下 SAM 可用 `localStorage`／等價；`srcdoc`（opaque origin）路徑須由殼橋接或避免當成分數快樂路徑。清除＝使用者清網站資料；**無**雲端、**無**跨 `play`↔`go` 自動搬。 |
+| **Invite 排除（硬）** | `/i/`：**不能**離線入座／對弈；不承諾該局分數長期保留；短鏈失效後重開＝頁內錯誤（請 Host 重新邀請）。可保留非局偏好（例：Roster 顯示名）。 |
+| **敘事** | 對讀者：「傳閱連結可留在手機、沒網路也能玩過的那幾顆」——**不是**「邀請 QR 離線也能加入」。 |
+| **否決** | Invite 離線；預先打包全型錄離線；雲排行榜／帳號存檔；把 go 做成第二個 OPFS 沙盒庫。 |
+
+**與「無持久 OPFS」：** §6.5 允許 Cache API／`localStorage`（或薄 keyed store）服務**單機小品**；仍**禁止**場殼式 OPFS 專案庫、`createProject` 快樂路徑、多沙盒管理面。
+
 ---
 
 ## 7. 執行與儲存模型
@@ -263,12 +303,13 @@ GET go.samkuo.me/i/<short_id>
 
 | 假設 | 場殼 Host／`?open=` | 純玩 go |
 | --- | --- | --- |
-| 持久 OPFS＋`createProject` | **要** | **不要** |
-| `sandboxId` | 常態＝OPFS 專案 | 可為 **session／記憶體** 實例 id（僅本頁生命週期） |
-| Canvas／UI 資產 | OPFS 或殼 FileMap | **記憶體 FileMap** 或等價 blob／薄 SW 服務 |
+| 持久 OPFS＋`createProject` | **要** | **不要**（§6.5 本機分數／離線 ≠ OPFS 沙盒庫） |
+| `sandboxId` | 常態＝OPFS 專案 | 執行期可為 **session／記憶體** id；**分數鍵用 `catalog_id`**（§6.5） |
+| Canvas／UI 資產 | OPFS 或殼 FileMap | **記憶體 FileMap** 或等價 blob／薄 SW 服務；（`/s/`）可再進 Cache 供造訪後離線 |
+| 離線殼／小品 | 造訪過的場路徑（DEC-009） | **僅 `/s/`** 造訪後離線（§6.5）；**`/i/` 無** |
 | Backend Runtime 寫盤 | 常態 | 弱化／避免；Invite 時 player 權威在 **Host session** |
 | WASI／Python host | 產品路徑要 projectId→OPFS | Invite 首刀不需要（gomoku）；`/s/` 以該 SAM 實際需求為準（本刀不擴 IDE） |
-| 型錄 resolve | 可現場／殼內 | **建置嵌入**（§5.4） |
+| 型錄 resolve | 可現場／殼內 | **建置嵌入**（§5.4；離線可查 id） |
 
 ### 7.2 SAM 怎麼跑
 
@@ -284,13 +325,23 @@ Session／`act`／棋盤權威在 **Host 場**；go 只渲染與經 Roster 隧�
 **型錄 `/s/`（模式 B）**
 
 1. 嵌入 catalog 查 `id` → `source`。
-2. 同記憶體 FileMap 管線載入（不寫 OPFS）。
-3. 無 join；本頁即玩。
+2. 同記憶體 FileMap 管線載入（不寫 OPFS）；成功後可 warm Cache（§6.5）。
+3. 無 join；本頁即玩；分數鍵依 `catalog_id`（§6.5）。
 4. 若使用者再開另一個 `/s/` 或 `/i/`，或按「下一個」／推薦（§5.6）→ **取代**當前唯一 SAM slot。
 
 ### 7.3 遠端 entry
 
-**非第一刀。** 若日後記憶體載入仍被部分 WebView 擋 fetch／blob，可另議 CDN／型錄靜態 entry；本計劃不阻塞在此。
+**非第一刀。** 若日後記憶體載入仍被部分 WebView 擋 fetch／blob，可另議 CDN／型錄靜態 entry；本計劃不阻塞在此。離線路徑仍以「曾成功 fetch 進 Cache」為準，不依賴遠端 entry 未 offline 時可用。
+
+### 7.4 SW 職責（go）
+
+| 職責 | 說明 |
+| --- | --- |
+| **畫布** | 既有：`/canvas/<sandboxId>/*` 記憶體 snapshot＋`/api` 轉發（與場對齊；Invite／`/s/` 共用） |
+| **離線（§6.5）** | 另：殼 document／hashed assets＋曾載入之 `/s/` SAM 產物——**network-first**；**不**對 `/i/*` 承諾離線 document |
+| **安裝** | Manifest／icon 靜態資產可進 Cache；SW 須滿足瀏覽器 installability 常見條件（實作細節另測 Safari／Chrome） |
+
+畫布 snapshot **仍是記憶體／頁生命週期**；離線再開 `/s/<id>`＝重新 materialize（自 Cache 取 FileMap），不是還原當下 Invite session。
 
 ---
 
@@ -364,6 +415,7 @@ dash provision → 場殼記憶體 API key
 | `/s/` 未知／已下架 id | 頁內錯誤；可請回型錄 |
 | SAM 下載失敗 | 頁內錯誤；不落到「請用 Safari 存沙盒」當主文案 |
 | Host 離線／answer 超時 | 可讀等待／失敗；已連上 peer 不受短鏈失效影響 |
+| Guest 斷網再開 `/i/` | 頁內錯誤／無法入座；**不**落到離線可玩（Invite 先天不能離線） |
 | 拒絕 consent | 不入座、不佔成功 handshake |
 | 非型錄 SAM 無 id | Header 分享不可用；不偽造 `/s/` |
 | 同 kind 無其他項 | 「下一個」／推薦隱藏或 disabled；不跨 kind 湊 |
@@ -386,13 +438,14 @@ dash provision → 場殼記憶體 API key
 
 | Phase | 內容 | 完成定義 | 狀態 |
 | --- | --- | --- | --- |
-| **0. 契約** | 本文件；GLOSSARY／DEC-050；保留名 `go`；交叉引用 | 產品／雙 URL／換片／非目標清楚 | **進行中**（2026-08-08：`/s/`＋分享＋同 kind 換片） |
+| **0. 契約** | 本文件；GLOSSARY／DEC-050；保留名 `go`；交叉引用 | 產品／雙 URL／換片／§6.5／非目標清楚 | **進行中**（2026-08-08：含 `/s/` 可安裝／離線／分數；Invite 臨時不能離線） |
 | **1. 骨架** | go Worker＋空 SPA；`go.samkuo.me`；`/i/:id` 進頁；binding／resolve stub | 開短鏈見純玩殼（可先假資料） | **完成**（`go-client/`） |
 | **2. 短鏈遷移** | 鑄邀請 `short_url`→go；api `/i/` → 302 go；CORS | Host modal QR＝go；舊 api 短鏈仍可用 | **完成**（含 `GET /v1/shorts/:id`） |
 | **3. Compose 可玩** | 記憶體載入 SAM；consent；join／WebRTC；gomoku player | 兩瀏覽器：場殼 Host＋**go Guest** 入座 | **進行中**（guestRuntime＋canvas SW） |
 | **4. E2E** | 開始→對弈→終局；TURN 有權路徑；窄屏 | [PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md) §9 以 go 為 Guest | 手測 |
-| **5. 型錄 `/s/`** | 嵌入 catalog（含 kind）；`/s/:id` 單機可玩；型錄分享改 go；Header 分享；同 kind「下一個」＋推薦≤3 | 開 `/s/pg-*` 可玩；分享＝`/s/<id>`；換片不跨 kind、無型錄 UI；`/i/` 無換片 | **進行中**（`goCatalog`／`/s/`／Header／`samOpenShareHref`→go） |
-| **6.（可選）** | short 不進 hash（B）；文件站導讀；場殼 `#pg=`／`view=canvas` 標「進階／除錯」或汰除 | 另議 | — |
+| **5. 型錄 `/s/`** | 嵌入 catalog（含 kind）；`/s/:id` 單機可玩；型錄分享改 go；Header 分享；同 kind「下一個」＋推薦≤3；**每 id 分享／OG title**（§5.5.1） | 開 `/s/pg-*` 可玩；分享＝`/s/<id>`＋小品名 title；換片不跨 kind；社群預覽可分辨小品；`/i/` 無換片 | **進行中**（prerender＋OG／Web Share title 已落地；手測預覽待） |
+| **6. `/s/` 可安裝／離線／分數** | Manifest＋主畫面；造訪後離線再開 `/s/<id>`；本機分數鍵＝`catalog_id`；SW 與畫布職責共存（§6.5／§7.4） | 標準瀏覽器可加主畫面；曾開過的 `/s/pg-*` 斷網可再玩且高分／分數仍在；`/i/` 斷網不可入座；無雲存檔 | **進行中**（manifest／SW shell cache／FileMap offline cache／score localStorage ns） |
+| **7.（可選）** | short 不進 hash（B）；文件站導讀；場殼 `#pg=`／`view=canvas` 標「進階／除錯」或汰除 | 另議 | — |
 
 ---
 
@@ -407,6 +460,7 @@ dash provision → 場殼記憶體 API key
 - [ ] 入座後 `ready`；僅 Host「開始」後可交替落子至終局
 - [ ] 有權 Host＋官方 TURN：無法直連時 go Guest 仍可連；UI 不揭露 relay
 - [ ] 連線後 session／棋步不經 Platform 中繼
+- [ ] **臨時／線上：** 斷網或 short 失效 → 頁內錯誤；**不**宣稱 `/i/` 離線可玩或主畫面永久入口
 
 **共通／chrome**
 
@@ -425,11 +479,22 @@ dash provision → 場殼記憶體 API key
 - [x] go Header 右「分享」：Web Share → 否則複製；網址＝`/s/<id>`，**絕非** `/i/…`
 - [x] Invite 局中分享仍為 `/s/<對應型錄 id>`（有 id 時）；無 id 則不可分享
 - [x] 分享取消（Abort）不誤報錯、不強制複製
+- [x] **分享 title／預覽（§5.5／§5.5.1）：** Web Share／`shareOrCopy` 的 title＝該筆 `entry.title`；不同 id 不同 `<title>`／`og:title`／`twitter:title`（含 blurb→description）；listed `/s/<id>` 建置 prerender 首包 HTML（`go-client`）
+- [ ] 手測：兩條不同 `/s/` 貼聊天室，預覽標題可分辨小品名
 - [x] `/s/`：「下一個」與推薦均同 `kind`；推薦 ≤3；不足不跨 kind 湊
 - [x] 無搜尋／filter／貨架等型錄選擇 UI
 - [x] `/i/` 不出現換片控件
 - [ ] 手測：`go:dev` 開 `/s/pg-breakout` 可玩；型錄分享連指向 go
 - [x] 首頁 `/` 呈現至多 3 則推薦（picks 優先）；點進 `/s/<id>`
+
+**`/s/` 可安裝／離線／本機分數（§6.5；Phase 6）**
+
+- [x] go 有 Web App Manifest＋圖示（`manifest.webmanifest`／favicon；start_url＝`/`）
+- [x] 線上成功玩過某 `/s/<id>` 後可 Cache FileMap；殼 SW network-first（`/i/` 不進 shell offline）
+- [x] 畫布 localStorage 以 `catalog_id` 命名空間（`injectGoScoreStorage`）；不綁隨機 `sandboxId`
+- [ ] 手測：Safari／Chrome 加入主畫面；斷網再開曾訪 `/s/`；有寫分的 SAM 跨重整分數仍在
+- [x] `/i/` 不進 shell offline cache；文件敘事不暗示 Invite 可離線
+- [x] 無雲存檔、無跨 `play`↔`go` 自動搬分、無 OPFS 沙盒庫 UI
 
 ---
 
@@ -438,12 +503,14 @@ dash provision → 場殼記憶體 API key
 | 用 | 不用 |
 | --- | --- |
 | 純玩版、`go.samkuo.me`、短網址（Invite）、型錄傳閱／`/s/<id>` | 把 go 叫成「場」、第二遊樂場、Guest IDE |
-| 當下 Invite／session（局數由 SAM 定） | 暗示純玩＝只能一局；雲存檔、我的小品庫（在 go 上） |
-| 傳閱、分享（＝`/s/<id>`） | 把 Header 分享說成「轉發邀請／這場對戰」 |
+| 當下 Invite／session（**臨時**；局數由 SAM 定） | 暗示純玩＝只能一局；Invite 離線；雲存檔、我的小品庫（在 go 上） |
+| `/s/` 造訪後離線、本機分數、加到主畫面 | Invite 離線對弈；全型錄預先離線包；雲排行榜 |
+| 傳閱、分享（＝`/s/<id>`）；分享 title＝小品 `entry.title` | 把 Header 分享說成「轉發邀請／這場對戰」；所有 `/s/` 同一預覽標題 |
+| 每 `/s/<id>` 不同 `og:title`（爬蟲可見） | 只改 client `<title>`、社群預覽仍是站級泛稱 |
 | 換片、下一個、同 kind 推薦 | go 上「型錄」「逛小品」「換一個任意類」 |
 | 一鍵開（場／作者）vs 分享（go／接收者） | 兩者混成同一深鏈 |
 | 山姆鍋 mark、遊樂場、`play.samkuo.me` | 無標匿名 lobby；Playgrounds 當對外品牌名 |
-| 請 Host 重新邀請 | 教 Guest 開 Safari 才能玩（go 快樂路徑） |
+| 請 Host 重新邀請 | 教 Guest 開 Safari 才能玩（go 快樂路徑）；教把邀請短鏈釘主畫面當永久遊戲 |
 
 ---
 
@@ -462,3 +529,6 @@ dash provision → 場殼記憶體 API key
 | 2026-08-08 | §5.7：首頁 `/` 推薦≤3（picks 優先、可跨 kind）→ `/s/<id>` |
 | 2026-08-08 | §5.5／§6.4：對弈中 chrome＝往下捲收起、往上展開（取代手動 logo 角標） |
 | 2026-08-08 | §6.4：logo／mark 連到 `play.samkuo.me`（非部落格） |
+| 2026-08-08 | **§6.5／§7.4：** `/s/` 可加主畫面、造訪後離線、本機分數（鍵＝`catalog_id`）；**Invite `/i/`＝臨時生命週期、先天不能離線**；Phase 6；非目標補雲存檔／Invite 離線 |
+| 2026-08-08 | **§5.5／§5.5.1：** 每個 `/s/<id>` 分享 title／社群預覽依 `entry.title`（及 blurb）而異；首包 HTML／prerender 須爬蟲可見；禁止全站同一 `og:title` |
+| 2026-08-08 | **實作：** go prerender `/s/<id>`＋OG；manifest／SW shell＋SAM FileMap offline cache；canvas score localStorage ns＝`catalog_id` |

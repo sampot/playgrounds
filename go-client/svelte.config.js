@@ -11,7 +11,10 @@ const config = {
     adapter: adapter({
       pages: "build",
       assets: "build",
-      fallback: "index.html",
+      // SPA shell for `/i/*` etc. Named 200.html so prerendered `/`（index.html）keeps OG.
+      // Cloudflare `not_found_handling: single-page-application` still serves index.html
+      // for unknown paths — listed `/s/<id>` are static `s/<id>.html` with per-entry meta.
+      fallback: "200.html",
       precompress: false,
       strict: true,
     }),

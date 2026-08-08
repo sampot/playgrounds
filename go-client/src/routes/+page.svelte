@@ -1,16 +1,33 @@
 <script lang="ts">
+  import {
+    GO_HOME_DESCRIPTION,
+    GO_HOME_DOCUMENT_TITLE,
+  } from "$lib/goShareMeta";
   import { recommendHome, type GoCatalogEntry } from "$lib/goCatalog";
   import { openPlaygroundHome, PLAY_ORIGIN } from "$lib/openPlayground";
+  import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
 
   const recs: GoCatalogEntry[] = recommendHome(3);
+  const canonical = `${PLAYGROUNDS_GO_ORIGIN}/`;
 </script>
 
 <svelte:head>
-  <title>純玩 · 山姆鍋遊樂場</title>
+  <title>{GO_HOME_DOCUMENT_TITLE}</title>
+  <meta name="description" content={GO_HOME_DESCRIPTION} />
+  <link rel="canonical" href={canonical} />
+  <meta property="og:type" content="website" />
+  <meta property="og:locale" content="zh_TW" />
+  <meta property="og:site_name" content="山姆鍋遊樂場" />
+  <meta property="og:title" content={GO_HOME_DOCUMENT_TITLE} />
+  <meta property="og:description" content={GO_HOME_DESCRIPTION} />
+  <meta property="og:url" content={canonical} />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content={GO_HOME_DOCUMENT_TITLE} />
+  <meta name="twitter:description" content={GO_HOME_DESCRIPTION} />
 </svelte:head>
 
 <h1>純玩</h1>
-<p class="lead">選一個小品直接玩。</p>
+<p class="lead">選一個小品直接玩。可加入主畫面；造訪過的小品離線也能再開。</p>
 
 {#if recs.length}
   <section class="home-rec" aria-label="推薦試試">
