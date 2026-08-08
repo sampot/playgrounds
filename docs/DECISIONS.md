@@ -300,12 +300,13 @@
 
 ### DEC-017: Playgrounds agent
 
-- **Status:** Accepted（2026-07-31；2026-08-01 釐清定位；**2026-08-01 修訂：** 任務 loop 歸 Controller，見 DEC-024；**2026-08-02 修訂：** 產品角色稱「管家（Steward）」；**同日再修：中文角色名改「總管」**（舊稱管家；對齊遊樂場隱喻）；**2026-08-02 再修：BYOK 金鑰改 SecretStore**，見 DEC-029；**2026-08-04 修訂：** 總管種子改開源 `sampot/pg-steward`，遊樂場不內嵌；**同日再修：** LLM Agent 種子 `sampot/pg-llm-agent`）
+- **Status:** Accepted（2026-07-31；2026-08-01 釐清定位；**2026-08-01 修訂：** 任務 loop 歸 Controller，見 DEC-024；**2026-08-02 修訂：** 產品角色稱「管家（Steward）」；**同日再修：中文角色名改「總管」**（舊稱管家；對齊遊樂場隱喻）；**2026-08-02 再修：BYOK 金鑰改 SecretStore**，見 DEC-029；**2026-08-04 修訂：** 總管種子改開源 `sampot/pg-steward`，遊樂場不內嵌；**同日再修：** LLM Agent 種子 `sampot/pg-llm-agent`；**2026-08-08 修訂：** 總管對話 scope 以任務為主，不因切換工作沙盒而換）
 - **Context:** 遊樂場主軸是開發單頁小程式（SAM；DEC-016）。其中一種 SAM 可以是 **Agent**：本身仍是普通 Playgrounds 沙盒（`index.html` + 可選 `functions.js`／`controller.js`），設為「現行 Agent」後才注入 `env.HOST`。需與畫布／bindings 對齊，且本站不加帳號後端、不把 key 上傳伺服器。
 - **Decision:**
   - **主從關係：** Playgrounds **首先**是輕量 Web 實驗場；Agent **只是**可在此開發／執行的一種單頁小程式（狗糧：Agent UI 也走畫布管線）。勿把遊樂場敘事寫成「Agent 開發平台」。
   - **Agent 用途不限 coding：** 現行 Agent 可以是改檔驗畫布的助手，也可以是其他**特定功能**的 Agent（數據、demo 編排、領域工具等）。人格／工具編排／prompt 留在該 Agent 沙盒裡；遊樂場只提供穩定 `env.HOST`／bindings。內建**範本 Agent**偏向「對工作沙盒觀察—改檔—驗證」以便示範 HOST，可 clone 後改用途。
   - **產品角色「總管（Steward）」：** 持有完整 `env.HOST` 的現行 Agent 席，產品敘事稱**總管**（English：**Steward**；舊稱「管家」）——使用者（遊樂場主人）唯一對口（下指示、拿結果），代為管理遊樂場；沙盒為有邊界的活動空間。實例**顯示名由使用者自訂**；「總管／Steward」是角色類名。技術文件可續用「現行 Agent」指 `activeAgentProjectId` 槽位。勿與 session **Host SAM** 混淆（見 DEC-023）。用語見 [GLOSSARY.md](./GLOSSARY.md)。
+  - **總管對話 scope＝任務（場級）：** 場網尺度下**整場**（origin／子網域分頁）才像一個專案；場內沙盒是同場工作物。使用者↔總管的 **UI 對話／transcript** 以**任務**為切換單位（開新對話、切對話列表）——**不**因 `openProject`／切換工作沙盒而自動換對話 history。工作沙盒與 `setTarget` 只是當前編輯／工具焦點。沙盒樹內 **`.agent/*`**（plan／memory 等）仍屬**該沙盒**的 agent 權威工作記憶（與對話房正交；見 DEC-026）。舊實作曾以工作沙盒 id 鍵名（`agent:sessions:<workSandboxId>:…`）綁定對話——視為待遷移遺留，不以之為產品語意。
   - **範本分流：** **總管範本**為開源小品 [`sampot/pg-steward`](https://github.com/sampot/pg-steward)（BYOK／HOST 對口；經 `?open=`／`/sam/` 取得，**不**內嵌遊樂場）；**LLM Agent 範本**為開源小品 [`sampot/pg-llm-agent`](https://github.com/sampot/pg-llm-agent)（BYOK／**無** HOST；檔案改 system prompt；可多實例入座 coding 編排 `worker`；見 [PG-LLM-AGENT-PLAN.md](./PG-LLM-AGENT-PLAN.md)）；**一般 Agent 範本**仍為遊樂場內建（Controller 背景／主動示範，**不**強制 LLM）。Agent 與工具 SAM 的主差在能否主動／背景運行，不在是否使用 LLM。
   - **雙執行面：** **工作沙盒**（遊樂場 `activeId`）走既有編輯器 + **原畫布**；**現行 Agent**（遊樂場 `activeAgentProjectId`，`localStorage`）走左側側欄 **Agent 區**（與 Files Tab 切換；Agent UI iframe）＋宿主持有的 **Controller 實例**（DEC-024）。下方 **dock** 預設僅 **Console**；Python／JavaScript REPL／Shell／自選 SAM 須明確加入（[DEC-044](#dec-044-playgrounds-下方面板-dockopt-in與自選-sam)）。Agent **UI** 是第二條 canvas 管線（同 SW／`index.html`），不是遊樂場介面手寫 chat 元件；**任務執行**在 `controller.js`（有則優先），不依賴 UI 是否已掛載。
   - **側欄 Tab 還原：** 記住使用者上次的 Files／Agent tab（layout）；無紀錄時預設 Files。開在 Files 時只還原「現行 Agent」id（徽章／寫入防護），**不**掛載 Agent 畫布；切到 Agent tab、或使用者主動設為／建立現行 Agent 時才載入 UI。已掛載後 Files↔Agent 切換保留 iframe（不重載）；僅在隱藏期間 Agent 檔案有變（stale）或手動重新整理時才重建。有 `controller.js` 時宿主可在 UI 未掛載時仍保持 Controller 運行。
@@ -325,6 +326,7 @@
   - Runtime 階段見 [PG-AGENT-PLAN.md](./PG-AGENT-PLAN.md)；三層／headless 見 [PG-SAM-RUNTIME-PLAN.md](./PG-SAM-RUNTIME-PLAN.md)；密鑰見 [PG-SECRETSTORE-PLAN.md](./PG-SECRETSTORE-PLAN.md)。
   - **Revision（2026-08-04）：** 完整 `env.HOST` 仍僅總管席。一般 SAM 經宣告＋準入取得窄 **`env.COMPUTE`**（如 `runPython`）見 [DEC-036](#dec-036-playgrounds-sam-環境資源綁定與準入)；不視為第二份 HOST。
   - **Revision（2026-08-07）：** API 授權粒度升級為 OAuth-style scopes（[DEC-051](#dec-051-playgrounds-api-scopes環境能力準入) Proposed）；`env.HOST`＝對口席動態全量客戶端；非總管經 scopes 得子集——見 [PG-API-SCOPES-SPEC.md](./PG-API-SCOPES-SPEC.md)。
+  - **Revision（2026-08-08）：** 總管對話 scope 改以**任務**為主（場級對口）；**不**因切換工作沙盒換 transcript。`.agent/*` 仍為各沙盒權威記憶。同步 GLOSSARY；`pg-steward` 鍵改場級並遷移舊 per-work 鍵；遊樂場 `openProject` 不關閉總管主持的 coding-orch session。
 - **Revision（2026-08-04）：** 總管種子改開源小品 [`sampot/pg-steward`](https://github.com/sampot/pg-steward)；遊樂場移除內建「總管」範本與「套用最新總管範本」。產品路徑與 workflow（DEC-034）同為一 SAM 一 repo＋`?open=`。
 - **Revision（2026-08-04）：** 產品級 BYOK LLM Agent（子代理／編排工人）種子為 [`sampot/pg-llm-agent`](https://github.com/sampot/pg-llm-agent)；遊樂場不內嵌。見 DEC-033 修訂與 [PG-LLM-AGENT-PLAN.md](./PG-LLM-AGENT-PLAN.md)。
 
@@ -495,7 +497,7 @@
     1. **字元預算**（非精準 token 計數）限制單次 `chat.completions` payload；
     2. **舊 tool 結果 stub**（保留近期完整結果；舊的標 `[compacted]` 並提示重跑工具）；
     3. **舊 user 輪次 digest**（保留近期輪次；更早的收成 `[context compacted]` 摘要，含先前 user asks／見過的 paths）；
-    4. **外置 working memory（Scheme A）**：`.agent/plan.md`＋`.agent/memory.md` 為單 HOST 分任務面；專用工具 `ensure_working_memory`／`write_plan`／`write_memory`／`get_task_focus`；開場自動種子＋**Task focus**；UI 工作記憶面板；可選 `README.md` 摘錄。UI transcript 仍可保留完整歷史。
+    4. **外置 working memory（Scheme A）**：`.agent/plan.md`＋`.agent/memory.md` 為**該沙盒檔案樹內**的 agent 權威工作記憶（單 HOST 分任務面）；專用工具 `ensure_working_memory`／`write_plan`／`write_memory`／`get_task_focus`；開場自動種子＋**Task focus**；UI 工作記憶面板；可選 `README.md` 摘錄。UI transcript 仍可保留完整歷史。**與**總管對話房 scope **正交**（對話以任務切換、不隨工作沙盒；見 DEC-017 2026-08-08）——換焦點沙盒時讀寫的是**該沙盒**的 `.agent/*`，不是整場合併記憶。
   - **Agentic retrieval 維持主路徑：** `search` → `read_file`／觀察工具；system prompt 禁止把大檔貼進聊天、禁止把已省略的 tool payload 當仍正確。
   - **不**以 DEC-023 **通道本身**充當 coding 子代理產品；多 LLM 子代理編排另以領域 protocol 定義（**2026-08-03：** 見 [DEC-033](#dec-033-playgrounds-coding-orchestration-session-protocol)）。
   - 細節與完成定義見 [PG-AGENT-PLAN.md](./PG-AGENT-PLAN.md) Phase 12／12b。
@@ -505,6 +507,7 @@
   - 既有使用者已建立的舊 Agent 沙盒不強制遷移；需「再建立範本」或抄路由才拿到新 hygiene／Scheme A 工具。
   - 變更預算常數、stub／digest、或 plan／memory 工具語意時更新本決策、AGENT-PLAN、GLOSSARY。
   - **Revision（2026-08-03）：** Scheme A 仍是單 HOST 分任務；真·多 LLM 子代理走 `coding-orchestration.v1`（DEC-033），勿把派工語意塞進 hygiene。
+  - **Revision（2026-08-08）：** 釐清 `.agent/*`＝沙盒級權威記憶；總管 UI 對話不因切工作沙盒而換（DEC-017）。勿把 transcript 與 `.agent/memory.md` 混成同一 scope。
 
 ### DEC-027: Playgrounds 大 SAM 檔案導航與語言邊界
 

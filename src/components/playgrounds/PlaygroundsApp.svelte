@@ -2470,8 +2470,13 @@
     await flushSave();
     await clearAllMainCanvasTabs();
     clearAllBottomSamPanels();
+    // DEC-023: tear down when Host SAM is the work sandbox being left.
+    // Steward-hosted coding-orch stays with the task/chat (DEC-017 2026-08-08).
     if (multiAgentSession) {
-      await closeMultiAgentSession();
+      const hostId = multiAgentSession.hostSandboxId;
+      if (!hostId || hostId === activeId) {
+        await closeMultiAgentSession();
+      }
     }
     invalidateFunctionsModuleCache();
     activeId = id;
@@ -7420,7 +7425,7 @@
               {#if meta?.name || activeId}
                 <span
                   class="text-skin-base/35 max-w-[40%] shrink-0 truncate"
-                  title="工作沙盒（總管對話與此綁定）：{meta?.name ??
+                  title="工作沙盒（編輯／畫布焦點；總管對話以任務為準，不隨此切換）：{meta?.name ??
                     activeId}"
                   >工作 · {meta?.name ?? activeId}</span
                 >

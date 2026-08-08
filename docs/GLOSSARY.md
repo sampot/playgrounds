@@ -120,8 +120,8 @@
 | Preview 面板（遊樂場） | 畫布 | 程式在同源 iframe 的**渲染／執行結果**（場網經 `/canvas/` SW 虛擬站台；過渡舊場仍為 `/playgrounds/canvas/`），不是靜態預覽稿，也不是 chat artifact。程式識別可仍含 `preview`。工作沙盒走原畫布。見 DEC-041／042。 |
 | Console 面板（遊樂場） | Console | 下方 dock **常駐**面板：工作沙盒畫布 `console.*`／runtime 錯誤（經 bridge `postMessage`）。預設**不**鏡像到瀏覽器 DevTools；可在「選項 → 設定」開啟。見 DEC-016／044。 |
 | 下方面板 dock（遊樂場） | 下方 dock／bottom dock | 編輯器下方的輔助槽：預設僅 Console；Python／JavaScript／Shell 與自選 plain SAM 須**明確加入**。Worker／Pyodide／WASI／下方 iframe **真用才啟動**。與 main content（DEC-030）分工；MVP 下槽**不**核發 Tool grant。見 DEC-044、[PG-BOTTOM-DOCK-PLAN.md](./PG-BOTTOM-DOCK-PLAN.md)。 |
-| 工作沙盒（遊樂場） | 工作沙盒 | 遊樂場介面當前開啟、編輯器與原畫布所對應的 OPFS 沙盒（`activeId`）——即當前編輯的那份 SAM。舊稱「工作專案」。 |
-| Steward／現行 Agent（遊樂場） | 總管 | 產品角色（English：**Steward**）：**取代 UI／產品文案中的「現行 Agent」**。使用者（遊樂場主人）的**唯一對口**（下指示、拿結果）；代為管理遊樂場，持有完整 `env.HOST` 的那一席。Agent 仍是 SAM 種類；多個 Agent 裡只有被設為總管的那位有 HOST。技術槽位 `activeAgentProjectId`（文件／API 可續稱現行 Agent）。**實例顯示名由使用者自訂**；「總管」是角色類名。舊稱「管家」（含「家」與遊樂場隱喻不合）。預設≠ session Participant；若總管要**參與** session，必須以 **Host agent** 身分（主持沙盒＝總管席）。勿與未兼任總管的 Host SAM、一般／參與 Agent 混淆。見 DEC-017／023／033。 |
+| 工作沙盒（遊樂場） | 工作沙盒 | 遊樂場介面當前開啟、編輯器與原畫布所對應的 OPFS 沙盒（`activeId`）——即當前編輯的那份 SAM。舊稱「工作專案」。**不是**總管對話切換軸（對話以任務為準；見 DEC-017）。 |
+| Steward／現行 Agent（遊樂場） | 總管 | 產品角色（English：**Steward**）：**取代 UI／產品文案中的「現行 Agent」**。使用者（遊樂場主人）的**唯一對口**（下指示、拿結果）；代為管理遊樂場，持有完整 `env.HOST` 的那一席。Agent 仍是 SAM 種類；多個 Agent 裡只有被設為總管的那位有 HOST。技術槽位 `activeAgentProjectId`（文件／API 可續稱現行 Agent）。**實例顯示名由使用者自訂**；「總管」是角色類名。舊稱「管家」（含「家」與遊樂場隱喻不合）。預設≠ session Participant；若總管要**參與** session，必須以 **Host agent** 身分（主持沙盒＝總管席）。**對話 scope 以任務為主**（開新／切對話），**不**因切換工作沙盒而換 transcript；場內沙盒＝同場工作物（場／origin 才像專案邊界）。勿與未兼任總管的 Host SAM、一般／參與 Agent 混淆。見 DEC-017／023／033。 |
 | 總管範本（遊樂場） | 總管範本 | 開源總管角色 SAM 種子（[`sampot/pg-steward`](https://github.com/sampot/pg-steward)；含 BYOK 對話與 HOST 工具）。經場網 [`/sam/`](https://play.samkuo.me/sam/) 或 `?open=sampot/pg-steward` 開入後再「設為總管」。遊樂場**不**內嵌；硬核使用者亦可自寫對口骨架。 |
 | LLM Agent 範本（遊樂場） | coding agent／`pg-llm-agent` | 開源 **BYOK coding agent** 種子（[`sampot/pg-llm-agent`](https://github.com/sampot/pg-llm-agent)）：production-ready；system prompt 等為沙盒檔；密鑰走 SecretStore；**無** `env.HOST`；可多實例入座 `coding-orchestration.v1`（session role 仍為 `worker`）。遊樂場**不**內嵌。狗糧 `codingOrchestrationWorkerStarter` 僅驗證／教學。見 [PG-LLM-AGENT-PLAN.md](./PG-LLM-AGENT-PLAN.md)、DEC-017／033。 |
 | Agent 範本（遊樂場） | Agent 範本 | 一般 Agent SAM 種子（`createAgentBaseStarterFiles`）：有 Controller、可背景／主動運行，**不**強制 LLM。與工具 SAM 的差別在主動／背景能力，不在是否聊天。 |
@@ -141,10 +141,10 @@
 | API scope（遊樂場） | scope／`resource:action` | 中粒度授權單位（非角色、非逐 HOST 方法）；慢變目錄；獲准後投影為 `env.*` 方法子集。見 DEC-051、[PG-API-SCOPES-SPEC.md](./PG-API-SCOPES-SPEC.md)。 |
 | 準入（遊樂場 binding） | 準入／admit | 使用者同意後，將 scope／capability 記入沙盒已核發集合並允許注入對應 binding。已核發集合預設不進 `.sam`。見 DEC-036／051。 |
 | compute binding（遊樂場） | `env.COMPUTE` | 已準入 `compute:*`（或舊名 `runPython`／`runCmd`）後注入的窄 binding；方法亦投影進 **HOST 形子集**（DEC-051）；遷移期雙掛。≠ 對口全量 `env.HOST`。見 DEC-036／051、[PG-API-SCOPES-SPEC.md](./PG-API-SCOPES-SPEC.md)。 |
-| Durable KV（遊樂場） | Durable KV | 對齊 Cloudflare KV 形的模擬 binding；OPFS 後端（`playgrounds-kv/<sandboxId>/`；目錄前綴歷史名可保留），跨重整存活；export／clone **預設**不複製（可選）。見 DEC-018。Agent 對話 session 以 **工作沙盒 id** 為 scope（`agent:sessions:<workSandboxId>:…`），切換工作沙盒即換對話 history。 |
-| context hygiene（遊樂場 Agent） | context hygiene／脈絡衛生 | 送 LLM 前的字元預算、舊 tool stub、舊輪次 digest，外加 `.agent/plan.md`／`.agent/memory.md`；**不是** Embedding RAG。見 DEC-026、PG-AGENT-PLAN Phase 12。 |
-| working memory（遊樂場 Agent） | 工作記憶／`.agent/memory.md` | Agent 應維護的跨回合耐久筆記（決策、約束、關鍵路徑）；開場可注入摘錄。與 UI transcript 分離。 |
-| Scheme A（遊樂場 Agent） | Scheme A／單 HOST 分任務 | 同一現行 Agent 用 `.agent/plan.md`＋`.agent/memory.md`＋`write_plan`／`write_memory`／`get_task_focus` 拆任務；**不是**多 LLM 子代理。多 LLM 工人編排見 `coding-orchestration.v1`／DEC-033。見 DEC-026、AGENT-PLAN Phase 12b。 |
+| Durable KV（遊樂場） | Durable KV | 對齊 Cloudflare KV 形的模擬 binding；OPFS 後端（`playgrounds-kv/<sandboxId>/`；目錄前綴歷史名可保留），跨重整存活；export／clone **預設**不複製（可選）。見 DEC-018。**總管 UI 對話**存總管沙盒 KV、以**任務**為 scope（`agent:sessions:index:v1`／`agent:session:<sessionId>:v1`；不因切換工作沙盒而換 history；見 DEC-017 2026-08-08）。舊鍵 `agent:sessions:<workSandboxId>:…` 於載入時遷移。 |
+| context hygiene（遊樂場 Agent） | context hygiene／脈絡衛生 | 送 LLM 前的字元預算、舊 tool stub、舊輪次 digest，外加該沙盒 `.agent/plan.md`／`.agent/memory.md`；**不是** Embedding RAG。見 DEC-026、PG-AGENT-PLAN Phase 12。 |
+| working memory（遊樂場 Agent） | 工作記憶／`.agent/memory.md` | **該沙盒**檔案樹內的 agent 權威耐久筆記（決策、約束、關鍵路徑；常與 `.agent/plan.md` 成對）；開場可注入摘錄。與總管 UI transcript **分離且正交**——transcript 跟任務走，`.agent/*` 跟沙盒走。 |
+| Scheme A（遊樂場 Agent） | Scheme A／單 HOST 分任務 | 同一現行 Agent 用**當前焦點沙盒**的 `.agent/plan.md`＋`.agent/memory.md`＋`write_plan`／`write_memory`／`get_task_focus` 拆任務；**不是**多 LLM 子代理，也**不是**總管 UI 對話房的切換條件。多 LLM 工人編排見 `coding-orchestration.v1`／DEC-033。見 DEC-026、AGENT-PLAN Phase 12b。 |
 | 仿 D1（遊樂場） | 仿 D1／`env.DB` | sql.js 子集；OPFS `playgrounds-db/<sandboxId>/`。見 DEC-020。 |
 | `env.SECRETS`（遊樂場；歷史） | Secrets bag（歷史） | 舊 `{ get(name), list() }` 字典 binding；**已由** `env.secrets.<NAME>.get()` **獨立 binding 取代**（DEC-029／035）。 |
 | `env.secrets`（遊樂場） | secrets 命名空間 | 小寫命名空間（本身不是 binding）；其下每密鑰一顆 `await env.secrets.<NAME>.get()`。見 DEC-029／035、[PG-SAM-ENV-SPEC.md](./PG-SAM-ENV-SPEC.md)。 |

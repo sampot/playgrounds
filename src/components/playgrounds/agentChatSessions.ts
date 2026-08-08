@@ -1,16 +1,15 @@
 /**
- * Multi-session chat index for the agent starter (Durable KV).
- * Sessions are scoped per work project id.
- * Pure helpers — no fetch / DOM.
+ * Multi-session chat index for the steward (Durable KV on the steward sandbox).
+ * Product (DEC-017 2026-08-08): chat is task-/field-scoped — must not switch
+ * transcript merely because the work sandbox changes. Pure helpers — no fetch / DOM.
  */
 
-/** Pre–per-project index (migrated into scoped keys on first load). */
-export const LEGACY_SESSIONS_INDEX_KEY = "agent:sessions:index:v1";
-/** Ultra-old single-blob session. */
+/** Field-scoped session index (canonical). */
+export const SESSIONS_INDEX_KEY = "agent:sessions:index:v1";
+/** @deprecated alias — same as SESSIONS_INDEX_KEY */
+export const LEGACY_SESSIONS_INDEX_KEY = SESSIONS_INDEX_KEY;
+/** Ultra-old single-blob session (pre multi-session). */
 export const LEGACY_SESSION_KEY = "agent:session:v1";
-
-/** @deprecated use LEGACY_SESSIONS_INDEX_KEY */
-export const SESSIONS_INDEX_KEY = LEGACY_SESSIONS_INDEX_KEY;
 
 export interface AgentSessionMeta {
   id: string;
@@ -29,20 +28,32 @@ export interface AgentSessionPayload {
   updatedAt?: string;
 }
 
-export function sessionsIndexKey(workSandboxId: string): string {
+/** Field-scoped index key (no work-sandbox segment). */
+export function sessionsIndexKey(): string {
+  return SESSIONS_INDEX_KEY;
+}
+
+/** Field-scoped message blob key. */
+export function sessionMessagesKey(sessionId: string): string {
+  return `agent:session:${sessionId}:v1`;
+}
+
+/** @deprecated pre–task-scope layout; use only for migration. */
+export function workScopedSessionsIndexKey(workSandboxId: string): string {
   return `agent:sessions:${workSandboxId}:index:v1`;
 }
 
-export function sessionMessagesKey(
+/** @deprecated pre–task-scope layout; use only for migration. */
+export function workScopedSessionMessagesKey(
   workSandboxId: string,
   sessionId: string
 ): string {
   return `agent:session:${workSandboxId}:${sessionId}:v1`;
 }
 
-/** Unscoped multi-session message key (pre–per-project). */
+/** @deprecated same as sessionMessagesKey (field-scoped). */
 export function legacySessionMessagesKey(sessionId: string): string {
-  return `agent:session:${sessionId}:v1`;
+  return sessionMessagesKey(sessionId);
 }
 
 export function createSessionId(now = Date.now()): string {
@@ -143,6 +154,29 @@ export function migrateLegacyToIndex(
     },
     legacyMessages: messages,
   };
+}
+
+/** Merge session indexes (newer updatedAt wins per id). Keeps `preferred.currentId` when still present. */
+export function mergeSessionsIndexes(
+  preferred: AgentSessionsIndex,
+  ...extras: AgentSessionsIndex[]
+): AgentSessionsIndex {
+  const byId = new Map<string, AgentSessionMeta>();
+  for (const s of preferred.sessions) byId.set(s.id, s);
+  for (const idx of extras) {
+    for (const s of idx.sessions) {
+      const prev = byId.get(s.id);
+      if (!prev || prev.updatedAt < s.updatedAt) byId.set(s.id, s);
+    }
+  }
+  const sessions = [...byId.values()].sort((a, b) =>
+    a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0
+  );
+  if (!sessions.length) return emptySessionsIndex();
+  const currentId = sessions.some(s => s.id === preferred.currentId)
+    ? preferred.currentId
+    : sessions[0]!.id;
+  return { currentId, sessions };
 }
 
 export function upsertSessionMeta(

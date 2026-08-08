@@ -3,24 +3,33 @@ import {
   createSessionId,
   emptySessionsIndex,
   legacySessionMessagesKey,
+  mergeSessionsIndexes,
   migrateLegacyToIndex,
   parseSessionPayload,
   parseSessionsIndex,
   removeSessionFromIndex,
   sessionMessagesKey,
   sessionsIndexKey,
+  SESSIONS_INDEX_KEY,
   titleFromMessages,
   upsertSessionMeta,
+  workScopedSessionMessagesKey,
+  workScopedSessionsIndexKey,
 } from "./agentChatSessions";
 
 describe("agentChatSessions", () => {
-  it("builds per-project message keys and empty index", () => {
+  it("builds field-scoped message keys and empty index", () => {
     const id = createSessionId(1);
-    expect(sessionsIndexKey("work-a")).toBe("agent:sessions:work-a:index:v1");
-    expect(sessionMessagesKey("work-a", id)).toBe(
+    expect(sessionsIndexKey()).toBe(SESSIONS_INDEX_KEY);
+    expect(sessionsIndexKey()).toBe("agent:sessions:index:v1");
+    expect(sessionMessagesKey(id)).toBe(`agent:session:${id}:v1`);
+    expect(legacySessionMessagesKey(id)).toBe(sessionMessagesKey(id));
+    expect(workScopedSessionsIndexKey("work-a")).toBe(
+      "agent:sessions:work-a:index:v1"
+    );
+    expect(workScopedSessionMessagesKey("work-a", id)).toBe(
       `agent:session:work-a:${id}:v1`
     );
-    expect(legacySessionMessagesKey(id)).toBe(`agent:session:${id}:v1`);
     const idx = emptySessionsIndex("2026-01-01T00:00:00.000Z");
     expect(idx.sessions).toHaveLength(1);
     expect(idx.currentId).toBe(idx.sessions[0]!.id);
@@ -60,6 +69,26 @@ describe("agentChatSessions", () => {
     expect(migrated).not.toBeNull();
     expect(migrated!.index.sessions[0]!.title).toContain("舊對話");
     expect(migrated!.legacyMessages).toHaveLength(1);
+  });
+
+  it("merges work-scoped indexes into field scope", () => {
+    const a: ReturnType<typeof emptySessionsIndex> = {
+      currentId: "s-a",
+      sessions: [
+        { id: "s-a", title: "A", updatedAt: "2026-01-02T00:00:00.000Z" },
+      ],
+    };
+    const b = {
+      currentId: "s-b",
+      sessions: [
+        { id: "s-b", title: "B", updatedAt: "2026-01-03T00:00:00.000Z" },
+        { id: "s-a", title: "A-old", updatedAt: "2026-01-01T00:00:00.000Z" },
+      ],
+    };
+    const merged = mergeSessionsIndexes(a, b);
+    expect(merged.currentId).toBe("s-a");
+    expect(merged.sessions.map(s => s.id)).toEqual(["s-b", "s-a"]);
+    expect(merged.sessions.find(s => s.id === "s-a")!.title).toBe("A");
   });
 
   it("upserts and removes sessions", () => {
