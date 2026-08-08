@@ -1,10 +1,47 @@
 <script lang="ts">
+  import { afterNavigate } from "$app/navigation";
+  import { browser } from "$app/environment";
   import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
 
   const title = "使用說明 · 純玩";
   const description =
     "如何加入主畫面，以及用 LINE 等 App 內建瀏覽器開啟時怎麼改用系統瀏覽器。";
   const canonical = `${PLAYGROUNDS_GO_ORIGIN}/help`;
+
+  let backHref = $state("/");
+  let backLabel = $state("← 回純玩首頁");
+
+  function isHelpPath(pathname: string): boolean {
+    return pathname === "/help" || pathname.startsWith("/help/");
+  }
+
+  function applyBack(pathWithSearch: string): void {
+    const path = pathWithSearch || "/";
+    backHref = path;
+    backLabel = path === "/" ? "← 回純玩首頁" : "← 回上一頁";
+  }
+
+  afterNavigate(({ from }) => {
+    if (!browser) return;
+    if (from?.url && !isHelpPath(from.url.pathname)) {
+      applyBack(from.url.pathname + from.url.search + from.url.hash);
+      return;
+    }
+    // Full navigation into /help: use same-origin referrer when it is a prior go page.
+    try {
+      const ref = document.referrer;
+      if (ref) {
+        const u = new URL(ref);
+        if (u.origin === location.origin && !isHelpPath(u.pathname)) {
+          applyBack(u.pathname + u.search + u.hash);
+          return;
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+    applyBack("/");
+  });
 </script>
 
 <svelte:head>
@@ -23,7 +60,7 @@
 </svelte:head>
 
 <p class="help-back">
-  <a href="/">← 回純玩首頁</a>
+  <a href={backHref}>{backLabel}</a>
 </p>
 
 <h1>使用說明</h1>
