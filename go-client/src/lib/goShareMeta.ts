@@ -32,4 +32,4 @@ export function goSamCanonicalUrl(
 
 export const GO_HOME_DOCUMENT_TITLE = "純玩 · 山姆鍋遊樂場";
 export const GO_HOME_DESCRIPTION =
-  "山姆鍋遊樂場 · 純玩——打開型錄小品直接玩，無需編輯環境。";
+  "山姆鍋遊樂場 · 純玩——打開遊戲直接玩。";

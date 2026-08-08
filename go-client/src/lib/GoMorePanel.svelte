@@ -20,6 +20,11 @@
     onClose: () => void;
     onPick: (catalogId: string) => void;
     onFlash: (msg: string) => void;
+    /**
+     * After clear-all succeeds — navigate home then show flash
+     * (page leave clears session flash).
+     */
+    onClearedAll?: (flash: string) => void;
   };
 
   let {
@@ -30,6 +35,7 @@
     onClose,
     onPick,
     onFlash,
+    onClearedAll,
   }: Props = $props();
 
   type DownloadedRow = { id: string; title: string };
@@ -124,10 +130,12 @@
       } else if (c.kind === "all") {
         const scores = clearAllGoScores();
         const packs = await clearAllGoSamOfflineCache();
-        onFlash(
-          `已清除全部本機遊戲資料（分數 ${scores} 筆、離線包 ${packs} 個）`
-        );
-        await refreshDownloaded();
+        const flash = `已清除全部本機遊戲資料（分數 ${scores} 筆、離線包 ${packs} 個）`;
+        confirm = null;
+        onClose();
+        if (onClearedAll) onClearedAll(flash);
+        else onFlash(flash);
+        return;
       }
       confirm = null;
     } finally {
@@ -153,7 +161,7 @@
     }
     return {
       title: "清除全部本機遊戲資料",
-      body: "清除所有小品的進度／分數與離線下載。不會清除主題等偏好設定。無法復原。",
+      body: "清除所有小品的進度／分數與離線下載，並回到首頁。不會清除主題等偏好設定。無法復原。",
       ok: "全部清除",
     };
   });

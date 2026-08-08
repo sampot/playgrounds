@@ -256,6 +256,14 @@
     shareOpen = false;
     void goto(`/s/${encodeURIComponent(id)}`);
   }
+
+  function goHomeAfterClearAll(flash: string) {
+    moreOpen = false;
+    shareOpen = false;
+    void goto("/").then(() => {
+      chromeSession.setFlash(flash);
+    });
+  }
 </script>
 
 <div
@@ -381,5 +389,6 @@
     onClose={() => (moreOpen = false)}
     onPick={goToId}
     onFlash={msg => chromeSession.setFlash(msg)}
+    onClearedAll={goHomeAfterClearAll}
   />
 {/if}

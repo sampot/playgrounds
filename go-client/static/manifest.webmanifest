@@ -1,7 +1,7 @@
 {
   "name": "山姆鍋遊樂場 · 純玩",
   "short_name": "純玩",
-  "description": "打開型錄小品直接玩——無需編輯環境。",
+  "description": "打開遊戲直接玩。",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
