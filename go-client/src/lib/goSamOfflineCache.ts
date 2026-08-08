@@ -104,3 +104,70 @@ export async function getGoSamOfflineCache(
     return null;
   }
 }
+
+function pathnameFromCacheKey(url: string): string {
+  try {
+    return new URL(url).pathname;
+  } catch {
+    // Cache mocks／relative put keys may not be absolute.
+    const path = url.split("?")[0] ?? "";
+    return path.startsWith("/") ? path : "";
+  }
+}
+
+function catalogIdFromCacheKey(url: string): string | null {
+  const pathname = pathnameFromCacheKey(url);
+  if (!pathname.startsWith(PATH_PREFIX)) return null;
+  const raw = pathname.slice(PATH_PREFIX.length);
+  if (!raw) return null;
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
+
+/** Catalog ids with a visit-then-offline FileMap cache (§6.6 已下載). */
+export async function listGoSamOfflineCatalogIds(): Promise<string[]> {
+  if (typeof caches === "undefined") return [];
+  try {
+    const cache = await caches.open(CACHE_NAME);
+    const keys = await cache.keys();
+    const ids: string[] = [];
+    for (const req of keys) {
+      const id = catalogIdFromCacheKey(req.url);
+      if (id) ids.push(id);
+    }
+    return [...new Set(ids)].sort((a, b) => a.localeCompare(b, "zh-Hant"));
+  } catch {
+    return [];
+  }
+}
+
+export async function deleteGoSamOfflineCache(
+  catalogId: string
+): Promise<boolean> {
+  if (typeof caches === "undefined") return false;
+  const id = catalogId.trim();
+  if (!id) return false;
+  try {
+    const cache = await caches.open(CACHE_NAME);
+    return await cache.delete(cacheUrl(id));
+  } catch {
+    return false;
+  }
+}
+
+export async function clearAllGoSamOfflineCache(): Promise<number> {
+  if (typeof caches === "undefined") return 0;
+  try {
+    const ids = await listGoSamOfflineCatalogIds();
+    let n = 0;
+    for (const id of ids) {
+      if (await deleteGoSamOfflineCache(id)) n += 1;
+    }
+    return n;
+  } catch {
+    return 0;
+  }
+}

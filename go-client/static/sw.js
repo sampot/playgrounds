@@ -5,7 +5,7 @@
  *
  * Must stay aligned with field public/sw.js for canvas-bridge + API forward.
  */
-const GO_SW_REV = 3;
+const GO_SW_REV = 4;
 const CANVAS_PREFIX = "/canvas/";
 const SYNC_TYPE = "playgrounds-canvas-sync";
 const SYNC_ACK = "playgrounds-canvas-sync-ack";
@@ -338,10 +338,13 @@ async function networkFirstShell(request) {
     const home = await cache.match("/");
     if (home) return home;
   }
-  return new Response("離線無法載入", {
-    status: 503,
-    headers: { "Content-Type": "text/plain; charset=utf-8" },
-  });
+  return new Response(
+    "現在沒有網路，而且這一頁還沒存到這台裝置。請連線後再開一次。",
+    {
+      status: 503,
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    }
+  );
 }
 
 async function respondCanvas(request, parsed) {

@@ -3,6 +3,7 @@
  */
 
 import { getGoCatalogEntry, type GoCatalogEntry } from "./goCatalog";
+import { friendlySoloLoadError } from "./goFriendlyError";
 import {
   getGoSamOfflineCache,
   putGoSamOfflineCache,
@@ -157,10 +158,7 @@ export function createSoloRuntime() {
       set({
         phase: "error",
         entry,
-        error:
-          e instanceof Error
-            ? `載入失敗：${e.message}`
-            : `載入失敗：${String(e)}`,
+        error: friendlySoloLoadError(e, entry.title),
         message: "",
         canvasUrl: null,
         canvasSrcdoc: null,

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import { chromeSession } from "$lib/chromeSession.svelte";
+  import GoMorePanel from "$lib/GoMorePanel.svelte";
   import GoShareSheet from "$lib/GoShareSheet.svelte";
   import { nextSameKind, recommendSameKind } from "$lib/goCatalog";
   import {
@@ -13,8 +14,8 @@
   import { goSamShareTitle } from "$lib/goShareMeta";
   import { getGoCatalogEntry } from "$lib/goCatalog";
 
+  /** Visible host in chrome — playground home, not catalog path (DEC-050 §6.4). */
   const playHost = PLAY_ORIGIN.replace(/^https:\/\//, "");
-  const catalogHostLabel = `${playHost}/sam/?kind=game`;
 
   function goOrigin(): string {
     if (typeof location !== "undefined" && location.origin) {
@@ -45,14 +46,13 @@
     }
   }
 
-  /** After reveal: hide again if header idle for 3s (paused while share sheet open). */
+  /** After reveal: hide again if header idle for 3s (paused while share／more open). */
   function scheduleChromeAutoHide() {
     clearChromeAutoHide();
-    if (!canvasActive || chromeHidden || shareOpen) return;
+    if (!canvasActive || chromeHidden || shareOpen || moreOpen) return;
     chromeAutoHideTimer = setTimeout(() => {
       chromeAutoHideTimer = null;
-      if (shareOpen) return;
-      moreOpen = false;
+      if (shareOpen || moreOpen) return;
       chromeHidden = true;
     }, CHROME_AUTO_HIDE_MS);
   }
@@ -65,7 +65,9 @@
   const mode = $derived(chromeSession.mode);
   const canvasActive = $derived(chromeSession.canvasActive);
   const shareEnabled = $derived(Boolean(catalogId));
-  /** §5.6：僅當前小品為 `kind: game` 時露出換片／遊戲推薦。 */
+  /** §6.6：本機溢流 — `/`／`/s/`；Invite 不露. */
+  const showMore = $derived(mode !== "invite");
+  /** §5.6：僅當前小品為 `kind: game` 時露出換片／試試這些. */
   const showSwap = $derived(
     mode === "solo" &&
       Boolean(catalogId) &&
@@ -98,12 +100,10 @@
   });
 
   $effect(() => {
-    if (mode === "solo" && catalogId) {
+    if (mode === "solo" && catalogId && chromeSession.kind === "game") {
       recommends = recommendSameKind(catalogId, 3);
-      moreOpen = false;
     } else {
       recommends = [];
-      moreOpen = false;
     }
   });
 
@@ -112,7 +112,11 @@
   });
 
   $effect(() => {
-    if (shareOpen) {
+    if (mode === "invite") moreOpen = false;
+  });
+
+  $effect(() => {
+    if (shareOpen || moreOpen) {
       clearChromeAutoHide();
       return;
     }
@@ -123,12 +127,10 @@
     if (!canvasActive) {
       clearChromeAutoHide();
       chromeHidden = false;
-      moreOpen = false;
       return;
     }
 
     chromeHidden = false;
-    moreOpen = false;
     clearChromeAutoHide();
 
     let acc = 0;
@@ -142,7 +144,6 @@
       const wasHidden = chromeHidden;
       chromeHidden = hidden;
       if (hidden) {
-        moreOpen = false;
         clearChromeAutoHide();
       } else if (wasHidden) {
         // Revealed by scroll-up／pull — auto-hide if idle.
@@ -243,6 +244,13 @@
     shareOpen = true;
   }
 
+  function openMore() {
+    shareOpen = false;
+    clearChromeAutoHide();
+    chromeHidden = false;
+    moreOpen = true;
+  }
+
   function goToId(id: string) {
     moreOpen = false;
     shareOpen = false;
@@ -286,14 +294,14 @@
     <a
       class="play-link"
       href={PLAY_CATALOG_HREF}
-      title={`山姆鍋遊樂場 · 遊戲小品（${catalogHostLabel}）`}
+      title={`山姆鍋遊樂場（${playHost}）· 遊戲小品`}
       target="_blank"
       rel="noopener noreferrer"
       onclick={openPlaygroundCatalog}
     >
       <span class="play-label">山姆鍋遊樂場</span>
       {#if !canvasActive}
-        <span class="host">{catalogHostLabel}</span>
+        <span class="host">{playHost}</span>
       {/if}
     </a>
     {#if showSwap && canvasActive}
@@ -305,33 +313,17 @@
       >
         下一個
       </button>
-      {#if recommends.length}
-        <div class="hdr-more">
-          <button
-            type="button"
-            class="hdr-more-btn"
-            aria-expanded={moreOpen}
-            aria-haspopup="menu"
-            onclick={() => (moreOpen = !moreOpen)}
-          >
-            更多
-          </button>
-          {#if moreOpen}
-            <ul class="hdr-menu" role="menu">
-              {#each recommends as rec (rec.id)}
-                <li role="none">
-                  <button
-                    type="button"
-                    role="menuitem"
-                    class="hdr-menu-item"
-                    onclick={() => goToId(rec.id)}>{rec.title}</button
-                  >
-                </li>
-              {/each}
-            </ul>
-          {/if}
-        </div>
-      {/if}
+    {/if}
+    {#if showMore}
+      <button
+        type="button"
+        class="hdr-more-btn"
+        aria-expanded={moreOpen}
+        aria-haspopup="dialog"
+        onclick={openMore}
+      >
+        更多
+      </button>
     {/if}
     <button
       type="button"
@@ -344,7 +336,7 @@
     </button>
   </header>
 
-  {#if chromeSession.flash && !(canvasActive && chromeHidden && !shareOpen)}
+  {#if chromeSession.flash && !(canvasActive && chromeHidden && !shareOpen && !moreOpen)}
     <p
       class={["chrome-flash", canvasActive && "chrome-flash--toast"]
         .filter(Boolean)
@@ -365,19 +357,6 @@
       >
         下一個
       </button>
-      {#if recommends.length}
-        <ul class="swap-rec">
-          {#each recommends as rec (rec.id)}
-            <li>
-              <button
-                type="button"
-                class="swap-chip"
-                onclick={() => goToId(rec.id)}>{rec.title}</button
-              >
-            </li>
-          {/each}
-        </ul>
-      {/if}
     </nav>
   {/if}
 </div>
@@ -389,6 +368,18 @@
     url={shareUrl}
     spoken={shareSpoken}
     onClose={() => (shareOpen = false)}
+    onFlash={msg => chromeSession.setFlash(msg)}
+  />
+{/if}
+
+{#if showMore}
+  <GoMorePanel
+    open={moreOpen}
+    currentCatalogId={mode === "solo" ? catalogId : null}
+    showTryThese={showSwap}
+    {recommends}
+    onClose={() => (moreOpen = false)}
+    onPick={goToId}
     onFlash={msg => chromeSession.setFlash(msg)}
   />
 {/if}

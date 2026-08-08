@@ -67,8 +67,7 @@ a {
   pointer-events: none;
 }
 .chrome-root--overlay .chrome,
-.chrome-root--overlay .chrome-flash--toast,
-.chrome-root--overlay .hdr-more {
+.chrome-root--overlay .chrome-flash--toast {
   pointer-events: auto;
 }
 
@@ -170,47 +169,6 @@ a {
   opacity: 0.4;
   cursor: not-allowed;
 }
-.chrome--compact .hdr-more {
-  position: relative;
-  flex-shrink: 0;
-}
-.chrome--compact .hdr-menu {
-  list-style: none;
-  margin: 0.25rem 0 0;
-  padding: 0.25rem;
-  position: absolute;
-  right: 0;
-  top: 100%;
-  z-index: 30;
-  min-width: 8rem;
-  max-width: min(14rem, 70vw);
-  border: 1px solid rgb(var(--line));
-  border-radius: var(--radius);
-  background: color-mix(in oklab, rgb(var(--fill)) 94%, transparent);
-  box-shadow: 0 6px 18px color-mix(in oklab, rgb(var(--ink)) 14%, transparent);
-}
-.chrome--compact .hdr-menu-item {
-  display: block;
-  width: 100%;
-  min-height: 2.5rem;
-  padding: 0.4rem 0.65rem;
-  border: none;
-  border-radius: calc(var(--radius) - 2px);
-  background: transparent;
-  color: rgb(var(--ink));
-  font: inherit;
-  font-size: 0.85rem;
-  text-align: start;
-  cursor: pointer;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.chrome--compact .hdr-menu-item:hover,
-.chrome--compact .hdr-menu-item:focus-visible {
-  background: color-mix(in oklab, rgb(var(--accent)) 14%, transparent);
-  outline: none;
-}
 .chrome a.play-link:hover,
 .chrome a.play-link:focus-visible {
   color: rgb(var(--accent));
@@ -229,8 +187,9 @@ a {
   word-break: break-all;
   line-height: 1.2;
 }
-.chrome .share-btn {
-  margin-left: auto;
+.chrome .share-btn,
+.chrome .hdr-more-btn,
+.chrome .hdr-next {
   min-width: 2.75rem;
   min-height: 2.75rem;
   padding: 0.35rem 0.75rem;
@@ -242,15 +201,25 @@ a {
   font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
+  flex-shrink: 0;
+  white-space: nowrap;
   -webkit-tap-highlight-color: color-mix(in oklab, rgb(var(--accent)) 18%, transparent);
 }
+.chrome .share-btn {
+  margin-left: auto;
+}
 .chrome .share-btn:hover:not(:disabled),
-.chrome .share-btn:focus-visible:not(:disabled) {
+.chrome .share-btn:focus-visible:not(:disabled),
+.chrome .hdr-more-btn:hover,
+.chrome .hdr-more-btn:focus-visible,
+.chrome .hdr-next:hover:not(:disabled),
+.chrome .hdr-next:focus-visible:not(:disabled) {
   border-color: rgb(var(--accent));
   color: rgb(var(--accent));
   outline: none;
 }
-.chrome .share-btn:disabled {
+.chrome .share-btn:disabled,
+.chrome .hdr-next:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }

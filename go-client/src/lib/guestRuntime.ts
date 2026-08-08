@@ -17,6 +17,10 @@ import {
 } from "@pg/platform/platformCompose";
 import type { FileMap } from "@pg/projectTypes";
 import {
+  friendlyInviteError,
+  friendlySamDownloadError,
+} from "./goFriendlyError";
+import {
   goLoadProgressFromFiles,
   type GoLoadProgress,
 } from "./goLoadProgress";
@@ -367,7 +371,7 @@ export function createGuestRuntime() {
     } catch (e) {
       set({
         phase: "error",
-        error: e instanceof Error ? e.message : String(e),
+        error: friendlyInviteError(e),
         message: "",
       });
     }
@@ -460,10 +464,7 @@ export function createGuestRuntime() {
     } catch (e) {
       set({
         phase: "error",
-        error:
-          e instanceof Error
-            ? `載入小品失敗：${e.message}`
-            : `載入小品失敗：${String(e)}`,
+        error: friendlySamDownloadError(e),
         message: "",
         loadProgress: null,
       });
@@ -562,10 +563,7 @@ export function createGuestRuntime() {
     } catch (e) {
       set({
         phase: "error",
-        error:
-          e instanceof Error
-            ? `連線失敗：${e.message}`
-            : `連線失敗：${String(e)}`,
+        error: friendlyInviteError(e, "連線失敗"),
         message: "",
       });
     }

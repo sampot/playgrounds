@@ -8,6 +8,7 @@
     goSamDescription,
     goSamDocumentTitle,
   } from "$lib/goShareMeta";
+  import { isLikelyOffline } from "$lib/goFriendlyError";
   import {
     createSoloRuntime,
     type SoloStatus,
@@ -73,6 +74,18 @@
     if (!id) return;
     void runtime.bootFromCatalogId(id);
   });
+
+  const showOfflineHint = $derived(
+    status?.phase === "error" &&
+      (isLikelyOffline() ||
+        Boolean(status.error?.includes("沒有網路") || status.error?.includes("還沒存")))
+  );
+
+  function retryLoad() {
+    const id = catalogId;
+    if (!id) return;
+    void runtime.bootFromCatalogId(id);
+  }
 </script>
 
 <svelte:head>
@@ -111,22 +124,29 @@
     label="小品下載進度"
   />
 {:else if status.phase === "error"}
-  <h1>無法開啟</h1>
+  <h1>打不開</h1>
   <p class="err" role="alert">{status.error}</p>
-  <p class="lead">
-    可回
-    <a href={`${PLAY_ORIGIN}/sam/`} target="_blank" rel="noopener noreferrer"
-      >型錄</a
-    >
-    或
-    <a
-      href={`${PLAY_ORIGIN}/`}
-      target="_blank"
-      rel="noopener noreferrer"
-      onclick={openPlaygroundHome}>遊樂場</a
-    >
-    挑選其他小品。
+  <p class="actions">
+    <button type="button" class="btn primary" onclick={retryLoad}>再試一次</button>
   </p>
+  {#if showOfflineHint}
+    <p class="lead">連上網路後再試；成功開過一次的小品，之後就能離線玩。</p>
+  {:else}
+    <p class="lead">
+      可回
+      <a href={`${PLAY_ORIGIN}/sam/`} target="_blank" rel="noopener noreferrer"
+        >型錄</a
+      >
+      或
+      <a
+        href={`${PLAY_ORIGIN}/`}
+        target="_blank"
+        rel="noopener noreferrer"
+        onclick={openPlaygroundHome}>遊樂場</a
+      >
+      挑選其他小品。
+    </p>
+  {/if}
 {:else}
   <h1 class="sr-only">{status.entry?.title || entry?.title || "小品"}</h1>
   {#if showCanvas}
@@ -158,6 +178,29 @@
 <style>
   .lead {
     margin-top: 1rem;
+  }
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    margin-top: 1rem;
+  }
+  .btn {
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+    padding: 0.55rem 1rem;
+    border-radius: var(--radius);
+    border: 1px solid rgb(var(--line));
+    background: rgb(var(--card));
+    color: rgb(var(--ink));
+    font: inherit;
+    font-weight: 650;
+    cursor: pointer;
+  }
+  .btn.primary {
+    background: rgb(var(--accent));
+    border-color: rgb(var(--accent));
+    color: #fff;
   }
   .stage {
     flex: 1;

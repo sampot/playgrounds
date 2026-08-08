@@ -1013,16 +1013,19 @@
   2. **Invite 短網址：** 場 Invite 的 `short_url`／QR＝**`https://go.samkuo.me/i/<short_id>`**。Invite 權威與 short map 仍在 Platform；`api.samkuo.me/i/…` 可 302 → go（相容）。**臨時生命週期**（TTL／撤銷／Host session）；**先天不能離線**——不承諾以 `/i/` 加主畫面後離線重玩或該局長期存檔。
   3. **型錄傳閱：** **`https://go.samkuo.me/s/<catalog_id>`**——**只認型錄 `id`**；go **建置內嵌** catalog（與 `catalog:gen` 同產線）。型錄列「分享」與 go Header「分享」只出此形；**不是** `/i/`、不是場 `?open=`／`view=canvas`。非型錄 SAM 不產生 `/s/`。型錄「一鍵開」仍進場殼編輯面。
   4. **Header 分享：** 頂列右「分享」→ **頁內分享面**（系統分享／QR／複製並列；非僅靜默 Web Share→複製）。網址＝當前 SAM 的 `/s/<id>`（能對上嵌入型錄時），**永不**＝當前 Invite 短鏈。QR 載荷＝同一 `/s/<id>` HTTPS（現場面對面快樂路徑；接收端用系統相機即可）。**分享 title／社群預覽**依該筆型錄 **`entry.title`**（及 blurb）而異——每個 `/s/<id>` 不同；首包 HTML 須爬蟲可見（見計劃 §5.5／§5.5.1）。Host 邀請 QR 仍只出 `/i/`。
-  5. **`/s/` 換片：** 僅單機傳閱且當前 **`kind: game`**。提供「下一個」與隨機推薦 **≤3**；候選**必須**為其他 **game**；不足不跨 kind 湊。非 game 的 `/s/` 可玩但不換片。**不**提供型錄形式選擇（搜尋／filter／貨架）。取代當前唯一 SAM slot。**Invite `/i/` 不換片。**
+  5. **`/s/` 換片：** 僅單機傳閱且當前 **`kind: game`**。頂列「下一個」＋「試試這些」**≤3**（候選皆其他 game）；不足不跨 kind 湊。非 game 的 `/s/` 可玩但不換片。**不**提供型錄形式選擇。取代當前唯一 SAM slot。**Invite `/i/` 不換片。**
   6. **儲存：** 不依賴持久 OPFS／沙盒庫；SAM 以記憶體／session FileMap（或等價）載入；Invite 入座 reuse 本頁實例。**`/s/` 另可：** 可安裝至主畫面、造訪後離線再玩、本機分數（鍵綁 `catalog_id`）——見計劃 §6.5；≠ 雲存檔、≠ 跨 `play`↔`go` 搬分。
-  7. **範圍：** Invite 首刀＝`invite.compose`／五子棋 E2E（[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)）；`/s/`＝型錄傳閱＋game 換片（Phase 5）＋可安裝／離線／本機分數（Phase 6）。Host 與「一鍵開」仍走場殼＋OPFS。
-  8. **保留名：** `go` ∈ 場網保留表（與 `api`／`docs`／`dash` 同級）。
-  9. **TURN／點數：** Invite Guest 仍經 `join_cap` 取官方 TURN（記 Host）；對人透明。`/s/` 不經 Platform／TURN。
+  7. **Header「更多」＝本機溢流：** 「更多」**不是**「只有推薦」。本機段＝「已下載的遊戲」＋**分層**清除（進度／分數 vs 離線包 vs 可選全部）；試試這些可作第二段。頁內面板＋確認（禁止原生 dialog）。首頁 `/` 與 `/s/` 可開；**Invite `/i/` 不露**本機選單。見計劃 §6.6。
+  8. **範圍：** Invite 首刀＝`invite.compose`／五子棋 E2E（[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)）；`/s/`＝型錄傳閱＋game 換片（Phase 5）＋可安裝／離線／本機分數（Phase 6）＋「更多」本機溢流（Phase 6b）。Host 與「一鍵開」仍走場殼＋OPFS。
+  9. **保留名：** `go` ∈ 場網保留表（與 `api`／`docs`／`dash` 同級）。
+  10. **TURN／點數：** Invite Guest 仍經 `join_cap` 取官方 TURN（記 Host）；對人透明。`/s/` 不經 Platform／TURN。
   - 細節／階段見 [PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)。
 - **Consequences:**
   - 勿把 go 做成無主匿名對戰頁；須可辨識山姆鍋／遊樂場並鏈到 `play.samkuo.me`。
   - 勿把 go 當成另一個遊樂場場（無 OPFS 場語意）；勿在 go 做 IDE；勿多 SAM 庫；勿在 go 複製完整型錄 UX。
   - 勿對非 game 推換片／推薦；勿跨 kind 湊；勿在 Invite 局中提供換小品。
+  - 勿把「更多」定義成只有推薦；勿把「已下載」做成我的遊戲庫／迷你型錄；勿在 Invite 上露本機清除／已下載。
+  - 勿用含糊「清除遊戲資料」一次刪光且無頁內確認；清除須分層（分數 vs 離線包）。
   - 勿再以 `api…/i/…` 當邀請 QR 權威；鑄邀請回傳短鏈須組在 go。
   - 勿用 `/i/` 或 Platform short 服務型錄傳閱；勿用 `source`／`?open=` 當 go 傳閱主形。
   - 勿要求接收者開 Safari／寫 OPFS 才能完成 go 快樂路徑（Invite 或 `/s/`）。
@@ -1044,6 +1047,7 @@
 - **Revision（2026-08-08）：** Header「分享」＝頁內分享面（系統分享／QR／複製）；現場快樂路徑＝掃 `/s/<id>` QR。
 - **Revision（2026-08-08）：** 換片／首頁推薦**僅 `kind: game`**（非 game 的 `/s/` 不換片；首頁不跨 kind）。
 - **Revision（2026-08-08）：** go 頂列「山姆鍋遊樂場」→ `play…/sam/?kind=game`；mark 仍 → play `/`。
+- **Revision（2026-08-08）：** Header「更多」＝本機溢流（已下載／分層清除）；≠ 只有推薦；Invite 不露。
 
 ### DEC-051: Playgrounds API scopes（環境能力準入）
 
