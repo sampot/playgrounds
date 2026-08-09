@@ -1,0 +1,7 @@
+title: 象棋
+kind: game
+series: 桌遊
+blurb: 楚河漢界、將軍困斃；人機／雙人／AI 對 AI。
+source: sampot/pg-xiangqi
+license: MIT
+status: listed

@@ -987,6 +987,16 @@
       "license": "MIT"
     },
     {
+      "id": "pg-xiangqi",
+      "title": "象棋",
+      "kind": "game",
+      "series": "桌遊",
+      "blurb": "楚河漢界、將軍困斃；人機／雙人／AI 對 AI。",
+      "source": "sampot/pg-xiangqi",
+      "status": "listed",
+      "license": "MIT"
+    },
+    {
       "id": "pg-yamlfmt",
       "title": "YAML 整形",
       "kind": "tool",
