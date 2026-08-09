@@ -9,7 +9,7 @@
 
 ---
 
-## 已實作（41）
+## 已實作（42）
 
 ### 精緻可玩（6）
 
@@ -63,13 +63,14 @@
 | `pg-mali` | 小瑪莉 | 復古燈圈跑燈 |
 | `pg-pinfall` | 釘雨落珠 | 發射撞釘入洞 |
 
-### 桌遊（9）
+### 桌遊（10）
 
 | id | 標題 | 一句話 |
 | --- | --- | --- |
 | `pg-big2` | 大老二 | 四人出牌人機 |
 | `pg-gomoku` | 五子棋 | 雙人／人機；Invite `gomoku.v1` |
 | `pg-junqi` | 軍棋 | 陸戰棋暗棋對 AI |
+| `pg-mahjong` | 台灣麻將 | 十六張簡化台、補花吃碰槓胡、人機 |
 | `pg-match3` | 消消樂 | 三消、關卡目標 |
 | `pg-redpick` | 撿紅點 | 對點數撿牌、四人人機 |
 | `pg-sudoku` | 數獨 | 九宮填數、難度／筆記／提示 |
@@ -109,7 +110,6 @@
 | 高 | · | `pg-cityroam` | 巷弄迷走 | 街機 | `art/roguelike-modern-city/`、`sfx/rpg-audio/`、`music/hydrogene-16bit-rpg/` | **新**；小地圖收集／避開 |
 | 高 | · | `pg-microdungeon` | 迷你地城 | 精緻可玩 | `sfx/oga-rpg-sound-pack/`、`music/hydrogene-8bit-musics/`、`art/1-bit-pack/` 或 `puzzle-pack-1/` | **新**；短關探索＋戰鬥節奏 |
 | 高 | · | `pg-reacttap` | 表情對決 | 精緻可玩 | `art/emotes-pack/`、`art/toon-characters/`、`sfx/voiceover-pack/` | **新**；出題反應／搶拍 |
-| 中 | ✓ | `pg-mahjong` | 台灣麻將 | 桌遊 | `art/riichi-mahjong-tiles/`（牌面） | **十六張**台規；花牌／桌面 UI 需補；勿做成日麻／港麻 |
 | 中 | ✓ | `pg-mines` | 踩地雷 | 懷舊 | `sfx/oga-8-bit-sound-effect-pack/`、`art/ui-pack/` | 盤面多半程式繪；電腦課經典 |
 | 中 | ✓ | `pg-solitaire` | 接龍 | 懷舊 | `art/playing-cards-pack/` | **新**；克朗代克；與新接龍並列無妨 |
 | 中 | ✓ | `pg-memory` | 對對碰 | 桌遊 | `art/playing-cards-pack/` 或 `puzzle-pack-1/` | **新**；翻牌配對；可台灣圖騰自製卡背 |
@@ -129,7 +129,7 @@
 
 | 題材 | 既有 id |
 | --- | --- |
-| 尪仔標、路名地產、成語、暗棋、鬥獸棋、軍棋、象棋、大老二、撿紅點 | `pg-wanzai`、`pg-twland`、`pg-chengyu`、`pg-banqi`、`pg-jungle`、`pg-junqi`、`pg-xiangqi`、`pg-big2`、`pg-redpick` |
+| 尪仔標、路名地產、成語、暗棋、鬥獸棋、軍棋、象棋、大老二、撿紅點、台灣麻將 | `pg-wanzai`、`pg-twland`、`pg-chengyu`、`pg-banqi`、`pg-jungle`、`pg-junqi`、`pg-xiangqi`、`pg-big2`、`pg-redpick`、`pg-mahjong` |
 | 夜市射氣球／套圈／打地鼠／切水果 | `pg-popshot`、`pg-ringtoss`、`pg-moletap`、`pg-fruitcut` |
 | 小瑪莉、夾娃娃、推幣、釘珠、賽馬燈、賓果燈 | `pg-mali`、`pg-clawgrab`、`pg-coinpush`、`pg-pinfall`、`pg-horselit`、`pg-bingolite` |
 | 跳房子／踢毽子、木頭人、飛行棋簡化、躍階平台 | `pg-hopkick`、`pg-statue`、`pg-wingrace`、`pg-leaptrail` |

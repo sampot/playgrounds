@@ -12,6 +12,22 @@ import {
 export const MAX_TRANSFER_FILES = 200;
 export const MAX_TRANSFER_BYTES = 32 * 1024 * 1024;
 
+/** Local dir upload skips VCS / install trees (webkitdirectory includes them). */
+const SKIP_LOCAL_TRANSFER_DIR =
+  /(?:^|\/)(?:\.git|node_modules|\.svn|\.hg)(?:\/|$)/u;
+
+/**
+ * True when a relative path from the OS picker should not enter the sandbox.
+ * Keeps PNG／assets; only drops heavy non-project trees.
+ */
+export function shouldSkipLocalTransferPath(relPath: string): boolean {
+  const n = String(relPath || "")
+    .trim()
+    .replace(/\\/gu, "/")
+    .replace(/^\.\/+/u, "");
+  return SKIP_LOCAL_TRANSFER_DIR.test(n);
+}
+
 export function downloadBytes(
   filename: string,
   data: Uint8Array,
@@ -123,9 +139,7 @@ export async function browserFilesToFileMap(
     stripPrefix = relatives[0]!.split("/")[0]!;
   }
 
-  const out: FileMap = {};
-  let totalBytes = 0;
-
+  const accepted: { file: File; rel: string }[] = [];
   for (let i = 0; i < files.length; i++) {
     const file = files[i]!;
     let rel = relatives[i]!;
@@ -135,6 +149,19 @@ export async function browserFilesToFileMap(
     ) {
       rel = rel === stripPrefix ? file.name : rel.slice(stripPrefix.length + 1);
     }
+    if (shouldSkipLocalTransferPath(rel)) continue;
+    accepted.push({ file, rel });
+  }
+
+  if (accepted.length === 0) {
+    throw new Error("未選擇檔案（已略過 .git／node_modules 等）");
+  }
+
+  const out: FileMap = {};
+  let totalBytes = 0;
+
+  for (let i = 0; i < accepted.length; i++) {
+    const { file, rel } = accepted[i]!;
     const path = joinProjectPath(base, rel);
     totalBytes += file.size;
     assertTransferBudget(i + 1, totalBytes);

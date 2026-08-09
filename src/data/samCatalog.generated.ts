@@ -500,6 +500,16 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     license: "MIT",
   },
   {
+    id: "pg-mahjong",
+    title: "台灣麻將",
+    kind: "game",
+    series: "桌遊",
+    blurb: "十六張台規簡化版：補花、吃碰槓胡、簡化台；四人人機。",
+    source: "sampot/pg-mahjong",
+    status: "unlisted",
+    license: "MIT",
+  },
+  {
     id: "pg-mali",
     title: "小瑪莉",
     kind: "game",

@@ -6,6 +6,7 @@ import {
   filenameFromContentDisposition,
   filenameFromUrl,
   pathsToZip,
+  shouldSkipLocalTransferPath,
 } from "./workspaceTransfer";
 import { unzipSync } from "fflate";
 
@@ -64,11 +65,40 @@ describe("browserDirectoryRootName", () => {
   });
 });
 
+describe("shouldSkipLocalTransferPath", () => {
+  it("skips VCS and node_modules trees", () => {
+    expect(shouldSkipLocalTransferPath(".git/config")).toBe(true);
+    expect(shouldSkipLocalTransferPath("proj/.git/HEAD")).toBe(true);
+    expect(shouldSkipLocalTransferPath("node_modules/x/index.js")).toBe(true);
+    expect(shouldSkipLocalTransferPath("pkg/node_modules/y")).toBe(true);
+  });
+
+  it("keeps project assets including png", () => {
+    expect(shouldSkipLocalTransferPath("assets/tiles/Man1.png")).toBe(false);
+    expect(shouldSkipLocalTransferPath("index.html")).toBe(false);
+    expect(shouldSkipLocalTransferPath("src/app.js")).toBe(false);
+  });
+});
+
 describe("browserFilesToFileMap", () => {
   it("maps files under destDir", async () => {
     const f = new File(["hi"], "note.txt", { type: "text/plain" });
     const map = await browserFilesToFileMap([f], "docs");
     expect(map["docs/note.txt"]).toBe("hi");
+  });
+
+  it("omits .git files from webkitdirectory picks", async () => {
+    const keep = new File(["ok"], "index.html");
+    Object.defineProperty(keep, "webkitRelativePath", {
+      value: "pg-mahjong/index.html",
+    });
+    const git = new File(["x"], "config");
+    Object.defineProperty(git, "webkitRelativePath", {
+      value: "pg-mahjong/.git/config",
+    });
+    const map = await browserFilesToFileMap([keep, git], "");
+    expect(map["index.html"]).toBe("ok");
+    expect(map[".git/config"]).toBeUndefined();
   });
 
   it("strips shared webkitRelativePath root", async () => {
