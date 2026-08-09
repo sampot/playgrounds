@@ -10,6 +10,12 @@
     type GuestStatus,
   } from "$lib/guestRuntime";
   import {
+    GO_INVITE_DESCRIPTION,
+    GO_INVITE_DOCUMENT_TITLE,
+    goInviteCanonicalUrl,
+    goOgMeta,
+  } from "$lib/goShareMeta";
+  import {
     composeSamSource,
     composeSessionProtocol,
   } from "@pg/platform/platformCompose";
@@ -17,8 +23,16 @@
     likelyInAppBrowser,
   } from "$lib/goCanvasSupport";
   import { setGoMemoryCanvasWindow } from "$lib/goMemoryCanvas";
+  import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
 
   const shortId = $derived(page.params.shortId?.trim() || "");
+  const og = $derived(
+    goOgMeta({
+      title: GO_INVITE_DOCUMENT_TITLE,
+      description: GO_INVITE_DESCRIPTION,
+      url: goInviteCanonicalUrl(shortId, PLAYGROUNDS_GO_ORIGIN),
+    })
+  );
   let status = $state<GuestStatus | null>(null);
   let nameInput = $state("對手");
   let busy = $state(false);
@@ -104,14 +118,25 @@
 </script>
 
 <svelte:head>
-  <title>加入 · 山姆鍋遊樂場</title>
+  <title>{og.title}</title>
+  <meta name="description" content={og.description} />
+  <link rel="canonical" href={og.url} />
+  <meta property="og:type" content="website" />
+  <meta property="og:locale" content="zh_TW" />
+  <meta property="og:site_name" content={og.siteName} />
+  <meta property="og:title" content={og.title} />
+  <meta property="og:description" content={og.description} />
+  <meta property="og:url" content={og.url} />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content={og.title} />
+  <meta name="twitter:description" content={og.description} />
 </svelte:head>
 
 {#if !shortId}
   <h1>無法開始</h1>
   <p class="err" role="alert">邀請連結不完整</p>
 {:else if !status || status.phase === "resolving" || status.phase === "idle"}
-  <h1>加入</h1>
+  <h1>邀請</h1>
   <p class="status" role="status">{status?.message || "正在讀取邀請…"}</p>
 {:else if status.phase === "error"}
   <h1>無法開始</h1>
@@ -134,10 +159,10 @@
     >
   </p>
 {:else if status.phase === "consent"}
-  <h1>加入對弈</h1>
+  <h1>接受邀請</h1>
   {#if inAppHint}
     <p class="hint" role="note">
-      偵測到 App 內建瀏覽器。若加入後無法顯示棋盤，請改用 Safari／Chrome 開啟本連結。
+      偵測到 App 內建瀏覽器。若加入後無法顯示遊戲畫面，請改用 Safari／Chrome 開啟本連結。
     </p>
   {/if}
   <p class="lead">
@@ -173,7 +198,7 @@
     </button>
   </div>
 {:else if showCanvas}
-  <h1 class="sr-only">對弈</h1>
+  <h1 class="sr-only">邀請</h1>
   <div class="stage stage--fill">
     {#if status.canvasMode === "memory" && status.canvasSrcdoc}
       {#key status.canvasGeneration}
@@ -197,7 +222,7 @@
     {/if}
   </div>
 {:else}
-  <h1 class="sr-only">對弈</h1>
+  <h1 class="sr-only">邀請</h1>
   <p class="status bar" role="status">
     {status.message || "進行中…"}
   </p>
@@ -224,7 +249,7 @@
         label="小品下載進度"
       />
     {/if}
-    <p class="wait-hint">對弈畫面會在入座完成後出現，請勿關閉此頁。</p>
+    <p class="wait-hint">遊戲畫面會在入座完成後出現，請勿關閉此頁。</p>
   </div>
 {/if}
 

@@ -1,12 +1,18 @@
 <script lang="ts">
   import { afterNavigate } from "$app/navigation";
   import { browser } from "$app/environment";
+  import {
+    GO_HELP_DESCRIPTION,
+    GO_HELP_DOCUMENT_TITLE,
+    goOgMeta,
+  } from "$lib/goShareMeta";
   import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
 
-  const title = "使用說明 · 純玩";
-  const description =
-    "如何加入主畫面，以及用 LINE 等 App 內建瀏覽器開啟時怎麼改用系統瀏覽器。";
-  const canonical = `${PLAYGROUNDS_GO_ORIGIN}/help`;
+  const og = goOgMeta({
+    title: GO_HELP_DOCUMENT_TITLE,
+    description: GO_HELP_DESCRIPTION,
+    url: `${PLAYGROUNDS_GO_ORIGIN}/help`,
+  });
 
   let backHref = $state("/");
   let backLabel = $state("← 回純玩首頁");
@@ -45,18 +51,18 @@
 </script>
 
 <svelte:head>
-  <title>{title}</title>
-  <meta name="description" content={description} />
-  <link rel="canonical" href={canonical} />
+  <title>{og.title}</title>
+  <meta name="description" content={og.description} />
+  <link rel="canonical" href={og.url} />
   <meta property="og:type" content="website" />
   <meta property="og:locale" content="zh_TW" />
-  <meta property="og:site_name" content="山姆鍋遊樂場" />
-  <meta property="og:title" content={title} />
-  <meta property="og:description" content={description} />
-  <meta property="og:url" content={canonical} />
+  <meta property="og:site_name" content={og.siteName} />
+  <meta property="og:title" content={og.title} />
+  <meta property="og:description" content={og.description} />
+  <meta property="og:url" content={og.url} />
   <meta name="twitter:card" content="summary" />
-  <meta name="twitter:title" content={title} />
-  <meta name="twitter:description" content={description} />
+  <meta name="twitter:title" content={og.title} />
+  <meta name="twitter:description" content={og.description} />
 </svelte:head>
 
 <p class="help-back">

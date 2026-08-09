@@ -2,32 +2,39 @@
   import {
     GO_HOME_DESCRIPTION,
     GO_HOME_DOCUMENT_TITLE,
+    GO_HOME_LEAD,
+    goOgMeta,
   } from "$lib/goShareMeta";
   import { recommendHome, type GoCatalogEntry } from "$lib/goCatalog";
   import { openPlaygroundHome, PLAY_ORIGIN } from "$lib/openPlayground";
   import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
 
   const recs: GoCatalogEntry[] = recommendHome(3);
-  const canonical = `${PLAYGROUNDS_GO_ORIGIN}/`;
+  const og = goOgMeta({
+    title: GO_HOME_DOCUMENT_TITLE,
+    description: GO_HOME_DESCRIPTION,
+    url: `${PLAYGROUNDS_GO_ORIGIN}/`,
+  });
 </script>
 
 <svelte:head>
-  <title>{GO_HOME_DOCUMENT_TITLE}</title>
-  <meta name="description" content={GO_HOME_DESCRIPTION} />
-  <link rel="canonical" href={canonical} />
+  <title>{og.title}</title>
+  <meta name="description" content={og.description} />
+  <link rel="canonical" href={og.url} />
   <meta property="og:type" content="website" />
   <meta property="og:locale" content="zh_TW" />
-  <meta property="og:site_name" content="山姆鍋遊樂場" />
-  <meta property="og:title" content={GO_HOME_DOCUMENT_TITLE} />
-  <meta property="og:description" content={GO_HOME_DESCRIPTION} />
-  <meta property="og:url" content={canonical} />
+  <meta property="og:site_name" content={og.siteName} />
+  <meta property="og:title" content={og.title} />
+  <meta property="og:description" content={og.description} />
+  <meta property="og:url" content={og.url} />
   <meta name="twitter:card" content="summary" />
-  <meta name="twitter:title" content={GO_HOME_DOCUMENT_TITLE} />
-  <meta name="twitter:description" content={GO_HOME_DESCRIPTION} />
+  <meta name="twitter:title" content={og.title} />
+  <meta name="twitter:description" content={og.description} />
 </svelte:head>
 
 <h1>純玩</h1>
-<p class="lead">選一個遊戲直接玩。造訪過的離線也能再開。</p>
+<p class="lead">{GO_HOME_LEAD}</p>
+<p class="status">選一個遊戲直接玩。造訪過的離線也能再開。</p>
 
 {#if recs.length}
   <section class="home-rec" aria-label="推薦試試">

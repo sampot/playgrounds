@@ -181,11 +181,12 @@ GET go.samkuo.me/i/<short_id>
 | --- | --- |
 | **權威** | 型錄 **`entry.title`**（及可選 **`entry.blurb`** 作說明）；與 §5.5 分享 title 同源 |
 | **`<title>`／`og:title`／`twitter:title`** | **每個** listed `/s/<id>` **不同**；須含該筆 `entry.title`。形狀：`{title} · 山姆鍋遊樂場`（文案勿單用「遊樂場」）。未知／下架 id → 錯誤頁泛稱，**勿**冒充某小品名 |
-| **`og:description`／`description`** | 優先 `entry.blurb`；無則短站群句＋小品名。不同小品宜可分辨 |
+| **`og:description`／`description`** | **一律含站群脈絡**。有 blurb → `山姆鍋遊樂場 · 純玩｜{blurb}`；無則短站群句＋小品名。不同小品宜可分辨 |
 | **`og:url`** | 對應該 `/s/<id>` canonical |
+| **`og:image`** | **刻意不提供**（文字卡即可；勿加站級／每小品預覽圖當快樂路徑） |
 | **爬蟲可見（硬）** | 預覽爬蟲多半**不執行**客戶端 JS。每個 listed `catalog_id` 的首包 HTML（或邊緣等價注入）就須帶上述 meta——**建置 prerender** `/s/<id>`（entries 來自嵌入 catalog）或 Worker／HTML rewrite 注入；**否決**只靠 SPA hydrate 後改 `<title>` 當社群預覽快樂路徑 |
-| **Invite `/i/`** | 短鏈預覽可用泛稱（例：加入／受邀）；**不**要求依局內 SAM 變 title（分享小品仍走 `/s/`＋本節） |
-| **否決** | 全站單一 `og:title`；複製連結有小品名但貼網址預覽卻是「純玩」；為預覽而把 secret 放進 `/i/` 公開 HTML |
+| **Invite `/i/`** | 短鏈預覽用**中性**泛稱：`接受邀請 · 山姆鍋遊樂場`（description 同脈絡）；**禁止**預設「對弈／對局」。**不**要求依局內 SAM 變 title（分享小品仍走 `/s/`＋本節） |
+| **否決** | 全站單一 `og:title`；複製連結有小品名但貼網址預覽卻是「純玩」；為預覽而把 secret 放進 `/i/` 公開 HTML；為社群預覽而強制加 `og:image` |
 
 **驗收直覺：** 分享「打磚塊」與「五子棋」兩條 `/s/` 連到聊天室，未點開前預覽標題就應分別讀出打磚塊／五子棋。
 

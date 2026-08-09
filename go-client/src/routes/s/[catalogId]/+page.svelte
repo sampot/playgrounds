@@ -4,6 +4,9 @@
   import GoSamLoadBar from "$lib/GoSamLoadBar.svelte";
   import { openPlaygroundHome, PLAY_ORIGIN } from "$lib/openPlayground";
   import {
+    GO_SAM_UNKNOWN_DESCRIPTION,
+    GO_SAM_UNKNOWN_DOCUMENT_TITLE,
+    goOgMeta,
     goSamCanonicalUrl,
     goSamDescription,
     goSamDocumentTitle,
@@ -21,18 +24,18 @@
 
   const catalogId = $derived(data.catalogId);
   const entry = $derived(data.entry);
-  const docTitle = $derived(
-    entry ? goSamDocumentTitle(entry) : "小品 · 山姆鍋遊樂場"
-  );
-  const description = $derived(
-    entry
-      ? goSamDescription(entry)
-      : "山姆鍋遊樂場 · 純玩小品。"
-  );
-  const canonical = $derived(
-    catalogId
-      ? goSamCanonicalUrl(catalogId, PLAYGROUNDS_GO_ORIGIN)
-      : PLAYGROUNDS_GO_ORIGIN
+  const og = $derived(
+    goOgMeta({
+      title: entry
+        ? goSamDocumentTitle(entry)
+        : GO_SAM_UNKNOWN_DOCUMENT_TITLE,
+      description: entry
+        ? goSamDescription(entry)
+        : GO_SAM_UNKNOWN_DESCRIPTION,
+      url: catalogId
+        ? goSamCanonicalUrl(catalogId, PLAYGROUNDS_GO_ORIGIN)
+        : `${PLAYGROUNDS_GO_ORIGIN}/`,
+    })
   );
 
   let status = $state<SoloStatus | null>(null);
@@ -89,18 +92,18 @@
 </script>
 
 <svelte:head>
-  <title>{docTitle}</title>
-  <meta name="description" content={description} />
-  <link rel="canonical" href={canonical} />
+  <title>{og.title}</title>
+  <meta name="description" content={og.description} />
+  <link rel="canonical" href={og.url} />
   <meta property="og:type" content="website" />
   <meta property="og:locale" content="zh_TW" />
-  <meta property="og:site_name" content="山姆鍋遊樂場" />
-  <meta property="og:title" content={docTitle} />
-  <meta property="og:description" content={description} />
-  <meta property="og:url" content={canonical} />
+  <meta property="og:site_name" content={og.siteName} />
+  <meta property="og:title" content={og.title} />
+  <meta property="og:description" content={og.description} />
+  <meta property="og:url" content={og.url} />
   <meta name="twitter:card" content="summary" />
-  <meta name="twitter:title" content={docTitle} />
-  <meta name="twitter:description" content={description} />
+  <meta name="twitter:title" content={og.title} />
+  <meta name="twitter:description" content={og.description} />
 </svelte:head>
 
 {#if !catalogId}

@@ -30,7 +30,7 @@ export function likelyInAppBrowser(): boolean {
 
 export function goCanvasSwUnavailableMessage(): string {
   if (likelyInAppBrowser()) {
-    return "目前的 App 內建瀏覽器無法載入對弈畫面。請用系統瀏覽器開啟此連結（iPhone：右上角⋯ → 在 Safari 開啟）。";
+    return "目前的 App 內建瀏覽器無法載入遊戲畫面。請用系統瀏覽器開啟此連結（iPhone：右上角⋯ → 在 Safari 開啟）。";
   }
-  return "此瀏覽器無法載入對弈畫面（缺少 Service Worker）。請改用 Safari 或 Chrome 開啟邀請連結。";
+  return "此瀏覽器無法載入遊戲畫面（缺少 Service Worker）。請改用 Safari 或 Chrome 開啟邀請連結。";
 }
