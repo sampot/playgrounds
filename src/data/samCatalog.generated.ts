@@ -706,7 +706,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "精緻可玩",
     blurb: "大地圖障礙繞行＋空襲飛行單位；指揮部被毀即出局；出擊交 AI。",
     source: "sampot/pg-sandrts",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
