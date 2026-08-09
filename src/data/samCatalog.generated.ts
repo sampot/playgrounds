@@ -704,7 +704,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     title: "沙丘戰線",
     kind: "game",
     series: "精緻可玩",
-    blurb: "大地圖隨機陣地、2～4 方塔防混戰；拖移鏡頭、出擊交戰全交 AI，可託管。",
+    blurb: "大地圖障礙繞行＋空襲飛行單位；指揮部被毀即出局；出擊交 AI。",
     source: "sampot/pg-sandrts",
     status: "listed",
     license: "MIT",
