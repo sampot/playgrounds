@@ -9,15 +9,16 @@
 
 ---
 
-## 已實作（42）
+## 已實作（43）
 
-### 精緻可玩（6）
+### 精緻可玩（7）
 
 | id | 標題 | 一句話 |
 | --- | --- | --- |
 | `pg-chengyu` | 成語接龍 | 末字起頭接龍、挑戰計分與人機 |
 | `pg-hopkick` | 跳房子踢毽子 | 跳房子節拍點格與踢毽子連擊 |
 | `pg-rubik` | 魔術方塊 | 3×3 轉看／轉層／打亂／計時；本機最佳 |
+| `pg-sandrts` | 沙丘戰線 | 大地圖隨機陣地、2～4 方可託管 |
 | `pg-skyburst` | 蒼穹連射 | 垂直捲軸射擊、武裝升級、首領彈幕 |
 | `pg-sokoban` | 推箱子 | 十二關、復原、滑動操作 |
 | `pg-statue` | 一二三木頭人 | 移動／定格賽跑、人機裁判 |
@@ -116,7 +117,6 @@
 | 中 | ✓ | `pg-guaguale` | 刮刮樂 | 機台 | `sfx/casino-audio/`、`art/ui-pack/` | 刮層／獎項圖需補；純娛樂勿真博弈 |
 | 中 | ✓ | `pg-bikekan` | 大家來找碴 | 懷舊 | `sfx/ui-audio/`、`music/music-jingles/` | 關卡雙圖需自製或另找 |
 | 中 | · | `pg-spacepulse` | 數位脈衝 | 街機 | `sfx/digital-audio/`、`sfx/sci-fi-sounds/`、`art/particle-pack/`、`music/super-16bit-sounds/` | **新**；節奏／閃避射擊皮；≠ `pg-starshot` 固定畫面波次 |
-| 中 | · | `pg-sandrts` | 沙丘戰線 | 精緻可玩 | [`art/rts/`](../game-assets/art/rts/)（坦克／飛彈／爆炸／飛機／塔／沙漠）、`sfx/sci-fi-sounds/`、`sfx/impact-sounds/`、`music/hydrogene-8bit-musics/` | **新**；小型即時戰略（類 Dune II）；首刀俯視單位＋簡易基地；見 `art/rts/README.md`；採收機／統一美術仍薄 |
 | 低 | ✓ | `pg-sisek` | 四色牌 | 桌遊 | （缺） | 台灣特有牌具；需自繪或另找 pack |
 | 低 | ✓ | `pg-carrom` | 康樂球 | 街機 | （缺） | 學校康樂；物理＋桌面美術 |
 | 低 | ✓ | `pg-diaoshui` | 釣水球 | 懷舊 | （缺） | 夜市紙鉤；≠射氣球／套圈 |
@@ -134,6 +134,7 @@
 | 小瑪莉、夾娃娃、推幣、釘珠、賽馬燈、賓果燈 | `pg-mali`、`pg-clawgrab`、`pg-coinpush`、`pg-pinfall`、`pg-horselit`、`pg-bingolite` |
 | 跳房子／踢毽子、木頭人、飛行棋簡化、躍階平台 | `pg-hopkick`、`pg-statue`、`pg-wingrace`、`pg-leaptrail` |
 | 固定畫面太空射擊 | `pg-starshot`（若做 `pg-spacepulse` 須機制明顯不同） |
+| 固定點線塔防 | `pg-towerdef`（`pg-sandrts`＝自由佈局＋出擊 AI，勿做成複製品） |
 
 ### 候補想法（未排程 id）
 

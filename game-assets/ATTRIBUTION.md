@@ -69,9 +69,9 @@
 | `art/holiday-kit/` | Holiday Kit | https://kenney.nl/assets/holiday-kit | |
 | `art/roguelike-modern-city/` | Roguelike Modern City | https://kenney.nl/assets/roguelike-modern-city | |
 
-### RTS／軍事（`art/rts/`；類 Dune II）
+### RTS／軍事（`art/rts/`；`pg-sandrts` 沙丘皮）
 
-索引用途見 [`art/rts/README.md`](./art/rts/README.md)。皆 Kenney **CC0**（另列 OGA）：
+索引用途見 [`art/rts/README.md`](./art/rts/README.md)（自由佈局塔防／沙漠軍事皮，非完整 RTS）。皆 Kenney **CC0**（另列 OGA）：
 
 | 本地路徑 | Pack | URL | 用途 |
 | --- | --- | --- | --- |
@@ -131,7 +131,7 @@
 | 四色牌牌面 | 尚無可靠 CC0 pack；宜自繪或另尋 |
 | 可免署名字型 | 多數開源字型為 OFL／需署名；未收入 `fonts/` |
 | 真麻將「花牌／十六張台規 UI」 | 已由 `sampot/pg-mahjong` 採 Gemini AI 花牌＋桌面 UI；庫內仍僅基礎牌 |
-| RTS 採收機／香料工人／統一沙丘美術 | `art/rts/` 坦克／空中／塔／沙漠已有；步行兵與「沙蟲風」生物仍薄 |
+| 沙丘戰線採收機／香料工人／統一美術 | `art/rts/` 坦克／空中／塔／沙漠已有；步行兵與「沙蟲風」生物仍薄 |
 | 磁碟空間 | itch 包含 wav 全套時體積大；進 `pg-*` 只拷需要的 **ogg**（或 mp3）即可 |
 
 捐助（非義務）：https://kenney.nl/donate

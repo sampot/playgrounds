@@ -700,6 +700,16 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     license: "MIT",
   },
   {
+    id: "pg-sandrts",
+    title: "沙丘戰線",
+    kind: "game",
+    series: "精緻可玩",
+    blurb: "大地圖隨機陣地、2～4 方塔防混戰；拖移鏡頭、出擊交戰全交 AI，可託管。",
+    source: "sampot/pg-sandrts",
+    status: "listed",
+    license: "MIT",
+  },
+  {
     id: "pg-semver",
     title: "Semver 對照",
     kind: "tool",

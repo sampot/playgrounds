@@ -61,6 +61,6 @@ mkdir -p game-assets/{art,sfx,music,fonts,_staging}
 - **Kenney**：音效、jingle、撲克／UI／平台／粒子／角色等
 - **麻將／象棋**：FluffyStuff 牌面、OGA 像素麻將、xiangqi-setup CC0 主題、sashite xiongqi
 - **OpenGameArt**：8-bit 音效庫、chiptune 關卡曲、骰子等
-- **RTS／軍事**（[`art/rts/`](./art/rts/)）：俯視坦克、飛彈／爆炸、飛機／直升機、砲塔與工廠／沙漠皮（類 Dune II）
+- **RTS／軍事**（[`art/rts/`](./art/rts/)）：俯視坦克、飛彈／爆炸、飛機／直升機、砲塔與工廠／沙漠皮（`pg-sandrts` 自由佈局塔防用；皮類 Dune II）
 
 完整清單與 URL 見 [`ATTRIBUTION.md`](./ATTRIBUTION.md)。原始 zip 在 `_staging/`（含 itch 長 BGM：Not Jam／Dylann Taylor／HydroGene）。進遊戲優先拷 **ogg**，勿整包 wav。
