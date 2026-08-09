@@ -6779,7 +6779,7 @@
         {#if actionsMenuOpen}
           <div
             id="playgrounds-actions-menu-list"
-            class="playgrounds-popover border-skin-line bg-skin-fill absolute top-[calc(100%+0.25rem)] left-0 z-30 w-max min-w-[12.5rem] max-w-[min(16rem,calc(100vw-1.5rem))] overflow-hidden rounded-md border py-1 shadow-lg"
+            class="playgrounds-popover border-skin-line bg-skin-fill absolute top-[calc(100%+0.25rem)] right-0 z-30 w-max min-w-[12.5rem] max-w-[min(16rem,calc(100vw-1.5rem))] overflow-hidden rounded-md border py-1 shadow-lg"
             role="menu"
             aria-labelledby="playgrounds-actions-menu"
           >
