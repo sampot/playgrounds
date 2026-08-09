@@ -10,8 +10,8 @@ describe("goShareMeta", () => {
   it("uses distinct document titles per entry.title", () => {
     const a = goSamDocumentTitle({ title: "打磚塊" });
     const b = goSamDocumentTitle({ title: "五子棋" });
-    expect(a).toContain("打磚塊");
-    expect(b).toContain("五子棋");
+    expect(a).toBe("打磚塊 · 山姆鍋遊樂場");
+    expect(b).toBe("五子棋 · 山姆鍋遊樂場");
     expect(a).not.toBe(b);
     expect(goSamShareTitle({ title: "打磚塊" })).toBe("打磚塊");
   });

@@ -48,7 +48,7 @@
 {/if}
 
 <p class="status">
-  完整遊樂場在
+  完整山姆鍋遊樂場在
   <a
     href={`${PLAY_ORIGIN}/`}
     target="_blank"

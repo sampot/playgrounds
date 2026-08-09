@@ -12,7 +12,7 @@ export function goSamShareTitle(entry: Pick<GoCatalogEntry, "title">): string {
 
 /** `<title>`／og:title／twitter:title */
 export function goSamDocumentTitle(entry: Pick<GoCatalogEntry, "title">): string {
-  return `${goSamShareTitle(entry)} · 遊樂場`;
+  return `${goSamShareTitle(entry)} · 山姆鍋遊樂場`;
 }
 
 export function goSamDescription(

@@ -22,7 +22,7 @@
   const catalogId = $derived(data.catalogId);
   const entry = $derived(data.entry);
   const docTitle = $derived(
-    entry ? goSamDocumentTitle(entry) : "小品 · 遊樂場"
+    entry ? goSamDocumentTitle(entry) : "小品 · 山姆鍋遊樂場"
   );
   const description = $derived(
     entry
@@ -142,7 +142,7 @@
         href={`${PLAY_ORIGIN}/`}
         target="_blank"
         rel="noopener noreferrer"
-        onclick={openPlaygroundHome}>遊樂場</a
+        onclick={openPlaygroundHome}>山姆鍋遊樂場</a
       >
       挑選其他小品。
     </p>

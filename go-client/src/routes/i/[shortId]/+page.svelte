@@ -130,7 +130,7 @@
       href={`${PLAY_ORIGIN}/`}
       target="_blank"
       rel="noopener noreferrer"
-      onclick={openPlaygroundHome}>遊樂場主頁</a
+      onclick={openPlaygroundHome}>山姆鍋遊樂場主頁</a
     >
   </p>
 {:else if status.phase === "consent"}

@@ -180,7 +180,7 @@ GET go.samkuo.me/i/<short_id>
 | 項 | 規格 |
 | --- | --- |
 | **權威** | 型錄 **`entry.title`**（及可選 **`entry.blurb`** 作說明）；與 §5.5 分享 title 同源 |
-| **`<title>`／`og:title`／`twitter:title`** | **每個** listed `/s/<id>` **不同**；須含該筆 `entry.title`。建議形狀：`{title} · 遊樂場` 或 `{title} · 山姆鍋遊樂場`（全站同一後綴即可）。未知／下架 id → 錯誤頁泛稱，**勿**冒充某小品名 |
+| **`<title>`／`og:title`／`twitter:title`** | **每個** listed `/s/<id>` **不同**；須含該筆 `entry.title`。形狀：`{title} · 山姆鍋遊樂場`（文案勿單用「遊樂場」）。未知／下架 id → 錯誤頁泛稱，**勿**冒充某小品名 |
 | **`og:description`／`description`** | 優先 `entry.blurb`；無則短站群句＋小品名。不同小品宜可分辨 |
 | **`og:url`** | 對應該 `/s/<id>` canonical |
 | **爬蟲可見（硬）** | 預覽爬蟲多半**不執行**客戶端 JS。每個 listed `catalog_id` 的首包 HTML（或邊緣等價注入）就須帶上述 meta——**建置 prerender** `/s/<id>`（entries 來自嵌入 catalog）或 Worker／HTML rewrite 注入；**否決**只靠 SPA hydrate 後改 `<title>` 當社群預覽快樂路徑 |
