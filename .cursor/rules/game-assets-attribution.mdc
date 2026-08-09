@@ -1,0 +1,17 @@
+---
+description: game-assets may be used in games; always credit sources (even when license does not require it)
+alwaysApply: true
+---
+
+# game-assets 署名（硬）
+
+開發／改 `pg-*` 遊戲時**可以使用**本 repo [`game-assets/`](../../game-assets/) 內已核授權的美術／音效／音樂／字型。
+
+**署名規則（硬）：**
+
+- 授權**要求**署名 → 必須依其要求署名（遊戲內 credits／關於、與／或該 SAM repo 的 README／`ATTRIBUTION`／`License`）。
+- 授權**不要求**署名（例：CC0）→ **仍要署名**（本專案慣例；至少在該 SAM 的 README 或 `ATTRIBUTION.md`／credits 面列出作者／pack／來源 URL）。
+- 從 `game-assets/` **複製**進各遊戲 repo；勿 runtime 依賴 `playgrounds/game-assets/` 路徑。
+- 來源與授權對照以 [`game-assets/ATTRIBUTION.md`](../../game-assets/ATTRIBUTION.md) 與各 pack 的 `License.txt` 為準。
+
+例外：無。未核授權或不明授權的素材不得使用。

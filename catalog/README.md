@@ -1,6 +1,6 @@
 # SAM catalog（投稿）
 
-Authority for the field `/sam/` page lives here: one YAML file per entry under [`entries/`](./entries/). Build-time codegen writes `src/data/samCatalog.generated.ts` and `public/catalog/v1.json`; the app imports helpers from `src/data/samCatalog.ts` (see [PG-CATALOG-QUERY-PLAN.md](../docs/PG-CATALOG-QUERY-PLAN.md)).
+Authority for the field `/sam/` page lives here: one YAML file per entry under [`entries/`](./entries/). Build-time codegen writes `src/data/samCatalog.generated.ts` and `public/catalog/v1.json`; the app imports helpers from `src/data/samCatalog.ts` (see [PG-CATALOG-QUERY-PLAN.md](../docs/PG-CATALOG-QUERY-PLAN.md)). Maintainer snapshot of **`kind: game`**（已上架＋backlog）：[PG-GAMES.md](../docs/PG-GAMES.md).
 
 ## Add an entry
 

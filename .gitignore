@@ -12,3 +12,8 @@ worker-configuration.d.ts
 
 # platform-api local secrets (wrangler)
 platform-api/.dev.vars
+
+# Local free asset library for pg-* games (binaries not shipped / not in git)
+/game-assets/**
+!/game-assets/README.md
+!/game-assets/ATTRIBUTION.md
