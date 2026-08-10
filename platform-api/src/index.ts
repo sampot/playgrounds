@@ -37,6 +37,11 @@ import {
   userTurnHosted,
   userTurnPrefer,
 } from "./credits.js";
+import {
+  appendAnalyticsBatch,
+  listAnalyticsDays,
+  listAnalyticsGames,
+} from "./analytics.js";
 import { generateCloudflareIceServers, turnConfigured } from "./turn.js";
 import { FAVICON_SVG } from "./faviconSvg.js";
 import { withCors } from "./cors.js";
@@ -99,6 +104,8 @@ export type Env = {
   TURN_API_TOKEN?: string;
   /** Pure-play Guest origin for invite short_url (DEC-050). Default go.samkuo.me. */
   GO_PUBLIC_ORIGIN?: string;
+  /** Catalog authority origin for listed-game analytics lookups (default play.samkuo.me). */
+  SAM_CATALOG_ORIGIN?: string;
 };
 
 function json(
@@ -380,6 +387,10 @@ async function route(
   url: URL
 ): Promise<Response> {
   const { pathname } = url;
+
+  // Play analytics (public batch write + admin read).
+  const analyticsRes = await routeAnalytics(request, env, url);
+  if (analyticsRes) return analyticsRes;
 
   // Short link → pure-play client (DEC-050)
   const shortMatch = /^\/i\/([A-Za-z0-9_-]+)$/.exec(pathname);
@@ -1322,4 +1333,95 @@ async function findInviteIdBySecret(
   secret: string
 ): Promise<string | null> {
   return env.STORE.get(`secret:${secret}`);
+}
+
+// —— Play analytics (PG-ANALYTICS-PLAN) ——
+
+const ANALYTICS_BATCH_MAX = 50;
+/** Coarse per-IP sliding window to stop trivial floods (not precise metering). */
+const ANALYTICS_RATE_MAX = 120;
+const ANALYTICS_RATE_WINDOW = 60_000;
+const ANALYTICS_RATE_PREFIX = "analytics:rate:";
+
+function analyticsRateKey(ip: string, windowStart: number): string {
+  return `${ANALYTICS_RATE_PREFIX}${ip}:${Math.floor(windowStart / ANALYTICS_RATE_WINDOW)}`;
+}
+
+async function analyticsAllowed(env: Env, request: Request): Promise<boolean> {
+  const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+  const key = analyticsRateKey(ip, Date.now());
+  const raw = await env.STORE.get(key);
+  const n = raw ? Number(raw) : 0;
+  if (n >= ANALYTICS_RATE_MAX) return false;
+  await env.STORE.put(key, String(n + 1), {
+    expirationTtl: Math.ceil(ANALYTICS_RATE_WINDOW / 1000),
+  });
+  return true;
+}
+
+/** Listed-ness authority: check the `/sam/` catalog v1 JSON on the field Worker. */
+async function analyticsListedSet(env: Env): Promise<Set<string>> {
+  try {
+    const origin = env.SAM_CATALOG_ORIGIN?.trim() || "https://play.samkuo.me";
+    const res = await fetch(`${origin}/catalog/v1.json`);
+    if (!res.ok) return new Set();
+    const data = (await res.json()) as { entries?: { id: string }[] };
+    if (!Array.isArray(data.entries)) return new Set();
+    return new Set(data.entries.map((e) => e.id));
+  } catch {
+    // Catalog unreachable — treat nothing as listed (don't mislabel plays).
+    return new Set();
+  }
+}
+
+async function routeAnalytics(
+  request: Request,
+  env: Env,
+  url: URL
+): Promise<Response | null> {
+  // Public batch write (go client — sendBeacon; must work without auth).
+  if (request.method === "POST" && url.pathname === "/v1/analytics/batch") {
+    if (!(await analyticsAllowed(env, request))) {
+      return json({ error: "rate_limited" }, 429);
+    }
+    const body = (await request.json().catch(() => ({}))) as {
+      events?: unknown;
+    };
+    if (!Array.isArray(body.events)) {
+      return json({ error: "bad_request" }, 400);
+    }
+    if (body.events.length > ANALYTICS_BATCH_MAX) {
+      return json({ error: "batch_too_large" }, 413);
+    }
+    const { accepted, rejected } = await appendAnalyticsBatch(
+      env.STORE,
+      body.events
+    );
+    return json({ ok: true, accepted, rejected });
+  }
+
+  // Admin read: totals + optional N-day trend (DAU).
+  if (request.method === "GET" && url.pathname === "/v1/analytics/games") {
+    const auth = await requireAccessToken(env, request);
+    if (!auth.ok) return auth.res;
+    if (auth.role !== "admin") {
+      return json({ error: "forbidden" }, 403);
+    }
+    const daysParam = url.searchParams.get("days");
+    const days = daysParam ? Number(daysParam) : 0;
+    const listedSet = await analyticsListedSet(env);
+    const isListed = (id: string) => listedSet.has(id);
+    if (Number.isFinite(days) && days >= 1 && days <= 90) {
+      const daysOut = await listAnalyticsDays(
+        env.STORE,
+        Math.floor(days),
+        isListed
+      );
+      return json({ days: daysOut });
+    }
+    const games = await listAnalyticsGames(env.STORE, isListed);
+    return json({ games });
+  }
+
+  return null;
 }

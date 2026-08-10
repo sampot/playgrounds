@@ -18,6 +18,13 @@
   } from "$lib/soloRuntime";
   import { setGoMemoryCanvasWindow } from "$lib/goMemoryCanvas";
   import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
+  import {
+    endGoPlay,
+    startGoAnalyticsFlusher,
+    startGoPlay,
+    tickGoPlay,
+    type GoPlayTracker,
+  } from "$lib/goAnalytics";
   import type { PageData } from "./$types";
 
   let { data }: { data: PageData } = $props();
@@ -41,6 +48,13 @@
   let status = $state<SoloStatus | null>(null);
   const runtime = createSoloRuntime();
 
+  // —— play analytics (PG-ANALYTICS-PLAN) ——
+  let playTracker = $state<GoPlayTracker | null>(null);
+  let playedCatalog: string | null = null;
+  const documentVisible = $derived(
+    typeof document === "undefined" ? true : document.visibilityState === "visible"
+  );
+
   // Subscribe immediately so fast boots are not missed before onMount.
   const stopRuntime = runtime.subscribe(s => {
     status = s;
@@ -53,6 +67,46 @@
       (Boolean(status.canvasUrl) || Boolean(status.canvasSrcdoc))
   );
 
+  // (Re)start a play when a new catalog booted a canvas (play_start).
+  $effect(() => {
+    const id = catalogId;
+    const listed = Boolean(entry);
+    if (!showCanvas || !id) return;
+    if (playedCatalog === id && playTracker) return;
+    // Swap to another catalog mid-play — close the previous one first.
+    const prior = playedCatalog && playedCatalog !== id ? playedCatalog : null;
+    const priorTracker = prior ? playTracker : null;
+    playedCatalog = id;
+    if (prior && priorTracker) {
+      playTracker = null;
+      void endGoPlay(prior, priorTracker);
+    }
+    void startGoPlay(id, listed).then(t => {
+      if (t) playTracker = t;
+    });
+  });
+
+  // Accrue visible time while the page stays visible.
+  $effect(() => {
+    if (!playTracker || !documentVisible) return;
+    const onVis = () => {
+      if (document.visibilityState === "visible") tickGoPlay(playTracker!);
+    };
+    document.addEventListener("visibilitychange", onVis);
+    tickGoPlay(playTracker);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  });
+
+  // Close the current play on hide/unload (visible time only), best-effort flush.
+  $effect(() => {
+    if (!playTracker || documentVisible) return;
+    const tracker = playTracker;
+    const id = playedCatalog;
+    playTracker = null;
+    playedCatalog = null;
+    if (id) void endGoPlay(id, tracker);
+  });
+
   function onMemoryFrameLoad(ev: Event) {
     const el = ev.currentTarget as HTMLIFrameElement;
     setGoMemoryCanvasWindow(el.contentWindow);
@@ -60,7 +114,16 @@
 
   onMount(() => {
     if (entry) chromeSession.setSolo(entry);
+    const stopFlush = startGoAnalyticsFlusher();
     return () => {
+      stopFlush();
+      if (playedCatalog && playTracker) {
+        const id = playedCatalog;
+        const tracker = playTracker;
+        playTracker = null;
+        playedCatalog = null;
+        void endGoPlay(id, tracker);
+      }
       stopRuntime();
       runtime.dispose();
       chromeSession.clear();

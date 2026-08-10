@@ -31,6 +31,16 @@ export type CreditSessionRow = {
   sessionId?: string;
 };
 
+export type GameAnalyticsRow = {
+  catalog_id: string;
+  listed: boolean;
+  plays: number;
+  unique_sessions?: number;
+  avg_duration_sec: number;
+  day?: string;
+  dauc?: number;
+};
+
 export function getAccessToken(): string {
   try {
     return sessionStorage.getItem(AT_KEY) || "";

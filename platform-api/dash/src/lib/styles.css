@@ -452,3 +452,66 @@ label.meta {
   .hero, .panel { animation: none; }
   button, .btn { transition: none; }
 }
+
+/* —— 玩具分析 —— */
+.seg {
+  display: inline-flex;
+  gap: 0;
+  border: 1px solid rgb(var(--line));
+  border-radius: 0.35rem;
+  overflow: hidden;
+}
+.seg-btn {
+  min-height: 44px;
+  padding: 0.45rem 0.85rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: color-mix(in oklab, rgb(var(--ink)) 70%, transparent);
+  cursor: pointer;
+  font: inherit;
+}
+.seg-btn + .seg-btn {
+  border-left: 1px solid rgb(var(--line));
+}
+.seg-btn.seg-on {
+  background: rgb(var(--accent));
+  color: #fff;
+}
+.num {
+  width: 4.5rem;
+  min-height: 44px;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid rgb(var(--line));
+  border-radius: 0.35rem;
+  background: transparent;
+  color: rgb(var(--ink));
+  font: inherit;
+}
+.table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.analtable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  min-width: 20rem;
+}
+.analtable th,
+.analtable td {
+  text-align: left;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid rgb(var(--line));
+  white-space: nowrap;
+}
+.analtable thead th {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: color-mix(in oklab, rgb(var(--ink)) 60%, transparent);
+}
+.analtable .num-td {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
