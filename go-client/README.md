@@ -38,6 +38,8 @@ Requires Custom Domain `go.samkuo.me` (and possibly a dashboard Worker Route so 
 
 Build prerenders listed `/s/<id>` HTML so chat／social crawlers see distinct `og:title` (e.g. `打磚塊 · 山姆鍋遊樂場`) and brand-prefixed descriptions. Site-level `og:image`＝`/og.png`（1200×630；非每小品圖）.
 
+Search indexing: `robots.txt` allows `/`、`/help`、`/s/` and disallows `/i/`；`sitemap.xml`（`npm run sitemap`／prebuild）lists home + help + **listed** `/s/<id>` only. Invite pages also emit `noindex, nofollow`.
+
 ## Flow
 
 1. Host (play) mints `invite.compose` → `short_url` = `go…/i/…`

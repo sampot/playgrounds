@@ -5,7 +5,7 @@
  *
  * Must stay aligned with field public/sw.js for canvas-bridge + API forward.
  */
-const GO_SW_REV = 5;
+const GO_SW_REV = 6;
 const CANVAS_PREFIX = "/canvas/";
 const SYNC_TYPE = "playgrounds-canvas-sync";
 const SYNC_ACK = "playgrounds-canvas-sync-ack";
@@ -274,6 +274,8 @@ function isShellCacheablePath(pathname) {
   }
   if (
     pathname === "/manifest.webmanifest" ||
+    pathname === "/robots.txt" ||
+    pathname === "/sitemap.xml" ||
     pathname === "/favicon.svg" ||
     pathname === "/og.png" ||
     pathname === "/apple-touch-icon.png" ||
@@ -311,6 +313,8 @@ function extractShellAssetUrls(html, origin) {
     add(m[1]);
   }
   add("/manifest.webmanifest");
+  add("/robots.txt");
+  add("/sitemap.xml");
   add("/favicon.svg");
   add("/og.png");
   add("/apple-touch-icon.png");

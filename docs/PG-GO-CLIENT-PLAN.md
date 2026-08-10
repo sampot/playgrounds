@@ -559,6 +559,7 @@ dash provision → 場殼記憶體 API key
 **`/s/` 可安裝／離線／本機分數（§6.5；Phase 6）**
 
 - [x] go 有 Web App Manifest＋圖示（`manifest.webmanifest`／favicon；start_url＝`/`）
+- [x] SEO：`robots.txt`＋`sitemap.xml`（`/`／`/help`／listed `/s/`；Disallow／`noindex` `/i/`）
 - [x] 線上成功玩過某 `/s/<id>` 後可 Cache FileMap；殼 SW network-first（`/i/` 不進 shell offline）
 - [x] 畫布 `/api`→`functions.js`＋`env.KV`／`env.DB`（IndexedDB／localStorage；ns＝`catalog:<id>`）；不綁隨機 `sandboxId`；無 OPFS
 - [x] 舊 UI `localStorage` 分數 shim（`injectGoScoreStorage`）仍相容；§6.6 清除含 KV／DB＋shim
@@ -625,3 +626,4 @@ dash provision → 場殼記憶體 API key
 | 2026-08-08 | **§6.5／runtime：** go 與場同一應用模型——`/api`→`functions.js`→`env.KV`／`env.DB`；實作＝IndexedDB＋localStorage（非 OPFS）；驗收小品 `pg-rubik` |
 | 2026-08-08 | **sql.js：** 動態 import；WASM 同源 `/vendor/sql.js`＋SW network-first 離線 cache（非 CDN、非進 `/s/` 預載） |
 | 2026-08-10 | §5.5.1：站級 `og:image`＝`/og.png`（避免 FB 回退 favicon）；仍不做每小品專圖 |
+| 2026-08-10 | SEO：`robots.txt`（Allow `/`／`/help`／`/s/`；Disallow `/i/`）＋`sitemap.xml`（listed `/s/`）；`/i/` `noindex` |

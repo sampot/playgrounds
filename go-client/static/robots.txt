@@ -1,0 +1,10 @@
+# go.samkuo.me — index home, help, and catalog solo play; keep invites private.
+User-agent: *
+Allow: /
+Allow: /help
+Allow: /s/
+
+# Invite short links are temporary／session-scoped (DEC-050).
+Disallow: /i/
+
+Sitemap: https://go.samkuo.me/sitemap.xml

@@ -6,8 +6,9 @@
   "description": "Pure-play Guest client @ go.samkuo.me (DEC-050)",
   "scripts": {
     "vendor:sqljs": "node scripts/vendor-sqljs.mjs",
-    "dev": "npm run vendor:sqljs && vite dev --port 5174",
-    "prebuild": "npm run vendor:sqljs && npm run catalog:gen --prefix ..",
+    "sitemap": "node scripts/generate-sitemap.mjs",
+    "dev": "npm run vendor:sqljs && npm run sitemap && vite dev --port 5174",
+    "prebuild": "npm run vendor:sqljs && npm run catalog:gen --prefix .. && npm run sitemap",
     "build": "svelte-kit sync && vite build",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "prepare": "svelte-kit sync || echo ''",

@@ -120,6 +120,7 @@
 <svelte:head>
   <title>{og.title}</title>
   <meta name="description" content={og.description} />
+  <meta name="robots" content="noindex, nofollow" />
   <link rel="canonical" href={og.url} />
   <meta property="og:type" content="website" />
   <meta property="og:locale" content="zh_TW" />
