@@ -172,9 +172,9 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     title: "巷弄迷走",
     kind: "game",
     series: "街機",
-    blurb: "隨機街區撿金幣、躲警察、走到出口；30×20 格小地圖，行動裝置優先、無依賴。",
+    blurb: "隨機街區撿金幣、躲警察、走到出口；30×22 格小地圖，行動裝置優先、無依賴。",
     source: "sampot/pg-cityroam",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -586,7 +586,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "精緻可玩",
     blurb: "5 樓逐層往下的回合制隨機地城；每局重生，探索、戰鬥、寶箱、藥水；行動裝置優先、無依賴。",
     source: "sampot/pg-microdungeon",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -666,7 +666,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "街機",
     blurb: "橫向 2D 平台動作；5 個關卡收金幣、踩黏液、避尖刺；純前端輕量、mobile-first。",
     source: "sampot/pg-pixelhop",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {

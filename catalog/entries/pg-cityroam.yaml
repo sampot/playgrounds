@@ -1,7 +1,7 @@
 title: 巷弄迷走
 kind: game
 series: 街機
-blurb: 隨機街區撿金幣、躲警察、走到出口；30×20 格小地圖，行動裝置優先、無依賴。
+blurb: 隨機街區撿金幣、躲警察、走到出口；30×22 格小地圖，行動裝置優先、無依賴。
 source: sampot/pg-cityroam
 license: MIT
-status: listed
+status: unlisted
