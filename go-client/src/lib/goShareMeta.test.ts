@@ -64,7 +64,7 @@ describe("goShareMeta", () => {
     expect(GO_HELP_DOCUMENT_TITLE).toBe("使用說明 · 山姆鍋遊樂場");
   });
 
-  it("builds og meta fields without image", () => {
+  it("builds og meta fields with site og:image", () => {
     const og = goOgMeta({
       title: GO_HOME_DOCUMENT_TITLE,
       description: GO_HOME_DESCRIPTION,
@@ -76,6 +76,9 @@ describe("goShareMeta", () => {
       description: GO_HOME_DESCRIPTION,
       url: "https://go.samkuo.me/",
       siteName: "山姆鍋遊樂場",
+      image: "https://go.samkuo.me/og.png",
+      imageWidth: 1200,
+      imageHeight: 630,
     });
   });
 });

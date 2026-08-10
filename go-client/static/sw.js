@@ -275,6 +275,7 @@ function isShellCacheablePath(pathname) {
   if (
     pathname === "/manifest.webmanifest" ||
     pathname === "/favicon.svg" ||
+    pathname === "/og.png" ||
     pathname === "/apple-touch-icon.png" ||
     pathname === "/icons/apple-touch-icon.png" ||
     pathname === "/icon-192.png" ||
@@ -311,6 +312,7 @@ function extractShellAssetUrls(html, origin) {
   }
   add("/manifest.webmanifest");
   add("/favicon.svg");
+  add("/og.png");
   add("/apple-touch-icon.png");
   add("/icons/apple-touch-icon.png");
   add("/icon-192.png");

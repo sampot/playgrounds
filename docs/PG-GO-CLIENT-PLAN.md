@@ -183,10 +183,10 @@ GET go.samkuo.me/i/<short_id>
 | **`<title>`／`og:title`／`twitter:title`** | **每個** listed `/s/<id>` **不同**；須含該筆 `entry.title`。形狀：`{title} · 山姆鍋遊樂場`（文案勿單用「遊樂場」）。未知／下架 id → 錯誤頁泛稱，**勿**冒充某小品名 |
 | **`og:description`／`description`** | **一律含站群脈絡**。有 blurb → `山姆鍋遊樂場 · 純玩｜{blurb}`；無則短站群句＋小品名。不同小品宜可分辨 |
 | **`og:url`** | 對應該 `/s/<id>` canonical |
-| **`og:image`** | **刻意不提供**（文字卡即可；勿加站級／每小品預覽圖當快樂路徑） |
+| **`og:image`** | **站級** `https://go.samkuo.me/og.png`（1200×630；`twitter:card`＝`summary_large_image`）。**勿**為每小品做專圖；title／description 仍靠文字分辨小品 |
 | **爬蟲可見（硬）** | 預覽爬蟲多半**不執行**客戶端 JS。每個 listed `catalog_id` 的首包 HTML（或邊緣等價注入）就須帶上述 meta——**建置 prerender** `/s/<id>`（entries 來自嵌入 catalog）或 Worker／HTML rewrite 注入；**否決**只靠 SPA hydrate 後改 `<title>` 當社群預覽快樂路徑 |
 | **Invite `/i/`** | 短鏈預覽用**中性**泛稱：`接受邀請 · 山姆鍋遊樂場`（description 同脈絡）；**禁止**預設「對弈／對局」。**不**要求依局內 SAM 變 title（分享小品仍走 `/s/`＋本節） |
-| **否決** | 全站單一 `og:title`；複製連結有小品名但貼網址預覽卻是「純玩」；為預覽而把 secret 放進 `/i/` 公開 HTML；為社群預覽而強制加 `og:image` |
+| **否決** | 全站單一 `og:title`；複製連結有小品名但貼網址預覽卻是「純玩」；為預覽而把 secret 放進 `/i/` 公開 HTML；為每小品強制專屬 `og:image` |
 
 **驗收直覺：** 分享「打磚塊」與「五子棋」兩條 `/s/` 連到聊天室，未點開前預覽標題就應分別讀出打磚塊／五子棋。
 
@@ -624,3 +624,4 @@ dash provision → 場殼記憶體 API key
 | 2026-08-08 | **§6.6：** Header「更多」改＝**本機溢流**（已下載／分層清除）；試試這些＝換片第二段；與「只有推薦」脫鉤；`/i/` 不露本機；Phase 6b |
 | 2026-08-08 | **§6.5／runtime：** go 與場同一應用模型——`/api`→`functions.js`→`env.KV`／`env.DB`；實作＝IndexedDB＋localStorage（非 OPFS）；驗收小品 `pg-rubik` |
 | 2026-08-08 | **sql.js：** 動態 import；WASM 同源 `/vendor/sql.js`＋SW network-first 離線 cache（非 CDN、非進 `/s/` 預載） |
+| 2026-08-10 | §5.5.1：站級 `og:image`＝`/og.png`（避免 FB 回退 favicon）；仍不做每小品專圖 |

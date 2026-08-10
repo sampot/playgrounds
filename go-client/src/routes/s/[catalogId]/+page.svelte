@@ -101,9 +101,13 @@
   <meta property="og:title" content={og.title} />
   <meta property="og:description" content={og.description} />
   <meta property="og:url" content={og.url} />
-  <meta name="twitter:card" content="summary" />
+  <meta property="og:image" content={og.image} />
+  <meta property="og:image:width" content={String(og.imageWidth)} />
+  <meta property="og:image:height" content={String(og.imageHeight)} />
+  <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content={og.title} />
   <meta name="twitter:description" content={og.description} />
+  <meta name="twitter:image" content={og.image} />
 </svelte:head>
 
 {#if !catalogId}

@@ -1,12 +1,24 @@
 /**
  * Per-catalog share／document／OG titles (DEC-050 §5.5.1).
- * Text-only social preview — no og:image.
+ * Site-level og:image（`/og.png`）so Facebook／LINE 等不回退到 favicon.
  */
 
 import { goSamShareHref, PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
 import type { GoCatalogEntry } from "./goCatalog";
 
 export const GO_SITE_NAME = "山姆鍋遊樂場";
+
+/** Absolute path of the site OG banner（1200×630）. */
+export const GO_OG_IMAGE_PATH = "/og.png";
+export const GO_OG_IMAGE_WIDTH = 1200;
+export const GO_OG_IMAGE_HEIGHT = 630;
+
+/** Canonical absolute OG image URL（crawlers need absolute）. */
+export function goOgImageUrl(
+  origin: string = PLAYGROUNDS_GO_ORIGIN
+): string {
+  return `${origin.replace(/\/$/, "")}${GO_OG_IMAGE_PATH}`;
+}
 
 /** Web Share／shareOrCopy title — catalog entry title only. */
 export function goSamShareTitle(entry: Pick<GoCatalogEntry, "title">): string {
@@ -61,23 +73,31 @@ export function goInviteCanonicalUrl(
   return id ? `${origin}/i/${encodeURIComponent(id)}` : `${origin}/`;
 }
 
-/** Fields for svelte:head Open Graph／Twitter text cards (no image). */
+/** Fields for svelte:head Open Graph／Twitter cards. */
 export type GoOgMeta = {
   title: string;
   description: string;
   url: string;
   siteName: string;
+  image: string;
+  imageWidth: number;
+  imageHeight: number;
 };
 
 export function goOgMeta(input: {
   title: string;
   description: string;
   url: string;
+  /** Override default go origin for og:image（tests）. */
+  origin?: string;
 }): GoOgMeta {
   return {
     title: input.title,
     description: input.description,
     url: input.url,
     siteName: GO_SITE_NAME,
+    image: goOgImageUrl(input.origin ?? PLAYGROUNDS_GO_ORIGIN),
+    imageWidth: GO_OG_IMAGE_WIDTH,
+    imageHeight: GO_OG_IMAGE_HEIGHT,
   };
 }

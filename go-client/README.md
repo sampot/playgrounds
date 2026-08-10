@@ -36,7 +36,7 @@ Requires Custom Domain `go.samkuo.me` (and possibly a dashboard Worker Route so 
 | `/s/<catalog_id>` | Solo catalog play — per-entry share／OG title；visit-then-offline；local scores |
 | `/` | Home recommendations；PWA start_url |
 
-Build prerenders listed `/s/<id>` HTML so chat／social crawlers see distinct `og:title` (e.g. `打磚塊 · 山姆鍋遊樂場`) and brand-prefixed descriptions. No `og:image` by design.
+Build prerenders listed `/s/<id>` HTML so chat／social crawlers see distinct `og:title` (e.g. `打磚塊 · 山姆鍋遊樂場`) and brand-prefixed descriptions. Site-level `og:image`＝`/og.png`（1200×630；非每小品圖）.
 
 ## Flow
 
