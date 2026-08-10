@@ -10,9 +10,10 @@ export const PLAY_ORIGIN = "https://play.samkuo.me";
 
 /**
  * Field SAM catalog filtered to games — chrome「山姆鍋遊樂場」主連.
- * Query 契約：`?kind=`（見 PG-CATALOG-UX-PLAN／`catalogUrlSearchParams`）。
+ * Query 契約：`?kind=`（見 PG-CATALOG-UX-PLAN／`catalogUrlSearchParams`）；
+ * `from=go`＝一鍵開走純玩 `/s/<id>`（非場 `/?open=`）。
  */
-export const PLAY_CATALOG_HREF = `${PLAY_ORIGIN}/sam/?kind=game`;
+export const PLAY_CATALOG_HREF = `${PLAY_ORIGIN}/sam/?kind=game&from=go`;
 
 function popupLooksReal(w: Window | null): boolean {
   if (!w || w === window) return false;

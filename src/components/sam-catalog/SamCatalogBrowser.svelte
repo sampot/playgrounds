@@ -9,12 +9,14 @@
     catalogSeriesOptions,
     catalogUrlSearchParams,
     filterCatalogEntries,
+    isCatalogGoMode,
     parseCatalogUrlSearch,
     samCatalog,
     samCatalogPage,
     samPlaygroundsPicks,
     type CatalogDensity,
     type CatalogHumanFilter,
+    type CatalogOpenMode,
     type SamEntry,
     type SamKind,
   } from "../../data/samCatalog";
@@ -55,6 +57,9 @@
   let selectedKinds = $state<SamKind[]>([]);
   let selectedSeries = $state<string[]>([]);
   let density = $state<CatalogDensity>("compact");
+  /** Preserved from `?from=go` while syncing filter query. */
+  let goMode = $state(false);
+  let openMode = $derived<CatalogOpenMode>(goMode ? "go" : "field");
   let searchEl = $state<HTMLInputElement | null>(null);
   let canShare = $state(false);
   let shareBusy = $state(false);
@@ -135,7 +140,7 @@
 
   function writeUrl(next: CatalogHumanFilter = filter) {
     if (typeof location === "undefined") return;
-    const params = catalogUrlSearchParams(next);
+    const params = catalogUrlSearchParams(next, { goMode });
     const qs = params.toString();
     const path = `${location.pathname}${qs ? `?${qs}` : ""}${location.hash}`;
     const cur = `${location.pathname}${location.search}${location.hash}`;
@@ -260,10 +265,11 @@
     }
 
     if (syncUrl) {
+      goMode = isCatalogGoMode(location.search);
       applyFilter(readInitialFromLocation(), { pushUrl: false });
       // Clear bare kind／series hashes once query owns state (keep shareable ?).
       if (location.hash && (selectedKinds.length || selectedSeries.length)) {
-        const params = catalogUrlSearchParams(filter);
+        const params = catalogUrlSearchParams(filter, { goMode });
         const qs = params.toString();
         history.replaceState(
           null,
@@ -303,6 +309,7 @@
     <SamCatalogPicksShelf
       {picks}
       {onOpen}
+      {openMode}
       {disabled}
       dense={variant === "panel"}
     />
@@ -441,6 +448,7 @@
                   {entry}
                   {density}
                   {onOpen}
+                  {openMode}
                   {disabled}
                   onShareResult={setFlash}
                 />

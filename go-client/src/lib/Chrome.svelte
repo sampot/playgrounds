@@ -6,7 +6,6 @@
   import { nextSameKind, recommendSameKind } from "$lib/goCatalog";
   import {
     openPlaygroundCatalog,
-    openPlaygroundHome,
     PLAY_CATALOG_HREF,
     PLAY_ORIGIN,
   } from "$lib/openPlayground";
@@ -285,18 +284,19 @@
   >
     <a
       class="mark-link"
-      href={`${PLAY_ORIGIN}/`}
-      title={`山姆鍋遊樂場（${playHost}）`}
-      target="_blank"
-      rel="noopener noreferrer"
-      onclick={openPlaygroundHome}
+      href="/"
+      title="純玩首頁"
+      onclick={() => {
+        moreOpen = false;
+        shareOpen = false;
+      }}
     >
       <img
         class="mark"
         src="/favicon.svg"
         width="22"
         height="22"
-        alt="山姆鍋"
+        alt="純玩"
       />
     </a>
     <a

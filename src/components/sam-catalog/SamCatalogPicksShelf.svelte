@@ -1,25 +1,36 @@
 <script lang="ts">
   import {
     SAM_KIND_LABEL,
-    samOpenHref,
+    samCatalogOpenHref,
     samPlaygroundsPicks,
+    type CatalogOpenMode,
     type SamEntry,
   } from "../../data/samCatalog";
 
   let {
     picks = samPlaygroundsPicks(),
     onOpen,
+    openMode = "field",
     disabled = false,
     dense = false,
     showHeading = true,
   }: {
     picks?: SamEntry[];
     onOpen?: (entry: SamEntry) => void;
+    /** `go`：精選卡 → go `/s/<id>`（忽略 onOpen）. */
+    openMode?: CatalogOpenMode;
     disabled?: boolean;
     /** Tighter chips for panel／dialog. */
     dense?: boolean;
     showHeading?: boolean;
   } = $props();
+
+  let useFieldOnOpen = $derived(openMode === "field" && Boolean(onOpen));
+  let picksDesc = $derived(
+    openMode === "go"
+      ? "精選小品——點一下就開玩"
+      : "精選小品——點一下就開進本場"
+  );
 </script>
 
 <section
@@ -30,19 +41,19 @@
   {#if showHeading}
     <div class="picks-shelf-head">
       <h2 id="picks-shelf-heading">玩玩看</h2>
-      <p class="picks-shelf-desc">精選小品——點一下就開進本場</p>
+      <p class="picks-shelf-desc">{picksDesc}</p>
     </div>
   {/if}
   <ul class="picks-shelf-list" aria-label="精選小品">
     {#each picks as entry (entry.id)}
       <li>
-        {#if onOpen}
+        {#if useFieldOnOpen}
           <button
             type="button"
             class="picks-shelf-card"
             {disabled}
             title={entry.blurb}
-            onclick={() => onOpen(entry)}
+            onclick={() => onOpen?.(entry)}
           >
             <span class="picks-shelf-kind">{SAM_KIND_LABEL[entry.kind]}</span>
             <span class="picks-shelf-title">{entry.title}</span>
@@ -51,7 +62,7 @@
         {:else}
           <a
             class="picks-shelf-card"
-            href={samOpenHref(entry)}
+            href={samCatalogOpenHref(entry, openMode)}
             title={entry.blurb}
           >
             <span class="picks-shelf-kind">{SAM_KIND_LABEL[entry.kind]}</span>

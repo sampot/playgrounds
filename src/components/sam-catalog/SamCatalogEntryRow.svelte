@@ -3,10 +3,11 @@
   import ShareSheet from "@components/ShareSheet.svelte";
   import {
     SAM_KIND_LABEL,
-    samOpenHref,
+    samCatalogOpenHref,
     samOpenShareHref,
     samSourceHref,
     type CatalogDensity,
+    type CatalogOpenMode,
     type SamEntry,
   } from "../../data/samCatalog";
 
@@ -14,6 +15,7 @@
     entry,
     density = "compact",
     onOpen,
+    openMode = "field",
     disabled = false,
     onShareResult,
   }: {
@@ -21,6 +23,8 @@
     density?: CatalogDensity;
     /** Shell／panel：in-place open. Page：omit → `/?open=` link. */
     onOpen?: (entry: SamEntry) => void;
+    /** `go`：一鍵開 → go `/s/<id>`（忽略 onOpen）. */
+    openMode?: CatalogOpenMode;
     disabled?: boolean;
     onShareResult?: (message: string) => void;
   } = $props();
@@ -28,6 +32,8 @@
   let blurbOpen = $state(false);
   let shareOpen = $state(false);
   let showBlurb = $derived(density === "comfortable" || blurbOpen);
+  let useFieldOnOpen = $derived(openMode === "field" && Boolean(onOpen));
+  let openHref = $derived(samCatalogOpenHref(entry, openMode));
 
   const shareUrl = $derived(samOpenShareHref(entry));
   const shareSpoken = $derived.by(() => {
@@ -92,17 +98,17 @@
     >
       分享
     </button>
-    {#if onOpen}
+    {#if useFieldOnOpen}
       <button
         type="button"
         class="catalog-row-open"
         {disabled}
-        onclick={() => onOpen(entry)}
+        onclick={() => onOpen?.(entry)}
       >
-        開啟編輯
+        一鍵開
       </button>
     {:else}
-      <a class="catalog-row-open" href={samOpenHref(entry)}>開啟編輯</a>
+      <a class="catalog-row-open" href={openHref}>一鍵開</a>
     {/if}
   </div>
 

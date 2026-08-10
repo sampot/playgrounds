@@ -15,9 +15,9 @@ import {
   filterCatalogEntries,
   findCatalogBySource,
   getCatalogEntry,
+  isCatalogGoMode,
   isSampotCatalogSource,
   listCatalogEntries,
-  listRegisteredCatalogEntries,
   matchCatalogForProtocol,
   matchInstalledForProtocol,
   normalizeCatalogSource,
@@ -25,7 +25,7 @@ import {
   resolveCatalogInviteCandidates,
   resolveInviteCandidates,
   samCatalog,
-  samCatalogRegistered,
+  samCatalogOpenHref,
   samEntryOpenSource,
   samOpenHref,
   samOpenShareHref,
@@ -455,6 +455,29 @@ describe("catalog human filter (UX)", () => {
     );
     expect(parseCatalogUrlSearch("").q).toBe("");
     expect(parseCatalogUrlSearch("kind=nope").kinds).toEqual([]);
+  });
+
+  it("detects go mode and preserves from=go in URL params", () => {
+    expect(isCatalogGoMode("?kind=game&from=go")).toBe(true);
+    expect(isCatalogGoMode("kind=game")).toBe(false);
+    expect(isCatalogGoMode("from=play")).toBe(false);
+    const filter = {
+      q: "",
+      kinds: ["game"] as const,
+      series: [],
+    };
+    expect(catalogUrlSearchParams(filter, { goMode: true }).toString()).toBe(
+      "kind=game&from=go"
+    );
+    expect(catalogUrlSearchParams(filter).toString()).toBe("kind=game");
+  });
+
+  it("builds field vs go open hrefs for 一鍵開", () => {
+    const entry = getCatalogEntry("pg-breakout")!;
+    expect(samCatalogOpenHref(entry, "field")).toBe(samOpenHref(entry));
+    expect(samCatalogOpenHref(entry, "go")).toBe(
+      "https://go.samkuo.me/s/pg-breakout"
+    );
   });
 
   it("lists series options scoped by kind", () => {

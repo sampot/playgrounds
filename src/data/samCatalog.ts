@@ -443,6 +443,38 @@ export function samOpenHref(
   return `/?${params.toString()}`;
 }
 
+/** Query flag: catalog opened from pure-play go（一鍵開 → go `/s/<id>`）. */
+export const CATALOG_GO_MODE_PARAM = "from";
+export const CATALOG_GO_MODE_VALUE = "go";
+
+export type CatalogOpenMode = "field" | "go";
+
+/** True when `/sam/?from=go`（go client → field catalog）. */
+export function isCatalogGoMode(
+  search: string | URLSearchParams
+): boolean {
+  const params =
+    typeof search === "string"
+      ? new URLSearchParams(
+          search.startsWith("?") ? search.slice(1) : search
+        )
+      : search;
+  return params.get(CATALOG_GO_MODE_PARAM) === CATALOG_GO_MODE_VALUE;
+}
+
+/**
+ * Primary open CTA href for a catalog row／pick.
+ * - `field` → same-origin `/?open=`（edit／experiment）
+ * - `go` → absolute go `/s/<id>`（pure play）
+ */
+export function samCatalogOpenHref(
+  entry: Pick<SamEntry, "id" | "title" | "source">,
+  mode: CatalogOpenMode = "field"
+): string {
+  if (mode === "go") return samOpenShareHref(entry);
+  return samOpenHref(entry);
+}
+
 /** Absolute open URL on the default field (`play.samkuo.me`). */
 export function samOpenCanonicalHref(
   entry: Pick<SamEntry, "title" | "source">
@@ -666,13 +698,17 @@ export function parseCatalogUrlSearch(
 
 /** Build shareable query params（omit empty）. */
 export function catalogUrlSearchParams(
-  filter: CatalogHumanFilter
+  filter: CatalogHumanFilter,
+  options?: { goMode?: boolean }
 ): URLSearchParams {
   const params = new URLSearchParams();
   const q = filter.q.trim();
   if (q) params.set("q", q);
   if (filter.kinds.length) params.set("kind", filter.kinds.join(","));
   if (filter.series.length) params.set("series", filter.series.join(","));
+  if (options?.goMode) {
+    params.set(CATALOG_GO_MODE_PARAM, CATALOG_GO_MODE_VALUE);
+  }
   return params;
 }
 
