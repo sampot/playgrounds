@@ -7,8 +7,6 @@
 > **交付要求：** 遊戲只能以 HTML + CSS + JavaScript 形式交付，禁止任何 build 階段。
 > **測試指引：** 開發過程可使用 Vitest 執行單元測試。
 > **倉庫說明：** 每個遊戲都是獨立的 GitHub repo，本地路徑位於 `~/dev/sampot/<repo-name>`。
-> **交付要求：** 遊戲只能以 HTML + CSS + JavaScript 形式交付，禁止任何 build 階段。
-> **測試指引：** 開發過程可使用 Vitest 執行單元測試。
 
 純玩入口：`https://go.samkuo.me/s/<id>` · 場型錄：`/sam/?kind=game`
 
@@ -153,6 +151,12 @@
 
 - **非 game：** `toy`／`tool`／`agent`／`media` 不列本檔（例：`pg-cellife` 生命格子＝玩具模擬）。
 - **命名：** 勿與既有 id／玩法撞名（例：魔術方塊 `pg-rubik` ≠ 俄羅斯方塊 `pg-tetris`）。
-- **持久狀態：** 有分數／進度的新作應走 `functions.js` → `env.KV`／`env.DB`（場與 go 同形），勿讓 UI 直寫裸 `localStorage` 當權威。
+- **持久狀態（分數／進度）：** 有分數／進度的新作，前端只能透過 **`fetch('/api/…')`** 調用，由 runtime 代為持久化；**禁止** UI 直寫裸 `localStorage` 當權威（僅可作輕量臨時緩存）。規則如下：
+  - **KV（Durable；跨沙盒共享，適合單鍵數值如最高分／關卡）**：`GET /api/kv/{key}` 讀、`PUT /api/kv/{key}`（body＝字串值）寫、`DELETE /api/kv/{key}` 刪。範例（以 `pg-gongzhu` 為藍本）：
+    - 讀：`const res = await fetch('/api/kv/highscore'); const value = await res.text();`
+    - 寫：`await fetch('/api/kv/highscore', { method: 'PUT', body: String(score) });`
+    - 對照組：`functions.js` 內側等同 `await env.KV.get(key, 'text')`／`await env.KV.put(key, value)`（場與 go 同形；見 [`playgrounds-host-api.md`](./playgrounds-host-api.md) 的 `GET/PUT/DELETE /api/kv` 與 `env.KV` binding）。
+  - **DB（仿 D1 子集，適合多欄／查詢的複雜資料）**：走 `/api/db/…`（規格見 `playgrounds-host-api.md` 的 `env.DB`；遊戲類多數用不到，優先 KV）。
+  - 需要跨欄位原子更新或更進階時，才考慮在 SAM 內自帶 `functions.js` 路由（仍以 `env.KV`／`env.DB` 為權威）。
 - **美術／音效／音樂：** 本機庫 [`game-assets/`](../game-assets/)（二進位不進 git）可用於開發遊戲；定稿拷進各 `pg-*`，勿當 runtime 路徑。**署名硬規則：** 依授權要求署名；**不要求署名也要署名**（見該目錄 README／`ATTRIBUTION.md`）。
 - **Backlog 排序：** 以資源就緒度為主軸；台灣味優先但非硬限制。入庫新 pack 後重排對應列的就緒度。
