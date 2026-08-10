@@ -191,7 +191,7 @@ button, .btn {
   align-items: center;
   transition: transform 0.15s var(--ease), filter 0.15s var(--ease);
 }
-html[data-theme="dark"] button:not(.secondary):not(.danger):not(.icon-btn):not(.tab):not(.linkish),
+html[data-theme="dark"] button:not(.secondary):not(.danger):not(.icon-btn):not(.tab):not(.linkish):not(.seg-btn),
 html[data-theme="dark"] .btn:not(.secondary) {
   color: #06201c;
 }
@@ -296,6 +296,31 @@ label.meta {
   font-weight: 550;
 }
 .tab[aria-selected="true"] {
+  color: rgb(var(--ink));
+  border-bottom-color: rgb(var(--accent));
+}
+.dashnav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+  border-bottom: 1px solid rgb(var(--line));
+}
+.dashnav-link {
+  background: transparent;
+  color: color-mix(in oklab, rgb(var(--ink)) 62%, transparent);
+  text-decoration: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: 0.55rem 0.75rem;
+  margin-bottom: -1px;
+  font-weight: 550;
+}
+.dashnav-link:hover {
+  color: rgb(var(--ink));
+}
+.dashnav-link.on {
   color: rgb(var(--ink));
   border-bottom-color: rgb(var(--accent));
 }
@@ -467,7 +492,7 @@ label.meta {
   border: 0;
   border-radius: 0;
   background: transparent;
-  color: color-mix(in oklab, rgb(var(--ink)) 70%, transparent);
+  color: color-mix(in oklab, rgb(var(--ink)) 72%, transparent);
   cursor: pointer;
   font: inherit;
 }
@@ -477,6 +502,10 @@ label.meta {
 .seg-btn.seg-on {
   background: rgb(var(--accent));
   color: #fff;
+}
+/* Dark theme: accent is a light teal, so selected text flips to near-black. */
+html[data-theme="dark"] .seg-btn.seg-on {
+  color: #06201c;
 }
 .num {
   width: 4.5rem;
