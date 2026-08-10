@@ -12,13 +12,14 @@
 
 ---
 
-## 已實作（47）
+## 已實作（48）
 
-### 精緻可玩（7＋1 unlisted）
+### 精緻可玩（8＋1 unlisted）
 | id | 標題 | 一句話 |
 | --- | --- | --- |
 | `pg-chengyu` | 成語接龍 | 末字起頭接龍、挑戰計分與人機 |
 | `pg-hopkick` | 跳房子踢毽子 | 跳房子節拍點格與踢毽子連擊 |
+| `pg-microdungeon` | 迷你地城 | 5 樓逐層往下回合制隨機地城、戰鬥寶箱藥水 |
 | `pg-rubik` | 魔術方塊 | 3×3 轉看／轉層／打亂／計時；本機最佳 |
 | `pg-skyburst` | 蒼穹連射 | 垂直捲軸射擊、武裝升級、首領彈幕 |
 | `pg-sokoban` | 推箱子 | 十二關、復原、滑動操作 |
@@ -111,7 +112,6 @@
 | 高 | ✓ | `pg-shanghaimj` | 麻將消消 | 懷舊 | `art/riichi-mahjong-tiles/`、`sfx/ui-audio/` | **新**；牌面堆疊消對（≠台規十六張對局） |
 | 高 | · | `pg-foodcatch` | 接食材 | 街機 | `art/food-kit/`、`art/particle-pack/`、`sfx/impact-sounds/` | **新**；接落物／躲炸彈；≠ `pg-fruitcut` 滑切 |
 | 高 | · | `pg-cityroam` | 巷弄迷走 | 街機 | `art/roguelike-modern-city/`、`sfx/rpg-audio/`、`music/hydrogene-16bit-rpg/` | **新**；小地圖收集／避開 |
-| 高 | · | `pg-microdungeon` | 迷你地城 | 精緻可玩 | `sfx/oga-rpg-sound-pack/`、`music/hydrogene-8bit-musics/`、`art/1-bit-pack/` 或 `puzzle-pack-1/` | **新**；短關探索＋戰鬥節奏 |
 | 高 | · | `pg-reacttap` | 表情對決 | 精緻可玩 | `art/emotes-pack/`、`art/toon-characters/`、`sfx/voiceover-pack/` | **新**；出題反應／搶拍 |
 | 中 | ✓ | `pg-mines` | 踩地雷 | 懷舊 | `sfx/oga-8-bit-sound-effect-pack/`、`art/ui-pack/` | 盤面多半程式繪；電腦課經典 |
 | 中 | ✓ | `pg-solitaire` | 接龍 | 懷舊 | `art/playing-cards-pack/` | **新**；克朗代克；與新接龍並列無妨 |
@@ -135,6 +135,7 @@
 | 夜市射氣球／套圈／打地鼠／切水果 | `pg-popshot`、`pg-ringtoss`、`pg-moletap`、`pg-fruitcut` |
 | 小瑪莉、夾娃娃、推幣、釘珠、賽馬燈、賓果燈 | `pg-mali`、`pg-clawgrab`、`pg-coinpush`、`pg-pinfall`、`pg-horselit`、`pg-bingolite` |
 | 跳房子／踢毽子、木頭人、飛行棋簡化、躍階平台 | `pg-hopkick`、`pg-statue`、`pg-wingrace`、`pg-leaptrail`、`pg-pixelhop` |
+| 短關地城探索／戰鬥節奏 | `pg-microdungeon` |
 | 固定畫面太空射擊 | `pg-starshot`（若做 `pg-spacepulse` 須機制明顯不同） |
 | 固定點線塔防 | `pg-towerdef`（`pg-sandrts`＝自由佈局＋出擊 AI，勿做成複製品） |
 

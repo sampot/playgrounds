@@ -570,6 +570,16 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     license: "MIT",
   },
   {
+    id: "pg-microdungeon",
+    title: "迷你地城",
+    kind: "game",
+    series: "精緻可玩",
+    blurb: "5 樓逐層往下的回合制隨機地城；每局重生，探索、戰鬥、寶箱、藥水；行動裝置優先、無依賴。",
+    source: "sampot/pg-microdungeon",
+    status: "listed",
+    license: "MIT",
+  },
+  {
     id: "pg-mockdata",
     title: "假資料小造",
     kind: "tool",
