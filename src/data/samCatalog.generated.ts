@@ -278,6 +278,16 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     license: "MIT",
   },
   {
+    id: "pg-freecell",
+    title: "新接龍",
+    kind: "game",
+    series: "懷舊",
+    blurb: "電腦課回憶；八列牌、四暫存、四回收，全數歸位即勝。",
+    source: "sampot/pg-freecell",
+    status: "listed",
+    license: "MIT",
+  },
+  {
     id: "pg-frogcross",
     title: "青蛙過街",
     kind: "game",

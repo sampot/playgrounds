@@ -1,0 +1,7 @@
+title: 新接龍
+kind: game
+series: 懷舊
+blurb: 電腦課回憶；八列牌、四暫存、四回收，全數歸位即勝。
+source: sampot/pg-freecell
+license: MIT
+status: listed

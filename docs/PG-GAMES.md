@@ -12,7 +12,7 @@
 
 ---
 
-## 已實作（45）
+## 已實作（46）
 
 ### 精緻可玩（7＋1 unlisted）
 || id | 標題 | 一句話 |
@@ -43,11 +43,12 @@
 || `pg-topduel` | 陀螺對戰 | 蓄力發射、轉速碰撞 |
 || `pg-towerdef` | 迷你塔防 | 戰役星等、無盡模式 |
 
-### 懷舊（8）
+### 懷舊（9）
 
 || id | 標題 | 一句話 |
 | --- | --- | --- |
 || `pg-banqi` | 暗棋對弈 | 翻子吃子、簡易人機 |
+|| `pg-freecell` | 新接龍 | 電腦課經典；八列牌、四暫存、四回收 |
 || `pg-fruitcut` | 切水果 | 滑動切菜、炸彈、三命 |
 || `pg-jungle` | 鬥獸棋 | 獸穴、陷阱、河界 |
 || `pg-moletap` | 地洞敲敲 | 夜市節奏敲擊 |
@@ -102,7 +103,6 @@
 
 || 就緒 | 台灣味 | 建議 id | 標題（暫） | 系列（暫） | 主要 `game-assets/` | 備註 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-|| 高 | ✓ | `pg-freecell` | 新接龍 | 懷舊 | `art/playing-cards-pack/`、`sfx/ui-audio/` | 電腦課回憶；單機 |
 || 高 | ✓ | `pg-zhuagui` | 抓烏龜 | 桌遊 | `art/playing-cards-pack/` | 童玩抽對子；輕量 |
 || 高 | ✓ | `pg-xinzang` | 心臟病 | 桌遊 | `art/playing-cards-pack/` 或 `art/puzzle-pack-1/` | 翻牌搶拍；符號版亦可 |
 || 高 | ✓ | `pg-liarsdice` | 大話骰 | 桌遊 | `art/oga-simple-dice/`、`sfx/casino-audio/` | 熱座或簡易人機 |
@@ -131,7 +131,7 @@
 
 || 題材 | 既有 id |
 | --- | --- |
-|| 尪仔標、路名地產、成語、暗棋、鬥獸棋、軍棋、象棋、大老二、撿紅點、台灣麻將 | `pg-wanzai`、`pg-twland`、`pg-chengyu`、`pg-banqi`、`pg-jungle`、`pg-junqi`、`pg-xiangqi`、`pg-big2`、`pg-redpick`、`pg-mahjong` |
+|| 尪仔標、路名地產、成語、暗棋、鬥獸棋、軍棋、象棋、大老二、撿紅點、台灣麻將、新接龍 | `pg-wanzai`、`pg-twland`、`pg-chengyu`、`pg-banqi`、`pg-jungle`、`pg-junqi`、`pg-xiangqi`、`pg-big2`、`pg-redpick`、`pg-mahjong`、`pg-freecell` |
 || 夜市射氣球／套圈／打地鼠／切水果 | `pg-popshot`、`pg-ringtoss`、`pg-moletap`、`pg-fruitcut` |
 || 小瑪莉、夾娃娃、推幣、釘珠、賽馬燈、賓果燈 | `pg-mali`、`pg-clawgrab`、`pg-coinpush`、`pg-pinfall`、`pg-horselit`、`pg-bingolite` |
 || 跳房子／踢毽子、木頭人、飛行棋簡化、躍階平台 | `pg-hopkick`、`pg-statue`、`pg-wingrace`、`pg-leaptrail` |
