@@ -657,6 +657,16 @@
       "license": "MIT"
     },
     {
+      "id": "pg-pixelhop",
+      "title": "像素躍階",
+      "kind": "game",
+      "series": "街機",
+      "blurb": "橫向 2D 平台動作；5 個關卡收金幣、踩黏液、避尖刺；純前端輕量、mobile-first。",
+      "source": "sampot/pg-pixelhop",
+      "status": "listed",
+      "license": "MIT"
+    },
+    {
       "id": "pg-popshot",
       "title": "射氣球",
       "kind": "game",

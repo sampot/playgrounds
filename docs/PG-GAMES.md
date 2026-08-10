@@ -12,7 +12,7 @@
 
 ---
 
-## 已實作（46）
+## 已實作（47）
 
 ### 精緻可玩（7＋1 unlisted）
 | id | 標題 | 一句話 |
@@ -26,7 +26,7 @@
 | `pg-sandrts` | 沙丘戰線 | **unlisted**；障礙繞行＋空襲；指揮部被毀即出局 |
 | `pg-gongzhu` | 抽豬 | 夜市抽卡遊戲、避豬計分 |
 
-### 街機（12）
+### 街機（13）
 
 | id | 標題 | 一句話 |
 | --- | --- | --- |
@@ -37,6 +37,7 @@
 | `pg-leaptrail` | 躍階旅人 | 短關平台跳躍 |
 | `pg-marblepit` | 玻璃彈珠坑 | 凹坑對撞、撥彈進洞 |
 | `pg-mazeglow` | 迴廊拾光 | 迷宮撿光、反制追逐 |
+| `pg-pixelhop` | 像素躍階 | 5 個關卡收金幣、踩黏液、避尖刺；mobile-first |
 | `pg-starshot` | 星屑出擊 | 固定畫面太空射擊 |
 | `pg-tankduel` | 戰車對決 | 俯視坦克人機／觀戰 |
 | `pg-tetris` | 俄羅斯方塊 | 七種方塊、消行升級 |
@@ -102,14 +103,13 @@
 ### Backlog（依資源就緒度）
 
 | 就緒 | 台灣味 | 建議 id | 標題（暫） | 系列（暫） | 主要 `game-assets/` | 備註 |
-| --- | --- | --- | --- | --- | --- | --- | --- |
+| --- | --- | --- | --- | --- | --- | --- |
 | 高 | ✓ | `pg-zhuagui` | 抓烏龜 | 桌遊 | `art/playing-cards-pack/` | 童玩抽對子；輕量 |
 | 高 | ✓ | `pg-xinzang` | 心臟病 | 桌遊 | `art/playing-cards-pack/` 或 `art/puzzle-pack-1/` | 翻牌搶拍；符號版亦可 |
 | 高 | ✓ | `pg-liarsdice` | 大話骰 | 桌遊 | `art/oga-simple-dice/`、`sfx/casino-audio/` | 熱座或簡易人機 |
 | 高 | ✓ | `pg-lianlian` | 連連看 | 懷舊 | `art/puzzle-pack-1/`、`sfx/oga-512-8bit-sfx/`、`music/blippy-bits/` | 網咖世代；路徑相連消對 |
 | 高 | ✓ | `pg-shanghaimj` | 麻將消消 | 懷舊 | `art/riichi-mahjong-tiles/`、`sfx/ui-audio/` | **新**；牌面堆疊消對（≠台規十六張對局） |
 | 高 | · | `pg-foodcatch` | 接食材 | 街機 | `art/food-kit/`、`art/particle-pack/`、`sfx/impact-sounds/` | **新**；接落物／躲炸彈；≠ `pg-fruitcut` 滑切 |
-| 高 | · | `pg-pixelhop` | 像素躍階 | 街機 | `art/new-platformer-pack-1.1/`／`pixel-platformer/`、`music/oga-5-chiptunes-action/` | **新**；新關卡皮與手感；勿無謂重做 `pg-leaptrail` |
 | 高 | · | `pg-cityroam` | 巷弄迷走 | 街機 | `art/roguelike-modern-city/`、`sfx/rpg-audio/`、`music/hydrogene-16bit-rpg/` | **新**；小地圖收集／避開 |
 | 高 | · | `pg-microdungeon` | 迷你地城 | 精緻可玩 | `sfx/oga-rpg-sound-pack/`、`music/hydrogene-8bit-musics/`、`art/1-bit-pack/` 或 `puzzle-pack-1/` | **新**；短關探索＋戰鬥節奏 |
 | 高 | · | `pg-reacttap` | 表情對決 | 精緻可玩 | `art/emotes-pack/`、`art/toon-characters/`、`sfx/voiceover-pack/` | **新**；出題反應／搶拍 |
@@ -134,7 +134,7 @@
 | 尪仔標、路名地產、成語、暗棋、鬥獸棋、軍棋、象棋、大老二、撿紅點、台灣麻將、新接龍 | `pg-wanzai`、`pg-twland`、`pg-chengyu`、`pg-banqi`、`pg-jungle`、`pg-junqi`、`pg-xiangqi`、`pg-big2`、`pg-redpick`、`pg-mahjong`、`pg-freecell` |
 | 夜市射氣球／套圈／打地鼠／切水果 | `pg-popshot`、`pg-ringtoss`、`pg-moletap`、`pg-fruitcut` |
 | 小瑪莉、夾娃娃、推幣、釘珠、賽馬燈、賓果燈 | `pg-mali`、`pg-clawgrab`、`pg-coinpush`、`pg-pinfall`、`pg-horselit`、`pg-bingolite` |
-| 跳房子／踢毽子、木頭人、飛行棋簡化、躍階平台 | `pg-hopkick`、`pg-statue`、`pg-wingrace`、`pg-leaptrail` |
+| 跳房子／踢毽子、木頭人、飛行棋簡化、躍階平台 | `pg-hopkick`、`pg-statue`、`pg-wingrace`、`pg-leaptrail`、`pg-pixelhop` |
 | 固定畫面太空射擊 | `pg-starshot`（若做 `pg-spacepulse` 須機制明顯不同） |
 | 固定點線塔防 | `pg-towerdef`（`pg-sandrts`＝自由佈局＋出擊 AI，勿做成複製品） |
 
