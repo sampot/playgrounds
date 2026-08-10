@@ -12,7 +12,7 @@
 
 ---
 
-## 已實作（48）
+## 已實作（49）
 
 ### 精緻可玩（8＋1 unlisted）
 | id | 標題 | 一句話 |
@@ -27,12 +27,13 @@
 | `pg-sandrts` | 沙丘戰線 | **unlisted**；障礙繞行＋空襲；指揮部被毀即出局 |
 | `pg-gongzhu` | 抽豬 | 夜市抽卡遊戲、避豬計分 |
 
-### 街機（13）
+### 街機（14）
 
 | id | 標題 | 一句話 |
 | --- | --- | --- |
 | `pg-airhockey` | 空氣曲棍球 | 球拍彈盤進門、先得七分 |
 | `pg-breakout` | 打磚塊 | 擋板反彈清磚 |
+| `pg-cityroam` | 巷弄迷走 | 街區撿金幣、躲警察、走到出口；30×20 格小地圖 |
 | `pg-dancepad` | 節奏踏墊 | 四軌箭頭下落、踩拍連擊 |
 | `pg-frogcross` | 青蛙過街 | 過馬路、木筏、進巢 |
 | `pg-leaptrail` | 躍階旅人 | 短關平台跳躍 |
@@ -70,7 +71,7 @@
 | `pg-mali` | 小瑪莉 | 復古燈圈跑燈 |
 | `pg-pinfall` | 釘雨落珠 | 發射撞釘入洞 |
 
-### 桌遊（10）
+### 桌遊（11）
 
 | id | 標題 | 一句話 |
 | --- | --- | --- |
@@ -111,7 +112,6 @@
 | 高 | ✓ | `pg-lianlian` | 連連看 | 懷舊 | `art/puzzle-pack-1/`、`sfx/oga-512-8bit-sfx/`、`music/blippy-bits/` | 網咖世代；路徑相連消對 |
 | 高 | ✓ | `pg-shanghaimj` | 麻將消消 | 懷舊 | `art/riichi-mahjong-tiles/`、`sfx/ui-audio/` | **新**；牌面堆疊消對（≠台規十六張對局） |
 | 高 | · | `pg-foodcatch` | 接食材 | 街機 | `art/food-kit/`、`art/particle-pack/`、`sfx/impact-sounds/` | **新**；接落物／躲炸彈；≠ `pg-fruitcut` 滑切 |
-| 高 | · | `pg-cityroam` | 巷弄迷走 | 街機 | `art/roguelike-modern-city/`、`sfx/rpg-audio/`、`music/hydrogene-16bit-rpg/` | **新**；小地圖收集／避開 |
 | 高 | · | `pg-reacttap` | 表情對決 | 精緻可玩 | `art/emotes-pack/`、`art/toon-characters/`、`sfx/voiceover-pack/` | **新**；出題反應／搶拍 |
 | 中 | ✓ | `pg-mines` | 踩地雷 | 懷舊 | `sfx/oga-8-bit-sound-effect-pack/`、`art/ui-pack/` | 盤面多半程式繪；電腦課經典 |
 | 中 | ✓ | `pg-solitaire` | 接龍 | 懷舊 | `art/playing-cards-pack/` | **新**；克朗代克；與新接龍並列無妨 |
@@ -136,6 +136,7 @@
 | 小瑪莉、夾娃娃、推幣、釘珠、賽馬燈、賓果燈 | `pg-mali`、`pg-clawgrab`、`pg-coinpush`、`pg-pinfall`、`pg-horselit`、`pg-bingolite` |
 | 跳房子／踢毽子、木頭人、飛行棋簡化、躍階平台 | `pg-hopkick`、`pg-statue`、`pg-wingrace`、`pg-leaptrail`、`pg-pixelhop` |
 | 短關地城探索／戰鬥節奏 | `pg-microdungeon` |
+| 小地圖收集／避開 | `pg-cityroam` |
 | 固定畫面太空射擊 | `pg-starshot`（若做 `pg-spacepulse` 須機制明顯不同） |
 | 固定點線塔防 | `pg-towerdef`（`pg-sandrts`＝自由佈局＋出擊 AI，勿做成複製品） |
 

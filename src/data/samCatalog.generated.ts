@@ -168,6 +168,16 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     license: "MIT",
   },
   {
+    id: "pg-cityroam",
+    title: "巷弄迷走",
+    kind: "game",
+    series: "街機",
+    blurb: "隨機街區撿金幣、躲警察、走到出口；30×20 格小地圖，行動裝置優先、無依賴。",
+    source: "sampot/pg-cityroam",
+    status: "listed",
+    license: "MIT",
+  },
+  {
     id: "pg-clawgrab",
     title: "夾娃娃",
     kind: "game",
