@@ -10,6 +10,10 @@ export function corsHeaders(req: Request): HeadersInit {
   };
   if (allow) {
     h["Access-Control-Allow-Origin"] = allow;
+    // First-party origins only (samkuo.me / localhost). sendBeacon and
+    // cross-origin fetch always use credentials mode "include", so the
+    // preflight + response must echo this or the browser blocks the request.
+    h["Access-Control-Allow-Credentials"] = "true";
     h["Vary"] = "Origin";
   }
   return h;
