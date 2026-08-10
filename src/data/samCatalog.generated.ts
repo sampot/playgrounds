@@ -288,6 +288,16 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     license: "MIT",
   },
   {
+    id: "pg-foodcatch",
+    title: "接食材",
+    kind: "game",
+    series: "街機",
+    blurb: "移動菜藍接住掉下來的食物、躲開壞掉的番茄；連擊加倍、20 秒升級。行動裝置優先、無依賴。",
+    source: "sampot/pg-foodcatch",
+    status: "unlisted",
+    license: "MIT",
+  },
+  {
     id: "pg-freecell",
     title: "新接龍",
     kind: "game",

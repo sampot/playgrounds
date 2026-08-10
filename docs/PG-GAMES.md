@@ -12,7 +12,7 @@
 
 ---
 
-## 已實作（49）
+## 已實作（50）
 
 ### 精緻可玩（8＋1 unlisted）
 | id | 標題 | 一句話 |
@@ -27,7 +27,7 @@
 | `pg-sandrts` | 沙丘戰線 | **unlisted**；障礙繞行＋空襲；指揮部被毀即出局 |
 | `pg-gongzhu` | 抽豬 | 夜市抽卡遊戲、避豬計分 |
 
-### 街機（14）
+### 街機（15）
 
 | id | 標題 | 一句話 |
 | --- | --- | --- |
@@ -35,6 +35,7 @@
 | `pg-breakout` | 打磚塊 | 擋板反彈清磚 |
 | `pg-cityroam` | 巷弄迷走 | 街區撿金幣、躲警察、走到出口；30×20 格小地圖 |
 | `pg-dancepad` | 節奏踏墊 | 四軌箭頭下落、踩拍連擊 |
+| `pg-foodcatch` | 接食材 | 移動菜藍接食物、躲壞番茄；連擊加倍、20 秒升級 |
 | `pg-frogcross` | 青蛙過街 | 過馬路、木筏、進巢 |
 | `pg-leaptrail` | 躍階旅人 | 短關平台跳躍 |
 | `pg-marblepit` | 玻璃彈珠坑 | 凹坑對撞、撥彈進洞 |
@@ -111,7 +112,6 @@
 | 高 | ✓ | `pg-liarsdice` | 大話骰 | 桌遊 | `art/oga-simple-dice/`、`sfx/casino-audio/` | 熱座或簡易人機 |
 | 高 | ✓ | `pg-lianlian` | 連連看 | 懷舊 | `art/puzzle-pack-1/`、`sfx/oga-512-8bit-sfx/`、`music/blippy-bits/` | 網咖世代；路徑相連消對 |
 | 高 | ✓ | `pg-shanghaimj` | 麻將消消 | 懷舊 | `art/riichi-mahjong-tiles/`、`sfx/ui-audio/` | **新**；牌面堆疊消對（≠台規十六張對局） |
-| 高 | · | `pg-foodcatch` | 接食材 | 街機 | `art/food-kit/`、`art/particle-pack/`、`sfx/impact-sounds/` | **新**；接落物／躲炸彈；≠ `pg-fruitcut` 滑切 |
 | 高 | · | `pg-reacttap` | 表情對決 | 精緻可玩 | `art/emotes-pack/`、`art/toon-characters/`、`sfx/voiceover-pack/` | **新**；出題反應／搶拍 |
 | 中 | ✓ | `pg-mines` | 踩地雷 | 懷舊 | `sfx/oga-8-bit-sound-effect-pack/`、`art/ui-pack/` | 盤面多半程式繪；電腦課經典 |
 | 中 | ✓ | `pg-solitaire` | 接龍 | 懷舊 | `art/playing-cards-pack/` | **新**；克朗代克；與新接龍並列無妨 |
