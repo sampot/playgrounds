@@ -9,10 +9,9 @@
 
 ---
 
-## 已實作（43）
+## 已實作（44）
 
 ### 精緻可玩（6＋1 unlisted）
-
 | id | 標題 | 一句話 |
 | --- | --- | --- |
 | `pg-chengyu` | 成語接龍 | 末字起頭接龍、挑戰計分與人機 |
@@ -74,6 +73,7 @@
 | `pg-mahjong` | 台灣麻將 | 十六張簡化台、補花吃碰槓胡、人機 |
 | `pg-match3` | 消消樂 | 三消、關卡目標 |
 | `pg-redpick` | 撿紅點 | 對點數撿牌、四人人機 |
+| `pg-shisan` | 十三支 | 十三張排前中後三墩、逐墩比牌 |
 | `pg-sudoku` | 數獨 | 九宮填數、難度／筆記／提示 |
 | `pg-tictactoe` | 井字遊戲 | 3×3、Minimax |
 | `pg-twland` | 台灣路名地產 | 買地蓋房、機會命運 |
@@ -98,7 +98,6 @@
 
 | 就緒 | 台灣味 | 建議 id | 標題（暫） | 系列（暫） | 主要 `game-assets/` | 備註 |
 | --- | --- | --- | --- | --- | --- | --- |
-| 高 | ✓ | `pg-shisan` | 十三支 | 桌遊 | `art/playing-cards-pack/`、`sfx/casino-audio/` | 四人比牌 |
 | 高 | ✓ | `pg-gongzhu` | 抽豬 | 桌遊 | 同上 | 避豬避羊計分 |
 | 高 | ✓ | `pg-freecell` | 新接龍 | 懷舊 | `art/playing-cards-pack/`、`sfx/ui-audio/` | 電腦課回憶；單機 |
 | 高 | ✓ | `pg-zhuagui` | 抓烏龜 | 桌遊 | `art/playing-cards-pack/` | 童玩抽對子；輕量 |
