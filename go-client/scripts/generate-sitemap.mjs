@@ -62,11 +62,10 @@ function escapeXml(s) {
     .replaceAll("'", "&apos;");
 }
 
-export function generateGoSitemap({
-  catalogJsonPath,
-  outPath,
-  origin = GO_SITEMAP_ORIGIN,
-} = {}) {
+/**
+ * @param {{ catalogJsonPath: string, outPath: string, origin?: string }} opts
+ */
+export function generateGoSitemap({ catalogJsonPath, outPath, origin = GO_SITEMAP_ORIGIN }) {
   const raw = JSON.parse(readFileSync(catalogJsonPath, "utf8"));
   const ids = listedCatalogIds(raw.entries ?? []);
   const xml = buildSitemapXml(origin, ids);
