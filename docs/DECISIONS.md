@@ -1,6 +1,6 @@
 # 我是山姆鍋 — 架構與工程決策
 
-> **最後更新：** 2026-08-11（DEC-052 Proposed：純玩版登入＋Header profile；玩家主場＝go、作者＝play、共用型錄）
+> **最後更新：** 2026-08-12（DEC-053 Revision：`createGoHostBinding` 落實——go 純玩版同形 `env.HOST` 注入）
 > **對象：** 作者、AI agents；必要時給之後的自己讀
 
 本文件以輕量 **ADR**（Architecture Decision Record）記錄本站**顯著且耐久**的架構／工程選擇：選了什麼、為何不選其他、後續工作不可踩破的後果。細節規格仍以 [AGENTS.md](./AGENTS.md)、[TOOLS-PLAN.md](./TOOLS-PLAN.md) 等為準；此檔是可掃讀的決策索引，避免只活在 PR 與聊天裡。
@@ -91,6 +91,7 @@
 | [DEC-050](#dec-050-playgrounds-純玩版客戶端-gosamkuome) | Playgrounds 純玩版客戶端＠`go.samkuo.me` | Proposed |
 | [DEC-051](#dec-051-playgrounds-api-scopes環境能力準入) | Playgrounds API scopes（環境能力準入） | Accepted |
 | [DEC-052](#dec-052-純玩版登入與-header-profile) | 純玩版登入（play 相容協定；玩家主場 go）＋ Header profile | Proposed |
+| [DEC-053](#dec-053-sam-ui-只走-apifunctionsjsshellruntime-走-env-binding) | SAM UI 只走 `/api` → `functions.js`；shell/runtime 走 env binding | Accepted |
 
 ---
 
@@ -1098,6 +1099,24 @@
   - 登入不阻擋未登入也能玩（DEC-050 快樂路徑）。
   - 同步 GLOSSARY、[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)、[PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md)。
 - **Revision（2026-08-11）：** 初版 Proposed；同日補玩家主場定位（作者＝play／玩家＝go／共用型錄）＋GO-INVITE 後續輪廓。
+
+### DEC-053: SAM UI 只走 `/api` → `functions.js`；shell/runtime 走 env binding
+
+- **Status:** Accepted（2026-08-11；初版；`env.HOST`/`env.SESSION` 兩殼同形於 2026-08-12 落地 via `createGoHostBinding`）
+- **Context:** SAM 三層模型（DEC-024 / DEC-031）＝UI（`index.html`+`app.js`+css）／Infrastructure（`functions.js`）／Controller（`controller.js`）；後兩者共用同一組 resource 綁定（`env.KV`／`env.DB`／`env.HOST`／`env.SESSION` 等）。原本場殼 SW 與 go 純玩版 canvas bridge 各自攔截 `/api/shell/session/*`、`/api/shell/platform/*` 並在 shell 端實作，這讓同一份 `pg-gomoku` SAM 跑在場殼 `play` 與 go 純玩版時語意破（場殼走 `HostBridge`、go 走另一條 SW dispatch）。**UI 也因此被迫記得**兩條對外通道（`/api/...` 與 `/api/shell/...`），跟 DEC-024／031「UI 只走 functions.js」的分工衝突。
+- **Decision:**
+  1. **UI 對外契約：只有 `fetch('/api/...')`**。任何 `/api/shell/...` 路由都**不**是 UI 契約（即使 SW 仍派發以相容舊 SAM）；UI 不得直連。
+  2. **`functions.js` 是 SAM 的單一後端權威**：所有 `/api/host/session/*`、`/api/host/invite` 等路由由 SAM 自己的 `functions.js` 處理；`functions.js` 透過 `env.HOST`／`env.SESSION` 取得 shell/runtime 能力。
+  3. **`env.HOST` 兩殼同形**：場殼 `play`＝現有 [`HostBridge`](../../src/components/playgrounds/hostBridge.ts)；go 純玩版＝新增 [`createGoHostBinding`](../../go-client/src/lib/goHostBinding.ts) factory（DEC-017／023／053）。**不**另立 `env.SHELL`。
+  4. **`env.SESSION` 既有**（DEC-023）——僅 seated guest 注入；hostable sandbox 不注入。
+  5. **可攜性**：`pg-gomoku` 同一份 `functions.js` 在兩殼各看到自家 `env.HOST`；UI 與 routing 不需 fork。
+  6. **過渡層**：既有 `/api/shell/session/*` 與 `/api/shell/platform/*` SW dispatch（`goShellSession.ts`／`goShellPlatform.ts`）保留為未遷移 SAM 的相容層；新 SAM 不應依賴。
+- **Consequences:**
+  - 同步 GLOSSARY（新增 **host bridge (go)** 條）、[PG-GO-CLIENT-PLAN.md §6.7](./PG-GO-CLIENT-PLAN.md)、[playgrounds-host-api.md](./playgrounds-host-api.md) `env.HOST` 表。
+  - 不在 `functions.js` 內直接呼叫 SW dispatch 介面；只用 `env` binding。
+  - 不擴張 `env.HOST` 全表面（`runCmd`／`writeFile` 等留後續 PR；本期只補 pg-gomoku 用到的 session + invite 子集）。
+  - 非破壞變更：未遷移 SAM 仍能透過 `/api/shell/...` SW dispatch 運作。
+- **Revision（2026-08-12）：** `createGoHostBinding` 在 go 純玩版落實——hostable sandbox 注入同形 `env.HOST`；與 `hostInviteBind` 共用 `hostRuntime` 單例；既有 `/api/shell/session/*` 與 `/api/shell/platform/*` 派發降為過渡層（見 [PG-GO-CLIENT-PLAN.md §6.7.1](./PG-GO-CLIENT-PLAN.md)）。
 
 ---
 

@@ -15,6 +15,7 @@ import {
 import { mountGoCanvas, type GoCanvasMode } from "./mountGoCanvas";
 import { assertSamHasIndex, loadSamFiles } from "./samLoad";
 import type { FileMap } from "@pg/projectTypes";
+import type { HostRuntime } from "./hostRuntime";
 
 export type SoloPhase = "idle" | "loading" | "ready" | "error";
 
@@ -37,7 +38,15 @@ type Listener = (s: SoloStatus) => void;
 let samFilesRef: FileMap | null = null;
 let sandboxIdRef: string | null = null;
 
-export function createSoloRuntime() {
+export function createSoloRuntime(opts?: {
+  /**
+   * Lazy getter for the active HostRuntime (hostable SAMs only). When
+   * provided, mounted canvases will have `env.HOST` injected into functions.js
+   * (DEC-053). Resolve is deferred until each `/api/host/*` call so the bind
+   * lifecycle can complete after the canvas mounts.
+   */
+  getHostRuntime?: () => HostRuntime | null;
+}) {
   let status: SoloStatus = {
     phase: "idle",
     message: "",
@@ -141,6 +150,7 @@ export function createSoloRuntime() {
       generation += 1;
       const mounted = await mountGoCanvas(files, generation, {
         catalogId: entry.id,
+        getHostRuntime: opts?.getHostRuntime,
       });
       if (seq !== bootSeq) {
         mounted.dispose();

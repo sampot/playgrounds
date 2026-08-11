@@ -48,6 +48,16 @@ function emitPlatformEvent(ev: GoShellPlatformEvent): void {
   for (const l of platformListeners) l(ev);
 }
 
+/**
+ * Public helper: emit a Platform invite/compose (or login_needed) event into
+ * the go-client Platform event bus. Used by sibling subsystems — currently
+ * `goHostBinding.createPlatformInvite` — that need to surface their work to
+ * the page-level share-sheet flow without bypassing the listener contract.
+ */
+export function emitGoShellPlatformEvent(ev: GoShellPlatformEvent): void {
+  emitPlatformEvent(ev);
+}
+
 function jsonResponse(data: unknown, status = 200): SerializedResponse {
   const body = new TextEncoder().encode(JSON.stringify(data));
   return {

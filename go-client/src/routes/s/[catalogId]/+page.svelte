@@ -28,9 +28,10 @@
     type HostInviteController,
     type HostInviteShare,
   } from "$lib/hostInviteBind.svelte";
-  import { goAuth } from "$lib/goAuth.svelte";
-  import { hostableProtocolFor } from "$lib/goCatalog";
-  import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
+import { goAuth } from "$lib/goAuth.svelte";
+import { hostableProtocolFor } from "$lib/goCatalog";
+import type { HostRuntime } from "$lib/hostRuntime";
+import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
   import {
     endGoPlay,
     startGoAnalyticsFlusher,
@@ -59,7 +60,13 @@
   );
 
   let status = $state<SoloStatus | null>(null);
-  const runtime = createSoloRuntime();
+  // Mutable slot for the host-runtime getter (DEC-053 env.HOST). `hostInvite`
+  // is created in a `$effect` and binds a `HostRuntime` later than the canvas
+  // mounts, so we hand `soloRuntime` a getter that reads the latest binding.
+  let hostRuntimeRef: HostRuntime | null = null;
+  const runtime = createSoloRuntime({
+    getHostRuntime: () => hostRuntimeRef,
+  });
 
   // —— play analytics (PG-ANALYTICS-PLAN) ——
   let playTracker = $state<GoPlayTracker | null>(null);
@@ -198,6 +205,7 @@
     if (!id || !hostable) {
       hostInvite?.unbind();
       hostInvite = null;
+      hostRuntimeRef = null;
       return;
     }
     const bind = createHostInviteBind({
@@ -208,9 +216,14 @@
     });
     bind.bind();
     hostInvite = bind;
+    // DEC-053: hand `soloRuntime` the live HostRuntime so mounted canvases can
+    // resolve `env.HOST` (functions.js sees the same singleton the host bar
+    // uses — no split state).
+    hostRuntimeRef = bind.getHostRuntime();
     return () => {
       bind.unbind();
       if (hostInvite === bind) hostInvite = null;
+      hostRuntimeRef = null;
     };
   });
 

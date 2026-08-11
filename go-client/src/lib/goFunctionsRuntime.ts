@@ -1,5 +1,12 @@
 /**
  * go canvas `/api` → functions.js with env.KV／env.DB (IndexedDB／localStorage).
+ *
+ * Optional env.HOST injection (DEC-053): when the SAM is hostable (the page
+ * has bound a `HostRuntime` for it), we also inject `env.HOST` (same shape
+ * as the field `HostBridge`) so functions.js can route `/api/host/*` to the
+ * go-local `createGoHostBinding` factory. The factory in turn wraps the
+ * shared `HostRuntime` (env.KV authority) + `goAuth` (Platform invite mint).
+ * UI must not call `/api/host/*` directly — only functions.js does.
  */
 
 import {
@@ -22,12 +29,27 @@ import {
   goStorageKeyEphemeral,
   goStorageKeyForCatalog,
 } from "./goWebKv";
+import { createGoHostBinding } from "./goHostBinding";
+import type { HostRuntime } from "./hostRuntime";
+import {
+  createSessionBinding,
+  getSessionSeatIdForProject,
+} from "@pg/sessionBridge";
 
 export type GoFunctionsApiContext = {
   getFiles: () => FileMap | null;
   /** Durable catalog id for `/s/`; null → ephemeral memory bindings. */
   getCatalogId?: () => string | null;
   getSandboxId: () => string | null;
+  /**
+   * Resolve the active `HostRuntime` for this sandbox (DEC-053 env.HOST).
+   * When non-null, `env.HOST` is injected into functions.js so its
+   * `/api/host/*` routes have a backing implementation. When null (single-
+   * player SAMs, guest seats, or pre-bind), `env.HOST` is omitted so
+   * functions.js that try to use it get a clear `not_implemented` error
+   * instead of seeing a half-wired binding.
+   */
+  getHostRuntime?: () => HostRuntime | null;
 };
 
 type CacheEntry = {
@@ -96,9 +118,26 @@ export async function handleGoFunctionsApi(
     return jsonBytesResponse(functionsUnavailableBody(), 503);
   }
   const { key, durable } = storageFor(ctx);
-  const env = {
+  const hostRuntime = ctx.getHostRuntime?.() ?? null;
+  const env: Record<string, unknown> = {
     KV: createGoWebKv(key, { durable }),
     DB: createGoWebDb(key, { durable }),
+    // Seated guest: inject env.SESSION (DEC-023) so the SAM's own functions.js
+    // tunnel branch handles `/api/session/*` instead of the go shell re-
+    // implementing the routes. Mirrors the field shell's createFunctionsEnv.
+    ...(getSessionSeatIdForProject(sandboxId)
+      ? { SESSION: createSessionBinding(sandboxId) }
+      : {}),
+    // Hostable sandbox: inject env.HOST (DEC-053). Same shape as the field
+    // HostBridge so functions.js is portable across play.samkuo.me and go.
+    // factory is lazy so it picks up the shared HostRuntime singleton.
+    ...(hostRuntime
+      ? {
+          HOST: createGoHostBinding({
+            getHostRuntime: () => hostRuntime,
+          }),
+        }
+      : {}),
   };
   try {
     const req = deserializeRequest(request);

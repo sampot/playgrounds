@@ -191,6 +191,7 @@
 | 型錄查詢（遊樂場） | catalog query／`/catalog/v1.json` | 建置自 YAML 產結構化型錄；殼內 API 與可選同源 `GET /catalog/v1.json`；list／get／source／protocol 匹配；本機已安裝可經 `sam:protocol` head 探測並與型錄合併。見 DEC-046 Draft、[PG-CATALOG-QUERY-PLAN.md](./PG-CATALOG-QUERY-PLAN.md)。 |
 | lazy installation（遊樂場 session／型錄） | lazy install／延遲安裝 | 接受 session 邀請時，若尚無相容 SAM，自**小品型錄**（或邀請提示之來源）安裝後再入座；型錄項視為**虛擬可用**（類比 virtual actor：有需要才物化）。與 Avatar 無關的特規——本機與遠端同一路徑。見 DEC-023／045。 |
 | session binding（遊樂場） | `env.SESSION` | 參與座位期間注入的窄 API：座位資訊、狀態投影、事件訂閱、`act`／`leave`；≠ HOST／TOOL。 |
+| host bridge（go） | go `env.HOST` factory／`createGoHostBinding` | go 純玩版的 `env.HOST` 注入實作（[檔案](../../go-client/src/lib/goHostBinding.ts)）；同形同介面於場殼 `HostBridge`，把 `hostRuntime`（`env.KV` authority）+ `goAuth`（Platform invite 代理）包成單例。**不**另立 `env.SHELL`——DEC-053 收斂為「`env.HOST` 在兩殼同形」。 |
 | edge functions（遊樂場後端） | functions／edge functions | 對齊 Cloudflare Workers 形 `fetch` handler 的輔助後端；遊樂場可模擬 bindings，上線再部署真 edge。 |
 
 ## 自稱與產品提及（摘要）

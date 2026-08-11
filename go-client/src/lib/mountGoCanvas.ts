@@ -13,12 +13,20 @@ import {
   revokeGoMemoryBlobs,
 } from "./goMemoryCanvas";
 import { injectGoScoreStorage } from "./goScoreStorage";
+import type { HostRuntime } from "./hostRuntime";
 
 export type GoCanvasMode = "sw" | "memory";
 
 export type MountGoCanvasOptions = {
   /** Solo `/s/<id>` — durable KV／DB ns＋legacy score localStorage shim. */
   catalogId?: string | null;
+  /**
+   * Optional: the HostRuntime backing this canvas (hostable SAMs only).
+   * When provided, `env.HOST` is injected into functions.js so its
+   * `/api/host/*` routes resolve through the go-local HostBridge factory.
+   * Lives in the page, not in the canvas — pass a getter.
+   */
+  getHostRuntime?: () => HostRuntime | null;
 };
 
 export type MountedGoCanvas = {
@@ -46,14 +54,19 @@ function withSoloScoreNs(files: FileMap, catalogId: string | null | undefined): 
 function apiCtx(
   sandboxId: string,
   files: FileMap,
-  catalogId: string | null | undefined
+  catalogId: string | null | undefined,
+  getHostRuntime?: () => HostRuntime | null
 ): GoCanvasApiListenerOptions {
   const id = catalogId?.trim() || null;
-  return {
+  const ctx: GoCanvasApiListenerOptions = {
     getSandboxId: () => sandboxId,
     getFiles: () => files,
     getCatalogId: () => id,
   };
+  if (getHostRuntime) {
+    ctx.getHostRuntime = getHostRuntime;
+  }
+  return ctx;
 }
 
 /**
@@ -83,7 +96,7 @@ export async function mountGoCanvas(
   if (preferSw) {
     try {
       unlisten = installGoCanvasApiListener(
-        apiCtx(sandboxId, prepared, options.catalogId)
+        apiCtx(sandboxId, prepared, options.catalogId, options.getHostRuntime)
       );
       await syncGoCanvasSnapshot(sandboxId, generation, prepared);
       return {
@@ -101,7 +114,7 @@ export async function mountGoCanvas(
   }
 
   unlisten = installGoMemoryApiListener(
-    apiCtx(sandboxId, prepared, options.catalogId)
+    apiCtx(sandboxId, prepared, options.catalogId, options.getHostRuntime)
   );
   const built = buildGoMemoryCanvas(prepared, generation);
   memoryBlobUrls = built.blobUrls;

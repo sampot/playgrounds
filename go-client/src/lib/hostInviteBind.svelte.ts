@@ -3,7 +3,15 @@
  *
  * Owns a protocol-agnostic `hostRuntime` for the mounted catalog SAM, adapts it
  * to the shell-session shell (`/api/shell/session/*` proxied from the SAM
- * iframe), and surfaces invite share-sheet events.
+ * iframe — DEC-053 §6.7 transition layer), and surfaces invite share-sheet
+ * events.
+ *
+ * DEC-053 alignment: the per-method bodies that translate host-runtime
+ * operations into HostBridge calls live in `createGoHostBinding` (a single
+ * factory used by `env.HOST`). This module wires the factory into the SW
+ * dispatch (`GoShellSessionHost` adapter) and ensures the same `HostRuntime`
+ * singleton is reused so `env.HOST` and the page-level host bar observe one
+ * status — no split state.
  *
  * Protocol comes from the catalog entry (`hostableProtocolFor`) — not hardcoded
  * to any game. Login gate: `goAuth.isLoggedIn` — minting without a key throws
@@ -19,6 +27,7 @@ import {
   type HostPhase,
   type HostStatus,
 } from "./hostRuntime";
+import { createGoHostBinding, type GoHostBinding } from "./goHostBinding";
 import { handleGoFunctionsApi } from "./goFunctionsRuntime";
 import { hostableProtocolFor, type GoCatalogEntry, type HostableProtocol } from "./goCatalog";
 import type { FileMap } from "@pg/projectTypes";
@@ -54,6 +63,12 @@ export type HostInviteController = {
   close: () => Promise<void>;
   subscribe: (fn: (s: HostInviteStatus) => void) => () => void;
   getStatus: () => HostInviteStatus;
+  /**
+   * Resolve the live `HostRuntime` singleton for this controller (or null when
+   * not yet bound). DEC-053: `env.HOST` in functions.js and the SW shell
+   * session adapter must reference the same instance to keep state coherent.
+   */
+  getHostRuntime: () => HostRuntime | null;
 };
 
 function toProtocolSpec(proto: HostableProtocol): RosterSessionProtocolSpec {
@@ -96,6 +111,8 @@ export function createHostInviteBind(opts: {
       guestRoles: protocol.roles.filter(r => r !== "host"),
       guestTarget: 0,
       seats: [],
+      protocolId: protocol.protocolId,
+      apiVersion: protocol.apiVersion || "1",
     },
   };
 
@@ -116,6 +133,7 @@ export function createHostInviteBind(opts: {
             getFiles,
             getSandboxId,
             getCatalogId: () => catalogId,
+            getHostRuntime: () => ensureRuntime(),
           },
           {
             method: init?.method || "GET",
@@ -144,101 +162,78 @@ export function createHostInviteBind(opts: {
     };
   }
 
+  /**
+   * Build a single `GoHostBinding` instance backed by this controller's
+   * `HostRuntime` singleton. Created lazily and re-used by both `env.HOST`
+   * and the SW shell session adapter (`shellHost`) so the two paths stay
+   * perfectly in sync. Recreated on every `bind()` so each new runtime gets a
+   * fresh factory bound to it (cheap — just method dispatch tables).
+   */
+  let hostBinding: GoHostBinding | null = null;
+
+  function getHostBinding(): GoHostBinding {
+    if (hostBinding) return hostBinding;
+    hostBinding = createGoHostBinding({
+      getHostRuntime: () => runtime,
+    });
+    return hostBinding;
+  }
+
+  /**
+   * Adapter that translates the legacy `/api/shell/session/*` SW dispatch
+   * (DEC-053 §6.7 transition layer) into the canonical `GoHostBinding`
+   * surface. New SAMs call `env.HOST` directly via functions.js; this
+   * adapter only exists for SAMs that have not yet migrated to the
+   * `env.HOST` route set (`/api/host/*`).
+   */
   function shellHost(): GoShellSessionHost {
     return {
       async open() {
-        if (!runtime) throw new Error("Host 尚未就緒");
-        await runtime.open();
-        const s = runtime.getStatus();
+        const rt = runtime;
+        if (!rt) throw new Error("Host 尚未就緒");
+        const opened = await getHostBinding().openSession();
         return {
-          sessionId: s.sessionId || "",
-          channelName: s.channelName || "",
+          sessionId: opened.sessionId,
+          channelName: opened.channelName,
           protocol: protocolSpec,
         };
       },
       async close() {
-        await runtime?.close();
+        const binding = getHostBinding();
+        await binding.closeSession();
       },
       async getStatus() {
-        const s = runtime?.getStatus();
-        if (!s) {
+        const rt = runtime;
+        if (!rt) {
           return { active: false, seats: [] };
         }
-        const seats = [
-          {
-            seatId: "host",
-            role: s.hostRole,
-            kind: "human",
-            sandboxId: "host",
-            paused: false,
-          },
-          ...s.seats.map(seat => ({
+        const session = await getHostBinding().getSession();
+        const listSeats = await getHostBinding().listSeats();
+        return {
+          active: Boolean(session),
+          status: session ? "open" : "closed",
+          sessionId: session?.sessionId,
+          channelName: session?.channelName,
+          protocol: protocolSpec,
+          seats: listSeats.map(seat => ({
             seatId: seat.seatId,
             role: seat.role,
-            kind: "human",
-            sandboxId: seat.peerId,
-            paused: false,
+            kind: seat.kind,
+            sandboxId: seat.sandboxId ?? "",
+            paused: seat.paused,
           })),
-        ];
-        return {
-          active: true,
-          status: s.phase === "idle" || s.phase === "error" ? "closed" : "open",
-          sessionId: s.sessionId ?? undefined,
-          channelName: s.channelName ?? undefined,
-          protocol: protocolSpec,
-          seats,
         };
       },
       async hostDomainFetch(fetchOpts) {
-        if (!runtime) throw new Error("Host 尚未就緒");
-        const path = String(fetchOpts.path || "");
-        const normalized = path.startsWith("/") ? path : `/${path}`;
-        if (!normalized.startsWith("/api/session/")) {
-          throw Object.assign(new Error("host fetch 僅允許 /api/session/*"), {
-            code: "forbidden",
-          });
-        }
-        const init = {
-          method: fetchOpts.method || "GET",
+        const rt = runtime;
+        if (!rt) throw new Error("Host 尚未就緒");
+        return getHostBinding().hostSessionFetch(fetchOpts.path, {
+          method: fetchOpts.method,
           headers: fetchOpts.headers,
           body: fetchOpts.body,
-        };
-        // Host SAM hosts act directly; forward everything opaque to functions.js.
-        return invokeHostSessionShim(runtime, normalized, init);
+        });
       },
     };
-  }
-
-  async function invokeHostSessionShim(
-    rt: HostRuntime,
-    path: string,
-    init: { method?: string; headers?: Record<string, string>; body?: string }
-  ): Promise<unknown> {
-    const sandboxId = getSandboxId();
-    const files = getFiles();
-    if (!sandboxId || !files) throw new Error("Host 沙盒尚未就緒");
-    const same = await handleGoFunctionsApi(
-      { getFiles, getSandboxId, getCatalogId: () => catalogId },
-      {
-        method: init.method || "GET",
-        url: path,
-        headers: Object.entries(init.headers || {}),
-        body: init.body != null ? new TextEncoder().encode(init.body).buffer : null,
-      }
-    );
-    const text = new TextDecoder().decode(same.body ?? new ArrayBuffer(0));
-    const data = text ? (JSON.parse(text) as unknown) : null;
-    if (same.status >= 400) {
-      let message = `Host session API ${same.status}`;
-      let code = "act_rejected";
-      if (data && typeof data === "object") {
-        const o = data as { error?: string; code?: string };
-        if (typeof o.error === "string") message = o.error;
-        if (typeof o.code === "string") code = o.code;
-      }
-      throw Object.assign(new Error(message), { code });
-    }
-    return data;
   }
 
   let unsubRuntime: (() => void) | null = null;
@@ -272,6 +267,7 @@ export function createHostInviteBind(opts: {
     unsubRuntime = null;
     runtime?.dispose();
     runtime = null;
+    hostBinding = null;
   }
 
   async function buildShare(
@@ -351,5 +347,6 @@ export function createHostInviteBind(opts: {
     close,
     subscribe,
     getStatus: () => ({ ...status }),
+    getHostRuntime: () => runtime,
   };
 }

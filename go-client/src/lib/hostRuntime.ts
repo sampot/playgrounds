@@ -69,6 +69,9 @@ export type HostStatus = {
   /** Number of remote Guests the protocol expects to seat. */
   guestTarget: number;
   seats: HostGuestSeat[];
+  /** Protocol metadata (DEC-053 env.HOST mirror). */
+  protocolId: string;
+  apiVersion: string;
 };
 
 type Listener = (s: HostStatus) => void;
@@ -123,6 +126,8 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
     guestRoles,
     guestTarget,
     seats: [],
+    protocolId: deps.protocol.protocolId,
+    apiVersion: deps.protocol.apiVersion || "1",
   };
   const listeners = new Set<Listener>();
   let loop: ReturnType<typeof startPlatformHostAnswerLoop> | null = null;

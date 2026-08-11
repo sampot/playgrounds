@@ -1,8 +1,8 @@
 # Playgrounds 純玩版客戶端（`go.samkuo.me`）
 
-> **狀態：** Draft（2026-08-08）— 契約／階段草案；Invite 路徑實作進行中；型錄 `/s/<id>`／分享面／換片／§5.5.1 OG／§6.5 離線分數／**§6.6「更多」本機溢流**已定案  
+> **狀態：** Draft（2026-08-08）— 契約／階段草案；Invite 路徑實作進行中；型錄 `/s/<id>`／分享面／換片／§5.5.1 OG／§6.5 離線分數／**§6.6「更多」本機溢流**／**§6.7 架構硬規則**／**§6.7.1 `env.HOST` 注入（DEC-053）** 已定案  
 
-> **權威決策：** 建議 [DECISIONS.md](./DECISIONS.md) **DEC-050**（Proposed）  
+> **權威決策：** 建議 [DECISIONS.md](./DECISIONS.md) **DEC-050**（Proposed）／**DEC-053**（UI 只走 `/api/...`；shell/runtime 走 env binding）  
 > **相關：** [PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)（五子棋 E2E；Invite Guest 主路徑）、[PG-CATALOG-UX-PLAN.md](./PG-CATALOG-UX-PLAN.md)（型錄「分享」→ go）、[PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)、[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（官方 TURN；Guest 經 `join_cap`）、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)、[PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md)（go 登入＋Header profile；玩家主場；DEC-052）、DEC-004／009／023／025／042／045／047／048、[GLOSSARY.md](./GLOSSARY.md)
 
 一句話：**玩家主場**——獨立於場殼的純玩客戶端＠`go.samkuo.me`（作者主場＝`play.samkuo.me`，兩 UI 共用同一份型錄）：同時只跑一個 SAM、無編輯環境、不依賴持久 OPFS；啟動不限 Invite（型錄 id 傳閱與 Invite 短鏈並列）；傳閱網址 `/s/<catalog_id>`（內嵌 catalog）；`/s/` game 可換片；可安裝／造訪後離線／本機分數；Header「更多」＝本機溢流（已下載／分層清除）≠ 僅推薦；Invite `/i/`＝臨時 session（不能離線、不換片、無本機選單）；**登入（DEC-052）＝玩家身分；後續玩家主場互邀（GO-INVITE）**。
@@ -360,6 +360,31 @@ GET go.samkuo.me/i/<short_id>
 - 面板開啟期間：暫停 chrome 3s 自動收起（對齊分享面）。
 - 仍：**同時一個 SAM**；已下載列表只是索引，點選＝換片載入，不是多開。
 - **否決：** Invite 上露本機管理；把「更多」做成搜尋型錄；無確認的破壞性清除；「我的庫」產品敘事。
+
+### 6.7 架構硬規則（DEC-053）
+
+UI **只**經 `fetch('/api/...')` 走 `functions.js`；shell／runtime 能力一律以 **`env` binding** 注入（[`HostBridge`](../../src/components/playgrounds/hostBridge.ts) 等形狀）。controller.js 共用同一組 `env` binding。
+
+| 契約 | 內容 |
+| --- | --- |
+| **UI 契約** | UI 不得直連 `/api/shell/...`；唯一對外通道＝自家 `functions.js` 路由。場殼 `play` 與 go 純玩版共用同一契約，**同一份 `functions.js` 可攜**。 |
+| **shell/runtime 能力** | 注入 `env.HOST`（hostable）／`env.SESSION`（seated guest）/`env.SHELL`／`env.PLATFORM`。**不**另立 `env.SHELL` 給 go——DEC-053 收斂為「`env.HOST` 在兩殼同形」。 |
+| **dispatch 簽名** | SW / srcdoc memory bridge 只負責把 `/api/...` 序列化後派發給 `handleGoFunctionsApi`；shell session／platform 路由由 `functions.js` 處理。 |
+| **go dispatch 簡化** | `dispatchGoCanvasApi` 對 `/api/session/*` 探測對「未入座」回 `session_inactive`；其他（含 `/api/host/*`）一律走 `handleGoFunctionsApi`。`env.SESSION`／`env.HOST` 在 `goFunctionsRuntime.ts` 內 opt-in 注入。 |
+| **可攜性** | SAM 同一份 `functions.js` 在 `play` 與 `go` 各看到自家 `env.HOST`（場殼＝[`HostBridge`](../../src/components/playgrounds/hostBridge.ts)；go＝[`createGoHostBinding`](../../go-client/src/lib/goHostBinding.ts)）；**不**需 fork。 |
+
+#### 6.7.1 `env.HOST` 在 go 的注入（hostable sandbox）
+
+hostable SAM（catalog entry 有 `hostableProtocolFor`）在 `/s/<catalogId>` 載入時，go runtime 透過 [`createGoHostBinding`](../../go-client/src/lib/goHostBinding.ts) factory 把以下兩個 go-local 單例包成同形 `HostBridge` 物件，注入 `env.HOST`：
+
+- **session 權威**：[`hostRuntime`](../../go-client/src/lib/hostRuntime.ts) — GO-INVITE 框架；`openSession`／`closeSession`／`pauseSession`／`resumeSession`／`getSession`／`listSeats`／`hostSessionFetch` 全部委派給它；session 狀態存於 `env.KV`（`catalog:<id>` 鍵）。
+- **Platform invite**：[`goAuth.mintPlatformInvite`](../../go-client/src/lib/goAuth.svelte.ts) — 用場殼記憶體中的 field API key 經 Platform `/v1/invites`；成功後 emit `invite.compose` 事件給頁面既有分享面（[`GoShareSheet`](../../go-client/src/lib/GoShareSheet.svelte)）。
+
+**單例保證：** `createGoHostBinding` 與 `hostInviteBind` 共享同一 `hostRuntime` 實例（透過顯式 `getHostRuntime: () => HostRuntime | null` factory 傳入），避免 `env.HOST` 與頁面 host bar 看到不同狀態。
+
+**不實作：** `spawnParticipant`／`inviteRoster`／`joinSeat`／`leaveSeat`／`runCmd`／`writeFile` 等完整 `HostBridge` 表面目前回 `HostBridgeError('not_implemented', ...)`；pg-gomoku 不會觸發這些路徑，擴充另 PR。
+
+**過渡層：** 既有 `/api/shell/session/*` 與 `/api/shell/platform/*` SW dispatch（[`goShellSession.ts`](../../go-client/src/lib/goShellSession.ts)／[`goShellPlatform.ts`](../../go-client/src/lib/goShellPlatform.ts)）保留作為未遷移 SAM 的相容層（DEC-053 §6.7）。
 
 ---
 
