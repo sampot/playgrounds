@@ -29,6 +29,7 @@
     type HostInviteShare,
   } from "$lib/hostInviteBind.svelte";
   import { goAuth } from "$lib/goAuth.svelte";
+  import { hostableProtocolFor } from "$lib/goCatalog";
   import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
   import {
     endGoPlay,
@@ -167,9 +168,10 @@
     void runtime.bootFromCatalogId(id);
   }
 
-  // —— GO-INVITE：玩家主場邀請對弈（GO-INVITE §6.6）——
+  // —— GO-INVITE：玩家主場（框架，protocol 由 catalog 決定）——
 
-  const hostEntry = $derived(entry && entry.id === "pg-gomoku" ? entry : null);
+  const hostProtocol = $derived(hostableProtocolFor(entry));
+  const hostable = $derived(Boolean(hostProtocol));
 
   let hostInvite: HostInviteController | null = $state(null);
   let hostBusy = $state(false);
@@ -193,15 +195,14 @@
 
   $effect(() => {
     const id = catalogId;
-    const entry = hostEntry;
-    if (!id || !entry) {
+    if (!id || !hostable) {
       hostInvite?.unbind();
       hostInvite = null;
       return;
     }
     const bind = createHostInviteBind({
       catalogId: id,
-      entry,
+      entry: entry!,
       getFiles: () => runtime.getFiles(),
       getSandboxId: () => runtime.getSandboxId(),
     });
@@ -277,11 +278,12 @@
     hostShareOpen = false;
   }
 
+  /** 開始一局：generic opaque host act（framework 不解讀 payload）。 */
   function hostStart() {
-    void hostInvite?.start("host");
+    void hostInvite?.act({ type: "start", firstRole: "host" });
   }
-  function hostReset() {
-    void hostInvite?.reset();
+  function hostRestart() {
+    void hostInvite?.act({ type: "reset", firstRole: "host" });
   }
   function hostClose() {
     void hostInvite?.close();
@@ -354,7 +356,7 @@
   {/if}
 {:else}
   <h1 class="sr-only">{status.entry?.title || entry?.title || "小品"}</h1>
-  {#if hostEntry}
+  {#if hostable}
     <GoHostBar
       loggedIn={goAuth.loggedIn}
       controller={hostInvite}
@@ -362,7 +364,7 @@
       onInvite={inviteOpponent}
       onLoginNeeded={() => goAuth.login()}
       onStart={hostStart}
-      onReset={hostReset}
+      onReset={hostRestart}
       onClose={hostClose}
     />
   {/if}

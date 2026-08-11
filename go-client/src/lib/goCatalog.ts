@@ -12,15 +12,53 @@ import {
   type GeneratedSamEntry,
   type GeneratedSamEntryStatus,
   type GeneratedSamKind,
+  type GeneratedSamProtocol,
 } from "@data/samCatalog.generated";
 
 export type GoCatalogEntry = Pick<
   GeneratedSamEntry,
-  "id" | "title" | "kind" | "source" | "blurb" | "status"
+  "id" | "title" | "kind" | "source" | "blurb" | "status" | "protocols"
 >;
 
 export type GoSamKind = GeneratedSamKind;
 export type GoEntryStatus = GeneratedSamEntryStatus;
+export type GoProtocol = GeneratedSamProtocol;
+
+/**
+ * The hostable session protocol a go player can open for a catalog SAM
+ * (GO-INVITE framework). go hosting needs a declared roster session protocol;
+ * null when the SAM declares none (pure single-player / non-hostable).
+ */
+export type HostableProtocol = {
+  protocolId: string;
+  apiVersion: string;
+  roles: string[];
+  roleLimits?: Record<string, number>;
+};
+
+/**
+ * Resolve the hostable protocol for a catalog entry. Picks the first declared
+ * `protocols` entry (catalog authority); fallback to `gomoku.v1` for the
+ * single legacy hardcoded carrier so existing flows keep working.
+ */
+export function hostableProtocolFor(
+  entry: Pick<GoCatalogEntry, "id" | "protocols"> | undefined | null
+): HostableProtocol | null {
+  if (!entry) return null;
+  const first = entry.protocols?.find(p => p.protocolId.trim());
+  if (first) {
+    const out: HostableProtocol = {
+      protocolId: first.protocolId.trim(),
+      apiVersion: first.apiVersion?.trim() || "1",
+      roles: first.roles?.filter(Boolean) ?? [],
+    };
+    return out;
+  }
+  if (entry.id === "pg-gomoku") {
+    return { protocolId: "gomoku.v1", apiVersion: "1", roles: ["host", "player"] };
+  }
+  return null;
+}
 
 /**
  * go 換片／首頁推薦只推這個 kind（§5.6／§5.7）。
@@ -36,6 +74,7 @@ function toGoEntry(e: GeneratedSamEntry): GoCatalogEntry {
     source: e.source,
     blurb: e.blurb,
     status: e.status ?? "listed",
+    protocols: e.protocols,
   };
 }
 

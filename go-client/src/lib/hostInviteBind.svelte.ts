@@ -1,25 +1,26 @@
 /**
- * go-client Host-invite controller (GO-INVITE §6.5/§6.6).
+ * go-client Host-invite controller (GO-INVITE).
  *
- * Owns a `hostRuntime` for the mounted catalog SAM, adapts it to the
- * shell-session shell (`/api/shell/session/*` proxied from the SAM iframe),
- * and surfaces an invite share-sheet event when the SAM mints an invite.
+ * Owns a protocol-agnostic `hostRuntime` for the mounted catalog SAM, adapts it
+ * to the shell-session shell (`/api/shell/session/*` proxied from the SAM
+ * iframe), and surfaces invite share-sheet events.
  *
- * Login gate: `goAuth.isLoggedIn` — minting without a key throws
+ * Protocol comes from the catalog entry (`hostableProtocolFor`) — not hardcoded
+ * to any game. Login gate: `goAuth.isLoggedIn` — minting without a key throws
  * `not_provisioned` and the UI routes to login (no alert).
  */
 
 import { registerGoShellSessionHost, type GoShellSessionHost } from "./goShellSession";
-import type {
-  GoShellPlatformInviteEvent,
-} from "./goShellPlatform";
+import type { GoShellPlatformInviteEvent } from "./goShellPlatform";
 import {
   createHostRuntime,
   type HostRuntime,
   type HostRuntimeDeps,
   type HostPhase,
+  type HostStatus,
 } from "./hostRuntime";
 import { handleGoFunctionsApi } from "./goFunctionsRuntime";
+import { hostableProtocolFor, type GoCatalogEntry, type HostableProtocol } from "./goCatalog";
 import type { FileMap } from "@pg/projectTypes";
 import type { RosterSessionProtocolSpec } from "@pg/roster/rosterSessionBridge";
 
@@ -33,6 +34,8 @@ export type HostInviteShare = {
 export type HostInviteStatus = {
   phase: HostPhase;
   invite: HostInviteShare | null;
+  /** Generic host status mirror (seats / hostRole / guestTarget). */
+  host: HostStatus;
 };
 
 export type HostInviteController = {
@@ -43,45 +46,64 @@ export type HostInviteController = {
   /**
    * Adopt an invite minted by the Host SAM's own CTA (`/api/shell/platform/
    * invite` proxy success). Opens the session first if needed, then runs the
-   * Host answer loop and surfaces the share sheet via the status/subscribe.
+   * Host answer loop and surfaces the share sheet.
    */
   adoptSamInvite: (ev: GoShellPlatformInviteEvent) => Promise<HostInviteShare | null>;
-  start: (firstRole?: "host" | "player") => Promise<void>;
-  place: (row: number, col: number) => Promise<void>;
-  reset: () => Promise<void>;
+  /** Host act — forward an opaque protocol payload to the Host SAM. */
+  act: (payload: unknown) => Promise<unknown>;
   close: () => Promise<void>;
   subscribe: (fn: (s: HostInviteStatus) => void) => () => void;
   getStatus: () => HostInviteStatus;
 };
 
-function gomokuProtocolSpec(): RosterSessionProtocolSpec {
+function toProtocolSpec(proto: HostableProtocol): RosterSessionProtocolSpec {
   return {
-    protocolId: "gomoku.v1",
-    apiVersion: "1",
-    roles: ["host", "player"],
-    roleLimits: { host: 1, player: 1 },
+    protocolId: proto.protocolId,
+    apiVersion: proto.apiVersion,
+    roles: [...proto.roles],
+    ...(proto.roleLimits ? { roleLimits: { ...proto.roleLimits } } : {}),
     joinPolicy: "invite_only",
   };
 }
 
 export function createHostInviteBind(opts: {
   catalogId: string;
-  entry: GoCatalogEntryLike;
+  entry: Pick<GoCatalogEntry, "id" | "title" | "source" | "protocols">;
   getFiles: () => FileMap | null;
   getSandboxId: () => string | null;
 }): HostInviteController {
   const { catalogId, entry, getFiles, getSandboxId } = opts;
+  const protocol = hostableProtocolFor(entry)!;
+  if (!protocol) {
+    throw new Error("此小品未宣告可主持的 session 協定");
+  }
+  const protocolSpec = toProtocolSpec(protocol);
+
   let runtime: HostRuntime | null = null;
   let listeners = new Set<(s: HostInviteStatus) => void>();
   let status: HostInviteStatus = {
     phase: "idle",
     invite: null,
+    host: {
+      phase: "idle",
+      message: "",
+      error: null,
+      sessionId: null,
+      channelName: null,
+      inviteId: null,
+      shortUrl: null,
+      hostRole: "host",
+      guestRoles: protocol.roles.filter(r => r !== "host"),
+      guestTarget: 0,
+      seats: [],
+    },
   };
 
   function getHostDeps(): HostRuntimeDeps {
     return {
       getFiles,
       getSandboxId,
+      protocol,
       async invokeHostSession(
         path: string,
         init?: { method?: string; headers?: Record<string, string>; body?: string }
@@ -131,7 +153,7 @@ export function createHostInviteBind(opts: {
         return {
           sessionId: s.sessionId || "",
           channelName: s.channelName || "",
-          protocol: gomokuProtocolSpec(),
+          protocol: protocolSpec,
         };
       },
       async close() {
@@ -142,38 +164,29 @@ export function createHostInviteBind(opts: {
         if (!s) {
           return { active: false, seats: [] };
         }
+        const seats = [
+          {
+            seatId: "host",
+            role: s.hostRole,
+            kind: "human",
+            sandboxId: "host",
+            paused: false,
+          },
+          ...s.seats.map(seat => ({
+            seatId: seat.seatId,
+            role: seat.role,
+            kind: "human",
+            sandboxId: seat.peerId,
+            paused: false,
+          })),
+        ];
         return {
           active: true,
           status: s.phase === "idle" || s.phase === "error" ? "closed" : "open",
           sessionId: s.sessionId ?? undefined,
           channelName: s.channelName ?? undefined,
-          protocol: gomokuProtocolSpec(),
-          seats: s.playerSeated
-            ? [
-                {
-                  seatId: "host",
-                  role: "host",
-                  kind: "human",
-                  sandboxId: "host",
-                  paused: false,
-                },
-                {
-                  seatId: "player",
-                  role: "player",
-                  kind: "human",
-                  sandboxId: "player",
-                  paused: false,
-                },
-              ]
-            : [
-                {
-                  seatId: "host",
-                  role: "host",
-                  kind: "human",
-                  sandboxId: "host",
-                  paused: false,
-                },
-              ],
+          protocol: protocolSpec,
+          seats,
         };
       },
       async hostDomainFetch(fetchOpts) {
@@ -190,27 +203,7 @@ export function createHostInviteBind(opts: {
           headers: fetchOpts.headers,
           body: fetchOpts.body,
         };
-        if (normalized.endsWith("/act") && init.method?.toUpperCase() === "POST") {
-          const body = init.body ? (JSON.parse(init.body) as any) : {};
-          const payload = body?.payload;
-          const type = String(payload?.type || "");
-          if (type === "start") {
-            await runtime.start(
-              payload?.firstRole === "player" ? "player" : "host"
-            );
-            return { state: { status: runtime.getStatus().phase } };
-          }
-          if (type === "reset") {
-            await runtime.reset(
-              payload?.firstRole === "player" ? "player" : "host"
-            );
-            return { state: { status: runtime.getStatus().phase } };
-          }
-          if (type === "place") {
-            await runtime.place(Number(payload?.row), Number(payload?.col));
-            return { state: { status: runtime.getStatus().phase } };
-          }
-        }
+        // Host SAM hosts act directly; forward everything opaque to functions.js.
         return invokeHostSessionShim(runtime, normalized, init);
       },
     };
@@ -221,8 +214,6 @@ export function createHostInviteBind(opts: {
     path: string,
     init: { method?: string; headers?: Record<string, string>; body?: string }
   ): Promise<unknown> {
-    // Rebuild a HostRuntimeDeps-backed call: hostRuntime's own hostSessionFetch
-    // is private, so route through the functions runtime (same env.KV).
     const sandboxId = getSandboxId();
     const files = getFiles();
     if (!sandboxId || !files) throw new Error("Host 沙盒尚未就緒");
@@ -259,6 +250,7 @@ export function createHostInviteBind(opts: {
       status = {
         phase: r.phase,
         invite: status.invite,
+        host: r,
       };
       emit();
     });
@@ -289,7 +281,7 @@ export function createHostInviteBind(opts: {
       inviteId: mined.inviteId,
       shortUrl: mined.shortUrl,
       url: mined.shortUrl,
-      title: `邀請你對弈${entry.title}`,
+      title: `邀請你玩${entry.title}`,
     };
     status = { ...status, invite: share };
     emit();
@@ -309,7 +301,7 @@ export function createHostInviteBind(opts: {
         presentation: "maximize_preview",
       },
       session: {
-        protocol: gomokuProtocolSpec(),
+        protocol: protocolSpec,
         role: "player",
         consent: "always_ask",
       },
@@ -337,17 +329,11 @@ export function createHostInviteBind(opts: {
     return buildShare({ inviteId: ev.inviteId, shortUrl: ev.shortUrl });
   }
 
-  async function start(firstRole?: "host" | "player") {
-    await ensureRuntime().start(firstRole || "host");
-  }
-  async function place(row: number, col: number) {
-    await ensureRuntime().place(row, col);
-  }
-  async function reset() {
-    await ensureRuntime().reset();
+  async function act(payload: unknown) {
+    return ensureRuntime().act(payload);
   }
   async function close() {
-    await ensureRuntime().close();
+    return ensureRuntime().close();
   }
 
   function subscribe(fn: (s: HostInviteStatus) => void): () => void {
@@ -361,17 +347,9 @@ export function createHostInviteBind(opts: {
     unbind,
     mintShare,
     adoptSamInvite,
-    start,
-    place,
-    reset,
+    act,
     close,
     subscribe,
     getStatus: () => ({ ...status }),
   };
 }
-
-type GoCatalogEntryLike = {
-  id: string;
-  title: string;
-  source: string;
-};

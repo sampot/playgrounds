@@ -1,18 +1,23 @@
 /**
- * Pure-play Host runtime (GO-INVITE): a logged-in go player hosts a `gomoku.v1`
- * session from within the go-client and invites an opponent.
+ * Pure-play host session framework (GO-INVITE).
  *
- * Host authority lives in the Host SAM's `functions.js` (pg-gomoku) via go's
- * `env.KV` (goWebKv, `catalog:<id>`) — mirroring the author shell's session
- * engine but without the full sessionRuntime machinery. The Host:
- *  1. runs the Platform Host answer loop (`startPlatformHostAnswerLoop`) to
- *     accept the guest's WebRTC offer,
- *  2. dispatches guest relay (accept → seat_bound; act → Host SAM act; events →
- *     fan out to the guest),
- *  3. exposes go-page controls (open / start / place / reset / close).
+ * A logged-in go player hosts a session for ANY catalog SAM that declares a
+ * roster session protocol (see `hostableProtocolFor`). This module is
+ * protocol-agnostic: it owns connection establishment (Platform host answer
+ * loop → WebRTC peers), session open/channel, invite minting/adoption, and
+ * relays opaque `act`/`event` payloads between the local Host SAM's
+ * `functions.js` and any number of remote Guests.
  *
- * The memory field API key never leaves page memory; it is only handed to the
- * trusted Host answer loop (never injected into the SAM env).
+ * The Host SAM is the session authority: its `functions.js` (env.KV-backed via
+ * goWebKv `catalog:<id>`) validates moves and emits events. Protocol rules
+ * (gomoku, mahjong, big-two…) live ONLY there — the framework never inspects
+ * act payloads.
+ *
+ * Connection ownership: any number of Guests may connect (each is one
+ * `RosterPeerSession`); seats are assigned from the declared protocol roles.
+ * The local Host occupies `hostRole`; the rest are filled by invited Guests.
+ * No local Avatar projection spawn is needed — every participant runs the same
+ * SAM directly.
  */
 
 import {
@@ -33,6 +38,7 @@ import { buildSessionActResultPayload } from "@pg/roster/rosterSessionActTunnel"
 import { startPlatformHostAnswerLoop } from "@pg/platform/platformHostLoop";
 import { goAuth } from "./goAuth.svelte";
 import type { FileMap } from "@pg/projectTypes";
+import type { HostableProtocol } from "./goCatalog";
 
 export type HostPhase =
   | "idle"
@@ -43,6 +49,13 @@ export type HostPhase =
   | "ended"
   | "error";
 
+export type HostGuestSeat = {
+  seatId: string;
+  role: string;
+  peerId: string;
+  inviteId: string;
+};
+
 export type HostStatus = {
   phase: HostPhase;
   message: string;
@@ -51,17 +64,24 @@ export type HostStatus = {
   channelName: string | null;
   inviteId: string | null;
   shortUrl: string | null;
-  playerSeated: boolean;
-  firstRole: "host" | "player" | null;
+  hostRole: string;
+  guestRoles: string[];
+  /** Number of remote Guests the protocol expects to seat. */
+  guestTarget: number;
+  seats: HostGuestSeat[];
 };
 
 type Listener = (s: HostStatus) => void;
 
 export type HostRuntimeDeps = {
-  /** Resolve the Host SAM files (pg-gomoku). */
+  /** Resolve the Host SAM files. */
   getFiles: () => FileMap | null;
   /** Sandbox id of the mounted Host canvas / functions runtime. */
   getSandboxId: () => string | null;
+  /** The session protocol this SAM declares (drives seats + answer cap). */
+  protocol: HostableProtocol;
+  /** Role the local Host occupies (default "host"). */
+  hostRole?: string;
   /**
    * Invoke the Host SAM `functions.js` (env.KV-backed). Host authority calls
    * go `/api/session/*`; non-session paths are not forwarded.
@@ -72,7 +92,25 @@ export type HostRuntimeDeps = {
   ) => Promise<unknown>;
 };
 
+/** Host role default when the protocol doesn't declare one. */
+const DEFAULT_HOST_ROLE = "host";
+
+function guestTargetFor(protocol: HostableProtocol, hostRole: string): number {
+  const roles = protocol.roles?.length ? protocol.roles : ["host", "player"];
+  if (protocol.roleLimits) {
+    const n = Object.entries(protocol.roleLimits)
+      .filter(([r]) => r !== hostRole && roles.includes(r))
+      .reduce((sum, [, v]) => sum + (Number(v) || 0), 0);
+    return n >= 0 ? n : 0;
+  }
+  return Math.max(0, roles.filter(r => r !== hostRole).length);
+}
+
 export function createHostRuntime(deps: HostRuntimeDeps) {
+  const hostRole = deps.hostRole?.trim() || DEFAULT_HOST_ROLE;
+  const guestRoles = (deps.protocol.roles || []).filter(r => r !== hostRole);
+  const guestTarget = guestTargetFor(deps.protocol, hostRole);
+
   let status: HostStatus = {
     phase: "idle",
     message: "",
@@ -81,16 +119,22 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
     channelName: null,
     inviteId: null,
     shortUrl: null,
-    playerSeated: false,
-    firstRole: null,
+    hostRole,
+    guestRoles,
+    guestTarget,
+    seats: [],
   };
   const listeners = new Set<Listener>();
   let loop: ReturnType<typeof startPlatformHostAnswerLoop> | null = null;
-  let peerSession: RosterPeerSession | null = null;
   const localAgentId = `go-host-${crypto.randomUUID().slice(0, 8)}`;
-  let playerPeerId: string | null = null;
   const seatBoundSent = new Set<string>();
+  /** peerAgentId → session (one DataChannel per connected Guest). */
+  const peerSessions = new Map<string, RosterPeerSession>();
   let seq = 0;
+
+  /** Per-answer slot; peerId is resolved from the first presence message. */
+  type RelaySlot = { peerId: string | null; session: RosterPeerSession | null };
+  const slots: RelaySlot[] = [];
 
   function emit() {
     for (const l of listeners) l({ ...status });
@@ -101,17 +145,29 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
   }
 
   function sendRelay(payload: Record<string, unknown>, to?: string): void {
-    if (!peerSession) return;
-    const msg = {
-      type: "avatar_relay",
-      from: localAgentId,
-      ...(to ? { to } : {}),
-      payload,
-    };
-    try {
-      peerSession.send(msg);
-    } catch {
-      /* channel may be closed */
+    if (to) {
+      const sess = peerSessions.get(to);
+      if (!sess) return;
+      const msg = {
+        type: "avatar_relay",
+        from: localAgentId,
+        to,
+        payload,
+      };
+      try {
+        sess.send(msg);
+      } catch {
+        /* channel may be closed */
+      }
+      return;
+    }
+    for (const sess of peerSessions.values()) {
+      const msg = { type: "avatar_relay", from: localAgentId, payload };
+      try {
+        sess.send(msg);
+      } catch {
+        /* channel may be closed */
+      }
     }
   }
 
@@ -137,14 +193,13 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
           sessionId: status.sessionId,
           seq,
           event,
-        },
-        playerPeerId || undefined
+        }
       );
     }
     emit();
   }
 
-  /** Forward a guest `session_act` to the Host SAM `/api/session/act`. */
+  /** Forward a Guest `session_act` to the Host SAM `/api/session/act`. */
   async function forwardGuestAct(act: SessionActPayload): Promise<{
     ok: boolean;
     result?: unknown;
@@ -152,7 +207,6 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
   }> {
     try {
       const body = {
-        role: "player",
         seatId: act.seatId,
         payload: act.payload,
       };
@@ -160,9 +214,10 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(body),
-      })) as { ok?: boolean; events?: unknown[] };
+      })) as { ok?: boolean; events?: unknown[]; state?: unknown };
       const events = Array.isArray(result?.events) ? result.events : [];
       if (events.length > 0) publishEvents(events);
+      trackPhaseFromState(result?.state);
       return { ok: true, result };
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
@@ -179,10 +234,24 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
     }
   }
 
-  function onRelay(raw: unknown): void {
+  /** Derive a generic phase from the opaque `state.status` the SAM returns. */
+  function trackPhaseFromState(state: unknown): void {
+    const st =
+      state && typeof state === "object"
+        ? String((state as { status?: unknown }).status ?? "")
+        : "";
+    if (!st) return;
+    if (st === "active") set({ phase: "active", error: null });
+    else if (st === "ended") set({ phase: "ended", error: null });
+    else if (st === "ready") set({ phase: "ready", error: null });
+    else if (st === "waiting" || st === "open") set({ phase: "waiting", error: null });
+  }
+
+  function onRelay(raw: unknown, slot: RelaySlot): void {
     if (!isAvatarRelayMessage(raw)) return;
     const msg = raw;
     if (msg.from === localAgentId) return;
+    if (!slot.peerId) slot.peerId = msg.from;
     const payload = msg.payload;
     if (isSessionInviteAcceptPayload(payload)) {
       void handleGuestAccepted(payload, msg.from);
@@ -217,30 +286,44 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
     }
     if (seatBoundSent.has(payload.inviteId)) return;
     seatBoundSent.add(payload.inviteId);
-    playerPeerId = fromPeerId;
+    const role = payload.role?.trim() || guestRoles[0] || "player";
     const seatId = `seat-${crypto.randomUUID().slice(0, 8)}`;
+    const seat: HostGuestSeat = {
+      seatId,
+      role,
+      peerId: fromPeerId,
+      inviteId: payload.inviteId,
+    };
+    set({ seats: [...status.seats, seat] });
     sendRelay(
       {
         kind: SESSION_SEAT_BOUND_KIND,
         inviteId: payload.inviteId,
         sessionId: payload.sessionId,
         seatId,
-        role: payload.role || "player",
+        role,
         channelName: status.channelName,
       },
       fromPeerId
     );
-    set({
-      phase: "ready",
-      playerSeated: true,
-      message: "對手已入座 — 選誰先再按「開始」",
-      error: null,
-    });
+    const filled = status.seats.length;
+    if (guestTarget > 0 && filled >= guestTarget) {
+      set({
+        phase: "ready",
+        message: "所有對手已入座",
+        error: null,
+      });
+    } else {
+      set({
+        message: `已入座（${filled}/${guestTarget} 位對手）`,
+        error: null,
+      });
+    }
     try {
       await hostSessionFetch("/api/session/presence", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ playerSeated: true }),
+        body: JSON.stringify({ playerSeated: true, seats: status.seats }),
       });
     } catch {
       /* presence is best-effort */
@@ -251,7 +334,6 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
     act: SessionActPayload,
     fromPeerId: string
   ): Promise<void> {
-    if (fromPeerId !== playerPeerId) return;
     const { ok, result, error } = await forwardGuestAct(act);
     sendRelay(
       buildSessionActResultPayload({
@@ -265,13 +347,19 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
     );
   }
 
-  function relayHandlers(): RosterPeerHandlers {
+  function relayHandlers(slot: RelaySlot): RosterPeerHandlers {
     return {
       onMessage: (data: unknown) => {
         if (isPresenceMessage(data)) {
-          if (!playerPeerId) playerPeerId = data.agentId;
+          if (!slot.peerId) slot.peerId = data.agentId;
+          if (slot.peerId && slot.session) {
+            peerSessions.set(slot.peerId, slot.session);
+          }
+          if (slot.peerId && !status.seats.some(s => s.peerId === slot.peerId)) {
+            set({ message: "有人連上了，等待入座…" });
+          }
         } else if (isAvatarRelayMessage(data)) {
-          onRelay(data);
+          onRelay(data, slot);
         }
       },
       onChannelOpen: () => {
@@ -291,8 +379,6 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
       phase: "open",
       sessionId,
       channelName,
-      playerSeated: false,
-      firstRole: "host",
       message: "已開場 — 按「邀請對手」取得短網址",
       error: null,
     });
@@ -314,19 +400,13 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
 
   /**
    * Start (or restart) the Platform Host answer loop for `inviteId`. Used both
-   * by `mintInviteAndAnswer` and when the Host SAM mints by itself (its own CTA
-   * calls `/api/shell/platform/invite`, which go proxies — the page then adopts
-   * the minted invite here and runs the answer side).
+   * by `mintInviteAndAnswer` and when the Host SAM mints by itself.
    */
   async function startAnswerLoopForInvite(opts: {
     inviteId: string;
     shortUrl: string;
   }): Promise<void> {
-    set({
-      inviteId: opts.inviteId,
-      shortUrl: opts.shortUrl,
-      error: null,
-    });
+    set({ inviteId: opts.inviteId, shortUrl: opts.shortUrl, error: null });
     loop?.stop();
     const apiKey = goAuth.getPlatformApiKeyForHostLoop();
     if (!apiKey) {
@@ -338,29 +418,31 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
       apiKey,
       localPresence: { agentId: localAgentId, name: "玩家 A" },
       prepareHandlers: () => {
-        const slot: { s: RosterPeerSession | null } = { s: null };
+        const slot: RelaySlot = { peerId: null, session: null };
+        slots.push(slot);
         return {
-          handlers: relayHandlers(),
+          handlers: relayHandlers(slot),
           attachSession: (sess: RosterPeerSession) => {
-            slot.s = sess;
-            peerSession = sess;
+            slot.session = sess;
+            if (slot.peerId) peerSessions.set(slot.peerId, sess);
           },
         };
       },
-      maxAnswers: 1,
+      // Accept one answer per expected Guest seat (multi-player protocols).
+      maxAnswers: guestTarget > 0 ? guestTarget : 0,
       onStatus: (msg: string) => set({ message: msg }),
       onError: (msg: string) => set({ error: msg, message: "" }),
       onAnswered: async () => {
         set({ message: "握手完成，等待對方入座…" });
       },
       onDone: () => {
-        set({ message: "對方已連上", error: null });
+        set({ message: "所有人已連上", error: null });
       },
     });
   }
 
   /**
-   * Mint an invite to the opponent and run the Platform Host answer loop.
+   * Mint an invite to the opponent(s) and run the Platform Host answer loop.
    * `intent` carries invite.compose (same shape as the author shell).
    */
   async function mintInviteAndAnswer(opts: {
@@ -408,64 +490,34 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
     await startAnswerLoopForInvite(opts);
   }
 
-  /** Host act (start/place/reset) — forward to Host SAM, fan out events. */
-  async function hostAct(
-    payload: { type: string } & Record<string, unknown>
-  ): Promise<unknown> {
+  /**
+   * Host act — forward an opaque protocol payload to the Host SAM and fan out
+   * returned events. The framework never interprets `payload`.
+   */
+  async function hostAct(payload: unknown): Promise<unknown> {
     if (!status.sessionId) throw new Error("尚未開場");
     const result = (await hostSessionFetch("/api/session/act", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ role: "host", payload }),
+      body: JSON.stringify({ role: hostRole, payload }),
     })) as { ok?: boolean; events?: unknown[]; state?: unknown };
     const events = Array.isArray(result?.events) ? result.events : [];
     if (events.length) publishEvents(events);
+    trackPhaseFromState(result?.state);
     return result;
-  }
-
-  async function start(firstRole: "host" | "player"): Promise<void> {
-    set({ message: "開始中…" });
-    await hostAct({ type: "start", firstRole });
-    set({ phase: "active", firstRole, message: "對局開始", error: null });
-  }
-
-  async function place(row: number, col: number): Promise<void> {
-    await hostAct({ type: "place", row, col });
-  }
-
-  async function reset(firstRole?: "host" | "player"): Promise<void> {
-    const role = firstRole || status.firstRole || "host";
-    const result = (await hostAct({ type: "reset", firstRole: role })) as {
-      state?: { status?: string };
-    };
-    const st = result?.state?.status;
-    set({
-      phase:
-        st === "ended"
-          ? "ended"
-          : st === "active"
-            ? "active"
-            : st === "ready"
-              ? "ready"
-              : "waiting",
-      firstRole: role,
-      message:
-        st === "active" ? "已開下一局" : "棋盤已清空 — 等候對手入座",
-      error: null,
-    });
   }
 
   async function close(): Promise<void> {
     loop?.stop();
     loop = null;
-    if (peerSession) {
+    for (const sess of peerSessions.values()) {
       try {
-        peerSession.close();
+        sess.close();
       } catch {
         /* ignore */
       }
-      peerSession = null;
     }
+    peerSessions.clear();
     if (status.inviteId) {
       try {
         await goAuth.revokePlatformInvite(status.inviteId);
@@ -478,7 +530,7 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
         await hostSessionFetch("/api/session/presence", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ playerSeated: false }),
+          body: JSON.stringify({ playerSeated: false, seats: [] }),
         });
       } catch {
         /* ignore */
@@ -492,8 +544,7 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
       channelName: null,
       inviteId: null,
       shortUrl: null,
-      playerSeated: false,
-      firstRole: null,
+      seats: [],
     });
   }
 
@@ -509,21 +560,21 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
     open,
     mintInviteAndAnswer,
     adoptSamInvite,
-    start,
-    place,
-    reset,
+    /** Generic opaque host act (framework never inspects payload). */
+    act: hostAct,
+    hostSessionFetch,
     close,
     dispose() {
       loop?.stop();
       loop = null;
-      if (peerSession) {
+      for (const sess of peerSessions.values()) {
         try {
-          peerSession.close();
+          sess.close();
         } catch {
           /* ignore */
         }
-        peerSession = null;
       }
+      peerSessions.clear();
     },
   };
 }
