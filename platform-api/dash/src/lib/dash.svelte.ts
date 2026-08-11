@@ -23,6 +23,7 @@ export type ConfirmState = {
 } | null;
 
 const RETURN_FIELD_KEY = "pg_dash_return_field";
+const RETURN_PATH_KEY = "pg_dash_return_path";
 
 class DashStore {
   me = $state<Me | null>(null);
@@ -82,6 +83,34 @@ class DashStore {
     return v;
   }
 
+  stashReturnPath(path: string) {
+    const v = (path || "").trim();
+    if (!v || v === "/") return;
+    try {
+      sessionStorage.setItem(RETURN_PATH_KEY, v);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  peekReturnPath(): string {
+    try {
+      return sessionStorage.getItem(RETURN_PATH_KEY) || "";
+    } catch {
+      return "";
+    }
+  }
+
+  takeReturnPath(): string {
+    const v = this.peekReturnPath();
+    try {
+      sessionStorage.removeItem(RETURN_PATH_KEY);
+    } catch {
+      /* ignore */
+    }
+    return v;
+  }
+
   async refreshMe(): Promise<boolean> {
     const { res, data } = await api<Me & { error?: string }>("/v1/me");
     if (!res.ok) {
@@ -123,6 +152,11 @@ class DashStore {
     if (fieldParam?.trim()) {
       this.stashReturnField(fieldParam);
       params.delete("field");
+    }
+    const returnTo = params.get("return_to");
+    if (returnTo?.trim()) {
+      this.stashReturnPath(returnTo);
+      params.delete("return_to");
     }
     const session = params.get("session");
     const authError = params.get("auth_error");
@@ -180,13 +214,13 @@ class DashStore {
     const run = async () => {
       this.busy = true;
       try {
-        const body =
-          targetField && targetField.trim()
-            ? JSON.stringify({ target_field: targetField.trim() })
-            : "{}";
+        const body: Record<string, unknown> = {};
+        if (targetField && targetField.trim()) body.target_field = targetField.trim();
+        const returnPath = this.takeReturnPath();
+        if (returnPath) body.return_to = returnPath;
         const { res, data } = await api<{ field_url?: string; error?: string }>(
           "/v1/field/provision",
-          { method: "POST", body }
+          { method: "POST", body: JSON.stringify(body) }
         );
         if (!res.ok || !data.field_url) {
           this.flash(

@@ -3,6 +3,8 @@
 
   // After SSO, return to this go login page (not dash root) so the stashed
   // `?field=` auto-provisions straight back to go — no dash homepage flash.
+  // Thread `?return_to=` (the go page the user came from) through SSO as well,
+  // so provision lands back on the same game, not the go root.
   const returnPath =
     typeof window === "undefined"
       ? "/go/login"

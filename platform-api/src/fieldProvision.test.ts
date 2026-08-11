@@ -66,6 +66,32 @@ describe("normalizeFieldOrigin", () => {
     const url = fieldProvisionDeepLink("https://go.samkuo.me", "pg_pv_abc");
     expect(url).toBe("https://go.samkuo.me/#pg_provision=pg_pv_abc");
   });
+
+  it("appends a same-origin return path to the deep link", () => {
+    const url = fieldProvisionDeepLink(
+      "https://go.samkuo.me",
+      "pg_pv_abc",
+      "/s/pg-gomoku"
+    );
+    expect(url).toBe("https://go.samkuo.me/s/pg-gomoku#pg_provision=pg_pv_abc");
+  });
+
+  it("drops path traversal / fragment attempts from return path", () => {
+    expect(
+      fieldProvisionDeepLink(
+        "https://go.samkuo.me",
+        "pg_pv_abc",
+        "https://evil.example/x"
+      )
+    ).toBe("https://go.samkuo.me/#pg_provision=pg_pv_abc");
+    expect(
+      fieldProvisionDeepLink(
+        "https://go.samkuo.me",
+        "pg_pv_abc",
+        "/safe#fragment"
+      )
+    ).toBe("https://go.samkuo.me/#pg_provision=pg_pv_abc");
+  });
 });
 
 describe("field provision", () => {

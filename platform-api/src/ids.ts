@@ -118,16 +118,37 @@ export function fieldDeepLink(
   return `${origin}/#pg=${encodeURIComponent(secret)}`;
 }
 
-/** Host provision deep link — never embeds pg_sk_. */
+/**
+ * Host provision deep link — never embeds pg_sk_. `returnTo` is an optional
+ * same-origin path (e.g. go `/s/pg-gomoku`) the user started from, so the
+ * provision lands on that page instead of the field root.
+ */
 export function fieldProvisionDeepLink(
   fieldOriginOrHost: string,
-  provisionToken: string
+  provisionToken: string,
+  returnTo?: string
 ): string {
-  const origin = normalizeFieldOrigin(fieldOriginOrHost);
-  if (!origin) {
-    return `https://${DEFAULT_TARGET_FIELD}/#pg_provision=${encodeURIComponent(provisionToken)}`;
+  const origin = normalizeFieldOrigin(fieldOriginOrHost) || `https://${DEFAULT_TARGET_FIELD}`;
+  let path = "/";
+  if (returnTo) {
+    const clean = sanitizeFieldReturn(returnTo);
+    if (clean) path = clean;
   }
-  return `${origin}/#pg_provision=${encodeURIComponent(provisionToken)}`;
+  return `${origin}${path}#pg_provision=${encodeURIComponent(provisionToken)}`;
+}
+
+/** Sanitize a same-origin return path for the provision deep link. */
+export function sanitizeFieldReturn(
+  input: string | undefined | null
+): string | null {
+  if (!input) return null;
+  const raw = input.trim();
+  if (!raw || raw === "/") return "/";
+  if (!raw.startsWith("/") || raw.startsWith("//")) return null;
+  if (raw.includes("#")) return null;
+  if (raw.split("/").includes("..")) return null;
+  if (raw.length > 512) return null;
+  return raw;
 }
 
 /**

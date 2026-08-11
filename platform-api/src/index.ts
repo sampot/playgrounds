@@ -90,6 +90,7 @@ import {
   normalizeFieldOrigin,
   randomId,
   requestHostname,
+  sanitizeFieldReturn,
   shortId,
   goPublicOrigin,
   shortUrl,
@@ -931,6 +932,7 @@ async function route(
     }
     const body = (await request.json().catch(() => ({}))) as {
       target_field?: string;
+      return_to?: string;
     };
     let fieldOrigin = defaultFieldOriginOrFallback(user.defaultFieldUrl);
     if (typeof body.target_field === "string" && body.target_field.trim()) {
@@ -945,7 +947,15 @@ async function route(
       auth.userId,
       auth.role
     );
-    const fieldUrl = fieldProvisionDeepLink(fieldOrigin, prov.provisionToken);
+    const returnTo =
+      typeof body.return_to === "string"
+        ? sanitizeFieldReturn(body.return_to)
+        : undefined;
+    const fieldUrl = fieldProvisionDeepLink(
+      fieldOrigin,
+      prov.provisionToken,
+      returnTo ?? undefined
+    );
     return json({
       provision_token: prov.provisionToken,
       expires_at: prov.expiresAt,
