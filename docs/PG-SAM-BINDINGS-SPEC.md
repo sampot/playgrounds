@@ -362,9 +362,63 @@ HTTP／工具結果建議 `{ error, code }` 形，對齊 host-api。
 | [PG-AGENT-MODEL-SPEC.md](./PG-AGENT-MODEL-SPEC.md) | UI←網路→後端 |
 | DEC-017／022／023／024／031 | 總管／Tool／Session／meta／actor 模型 |
 | [GLOSSARY.md](./GLOSSARY.md) | 用語 |
+| [PG-UI-SDK-SPEC.md](./PG-UI-SDK-SPEC.md) | UI 端 `window.PG` 與主機預設 functions.js；前端 DRY 入口（**§16**） |
+| [PG-UI-SDK-PLAN.md](./PG-UI-SDK-PLAN.md) | 上列落地階段 |
 
 ---
 
-## 15. 產品句
+## 16. UI 端 SDK（`window.PG`）
 
-> **自己的檔案與狀態預設就能用。要用 Python／命令列這類環境能力，寫在 `index.html`，使用者同意才準入。分析類 SAM 走窄的 `env.COMPUTE`，不必當總管。**
+### 16.1 為什麼需要
+
+每個 SAM 為存取 intrinsic（`env.KV`／`env.DB`／`env.vars`）都要在 `functions.js` 寫 CRUD handler、在 UI 端寫 `fetch("/api/...")` 封裝——**DX 重複、跨 SAM 難以統一版本**。本節指**一個統一入口**給 UI 端用，後端仍由本規格前面章節的 intrinsic + capability 邊界把關。
+
+### 16.2 形態（對齊 [PG-UI-SDK-SPEC.md §3](./PG-UI-SDK-SPEC.md)）
+
+| 區 | 形態 |
+| --- | --- |
+| **全域** | `window.PG`（主機隨殼 ship 靜態檔 `/playgrounds/sdk.js`；與 `CANVAS_BRIDGE_SCRIPT` 並列注入） |
+| **intrinsic** | `PG.kv.*`／`PG.db.*`／`PG.vars` — 永遠掛載（無需 capability） |
+| **capability** | `PG.SESSION?`／`PG.COMPUTE?`／`PG.DELEGATE?`／`PG.HOST?` — 未準入時**屬性缺位**（`"HOST" in PG === false`） |
+| **錯誤** | 統一 `PgError`；`code` 對齊本規格 §7 |
+
+### 16.3 邊界（不破既有契約）
+
+- **UI 仍走網路：** SDK 內部全部是 `fetch("/api/...")`；不破 DEC-031／053「UI 對外契約＝`fetch("/api/...")`」。
+- **env 物件本體只在後端：** SDK **不**持有 `env.*`；**不**為 `env.SANDBOX`／`env.OBSERVE` 等另開平行頂層 binding 名（DEC-051 §4.2）。
+- **後端仍在 Runtime：** SDK 對 Backend Runtime／`postMessage`／WebRTC 通道無感；不破 DEC-038。
+- **沙盒 scope 鎖當前 canvas：** SDK 永不接受 `sandboxId` 參數；換沙盒 = 重新載 canvas。
+- **secrets 不暴露值：** SDK 不暴露 `PG.secrets`；UI 端必須經 SAM 自訂 `/api/...` 或 `PG.HOST` 派生結果（與本檔 §4.4 一致）。
+
+### 16.4 與注入面的對應
+
+| 後端注入（§6） | SDK 屬性 |
+| --- | --- |
+| `env.KV` | `PG.kv` |
+| `env.DB` | `PG.db` |
+| `env.vars` | `PG.vars`（同步、唯讀） |
+| `env.SESSION` | `PG.SESSION` |
+| `env.COMPUTE` | `PG.COMPUTE` |
+| `env.DELEGATE` | `PG.DELEGATE` |
+| `env.HOST` | `PG.HOST`（一律子集形狀；`capabilities()` 決定可用面） |
+
+未準入的注入面在 SDK 端以**屬性缺位**呈現——不是 `undefined`、不是呼叫端 throw——讓 UI 端用 `if ("HOST" in PG)` 探測（與 DEC-051 §6.4 一致）。
+
+### 16.5 主機裝的預設 `functions.js`
+
+SDK 的成功路徑對應**主機裝的預設 `functions.js`**（無 SAM 自訂時由 Backend Runtime 注入）。路由表與 `PgError.code` 完整定義見 [PG-UI-SDK-SPEC.md §4](./PG-UI-SDK-SPEC.md)；落地見 [PG-UI-SDK-PLAN.md](./PG-UI-SDK-PLAN.md) Phase 1。
+
+### 16.6 不在本規格
+
+- SDK 暴露密鑰**值**（`PG.secrets.<NAME>.get()` 永不掛）。
+- SDK 內建快取／離線副本（重複資源破 DEC-018／038 單權威）。
+- SDK 跨沙盒指定 `sandboxId`（必須重載 canvas）。
+- SDK 取代 SAM 自訂 `functions.js`（SDK 只負責 UI 端入口；後端可被接管）。
+
+> 細節與驗收：見 [PG-UI-SDK-SPEC.md](./PG-UI-SDK-SPEC.md) 全文；落地階段見 [PG-UI-SDK-PLAN.md](./PG-UI-SDK-PLAN.md)。
+
+---
+
+## 17. 產品句
+
+> **自己的檔案與狀態預設就能用。要用 Python／命令列這類環境能力，寫在 `index.html`，使用者同意才準入。分析類 SAM 走窄的 `env.COMPUTE`，不必當總管。UI 端所有資源呼叫走 `window.PG`；後端資源本體只在 Backend Runtime 內。**
