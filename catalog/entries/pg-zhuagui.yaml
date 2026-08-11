@@ -1,0 +1,7 @@
+title: 抓烏龜
+kind: game
+series: 桌遊
+blurb: 先丟對子、再從別家盲抽，最後手裡剩下唯一一張烏龜牌的輸家出局。四人（你＋3 AI）童玩桌遊、mobile-first。
+source: sampot/pg-zhuagui
+license: MIT
+status: unlisted

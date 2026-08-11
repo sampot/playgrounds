@@ -1,0 +1,7 @@
+title: 連連看
+kind: game
+series: 懷舊
+blurb: 點兩張相同牌，能用 ≤2 轉角的直線路徑相連即消除；四種難度依序解鎖、提示／洗牌。網咖世代經典、mobile-first。
+source: sampot/pg-lianlian
+license: MIT
+status: unlisted

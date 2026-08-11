@@ -5,14 +5,15 @@
 > **更新：** 上架／下架或 backlog 變動時改此檔；系列順序對齊 [`catalog/series.yaml`](../catalog/series.yaml) 的 `game`。  
 > **選題：** 台灣味優先、非限制；backlog 依 [`game-assets/`](../game-assets/) 資源就緒度排序。
 > **交付要求：** 遊戲只能以 HTML + CSS + JavaScript 形式交付，禁止任何 build 階段。
-> **測試指引：** 開發過程可使用 Vitest 執行單元測試。
+> **開發規則：** 遊戲 repo 不加入 `node_modules`、不安裝任何套件；需要工具（含測試）時一律以 `npx <pkg>` 臨時執行，不入 repo。
+> **測試指引：** 單元測試統一以 `npx vitest run` 執行。
 > **倉庫說明：** 每個遊戲都是獨立的 GitHub repo，本地路徑位於 `~/dev/sampot/<repo-name>`。
 
 純玩入口：`https://go.samkuo.me/s/<id>` · 場型錄：`/sam/?kind=game`
 
 ---
 
-## 已實作（50）
+## 已實作（55）
 
 ### 精緻可玩（8＋1 unlisted）
 | id | 標題 | 一句話 |
@@ -27,7 +28,7 @@
 | `pg-sandrts` | 沙丘戰線 | **unlisted**；障礙繞行＋空襲；指揮部被毀即出局 |
 | `pg-gongzhu` | 抽豬 | 夜市抽卡遊戲、避豬計分 |
 
-### 街機（15）
+### 街機（14＋1 unlisted）
 
 | id | 標題 | 一句話 |
 | --- | --- | --- |
@@ -35,7 +36,7 @@
 | `pg-breakout` | 打磚塊 | 擋板反彈清磚 |
 | `pg-cityroam` | 巷弄迷走 | 街區撿金幣、躲警察、走到出口；30×20 格小地圖 |
 | `pg-dancepad` | 節奏踏墊 | 四軌箭頭下落、踩拍連擊 |
-| `pg-foodcatch` | 接食材 | 移動菜藍接食物、躲壞番茄；連擊加倍、20 秒升級 |
+| `pg-foodcatch` | 接食材 | **unlisted**；移動菜藍接食物、躲壞番茄；連擊加倍、20 秒升級 |
 | `pg-frogcross` | 青蛙過街 | 過馬路、木筏、進巢 |
 | `pg-leaptrail` | 躍階旅人 | 短關平台跳躍 |
 | `pg-marblepit` | 玻璃彈珠坑 | 凹坑對撞、撥彈進洞 |
@@ -47,7 +48,7 @@
 | `pg-topduel` | 陀螺對戰 | 蓄力發射、轉速碰撞 |
 | `pg-towerdef` | 迷你塔防 | 戰役星等、無盡模式 |
 
-### 懷舊（9）
+### 懷舊（9＋2 unlisted）
 
 | id | 標題 | 一句話 |
 | --- | --- | --- |
@@ -55,9 +56,11 @@
 | `pg-freecell` | 新接龍 | 電腦課經典；八列牌、四暫存、四回收 |
 | `pg-fruitcut` | 切水果 | 滑動切菜、炸彈、三命 |
 | `pg-jungle` | 鬥獸棋 | 獸穴、陷阱、河界 |
+| `pg-lianlian` | 連連看 | **unlisted**；兩張相同牌以 ≤2 轉角路徑相連即消、提示／洗牌、四難度 |
 | `pg-moletap` | 地洞敲敲 | 夜市節奏敲擊 |
 | `pg-popshot` | 射氣球 | 夜市射靶破球 |
 | `pg-ringtoss` | 套圈圈 | 夜市拋環套瓶 |
+| `pg-shanghaimj` | 麻將消消 | **unlisted**；疊層麻將配對消除、自由牌判定、提示／洗牌 |
 | `pg-wanzai` | 尪仔標 | 選牌對拍、翻牌收穫 |
 | `pg-wingrace` | 翼途競飛 | 簡化飛行棋 |
 
@@ -72,13 +75,14 @@
 | `pg-mali` | 小瑪莉 | 復古燈圈跑燈 |
 | `pg-pinfall` | 釘雨落珠 | 發射撞釘入洞 |
 
-### 桌遊（11）
+### 桌遊（11＋3 unlisted）
 
 | id | 標題 | 一句話 |
 | --- | --- | --- |
 | `pg-big2` | 大老二 | 四人出牌人機 |
 | `pg-gomoku` | 五子棋 | 雙人／人機；Invite `gomoku.v1` |
 | `pg-junqi` | 軍棋 | 陸戰棋暗棋對 AI |
+| `pg-liarsdice` | 大話骰 | **unlisted**；喊「N 個 X」可加喊或抓、1 點萬能、拔骰出局 |
 | `pg-mahjong` | 台灣麻將 | 十六張簡化台、補花吃碰槓胡、人機 |
 | `pg-match3` | 消消樂 | 三消、關卡目標 |
 | `pg-redpick` | 撿紅點 | 對點數撿牌、四人人機 |
@@ -87,6 +91,8 @@
 | `pg-tictactoe` | 井字遊戲 | 3×3、Minimax |
 | `pg-twland` | 台灣路名地產 | 買地蓋房、機會命運 |
 | `pg-xiangqi` | 象棋 | 楚河漢界、將軍困斃；人機／雙人／AI 對 AI |
+| `pg-xinzang` | 心臟病 | **unlisted**；翻牌見心臟病號碼秒拍、最慢收整疊、對決 AI |
+| `pg-zhuagui` | 抓烏龜 | **unlisted**；丟對子後輪流盲抽、剩烏龜牌者出局、四人童玩 |
 
 ---
 
@@ -107,11 +113,6 @@
 
 | 就緒 | 台灣味 | 建議 id | 標題（暫） | 系列（暫） | 主要 `game-assets/` | 備註 |
 | --- | --- | --- | --- | --- | --- | --- |
-| 高 | ✓ | `pg-zhuagui` | 抓烏龜 | 桌遊 | `art/playing-cards-pack/` | 童玩抽對子；輕量 |
-| 高 | ✓ | `pg-xinzang` | 心臟病 | 桌遊 | `art/playing-cards-pack/` 或 `art/puzzle-pack-1/` | 翻牌搶拍；符號版亦可 |
-| 高 | ✓ | `pg-liarsdice` | 大話骰 | 桌遊 | `art/oga-simple-dice/`、`sfx/casino-audio/` | 熱座或簡易人機 |
-| 高 | ✓ | `pg-lianlian` | 連連看 | 懷舊 | `art/puzzle-pack-1/`、`sfx/oga-512-8bit-sfx/`、`music/blippy-bits/` | 網咖世代；路徑相連消對 |
-| 高 | ✓ | `pg-shanghaimj` | 麻將消消 | 懷舊 | `art/riichi-mahjong-tiles/`、`sfx/ui-audio/` | **新**；牌面堆疊消對（≠台規十六張對局） |
 | 高 | · | `pg-reacttap` | 表情對決 | 精緻可玩 | `art/emotes-pack/`、`art/toon-characters/`、`sfx/voiceover-pack/` | **新**；出題反應／搶拍 |
 | 中 | ✓ | `pg-mines` | 踩地雷 | 懷舊 | `sfx/oga-8-bit-sound-effect-pack/`、`art/ui-pack/` | 盤面多半程式繪；電腦課經典 |
 | 中 | ✓ | `pg-solitaire` | 接龍 | 懷舊 | `art/playing-cards-pack/` | **新**；克朗代克；與新接龍並列無妨 |

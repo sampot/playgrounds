@@ -1,0 +1,7 @@
+title: 麻將消消
+kind: game
+series: 懷舊
+blurb: 疊層麻將配對消除：只選兩側與上方自由的牌，把成對相同牌一一消除清空全盤；四種難度、提示／洗牌。
+source: sampot/pg-shanghaimj
+license: MIT
+status: unlisted

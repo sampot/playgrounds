@@ -1,0 +1,7 @@
+title: 大話骰
+kind: game
+series: 桌遊
+blurb: 每人五顆骰偷偷擲，輪流喊「N 個 X」、可加喊或抓；吹牛被抓就拔骰，骰子拔光出局。對決 AI、1 點萬能。
+source: sampot/pg-liarsdice
+license: MIT
+status: unlisted
