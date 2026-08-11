@@ -11,6 +11,7 @@ import {
   deleteApiKey,
   ensureUser,
   getApiKeyForUser,
+  getUser,
   getUserIdByGithub,
   getUserIdByGoogle,
   isBootstrapped,
@@ -225,6 +226,33 @@ describe("google oauth link + sso flow", () => {
     });
     expect(await res.text()).toBe("ok");
     expect(token.startsWith("pg_at_")).toBe(true);
+  });
+
+  it("completeSsoIntent login syncs avatar onto existing user (DEC-052)", async () => {
+    const store = memoryStore();
+    await ensureUser(store, "u1", "user");
+    // account predates avatarUrl persistence
+    await linkGithub(store, "u1", { id: "gh1", login: "sam" });
+    let after = await getUser(store, "u1");
+    expect(after?.github?.avatarUrl).toBeUndefined();
+
+    await completeSsoIntent({
+      env: { STORE: store },
+      state: { intent: "login", n: "x", exp: Date.now() + 60_000 },
+      subject: {
+        provider: "github",
+        id: "gh1",
+        label: "sam",
+        avatarUrl: "https://avatars.githubusercontent.com/u/123?v=4",
+      },
+      fail: (c) => new Response(c, { status: 400 }),
+      success: async () => new Response("ok"),
+    });
+
+    after = await getUser(store, "u1");
+    expect(after?.github?.avatarUrl).toBe(
+      "https://avatars.githubusercontent.com/u/123?v=4"
+    );
   });
 });
 

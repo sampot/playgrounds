@@ -15,6 +15,7 @@ import {
   linkGoogle,
   markBootstrapped,
   putApiKey,
+  putUser,
   type EnvStore,
 } from "./auth.js";
 import { apiKeyPlaintext } from "./ids.js";
@@ -82,6 +83,33 @@ async function linkSso(
   });
 }
 
+/**
+ * Refresh a user's avatar on repeat SSO logins (DEC-052). Older accounts
+ * predate `avatarUrl` persistence; the `login` / existing-user paths never
+ * updated it, so the go header couldn't show an avatar.
+ */
+async function syncSsoAvatar(
+  store: EnvStore,
+  userId: string,
+  subject: SsoSubject
+): Promise<void> {
+  const url = subject.avatarUrl?.trim() || null;
+  if (!url) return;
+  const user = await getUser(store, userId);
+  if (!user) return;
+  if (subject.provider === "github") {
+    if (user.github && user.github.avatarUrl !== url) {
+      user.github.avatarUrl = url;
+      await putUser(store, user);
+    }
+  } else {
+    if (user.google && user.google.avatarUrl !== url) {
+      user.google.avatarUrl = url;
+      await putUser(store, user);
+    }
+  }
+}
+
 function linkedIdOnUser(
   user: Awaited<ReturnType<typeof getUser>>,
   provider: SsoProvider
@@ -113,6 +141,7 @@ export async function completeSsoIntent(opts: {
     if (!userId) return fail("need_invite_or_link");
     const user = await getUser(store, userId);
     if (!user || user.disabled) return fail("forbidden");
+    await syncSsoAvatar(store, user.userId, subject);
     const at = await issueAccessToken(store, user.userId, user.role);
     return success(at.plaintext, at.record.expiresAt);
   }
@@ -149,6 +178,8 @@ export async function completeSsoIntent(opts: {
       if (!existingId) {
         const linked = await linkSso(store, userId, subject);
         if (!linked.ok) return fail(linked.error);
+      } else {
+        await syncSsoAvatar(store, userId, subject);
       }
       const at = await issueAccessToken(store, userId, "admin");
       return success(at.plaintext, at.record.expiresAt, "linked=1");
@@ -177,6 +208,7 @@ export async function completeSsoIntent(opts: {
     if (existingId) {
       const user = await getUser(store, existingId);
       if (!user || user.disabled) return fail("forbidden");
+      await syncSsoAvatar(store, user.userId, subject);
       const at = await issueAccessToken(store, user.userId, user.role);
       return success(at.plaintext, at.record.expiresAt);
     }
