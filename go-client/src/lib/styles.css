@@ -216,6 +216,21 @@ a {
   justify-content: center;
   padding: 0.3rem 0.55rem;
 }
+.chrome .profile-btn--login {
+  background: rgb(var(--accent));
+  border-color: rgb(var(--accent));
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.3rem 0.7rem;
+  min-height: 2.5rem;
+  letter-spacing: 0.02em;
+}
+.chrome--compact .profile-btn--login {
+  padding: 0.25rem 0.6rem;
+  min-height: 2rem;
+  font-size: 0.72rem;
+}
 .chrome .profile-glyph {
   display: inline-flex;
   color: rgb(var(--muted));
@@ -265,6 +280,14 @@ a {
 .chrome .hdr-next:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+/* Login CTA keeps filled accent over the shared hover group above. */
+.chrome .profile-btn--login:hover,
+.chrome .profile-btn--login:focus-visible {
+  border-color: rgb(var(--accent));
+  color: #fff;
+  filter: brightness(1.05);
+  outline: none;
 }
 .chrome-flash {
   margin: 0;

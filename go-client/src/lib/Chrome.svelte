@@ -364,53 +364,62 @@
     >
       分享
     </button>
-    <button
-      type="button"
-      class={["profile-btn", goAuth.loggedIn && "profile-btn--logged"]
-        .filter(Boolean)
-        .join(" ")}
-      aria-expanded={profileOpen}
-      aria-haspopup="dialog"
-      aria-label={goAuth.loggedIn ? "查看身分" : "登入"}
-      title={goAuth.loggedIn ? "查看身分" : "登入"}
-      onclick={onProfileClick}
-    >
-      {#if goAuth.loggedIn && goAuth.profile?.avatar_url}
-        <img
-          class="profile-avatar"
-          src={goAuth.profile.avatar_url}
-          alt="已登入"
-          width="26"
-          height="26"
-          referrerpolicy="no-referrer"
-        />
-      {:else}
-        <span
-          class={["profile-glyph", goAuth.loggedIn && "profile-glyph--logged"]
-            .filter(Boolean)
-            .join(" ")}
-        >
-          <svg
-            class="profile-icon"
-            viewBox="0 0 24 24"
-            width="22"
-            height="22"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.8"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
+    {#if goAuth.loggedIn}
+      <button
+        type="button"
+        class={["profile-btn", "profile-btn--logged"]
+          .filter(Boolean)
+          .join(" ")}
+        aria-expanded={profileOpen}
+        aria-haspopup="dialog"
+        aria-label="查看身分"
+        title="查看身分"
+        onclick={onProfileClick}
+      >
+        {#if goAuth.profile?.avatar_url}
+          <img
+            class="profile-avatar"
+            src={goAuth.profile.avatar_url}
+            alt="已登入"
+            width="26"
+            height="26"
+            referrerpolicy="no-referrer"
+          />
+        {:else}
+          <span
+            class={["profile-glyph", "profile-glyph--logged"]
+              .filter(Boolean)
+              .join(" ")}
           >
-            <circle cx="12" cy="8" r="4" />
-            <path d="M4 20c0-3.3 3.6-5.5 8-5.5s8 2.2 8 5.5" />
-          </svg>
-        </span>
-        {#if goAuth.loggedIn}
+            <svg
+              class="profile-icon"
+              viewBox="0 0 24 24"
+              width="22"
+              height="22"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="8" r="4" />
+              <path d="M4 20c0-3.3 3.6-5.5 8-5.5s8 2.2 8 5.5" />
+            </svg>
+          </span>
           <span class="profile-status" aria-hidden="true"></span>
         {/if}
-      {/if}
-    </button>
+      </button>
+    {:else}
+      <button
+        type="button"
+        class="profile-btn profile-btn--login"
+        aria-label="登入"
+        onclick={onProfileClick}
+      >
+        登入
+      </button>
+    {/if}
   </header>
 
   {#if chromeSession.flash && !(canvasActive && chromeHidden && !shareOpen && !moreOpen && !profileOpen)}
