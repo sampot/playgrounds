@@ -26,6 +26,8 @@ import {
 import { chromeSession } from "./chromeSession.svelte";
 
 const PROFILE_STORAGE_KEY = "go_auth_profile";
+/** Session-scoped memory credential (cleared when the tab closes). */
+const API_KEY_STORAGE_KEY = "go_auth_api_key";
 
 export type GoProfile = {
   user_id: string;
@@ -83,6 +85,30 @@ function writeStoredProfile(profile: GoProfile | null): void {
   }
 }
 
+function readSessionApiKey(): string | null {
+  if (typeof sessionStorage === "undefined") return null;
+  try {
+    return sessionStorage.getItem(API_KEY_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeSessionApiKey(key: string | null): void {
+  if (typeof sessionStorage === "undefined") return;
+  try {
+    if (key) sessionStorage.setItem(API_KEY_STORAGE_KEY, key);
+    else sessionStorage.removeItem(API_KEY_STORAGE_KEY);
+  } catch {
+    /* storage unavailable — in-memory only */
+  }
+}
+
+function clearPageUrl(): string {
+  if (typeof location === "undefined") return "/";
+  return location.pathname + location.search;
+}
+
 function goOrigin(): string {
   if (typeof location !== "undefined" && location.origin) {
     const host = location.hostname;
@@ -105,16 +131,20 @@ class GoAuth {
 
   constructor() {
     this.profile = readStoredProfile();
-    if (typeof window !== "undefined") {
-      window.addEventListener("pagehide", () => {
-        this.#clearApiKey();
-      });
+    // Session-scoped: survive same-tab refreshes / SPA nav; cleared on tab
+    // close because sessionStorage is per-tab. No `pagehide` clear — that would
+    // drop the credential on a browser refresh (direct URL entry / F5).
+    const rehydrated = readSessionApiKey();
+    if (rehydrated) {
+      this.#apiKey = rehydrated;
+      this.loggedIn = true;
     }
   }
 
   #clearApiKey(): void {
     this.#apiKey = null;
     this.loggedIn = false;
+    writeSessionApiKey(null);
   }
 
   clear(): void {
@@ -123,6 +153,7 @@ class GoAuth {
     this.profile = null;
     this.busy = false;
     writeStoredProfile(null);
+    writeSessionApiKey(null);
   }
 
   get isLoggedIn(): boolean {
@@ -137,7 +168,11 @@ class GoAuth {
    */
   login(): void {
     if (typeof window === "undefined") return;
-    window.location.assign(goLoginUrl(goOrigin()));
+    // Full-page redirect; record the current page so SSO returns to the same
+    // game (not the go root). The provision deep link lands on `?return_to`.
+    window.location.assign(
+      goLoginUrl(goOrigin(), { returnTo: clearPageUrl() })
+    );
   }
 
   logout(): void {
@@ -148,34 +183,57 @@ class GoAuth {
   /**
    * Consume `#pg_provision=` once at startup: redeem → memory key →
    * fetch profile → clear hash. Same as play (DEC-052). Fails soft.
+   *
+   * When no fresh provision is present but a session-scoped key was rehydrated
+   * (same-tab refresh / direct URL entry), revalidate it against `/v1/field/me`
+   * so a rotated-out key is dropped back to logged-out.
    */
   async initFromLocation(): Promise<void> {
     if (typeof window === "undefined") return;
+    if (this.busy) return;
     const parsed = parsePgProvisionFromLocation({
       hash: window.location.hash,
       search: window.location.search,
     });
-    if (!parsed) return;
-    clearPgProvisionHashFromLocation();
-    if (this.busy) return;
-    this.busy = true;
-    try {
-      const { api_key } = await redeemFieldProvision(parsed.token);
-      // Redeem first; only then claim the memory credential.
-      this.#apiKey = api_key;
-      this.loggedIn = true;
+    if (parsed) {
+      clearPgProvisionHashFromLocation();
+      this.busy = true;
+      try {
+        const { api_key } = await redeemFieldProvision(parsed.token);
+        // Redeem first; only then claim the memory credential (persisted to the
+        // session so a same-tab refresh keeps login).
+        this.#apiKey = api_key;
+        writeSessionApiKey(api_key);
+        this.loggedIn = true;
 
-      // Re-validate against `/v1/field/me`; on failure drop to stored profile.
-      const me = await fetchFieldMe(api_key);
-      this.profile = profileFromFieldMe(me);
-      writeStoredProfile(this.profile);
+        // Re-validate against `/v1/field/me`; on failure drop to stored profile.
+        const me = await fetchFieldMe(api_key);
+        this.profile = profileFromFieldMe(me);
+        writeStoredProfile(this.profile);
 
-      chromeSession.setFlash("已登入");
-    } catch (err) {
-      this.#clearApiKey();
-      chromeSession.setFlash("登入確認已失效，請從後台重新登入");
-    } finally {
-      this.busy = false;
+        chromeSession.setFlash("已登入");
+      } catch (err) {
+        this.#clearApiKey();
+        chromeSession.setFlash("登入確認已失效，請從後台重新登入");
+      } finally {
+        this.busy = false;
+      }
+      return;
+    }
+
+    // Rehydrated session key: refresh profile silently; on revalidation failure
+    // the constructor already marked loggedIn — drop it here.
+    if (this.#apiKey) {
+      this.busy = true;
+      try {
+        const me = await fetchFieldMe(this.#apiKey);
+        this.profile = profileFromFieldMe(me);
+        writeStoredProfile(this.profile);
+      } catch {
+        this.#clearApiKey();
+      } finally {
+        this.busy = false;
+      }
     }
   }
 

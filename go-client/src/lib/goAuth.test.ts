@@ -76,6 +76,32 @@ describe("goLoginUrl", () => {
     const url = goLoginUrl("");
     expect(new URL(url).searchParams.has("field")).toBe(false);
   });
+
+  it("carries return_to when a non-root page is provided", () => {
+    delete import.meta.env.VITE_PLATFORM_DASH_ORIGIN;
+    const url = goLoginUrl("https://go.samkuo.me", {
+      returnTo: "/s/pg-gomoku",
+    });
+    expect(new URL(url).searchParams.get("return_to")).toBe("/s/pg-gomoku");
+  });
+
+  it("omits return_to for the root path", () => {
+    delete import.meta.env.VITE_PLATFORM_DASH_ORIGIN;
+    const url = goLoginUrl("https://go.samkuo.me", { returnTo: "/" });
+    expect(new URL(url).searchParams.has("return_to")).toBe(false);
+  });
+
+  it("drops unsafe return_to (external origin / fragment / traversal)", () => {
+    delete import.meta.env.VITE_PLATFORM_DASH_ORIGIN;
+    for (const bad of [
+      "https://evil.example/x",
+      "/safe#frag",
+      "/a/../b",
+    ]) {
+      const url = goLoginUrl("https://go.samkuo.me", { returnTo: bad });
+      expect(new URL(url).searchParams.has("return_to")).toBe(false);
+    }
+  });
 });
 
 describe("goAuth.mintPlatformInvite (GO-INVITE)", () => {

@@ -65,12 +65,45 @@ export const GO_LOGIN_PATH = "/go/login";
 /**
  * Full-page login URL for go (DEC-054): dash's dedicated `/go/login` page with
  * `?field=` so after SSO the user is provisioned back to this go origin.
+ * `?return_to=` records the current page (default `/`) so SSO returns to the
+ * same game instead of the go root.
  */
-export function goLoginUrl(fieldOrigin: string): string {
+export function goLoginUrl(
+  fieldOrigin: string,
+  opts?: { returnTo?: string }
+): string {
   const dash = goDashOrigin().replace(/\/$/, "");
   const url = new URL(`${dash}${GO_LOGIN_PATH}`);
   if (fieldOrigin.trim()) url.searchParams.set("field", fieldOrigin.trim());
+  const ret = sanitizeReturnPath(opts?.returnTo);
+  if (ret && ret !== "/") url.searchParams.set("return_to", ret);
   return url.toString();
+}
+
+/**
+ * Sanitize a dash-relative-ish return path so it can't escape the origin or
+ * split the provision fragment. Returns null when unusable.
+ */
+export function sanitizeReturnPath(
+  input: string | undefined | null
+): string | null {
+  if (!input) return null;
+  let raw = input.trim();
+  if (!raw || raw === "/") return "/";
+  // Reject absolute URLs / protocol-relative — only a same-origin path is valid.
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(raw) || raw.startsWith("//")) return null;
+  if (raw.includes("#")) return null;
+  if (raw.split("/").includes("..")) return null;
+  try {
+    const u = new URL(raw, "https://go.samkuo.me");
+    raw = u.pathname + u.search;
+  } catch {
+    return null;
+  }
+  if (!raw.startsWith("/") || raw.startsWith("//")) return null;
+  if (raw.split("/").includes("..")) return null;
+  if (raw.length > 512) return null;
+  return raw;
 }
 
 /** Redeem one-time provision token → { api_key } (field API key). */
