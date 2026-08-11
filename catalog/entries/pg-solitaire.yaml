@@ -1,0 +1,7 @@
+title: 接龍
+kind: game
+series: 懷舊
+blurb: 克朗代克接龍：7 列牌堆翻牌移動、A 到 K 建堆、暫存回收、計時步數、本機最佳。
+source: sampot/pg-solitaire
+license: MIT
+status: unlisted

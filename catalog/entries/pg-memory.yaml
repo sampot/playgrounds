@@ -1,0 +1,7 @@
+title: 對對碰
+kind: game
+series: 桌遊
+blurb: 翻牌配對：先翻一張再翻第二張找相同配對，全部配對過關；可選牌數、計時步數、連對 combo。
+source: sampot/pg-memory
+license: MIT
+status: unlisted

@@ -1,0 +1,7 @@
+title: 圍棋
+kind: game
+series: 桌遊
+blurb: 9×9 首刀圍棋：落子、氣、提子、禁著（打劫禁）、終局數子；棋子盤面自繪、熱座或簡易 AI。
+source: sampot/pg-weiqi
+license: MIT
+status: unlisted

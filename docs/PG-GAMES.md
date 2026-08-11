@@ -13,14 +13,16 @@
 
 ---
 
-## 已實作（55）
+## 已實作（69）
 
-### 精緻可玩（8＋1 unlisted）
+### 精緻可玩（10＋3 unlisted）
 | id | 標題 | 一句話 |
 | --- | --- | --- |
 | `pg-chengyu` | 成語接龍 | 末字起頭接龍、挑戰計分與人機 |
+| `pg-diabolo` | 扯鈴 | **unlisted**；節拍連招（抖鈴／拋鈴／接鈴）累加 combo、難度遞增 |
 | `pg-hopkick` | 跳房子踢毽子 | 跳房子節拍點格與踢毽子連擊 |
 | `pg-microdungeon` | 迷你地城 | 5 樓逐層往下回合制隨機地城、戰鬥寶箱藥水 |
+| `pg-reacttap` | 表情對決 | **unlisted**；看表情種類限時搶拍、連續答對 combo 加速 |
 | `pg-rubik` | 魔術方塊 | 3×3 轉看／轉層／打亂／計時；本機最佳 |
 | `pg-skyburst` | 蒼穹連射 | 垂直捲軸射擊、武裝升級、首領彈幕 |
 | `pg-sokoban` | 推箱子 | 十二關、復原、滑動操作 |
@@ -28,12 +30,13 @@
 | `pg-sandrts` | 沙丘戰線 | **unlisted**；障礙繞行＋空襲；指揮部被毀即出局 |
 | `pg-gongzhu` | 抽豬 | 夜市抽卡遊戲、避豬計分 |
 
-### 街機（14＋1 unlisted）
+### 街機（16＋3 unlisted）
 
 | id | 標題 | 一句話 |
 | --- | --- | --- |
 | `pg-airhockey` | 空氣曲棍球 | 球拍彈盤進門、先得七分 |
 | `pg-breakout` | 打磚塊 | 擋板反彈清磚 |
+| `pg-carrom` | 康樂球 | **unlisted**；拖曳彈射打擊珠、碰撞推進對手棋子入口袋得點 |
 | `pg-cityroam` | 巷弄迷走 | 街區撿金幣、躲警察、走到出口；30×20 格小地圖 |
 | `pg-dancepad` | 節奏踏墊 | 四軌箭頭下落、踩拍連擊 |
 | `pg-foodcatch` | 接食材 | **unlisted**；移動菜藍接食物、躲壞番茄；連擊加倍、20 秒升級 |
@@ -42,40 +45,48 @@
 | `pg-marblepit` | 玻璃彈珠坑 | 凹坑對撞、撥彈進洞 |
 | `pg-mazeglow` | 迴廊拾光 | 迷宮撿光、反制追逐 |
 | `pg-pixelhop` | 像素躍階 | 5 個關卡收金幣、踩黏液、避尖刺；mobile-first |
+| `pg-spacepulse` | 數位脈衝 | **unlisted**；節拍驅動躲閃射擊、敵波在拍點推進；≠固定波次 |
 | `pg-starshot` | 星屑出擊 | 固定畫面太空射擊 |
 | `pg-tankduel` | 戰車對決 | 俯視坦克人機／觀戰 |
 | `pg-tetris` | 俄羅斯方塊 | 七種方塊、消行升級 |
 | `pg-topduel` | 陀螺對戰 | 蓄力發射、轉速碰撞 |
 | `pg-towerdef` | 迷你塔防 | 戰役星等、無盡模式 |
 
-### 懷舊（9＋2 unlisted）
+### 懷舊（15＋8 unlisted）
 
 | id | 標題 | 一句話 |
 | --- | --- | --- |
 | `pg-banqi` | 暗棋對弈 | 翻子吃子、簡易人機 |
+| `pg-bikekan` | 大家來找碴 | **unlisted**；程式繪製雙場景、點出所有差異、點錯扣時 |
+| `pg-diaoshui` | 釣水球 | **unlisted**；夜市紙鉤釣水球、紙圈套頸撈起、限時過關 |
 | `pg-freecell` | 新接龍 | 電腦課經典；八列牌、四暫存、四回收 |
 | `pg-fruitcut` | 切水果 | 滑動切菜、炸彈、三命 |
 | `pg-jungle` | 鬥獸棋 | 獸穴、陷阱、河界 |
 | `pg-lianlian` | 連連看 | **unlisted**；兩張相同牌以 ≤2 轉角路徑相連即消、提示／洗牌、四難度 |
+| `pg-marblecir` | 彈珠圈 | **unlisted**；地上畫圈、把圈內目標珠彈出圈外得點；≠凹坑對撞 |
+| `pg-mines` | 踩地雷 | **unlisted**；多難度盤面、開格 flood fill、旗標、計時 |
 | `pg-moletap` | 地洞敲敲 | 夜市節奏敲擊 |
 | `pg-popshot` | 射氣球 | 夜市射靶破球 |
 | `pg-ringtoss` | 套圈圈 | 夜市拋環套瓶 |
 | `pg-shanghaimj` | 麻將消消 | **unlisted**；疊層麻將配對消除、自由牌判定、提示／洗牌 |
+| `pg-solitaire` | 接龍 | **unlisted**；克朗代克 7 列翻牌、A→K 建堆、計時步數 |
+| `pg-stamppad` | 戳戳樂 | **unlisted**；付代幣戳開格子看獎品、收集過關 |
 | `pg-wanzai` | 尪仔標 | 選牌對拍、翻牌收穫 |
 | `pg-wingrace` | 翼途競飛 | 簡化飛行棋 |
 
-### 機台（6）
+### 機台（7＋1 unlisted）
 
 | id | 標題 | 一句話 |
 | --- | --- | --- |
 | `pg-bingolite` | 賓果閃燈 | 五五賓果燈板 |
 | `pg-clawgrab` | 夾娃娃 | 搖爪落下夾取 |
 | `pg-coinpush` | 推幣機 | 落幣堆疊、推板擠落 |
+| `pg-guaguale` | 刮刮樂 | **unlisted**；刮開洞看中獎開關、集齊符號中獎；純娛樂非博弈 |
 | `pg-horselit` | 賽馬機 | 六軌燈光賽馬 |
 | `pg-mali` | 小瑪莉 | 復古燈圈跑燈 |
 | `pg-pinfall` | 釘雨落珠 | 發射撞釘入洞 |
 
-### 桌遊（11＋3 unlisted）
+### 桌遊（14＋6 unlisted）
 
 | id | 標題 | 一句話 |
 | --- | --- | --- |
@@ -85,11 +96,14 @@
 | `pg-liarsdice` | 大話骰 | **unlisted**；喊「N 個 X」可加喊或抓、1 點萬能、拔骰出局 |
 | `pg-mahjong` | 台灣麻將 | 十六張簡化台、補花吃碰槓胡、人機 |
 | `pg-match3` | 消消樂 | 三消、關卡目標 |
+| `pg-memory` | 記憶翻牌 | **unlisted**；翻牌配對、pair 消除、關卡遞增 |
 | `pg-redpick` | 撿紅點 | 對點數撿牌、四人人機 |
 | `pg-shisan` | 十三支 | 十三張排前中後三墩、逐墩比牌 |
+| `pg-sisek` | 四色牌 | **unlisted**；112 張台味字牌、配對成組得分、人機 |
 | `pg-sudoku` | 數獨 | 九宮填數、難度／筆記／提示 |
 | `pg-tictactoe` | 井字遊戲 | 3×3、Minimax |
 | `pg-twland` | 台灣路名地產 | 買地蓋房、機會命運 |
+| `pg-weiqi` | 圍棋 9×9 | **unlisted**；小盤圍棋、氣／提子／打劫、地盤計分、對 AI |
 | `pg-xiangqi` | 象棋 | 楚河漢界、將軍困斃；人機／雙人／AI 對 AI |
 | `pg-xinzang` | 心臟病 | **unlisted**；翻牌見心臟病號碼秒拍、最慢收整疊、對決 AI |
 | `pg-zhuagui` | 抓烏龜 | **unlisted**；丟對子後輪流盲抽、剩烏龜牌者出局、四人童玩 |
@@ -113,20 +127,7 @@
 
 | 就緒 | 台灣味 | 建議 id | 標題（暫） | 系列（暫） | 主要 `game-assets/` | 備註 |
 | --- | --- | --- | --- | --- | --- | --- |
-| 高 | · | `pg-reacttap` | 表情對決 | 精緻可玩 | `art/emotes-pack/`、`art/toon-characters/`、`sfx/voiceover-pack/` | **新**；出題反應／搶拍 |
-| 中 | ✓ | `pg-mines` | 踩地雷 | 懷舊 | `sfx/oga-8-bit-sound-effect-pack/`、`art/ui-pack/` | 盤面多半程式繪；電腦課經典 |
-| 中 | ✓ | `pg-solitaire` | 接龍 | 懷舊 | `art/playing-cards-pack/` | **新**；克朗代克；與新接龍並列無妨 |
-| 中 | ✓ | `pg-memory` | 對對碰 | 桌遊 | `art/playing-cards-pack/` 或 `puzzle-pack-1/` | **新**；翻牌配對；可台灣圖騰自製卡背 |
-| 中 | ✓ | `pg-guaguale` | 刮刮樂 | 機台 | `sfx/casino-audio/`、`art/ui-pack/` | 刮層／獎項圖需補；純娛樂勿真博弈 |
-| 中 | ✓ | `pg-bikekan` | 大家來找碴 | 懷舊 | `sfx/ui-audio/`、`music/music-jingles/` | 關卡雙圖需自製或另找 |
-| 中 | · | `pg-spacepulse` | 數位脈衝 | 街機 | `sfx/digital-audio/`、`sfx/sci-fi-sounds/`、`art/particle-pack/`、`music/super-16bit-sounds/` | **新**；節奏／閃避射擊皮；≠ `pg-starshot` 固定畫面波次 |
-| 低 | ✓ | `pg-sisek` | 四色牌 | 桌遊 | （缺） | 台灣特有牌具；需自繪或另找 pack |
-| 低 | ✓ | `pg-carrom` | 康樂球 | 街機 | （缺） | 學校康樂；物理＋桌面美術 |
-| 低 | ✓ | `pg-diaoshui` | 釣水球 | 懷舊 | （缺） | 夜市紙鉤；≠射氣球／套圈 |
-| 低 | ✓ | `pg-marblecir` | 彈珠圈 | 懷舊 | （缺） | 地上畫圈；≠ `pg-marblepit`／釘雨 |
-| 低 | ✓ | `pg-diabolo` | 扯鈴 | 精緻可玩 | （缺） | 節奏／連招；物理從簡 |
-| 低 | ✓ | `pg-stamppad` | 戳戳樂 | 懷舊 | （缺） | 夜市戳洞兌獎簡化 |
-| 低 | ✓ | `pg-weiqi` | 圍棋 | 桌遊 | （缺成套） | 規則重；首刀 9×9＋數子；棋子／盤宜自繪 |
+| — | — | — | — | — | — | 目前無排程中 backlog（全部已上架，見「已實作」） |
 
 ### 已涵蓋、不必再做一顆複製品
 

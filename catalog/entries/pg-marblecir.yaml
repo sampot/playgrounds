@@ -1,0 +1,7 @@
+title: 彈珠圈
+kind: game
+series: 懷舊
+blurb: 地上畫圈彈珠：圈內放目標珠、彈射自己的珠把圈內珠打出圈外得點；回合制物理；≠凹坑對撞。
+source: sampot/pg-marblecir
+license: MIT
+status: unlisted

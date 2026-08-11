@@ -1,0 +1,7 @@
+title: 康樂球
+kind: game
+series: 街機
+blurb: 康樂球／彈珠桌：拖曳彈射自己的彈珠、碰撞推進對手棋子入口袋得點；簡化物理、回合制人機。
+source: sampot/pg-carrom
+license: MIT
+status: unlisted

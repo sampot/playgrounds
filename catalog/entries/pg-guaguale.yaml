@@ -1,0 +1,7 @@
+title: 刮刮樂
+kind: game
+series: 機台
+blurb: 夜市刮刮樂：刮開洞看中獎開關、集齊相同符號即中獎；純娛樂非博弈、刮層效果。
+source: sampot/pg-guaguale
+license: MIT
+status: unlisted

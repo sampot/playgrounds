@@ -1,0 +1,7 @@
+title: 踩地雷
+kind: game
+series: 懷舊
+blurb: 經典踩地雷：多難度盤面、開格 flood fill、旗標、計時、踩雷爆炸；電腦課經典、盤面程式繪製。
+source: sampot/pg-mines
+license: MIT
+status: unlisted

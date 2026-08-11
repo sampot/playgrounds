@@ -1,0 +1,7 @@
+title: 數位脈衝
+kind: game
+series: 街機
+blurb: 節拍驅動的躲閃射擊：敵波只在拍點上推進、玩家拍點移動避開並吃到能量粒子；≠固定畫面波次。
+source: sampot/pg-spacepulse
+license: MIT
+status: unlisted
