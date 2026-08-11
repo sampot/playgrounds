@@ -1,9 +1,10 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   clearPgProvisionHashFromLocation,
   goLoginUrl,
   parsePgProvisionFromLocation,
 } from "./platformClient";
+import { goAuth } from "./goAuth.svelte";
 
 describe("parsePgProvisionFromLocation", () => {
   it("parses #pg_provision= token", () => {
@@ -74,5 +75,91 @@ describe("goLoginUrl", () => {
     delete import.meta.env.VITE_PLATFORM_DASH_ORIGIN;
     const url = goLoginUrl("");
     expect(new URL(url).searchParams.has("field")).toBe(false);
+  });
+});
+
+describe("goAuth.mintPlatformInvite (GO-INVITE)", () => {
+  const originalFetch = globalThis.fetch;
+
+  afterEach(() => {
+    goAuth.__setApiKeyForTests(null);
+    if (originalFetch) globalThis.fetch = originalFetch;
+    vi.unstubAllGlobals();
+  });
+
+  it("mints with memory key → bearer header, invite.compose body, targetField=go origin", async () => {
+    goAuth.__setApiKeyForTests("pg_sk_test");
+    let capturedUrl: string = "";
+    let capturedInit: RequestInit | undefined;
+    vi.stubGlobal(
+      "fetch",
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        capturedUrl = typeof input === "string" ? input : String(input);
+        capturedInit = init;
+        return new Response(
+          JSON.stringify({
+            invite_id: "inv_1",
+            kind: "invite.compose",
+            expires_at: 1780000000000,
+            short_url: "https://go.samkuo.me/i/abc",
+            deep_link: "https://go.samkuo.me/i/abc",
+            secret: "sec",
+          }),
+          { status: 200, headers: { "content-type": "application/json" } }
+        );
+      }
+    );
+
+    const out = await goAuth.mintPlatformInvite({
+      kind: "invite.compose",
+      intent: { version: 1 },
+    });
+
+    expect(out.short_url).toBe("https://go.samkuo.me/i/abc");
+    expect(capturedUrl).toContain("/v1/invites");
+    expect(capturedInit?.method).toBe("POST");
+    const headers = new Headers(capturedInit?.headers as HeadersInit | undefined);
+    expect(headers.get("Authorization")).toBe("Bearer pg_sk_test");
+    const body = JSON.parse(String(capturedInit?.body) || "{}");
+    expect(body.kind).toBe("invite.compose");
+    expect(body.targetField).toContain("go");
+    expect(body.intent).toEqual({ version: 1 });
+  });
+
+  it("gives not_provisioned without a key", async () => {
+    goAuth.__setApiKeyForTests(null);
+    await expect(
+      goAuth.mintPlatformInvite({ kind: "invite.compose" })
+    ).rejects.toMatchObject({ code: "not_provisioned" });
+  });
+
+  it("propagates not_provisioned from a 401 platform response", async () => {
+    goAuth.__setApiKeyForTests("pg_sk_stale");
+    vi.stubGlobal(
+      "fetch",
+      async () =>
+        new Response(
+          JSON.stringify({ error: "通行證已失效", code: "not_provisioned" }),
+          { status: 401, headers: { "content-type": "application/json" } }
+        )
+    );
+    await expect(
+      goAuth.mintPlatformInvite({ kind: "invite.compose" })
+    ).rejects.toMatchObject({ code: "not_provisioned" });
+  });
+
+  it("never persists the api key to storage", () => {
+    const lsKeys: string[] = [];
+    vi.stubGlobal("localStorage", {
+      getItem: (k: string) => null,
+      setItem: (k: string) => void lsKeys.push(k),
+      removeItem: () => {},
+      key: () => null,
+      get length() {
+        return 0;
+      },
+    });
+    goAuth.__setApiKeyForTests("pg_sk_mem");
+    expect(lsKeys).toEqual([]);
   });
 });

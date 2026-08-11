@@ -26,6 +26,8 @@ import {
   handleGoFunctionsApi,
   type GoFunctionsApiContext,
 } from "./goFunctionsRuntime";
+import { handleGoShellPlatformApi } from "./goShellPlatform";
+import { handleGoShellSessionApi } from "./goShellSession";
 
 configurePlaygroundsPaths({ basePath: "", mode: "standalone" });
 
@@ -211,6 +213,10 @@ async function dispatchGoCanvasApi(
   sandboxId: string,
   request: SerializedRequest
 ): Promise<SerializedResponse> {
+  const shellPlatform = await handleGoShellPlatformApi(request);
+  if (shellPlatform) return shellPlatform;
+  const shellSession = await handleGoShellSessionApi(request);
+  if (shellSession) return shellSession;
   let path = "/";
   try {
     path = new URL(request.url, "https://go.local").pathname;

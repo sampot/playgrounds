@@ -13,6 +13,8 @@ import {
   type GoCanvasApiListenerOptions,
 } from "./goCanvas";
 import { handleGoFunctionsApi } from "./goFunctionsRuntime";
+import { handleGoShellPlatformApi } from "./goShellPlatform";
+import { handleGoShellSessionApi } from "./goShellSession";
 
 export const GO_MEMORY_SESSION_TYPE = "playgrounds-go-memory-session" as const;
 export const GO_MEMORY_SESSION_RESULT = "playgrounds-go-memory-session-result" as const;
@@ -177,6 +179,10 @@ async function dispatchMemoryApi(
   sandboxId: string,
   request: { method: string; url: string; body: ArrayBuffer | null }
 ) {
+  const shellPlatform = await handleGoShellPlatformApi(request);
+  if (shellPlatform) return shellPlatform;
+  const shellSession = await handleGoShellSessionApi(request);
+  if (shellSession) return shellSession;
   let path = "/";
   try {
     path = new URL(request.url, "https://go.local").pathname;

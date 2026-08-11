@@ -17,6 +17,18 @@
     type SoloStatus,
   } from "$lib/soloRuntime";
   import { setGoMemoryCanvasWindow } from "$lib/goMemoryCanvas";
+  import GoHostBar from "$lib/GoHostBar.svelte";
+  import GoShareSheet from "$lib/GoShareSheet.svelte";
+  import {
+    subscribeGoShellPlatformEvents,
+    type GoShellPlatformLoginNeededEvent,
+  } from "$lib/goShellPlatform";
+  import {
+    createHostInviteBind,
+    type HostInviteController,
+    type HostInviteShare,
+  } from "$lib/hostInviteBind.svelte";
+  import { goAuth } from "$lib/goAuth.svelte";
   import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
   import {
     endGoPlay,
@@ -131,7 +143,9 @@
   });
 
   $effect(() => {
-    chromeSession.setCanvasActive(showCanvas);
+    // 邀請對弈開場後保留頁內操作（Host bar ／分享面），不進入全屏畫布模式；
+    // 閒置時只是浮動 chip，維持全屏畫布。
+    chromeSession.setCanvasActive(showCanvas && !hostLiving);
     return () => chromeSession.setCanvasActive(false);
   });
 
@@ -151,6 +165,127 @@
     const id = catalogId;
     if (!id) return;
     void runtime.bootFromCatalogId(id);
+  }
+
+  // —— GO-INVITE：玩家主場邀請對弈（GO-INVITE §6.6）——
+
+  const hostEntry = $derived(entry && entry.id === "pg-gomoku" ? entry : null);
+
+  let hostInvite: HostInviteController | null = $state(null);
+  let hostBusy = $state(false);
+  let hostShareOpen = $state(false);
+  let hostShare: HostInviteShare | null = $state(null);
+  /** Host runtime phase mirror (reactive). */
+  let hostPhase = $state<"idle" | "open" | "waiting" | "ready" | "active" | "ended" | "error">("idle");
+
+  const hostLiving = $derived(hostPhase !== "idle" && hostPhase !== "error");
+
+  $effect(() => {
+    const c = hostInvite;
+    if (!c) {
+      hostPhase = "idle";
+      return;
+    }
+    return c.subscribe(s => {
+      hostPhase = s.phase;
+    });
+  });
+
+  $effect(() => {
+    const id = catalogId;
+    const entry = hostEntry;
+    if (!id || !entry) {
+      hostInvite?.unbind();
+      hostInvite = null;
+      return;
+    }
+    const bind = createHostInviteBind({
+      catalogId: id,
+      entry,
+      getFiles: () => runtime.getFiles(),
+      getSandboxId: () => runtime.getSandboxId(),
+    });
+    bind.bind();
+    hostInvite = bind;
+    return () => {
+      bind.unbind();
+      if (hostInvite === bind) hostInvite = null;
+    };
+  });
+
+  function openHostShare(share: HostInviteShare) {
+    hostShare = share;
+    hostShareOpen = true;
+    let spoken = share.shortUrl;
+    try {
+      const u = new URL(share.shortUrl);
+      spoken = `${u.host}${u.pathname}`;
+    } catch {
+      /* keep raw */
+    }
+    chromeSession.setFlash(`已產生邀請：${spoken}`);
+  }
+
+  function routeLoginNeeded(_ev: GoShellPlatformLoginNeededEvent) {
+    hostBusy = false;
+    chromeSession.setFlash("要邀請對弈需先登入遊樂場通行證");
+    goAuth.login();
+  }
+
+  $effect(() => {
+    return subscribeGoShellPlatformEvents(ev => {
+      if (ev.kind === "invite.compose") {
+        const b = hostInvite;
+        if (!b) return;
+        void b.adoptSamInvite(ev).then(share => {
+          if (share) openHostShare(share);
+        });
+      } else {
+        routeLoginNeeded(ev);
+      }
+    });
+  });
+
+  async function inviteOpponent() {
+    const b = hostInvite;
+    if (!b) return;
+    hostBusy = true;
+    try {
+      const share = await b.mintShare();
+      if (share) openHostShare(share);
+    } catch (e) {
+      const code =
+        e && typeof e === "object" && "code" in e
+          ? String((e as { code: unknown }).code)
+          : "";
+      if (code === "not_provisioned") {
+        routeLoginNeeded({
+          kind: "login_needed",
+          message: e instanceof Error ? e.message : "請先登入",
+        });
+      } else {
+        chromeSession.setFlash(
+          e instanceof Error ? e.message : "邀請失敗，請稍後再試"
+        );
+      }
+    } finally {
+      hostBusy = false;
+    }
+  }
+
+  function closeHostShareSheet() {
+    hostShareOpen = false;
+  }
+
+  function hostStart() {
+    void hostInvite?.start("host");
+  }
+  function hostReset() {
+    void hostInvite?.reset();
+  }
+  function hostClose() {
+    void hostInvite?.close();
+    chromeSession.setFlash("已結束這一場");
   }
 </script>
 
@@ -219,8 +354,24 @@
   {/if}
 {:else}
   <h1 class="sr-only">{status.entry?.title || entry?.title || "小品"}</h1>
+  {#if hostEntry}
+    <GoHostBar
+      loggedIn={goAuth.loggedIn}
+      controller={hostInvite}
+      busy={hostBusy}
+      onInvite={inviteOpponent}
+      onLoginNeeded={() => goAuth.login()}
+      onStart={hostStart}
+      onReset={hostReset}
+      onClose={hostClose}
+    />
+  {/if}
   {#if showCanvas}
-    <div class="stage stage--fill">
+    <div
+      class={["stage", hostLiving ? "" : "stage--fill"]
+        .filter(Boolean)
+        .join(" ")}
+    >
       {#if status.canvasMode === "memory" && status.canvasSrcdoc}
         {#key status.canvasGeneration}
           <iframe
@@ -242,6 +393,16 @@
         {/key}
       {/if}
     </div>
+  {/if}
+  {#if hostInvite && hostShare}
+    <GoShareSheet
+      open={hostShareOpen}
+      title={hostShare.title}
+      url={hostShare.url}
+      spoken={hostShare.url}
+      onClose={closeHostShareSheet}
+      onFlash={msg => chromeSession.setFlash(msg)}
+    />
   {/if}
 {/if}
 

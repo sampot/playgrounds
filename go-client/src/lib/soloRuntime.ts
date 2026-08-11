@@ -33,6 +33,10 @@ export type SoloStatus = {
 
 type Listener = (s: SoloStatus) => void;
 
+/** Latest mounted files (Host-invite bind reads after ready). */
+let samFilesRef: FileMap | null = null;
+let sandboxIdRef: string | null = null;
+
 export function createSoloRuntime() {
   let status: SoloStatus = {
     phase: "idle",
@@ -62,6 +66,8 @@ export function createSoloRuntime() {
   function clearMount() {
     disposeMount?.();
     disposeMount = null;
+    samFilesRef = null;
+    sandboxIdRef = null;
   }
 
   async function bootFromCatalogId(catalogId: string): Promise<void> {
@@ -141,6 +147,8 @@ export function createSoloRuntime() {
         return;
       }
       disposeMount = mounted.dispose;
+      samFilesRef = files;
+      sandboxIdRef = mounted.sandboxId;
       set({
         phase: "ready",
         entry,
@@ -195,6 +203,10 @@ export function createSoloRuntime() {
     subscribe,
     bootFromCatalogId,
     dispose,
+    /** Mounted SAM files (null before ready) — used by Host-invite bind. */
+    getFiles: () => samFilesRef,
+    /** Active sandboxId (null before ready). */
+    getSandboxId: () => sandboxIdRef,
     getStatus: () => ({ ...status }),
   };
 }

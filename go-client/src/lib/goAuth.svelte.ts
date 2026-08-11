@@ -16,9 +16,12 @@ import {
   clearPgProvisionHashFromLocation,
   fetchFieldMe,
   goLoginUrl,
+  mintPlatformInvite,
   parsePgProvisionFromLocation,
   redeemFieldProvision,
+  revokePlatformInvite,
   type FieldMeProfile,
+  type MintInviteResult,
 } from "./platformClient";
 import { chromeSession } from "./chromeSession.svelte";
 
@@ -176,7 +179,55 @@ class GoAuth {
     }
   }
 
-  /** Re-validate the memory key against `/v1/field/me` (returns live or null). */
+  /**
+   * Mint a Platform invite as the logged-in player (GO-INVITE). Uses the page
+   * memory field API key; throws an error with `code === "not_provisioned"` when
+   * missing / invalid so the UI can route to login. `targetField` = go origin.
+   */
+  async mintPlatformInvite(opts: {
+    kind?: string;
+    intent?: unknown;
+    ttlMs?: number;
+  }): Promise<MintInviteResult> {
+    const key = this.#apiKey;
+    if (!key) {
+      const err = new Error("尚未登入遊樂場通行證，請先登入") as Error & {
+        code?: string;
+      };
+      err.code = "not_provisioned";
+      throw err;
+    }
+    return mintPlatformInvite({
+      apiKey: key,
+      kind: opts.kind,
+      intent: opts.intent,
+      targetField: goOrigin(),
+      ttlMs: opts.ttlMs,
+    });
+  }
+
+  /**
+   * Hand the memory field API key to the trusted Host answer loop (GO-INVITE).
+   * Page-memory only — never exposed to SAM iframes or storage; cleared on
+   * unload alongside `#apiKey`.
+   */
+  getPlatformApiKeyForHostLoop(): string | null {
+    return this.#apiKey;
+  }
+
+  /** Revoke a hosted invite the current user owns (GO-INVITE). */
+  async revokePlatformInvite(inviteId: string): Promise<void> {
+    const key = this.#apiKey;
+    if (!key) return;
+    try {
+      await revokePlatformInvite({ inviteId, apiKey: key });
+    } catch {
+      /* revocation is best-effort */
+    }
+  }
+
+  /**
+   * Re-validate the memory key against `/v1/field/me` (returns live or null). */
   async refreshProfile(): Promise<GoProfile | null> {
     const key = this.#apiKey;
     if (!key) return null;
@@ -189,6 +240,12 @@ class GoAuth {
       this.#clearApiKey();
       return null;
     }
+  }
+
+  /** Test seam: inject an in-memory field API key (never touches storage). */
+  __setApiKeyForTests(key: string | null): void {
+    this.#apiKey = key;
+    this.loggedIn = Boolean(key);
   }
 }
 

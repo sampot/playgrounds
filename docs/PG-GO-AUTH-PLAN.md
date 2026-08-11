@@ -92,7 +92,7 @@ dash「登入我的遊樂場」（target=go，?field=go.samkuo.me）
 
 > 定位：**玩家是 go 的主場使用者，不是被動 Guest**。登入（本刀）建立的**頁面記憶體 field API key** 即為玩家側能力憑證。GO-INVITE 為**後續階段**，不在本刀 (DEC-052) 實作；本刀以「**驗證 pipeline 可承載**」收斂。
 
-**GO-INVITE 輪廓（後續起草）：**
+**GO-INVITE 輪廓（正式規格見 [PG-GO-HOST-INVITE-PLAN.md](./PG-GO-HOST-INVITE-PLAN.md)）：**
 
 - **入口**：已登入的玩家在單局內（`/i/<short>` 或 `/s/<catalog>`）可「對玩家發邀請」——回傳 `https://go.samkuo.me/i/<short>` 起新 session，**另一位玩家**入座。
 - **API key 來源**：同本刀 pipeline（`#pg_provision=` redeem → 記憶體 field API key）——身分與能力**同一把 key**，不需第二套授權。

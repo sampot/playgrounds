@@ -117,9 +117,72 @@ export async function fetchFieldMe(
   return (await res.json()) as FieldMeProfile;
 }
 
+export type MintInviteResult = {
+  invite_id: string;
+  kind: string;
+  /** Unix ms (Platform API). */
+  expires_at: number;
+  short_url: string;
+  deep_link: string;
+  secret: string;
+};
+
+/**
+ * Mint a Platform invite with a logged-in user's memory field API key (GO-INVITE).
+ * `targetField` = the go origin so short_url / deep_link land on go.
+ */
+export async function mintPlatformInvite(opts: {
+  apiKey: string;
+  kind?: string;
+  intent?: unknown;
+  targetField?: string;
+  ttlMs?: number;
+}): Promise<MintInviteResult> {
+  const origin = platformApiOrigin();
+  const res = await fetch(`${origin}/v1/invites`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${opts.apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      kind: opts.kind,
+      intent: opts.intent,
+      targetField: opts.targetField,
+      ttlMs: opts.ttlMs,
+    }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    const code = res.status === 401 ? "not_provisioned" : "error";
+    const message =
+      code === "not_provisioned" ? "通行證已失效，請重新登入" : text || "無法建立邀請";
+    const err = new Error(message) as Error & { code?: string };
+    err.code = code;
+    throw err;
+  }
+  return (await res.json()) as MintInviteResult;
+}
+
 export const PG_PROVISION_HASH_KEY = "pg_provision";
 
-export function parsePgProvisionFromLocation(opts: {
+/** Revoke an invite owned by the current user (GO-INVITE). Best-effort. */
+export async function revokePlatformInvite(opts: {
+  inviteId: string;
+  apiKey: string;
+}): Promise<void> {
+  const origin = platformApiOrigin();
+  const res = await fetch(
+    `${origin}/v1/invites/${encodeURIComponent(opts.inviteId)}`,
+    {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${opts.apiKey}` },
+    }
+  );
+  if (!res.ok) {
+    throw new Error("無法撤銷邀請");
+  }
+}export function parsePgProvisionFromLocation(opts: {
   hash?: string;
   search?: string;
 }): { token: string } | null {
