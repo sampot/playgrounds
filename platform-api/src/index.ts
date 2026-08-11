@@ -291,7 +291,8 @@ async function dashSuccessRedirect(
   request: Request,
   accessToken: string,
   expiresAt: number,
-  extraQuery?: string
+  extraQuery?: string,
+  returnPath = "/"
 ): Promise<Response> {
   const origin = new URL(request.url).origin;
   const maxAge = Math.max(60, Math.floor((expiresAt - Date.now()) / 1000));
@@ -304,10 +305,13 @@ async function dashSuccessRedirect(
       if (k) params.set(k, v ?? "1");
     }
   }
+  // returnPath is dash-relative (e.g. "/go/login"). Keep its query, append session.
+  const dest = new URL(returnPath, origin);
+  for (const [k, v] of params) dest.searchParams.set(k, v);
   return new Response(null, {
     status: 302,
     headers: {
-      Location: `${origin}/?${params.toString()}`,
+      Location: dest.toString(),
       "Set-Cookie": sessionCookieHeader(accessToken, maxAge, request),
     },
   });
@@ -516,7 +520,7 @@ async function route(
         intent: { intent: "bootstrap", bootstrapToken },
       };
     }
-    return { ok: true, intent: { intent: "login" } };
+    return { ok: true, intent: { intent: "login", return: url.searchParams.get("return") || undefined } };
   }
 
   if (request.method === "GET" && pathname === "/auth/github") {
@@ -619,7 +623,14 @@ async function route(
       },
       fail,
       success: (accessToken, expiresAt, extra) =>
-        dashSuccessRedirect(env, request, accessToken, expiresAt, extra),
+        dashSuccessRedirect(
+          env,
+          request,
+          accessToken,
+          expiresAt,
+          extra,
+          "return" in state ? state.return ?? "/" : "/"
+        ),
     });
   }
 
@@ -660,7 +671,14 @@ async function route(
       },
       fail,
       success: (accessToken, expiresAt, extra) =>
-        dashSuccessRedirect(env, request, accessToken, expiresAt, extra),
+        dashSuccessRedirect(
+          env,
+          request,
+          accessToken,
+          expiresAt,
+          extra,
+          "return" in state ? state.return ?? "/" : "/"
+        ),
     });
   }
 
@@ -702,7 +720,14 @@ async function route(
       },
       fail,
       success: (accessToken, expiresAt, extra) =>
-        dashSuccessRedirect(env, request, accessToken, expiresAt, extra),
+        dashSuccessRedirect(
+          env,
+          request,
+          accessToken,
+          expiresAt,
+          extra,
+          "return" in state ? state.return ?? "/" : "/"
+        ),
     });
   }
 

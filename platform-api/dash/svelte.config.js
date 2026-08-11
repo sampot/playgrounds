@@ -17,7 +17,15 @@ const config = {
     }),
     prerender: {
       handleHttpError: "warn",
-      entries: ["/", "/account", "/ops", "/analytics", "/admin", "/bootstrap"],
+      entries: [
+        "/",
+        "/account",
+        "/ops",
+        "/analytics",
+        "/admin",
+        "/bootstrap",
+        "/go/login",
+      ],
     },
   },
 };

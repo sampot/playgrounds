@@ -41,6 +41,11 @@
     <button type="button" class="linkish" onclick={logout}>登出</button>
   {:else}
     <span class="chip meta">尚未進入</span>
+    {#if dash.returnFieldHint}
+      <span class="meta">
+        登入後回到<span class="mono">{dash.returnFieldHint}</span>
+      </span>
+    {/if}
     <a class="btn" href="/auth/github?intent=login">使用 GitHub 進入</a>
     <a class="btn secondary" href="/auth/google?intent=login">使用 Google 進入</a>
     <a class="btn secondary" href="/auth/line?intent=login">使用 LINE 進入</a>

@@ -55,12 +55,20 @@ export function goDashOrigin(): string {
 }
 
 /**
- * Redirect to dash with `?field=` so after SSO the user is provisioned
- * back to this go origin (same flow as play, DEC-052).
+ * Dedicated minimal go login page on dash (only Google／LINE, DEC-054). The go
+ * client redirects here (full-page, no popup): after SSO the dash provisions
+ * the user back to this go origin via the existing `#pg_provision=` pipeline
+ * (same as play, DEC-052) — no cross-window handoff needed.
  */
-export function goFieldLoginUrl(fieldOrigin: string): string {
-  const dash = goDashOrigin();
-  const url = new URL("/", dash.endsWith("/") ? dash : `${dash}/`);
+export const GO_LOGIN_PATH = "/go/login";
+
+/**
+ * Full-page login URL for go (DEC-054): dash's dedicated `/go/login` page with
+ * `?field=` so after SSO the user is provisioned back to this go origin.
+ */
+export function goLoginUrl(fieldOrigin: string): string {
+  const dash = goDashOrigin().replace(/\/$/, "");
+  const url = new URL(`${dash}${GO_LOGIN_PATH}`);
   if (fieldOrigin.trim()) url.searchParams.set("field", fieldOrigin.trim());
   return url.toString();
 }
@@ -91,6 +99,7 @@ export type FieldMeProfile = {
   role: "admin" | "user";
   github: { login: string; avatar_url: string | null } | null;
   google: { email: string; avatar_url: string | null } | null;
+  line: { display_name: string; avatar_url: string | null } | null;
   default_field_url: string;
 };
 

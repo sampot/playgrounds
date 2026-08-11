@@ -2,6 +2,11 @@
  * go-client login state (DEC-052): play-compatible `#pg_provision=` → memory
  * field API key → `/v1/field/me` profile. Header identity / avatar.
  *
+ * Login is a full-page redirect (DEC-054 final): the go client jumps to the
+ * dash dedicated `/go/login` page (Google／LINE only), after SSO the dash
+ * provisions the user back here via `#pg_provision=`, and `initFromLocation`
+ * redeems it in place — no popup / cross-window handoff.
+ *
  * Security: the API key lives in page memory only (cleared on unload). The
  * non-secret profile may persist in localStorage so the avatar shows across
  * sessions; the API key never touches storage.
@@ -10,7 +15,7 @@
 import {
   clearPgProvisionHashFromLocation,
   fetchFieldMe,
-  goFieldLoginUrl,
+  goLoginUrl,
   parsePgProvisionFromLocation,
   redeemFieldProvision,
   type FieldMeProfile,
@@ -28,13 +33,26 @@ export type GoProfile = {
 };
 
 function profileFromFieldMe(me: FieldMeProfile): GoProfile {
+  // go's login surface is LINE-primary, Google-secondary; prefer the most
+  // recently relevant provider avatar. All linked providers are returned by
+  // `/v1/field/me`, so pick line → google → github (in provider order).
+  const avatar_url =
+    me.line?.avatar_url ??
+    me.google?.avatar_url ??
+    me.github?.avatar_url ??
+    null;
+  const label = me.line?.display_name
+    ? me.line.display_name
+    : me.google?.email
+      ? me.google.email
+      : me.github?.login
+        ? `@${me.github.login}`
+        : me.user_id;
   return {
     user_id: me.user_id,
     role: me.role,
-    label: me.github?.login
-      ? `@${me.github.login}`
-      : me.google?.email || me.user_id,
-    avatar_url: me.github?.avatar_url ?? me.google?.avatar_url ?? null,
+    label,
+    avatar_url,
     default_field_url: me.default_field_url,
   };
 }
@@ -108,9 +126,15 @@ class GoAuth {
     return this.loggedIn;
   }
 
+  /**
+   * Full-page redirect to the dash dedicated `/go/login` page (DEC-054). After
+   * SSO the dash provisions this go origin via `#pg_provision=`, and the page
+   * reload redeems it — no popup / cross-window handoff (the OAuth provider's
+   * `Cross-Origin-Opener-Policy` severs popup openers, so redirect is used).
+   */
   login(): void {
     if (typeof window === "undefined") return;
-    window.location.assign(goFieldLoginUrl(goOrigin()));
+    window.location.assign(goLoginUrl(goOrigin()));
   }
 
   logout(): void {
@@ -120,7 +144,7 @@ class GoAuth {
 
   /**
    * Consume `#pg_provision=` once at startup: redeem → memory key →
-   * fetch profile → clear hash. Fails soft (log out + inbox flash), never blocks play.
+   * fetch profile → clear hash. Same as play (DEC-052). Fails soft.
    */
   async initFromLocation(): Promise<void> {
     if (typeof window === "undefined") return;
@@ -142,8 +166,9 @@ class GoAuth {
       const me = await fetchFieldMe(api_key);
       this.profile = profileFromFieldMe(me);
       writeStoredProfile(this.profile);
+
       chromeSession.setFlash("已登入");
-    } catch {
+    } catch (err) {
       this.#clearApiKey();
       chromeSession.setFlash("登入確認已失效，請從後台重新登入");
     } finally {

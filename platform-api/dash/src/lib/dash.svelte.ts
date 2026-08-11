@@ -165,7 +165,9 @@ class DashStore {
         const ret = this.peekReturnField();
         if (ret) {
           this.flash("正在回到你的遊樂場…", "ok");
-          await this.provisionAndOpenField(ret, { skipConfirm: true });
+          await this.provisionAndOpenField(ret, {
+            skipConfirm: true,
+          });
         }
       }
     }

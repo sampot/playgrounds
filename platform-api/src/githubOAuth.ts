@@ -15,7 +15,7 @@ export type GithubProfile = {
 };
 
 export type OAuthIntent =
-  | { intent: "login" }
+  | { intent: "login"; return?: string }
   | { intent: "join"; inviteToken: string }
   | { intent: "link"; userId: string }
   | { intent: "bootstrap"; bootstrapToken: string };
