@@ -148,7 +148,8 @@ a {
 }
 .chrome--compact .share-btn,
 .chrome--compact .hdr-next,
-.chrome--compact .hdr-more-btn {
+.chrome--compact .hdr-more-btn,
+.chrome--compact .profile-btn {
   min-height: 2.5rem;
   padding: 0.3rem 0.55rem;
   border: 1px solid rgb(var(--line));
@@ -163,7 +164,7 @@ a {
   white-space: nowrap;
 }
 .chrome--compact .share-btn {
-  margin-left: auto;
+  margin-left: 0;
 }
 .chrome--compact .hdr-next:disabled {
   opacity: 0.4;
@@ -189,7 +190,8 @@ a {
 }
 .chrome .share-btn,
 .chrome .hdr-more-btn,
-.chrome .hdr-next {
+.chrome .hdr-next,
+.chrome .profile-btn {
   min-width: 2.75rem;
   min-height: 2.75rem;
   padding: 0.35rem 0.75rem;
@@ -205,15 +207,56 @@ a {
   white-space: nowrap;
   -webkit-tap-highlight-color: color-mix(in oklab, rgb(var(--accent)) 18%, transparent);
 }
-.chrome .share-btn {
+.chrome .profile-btn {
   margin-left: auto;
+}
+.chrome .profile-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.3rem 0.55rem;
+}
+.chrome .profile-glyph {
+  display: inline-flex;
+  color: rgb(var(--muted));
+}
+.chrome .profile-btn--logged .profile-glyph {
+  color: rgb(var(--accent));
+}
+.chrome .profile-avatar {
+  display: block;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 999px;
+  object-fit: cover;
+  border: 1px solid rgb(var(--line));
+  background: rgb(var(--fill));
+}
+.chrome .profile-status {
+  position: absolute;
+  right: 0.3rem;
+  bottom: 0.3rem;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: rgb(var(--accent));
+  border: 2px solid rgb(var(--fill));
+  box-sizing: border-box;
+}
+.chrome .profile-btn {
+  position: relative;
+}
+.chrome .profile-icon {
+  display: block;
 }
 .chrome .share-btn:hover:not(:disabled),
 .chrome .share-btn:focus-visible:not(:disabled),
 .chrome .hdr-more-btn:hover,
 .chrome .hdr-more-btn:focus-visible,
 .chrome .hdr-next:hover:not(:disabled),
-.chrome .hdr-next:focus-visible:not(:disabled) {
+.chrome .hdr-next:focus-visible:not(:disabled),
+.chrome .profile-btn:hover,
+.chrome .profile-btn:focus-visible {
   border-color: rgb(var(--accent));
   color: rgb(var(--accent));
   outline: none;

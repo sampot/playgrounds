@@ -179,6 +179,9 @@ export function normalizeFieldOrigin(input: string): string | null {
   if (!host.endsWith(".samkuo.me")) return null;
   const sub = host.slice(0, -".samkuo.me".length);
   if (!sub || sub.includes(".")) return null;
+  // `go` stays a reserved name (DEC-050) but is exceptionally a valid provision
+  // target for the pure-play client (DEC-052).
+  if (sub === "go") return `https://${host}`;
   if ((FIELD_RESERVED_SUBDOMAINS as readonly string[]).includes(sub)) {
     return null;
   }

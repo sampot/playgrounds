@@ -1,15 +1,12 @@
 /**
- * Platform API origin for invite preview／join (DEC-047／050).
- * Dev: empty → same-origin Vite proxy to platform-api.
+ * Platform API origin (DEC-047／050). Always the official API host —
+ * no Vite dev proxy, even in local dev. Override via `VITE_PLATFORM_API_ORIGIN`
+ * only for tests／self-hosting.
  */
 export function platformApiOrigin(): string {
   const fromEnv = import.meta.env.VITE_PLATFORM_API_ORIGIN as string | undefined;
   if (typeof fromEnv === "string" && fromEnv.trim()) {
     return fromEnv.trim().replace(/\/$/, "");
-  }
-  if (typeof window !== "undefined") {
-    const host = window.location.hostname;
-    if (host === "localhost" || host === "127.0.0.1") return "";
   }
   return "https://api.samkuo.me";
 }
@@ -36,4 +33,131 @@ export async function previewInviteBySecret(
     throw new Error(res.status === 404 ? "邀請不存在或已失效" : "無法讀取邀請");
   }
   return (await res.json()) as InvitePreview;
+}
+
+/* ------------------------------------------------------------------ *
+ *  Login (DEC-052): play-compatible `#pg_provision=` → field API key.
+ * ------------------------------------------------------------------ */
+
+export const GO_DASH_ORIGIN = "https://dash.samkuo.me";
+
+/**
+ * Dashboard origin for go login redirect. Always the official dash host —
+ * local dev relies on CORS (localhost allowed) rather than same-origin proxy.
+ * Override via `VITE_PLATFORM_DASH_ORIGIN` only for tests／self-hosting.
+ */
+export function goDashOrigin(): string {
+  const fromEnv = import.meta.env.VITE_PLATFORM_DASH_ORIGIN as string | undefined;
+  if (typeof fromEnv === "string" && fromEnv.trim()) {
+    return fromEnv.trim().replace(/\/$/, "");
+  }
+  return GO_DASH_ORIGIN;
+}
+
+/**
+ * Redirect to dash with `?field=` so after SSO the user is provisioned
+ * back to this go origin (same flow as play, DEC-052).
+ */
+export function goFieldLoginUrl(fieldOrigin: string): string {
+  const dash = goDashOrigin();
+  const url = new URL("/", dash.endsWith("/") ? dash : `${dash}/`);
+  if (fieldOrigin.trim()) url.searchParams.set("field", fieldOrigin.trim());
+  return url.toString();
+}
+
+/** Redeem one-time provision token → { api_key } (field API key). */
+export async function redeemFieldProvision(
+  provisionToken: string
+): Promise<{ api_key: string }> {
+  const origin = platformApiOrigin();
+  const res = await fetch(`${origin}/v1/field/provision/redeem`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ provision_token: provisionToken }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(
+      res.status === 410
+        ? "同意入座已過期或已被使用，請從後台重新登入"
+        : text || "無法兌換登入確認"
+    );
+  }
+  return (await res.json()) as { api_key: string };
+}
+
+export type FieldMeProfile = {
+  user_id: string;
+  role: "admin" | "user";
+  github: { login: string; avatar_url: string | null } | null;
+  google: { email: string; avatar_url: string | null } | null;
+  default_field_url: string;
+};
+
+/** Resolve self profile by field API key (DEC-052). */
+export async function fetchFieldMe(
+  apiKey: string
+): Promise<FieldMeProfile> {
+  const origin = platformApiOrigin();
+  const res = await fetch(`${origin}/v1/field/me`, {
+    headers: { Authorization: `Bearer ${apiKey}` },
+  });
+  if (!res.ok) {
+    throw new Error("無法讀取身分資料");
+  }
+  return (await res.json()) as FieldMeProfile;
+}
+
+export const PG_PROVISION_HASH_KEY = "pg_provision";
+
+export function parsePgProvisionFromLocation(opts: {
+  hash?: string;
+  search?: string;
+}): { token: string } | null {
+  const hash = (opts.hash ?? "").replace(/^#/, "");
+  let token: string | null = null;
+  if (hash) {
+    const params = new URLSearchParams(hash);
+    const v = params.get(PG_PROVISION_HASH_KEY);
+    if (v?.trim()) token = v.trim();
+    if (!token) {
+      const m = hash.match(
+        new RegExp(`(?:^|&)${PG_PROVISION_HASH_KEY}=([^&]+)`, "i")
+      );
+      if (m?.[1]) {
+        try {
+          token = decodeURIComponent(m[1]).trim();
+        } catch {
+          token = m[1].trim();
+        }
+      }
+    }
+  }
+  if (!token && opts.search) {
+    try {
+      const q = new URLSearchParams(
+        opts.search.startsWith("?") ? opts.search.slice(1) : opts.search
+      ).get(PG_PROVISION_HASH_KEY);
+      if (q?.trim()) token = q.trim();
+    } catch {
+      /* ignore */
+    }
+  }
+  if (!token) return null;
+  return { token };
+}
+
+export function clearPgProvisionHashFromLocation(): void {
+  if (typeof window === "undefined") return;
+  const { pathname, search, hash } = window.location;
+  if (!hash.includes(`${PG_PROVISION_HASH_KEY}=`)) return;
+  try {
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `${pathname}${search}`
+    );
+  } catch {
+    /* ignore */
+  }
 }

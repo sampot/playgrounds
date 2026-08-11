@@ -53,8 +53,8 @@ export type PlatformUser = {
   disabled?: boolean;
   /** Canonical origin e.g. https://play.samkuo.me */
   defaultFieldUrl?: string;
-  github?: { id: string; login: string; linkedAt: number };
-  google?: { id: string; email: string; linkedAt: number };
+  github?: { id: string; login: string; linkedAt: number; avatarUrl?: string };
+  google?: { id: string; email: string; linkedAt: number; avatarUrl?: string };
   /** Point balance (PG-PLATFORM-CREDITS-PLAN). */
   credits?: number;
   /** Admin: may use official TURN when credits allow. */
@@ -202,7 +202,7 @@ export async function getUserIdByGithub(
 export async function linkGithub(
   store: EnvStore,
   userId: string,
-  profile: { id: string; login: string }
+  profile: { id: string; login: string; avatarUrl?: string | null }
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const existing = await getUserIdByGithub(store, profile.id);
   if (existing && existing !== userId) {
@@ -217,6 +217,7 @@ export async function linkGithub(
     id: profile.id,
     login: profile.login,
     linkedAt: Date.now(),
+    avatarUrl: profile.avatarUrl ?? undefined,
   };
   await putUser(store, user);
   await store.put(SSO_GITHUB(profile.id), userId);
@@ -233,7 +234,7 @@ export async function getUserIdByGoogle(
 export async function linkGoogle(
   store: EnvStore,
   userId: string,
-  profile: { id: string; email: string }
+  profile: { id: string; email: string; avatarUrl?: string | null }
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const existing = await getUserIdByGoogle(store, profile.id);
   if (existing && existing !== userId) {
@@ -248,6 +249,7 @@ export async function linkGoogle(
     id: profile.id,
     email: profile.email,
     linkedAt: Date.now(),
+    avatarUrl: profile.avatarUrl ?? undefined,
   };
   await putUser(store, user);
   await store.put(SSO_GOOGLE(profile.id), userId);

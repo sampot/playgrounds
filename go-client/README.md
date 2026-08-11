@@ -8,11 +8,15 @@ Guest-only client at **`https://go.samkuo.me`** (DEC-050). No editor, no OPFS sa
 # terminal 1 — Platform API (short resolve / join / signal)
 npm run platform:dev
 
-# terminal 2 — go client (proxies /v1 → :8787)
+# terminal 2 — go client (talks directly to https://api.samkuo.me — no Vite /v1 proxy)
 npm run go:dev
 # → http://localhost:5174/i/<shortId>
 # → http://localhost:5174/s/pg-breakout
 ```
+
+The client always targets `https://api.samkuo.me` (and `https://dash.samkuo.me` for
+login). Local dev works because the Platform CORS allowlist includes `localhost`.
+Only override via `VITE_PLATFORM_API_ORIGIN`／`VITE_PLATFORM_DASH_ORIGIN` for tests／self-hosting.
 
 Optional in `platform-api/.dev.vars`:
 

@@ -22,8 +22,5 @@ export default defineConfig({
     fs: {
       allow: [root, path.resolve(root, "..")],
     },
-    proxy: {
-      "/v1": "http://127.0.0.1:8787",
-    },
   },
 });

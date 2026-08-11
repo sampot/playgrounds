@@ -2,7 +2,9 @@
   import { goto } from "$app/navigation";
   import { chromeSession } from "$lib/chromeSession.svelte";
   import GoMorePanel from "$lib/GoMorePanel.svelte";
+  import GoProfilePanel from "$lib/GoProfilePanel.svelte";
   import GoShareSheet from "$lib/GoShareSheet.svelte";
+  import { goAuth } from "$lib/goAuth.svelte";
   import { nextSameKind, recommendSameKind } from "$lib/goCatalog";
   import {
     openPlaygroundCatalog,
@@ -34,6 +36,7 @@
   let shareOpen = $state(false);
   let recommends = $state<ReturnType<typeof recommendSameKind>>([]);
   let moreOpen = $state(false);
+  let profileOpen = $state(false);
   /** Canvas play: hide chrome on scroll-down, show on scroll-up. */
   let chromeHidden = $state(false);
   let chromeAutoHideTimer: ReturnType<typeof setTimeout> | null = null;
@@ -45,13 +48,13 @@
     }
   }
 
-  /** After reveal: hide again if header idle for 3s (paused while share／more open). */
+  /** After reveal: hide again if header idle for 3s (paused while share／more／profile open). */
   function scheduleChromeAutoHide() {
     clearChromeAutoHide();
-    if (!canvasActive || chromeHidden || shareOpen || moreOpen) return;
+    if (!canvasActive || chromeHidden || shareOpen || moreOpen || profileOpen) return;
     chromeAutoHideTimer = setTimeout(() => {
       chromeAutoHideTimer = null;
-      if (shareOpen || moreOpen) return;
+      if (shareOpen || moreOpen || profileOpen) return;
       chromeHidden = true;
     }, CHROME_AUTO_HIDE_MS);
   }
@@ -115,7 +118,7 @@
   });
 
   $effect(() => {
-    if (shareOpen || moreOpen) {
+    if (shareOpen || moreOpen || profileOpen) {
       clearChromeAutoHide();
       return;
     }
@@ -238,6 +241,7 @@
   function openShare() {
     if (!catalogId || !shareUrl) return;
     moreOpen = false;
+    profileOpen = false;
     clearChromeAutoHide();
     chromeHidden = false;
     shareOpen = true;
@@ -245,9 +249,26 @@
 
   function openMore() {
     shareOpen = false;
+    profileOpen = false;
     clearChromeAutoHide();
     chromeHidden = false;
     moreOpen = true;
+  }
+
+  function openProfile() {
+    shareOpen = false;
+    moreOpen = false;
+    clearChromeAutoHide();
+    chromeHidden = false;
+    profileOpen = true;
+  }
+
+  function onProfileClick() {
+    if (!goAuth.loggedIn) {
+      goAuth.login();
+      return;
+    }
+    openProfile();
   }
 
   function goToId(id: string) {
@@ -289,6 +310,7 @@
       onclick={() => {
         moreOpen = false;
         shareOpen = false;
+        profileOpen = false;
       }}
     >
       <img
@@ -342,9 +364,56 @@
     >
       分享
     </button>
+    <button
+      type="button"
+      class={["profile-btn", goAuth.loggedIn && "profile-btn--logged"]
+        .filter(Boolean)
+        .join(" ")}
+      aria-expanded={profileOpen}
+      aria-haspopup="dialog"
+      aria-label={goAuth.loggedIn ? "查看身分" : "登入"}
+      title={goAuth.loggedIn ? "查看身分" : "登入"}
+      onclick={onProfileClick}
+    >
+      {#if goAuth.loggedIn && goAuth.profile?.avatar_url}
+        <img
+          class="profile-avatar"
+          src={goAuth.profile.avatar_url}
+          alt="已登入"
+          width="26"
+          height="26"
+          referrerpolicy="no-referrer"
+        />
+      {:else}
+        <span
+          class={["profile-glyph", goAuth.loggedIn && "profile-glyph--logged"]
+            .filter(Boolean)
+            .join(" ")}
+        >
+          <svg
+            class="profile-icon"
+            viewBox="0 0 24 24"
+            width="22"
+            height="22"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="8" r="4" />
+            <path d="M4 20c0-3.3 3.6-5.5 8-5.5s8 2.2 8 5.5" />
+          </svg>
+        </span>
+        {#if goAuth.loggedIn}
+          <span class="profile-status" aria-hidden="true"></span>
+        {/if}
+      {/if}
+    </button>
   </header>
 
-  {#if chromeSession.flash && !(canvasActive && chromeHidden && !shareOpen && !moreOpen)}
+  {#if chromeSession.flash && !(canvasActive && chromeHidden && !shareOpen && !moreOpen && !profileOpen)}
     <p
       class={["chrome-flash", canvasActive && "chrome-flash--toast"]
         .filter(Boolean)
@@ -392,3 +461,5 @@
     onClearedAll={goHomeAfterClearAll}
   />
 {/if}
+
+<GoProfilePanel open={profileOpen} onClose={() => (profileOpen = false)} />

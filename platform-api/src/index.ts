@@ -563,6 +563,7 @@ async function route(
         provider: "github",
         id: profile.id,
         label: profile.login,
+        avatarUrl: profile.avatarUrl,
       },
       fail,
       success: (accessToken, expiresAt, extra) =>
@@ -604,6 +605,7 @@ async function route(
         provider: "google",
         id: profile.id,
         label: profile.email,
+        avatarUrl: profile.avatarUrl,
       },
       fail,
       success: (accessToken, expiresAt, extra) =>
@@ -720,10 +722,10 @@ async function route(
       user_id: auth.userId,
       role: auth.role,
       github: user?.github
-        ? { id: user.github.id, login: user.github.login }
+        ? { id: user.github.id, login: user.github.login, avatar_url: user.github.avatarUrl ?? null }
         : null,
       google: user?.google
-        ? { id: user.google.id, email: user.google.email }
+        ? { id: user.google.id, email: user.google.email, avatar_url: user.google.avatarUrl ?? null }
         : null,
       key: key
         ? { prefix: key.prefix, created_at: key.createdAt }
@@ -854,6 +856,28 @@ async function route(
     return json({
       api_key: result.apiKey,
       note: "Store in field shell memory only. Not for SecretStore.",
+    });
+  }
+
+  // Self profile resolved by field API key (DEC-052): go-client has no access token.
+  if (request.method === "GET" && pathname === "/v1/field/me") {
+    const auth = await requireApiKey(env, request);
+    if (!auth.ok) return auth.res;
+    const user = await getUser(env.STORE, auth.userId);
+    if (!user) return json({ error: "user_not_found" }, 404);
+    return json({
+      user_id: auth.userId,
+      role: auth.role,
+      github: user.github
+        ? { login: user.github.login, avatar_url: user.github.avatarUrl ?? null }
+        : null,
+      google: user.google
+        ? { email: user.google.email, avatar_url: user.google.avatarUrl ?? null }
+        : null,
+      default_field_url: defaultFieldOriginOrFallback(user.defaultFieldUrl),
+      credits: userCredits(user),
+      turn_hosted: userTurnHosted(user),
+      turn_prefer: userTurnPrefer(user),
     });
   }
 

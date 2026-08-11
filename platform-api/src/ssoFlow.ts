@@ -27,6 +27,8 @@ export type SsoSubject = {
   id: string;
   /** github login or google email */
   label: string;
+  /** avatar URL from provider profile (DEC-052); optional */
+  avatarUrl?: string | null;
 };
 
 type StatePayload = OAuthIntent & { n: string; exp: number };
@@ -67,9 +69,17 @@ async function linkSso(
   subject: SsoSubject
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (subject.provider === "github") {
-    return linkGithub(store, userId, { id: subject.id, login: subject.label });
+    return linkGithub(store, userId, {
+      id: subject.id,
+      login: subject.label,
+      avatarUrl: subject.avatarUrl,
+    });
   }
-  return linkGoogle(store, userId, { id: subject.id, email: subject.label });
+  return linkGoogle(store, userId, {
+    id: subject.id,
+    email: subject.label,
+    avatarUrl: subject.avatarUrl,
+  });
 }
 
 function linkedIdOnUser(
