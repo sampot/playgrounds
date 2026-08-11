@@ -3,9 +3,9 @@
 > **狀態：** Draft（2026-08-08）— 契約／階段草案；Invite 路徑實作進行中；型錄 `/s/<id>`／分享面／換片／§5.5.1 OG／§6.5 離線分數／**§6.6「更多」本機溢流**已定案  
 
 > **權威決策：** 建議 [DECISIONS.md](./DECISIONS.md) **DEC-050**（Proposed）  
-> **相關：** [PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)（五子棋 E2E；Invite Guest 主路徑）、[PG-CATALOG-UX-PLAN.md](./PG-CATALOG-UX-PLAN.md)（型錄「分享」→ go）、[PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)、[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（官方 TURN；Guest 經 `join_cap`）、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)、DEC-004／009／023／025／042／045／047／048、[GLOSSARY.md](./GLOSSARY.md)
+> **相關：** [PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)（五子棋 E2E；Invite Guest 主路徑）、[PG-CATALOG-UX-PLAN.md](./PG-CATALOG-UX-PLAN.md)（型錄「分享」→ go）、[PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)、[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（官方 TURN；Guest 經 `join_cap`）、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)、[PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md)（go 登入＋Header profile；玩家主場；DEC-052）、DEC-004／009／023／025／042／045／047／048、[GLOSSARY.md](./GLOSSARY.md)
 
-一句話：**獨立於場殼的純玩客戶端＠`go.samkuo.me`——同時只跑一個 SAM、無編輯環境、不依賴持久 OPFS；啟動不限 Invite（型錄 id 傳閱與 Invite 短鏈並列）；傳閱網址 `/s/<catalog_id>`（內嵌 catalog）；`/s/` game 可換片；可安裝／造訪後離線／本機分數；Header「更多」＝本機溢流（已下載／分層清除）≠ 僅推薦；Invite `/i/`＝臨時 session（不能離線、不換片、無本機選單）。**
+一句話：**玩家主場**——獨立於場殼的純玩客戶端＠`go.samkuo.me`（作者主場＝`play.samkuo.me`，兩 UI 共用同一份型錄）：同時只跑一個 SAM、無編輯環境、不依賴持久 OPFS；啟動不限 Invite（型錄 id 傳閱與 Invite 短鏈並列）；傳閱網址 `/s/<catalog_id>`（內嵌 catalog）；`/s/` game 可換片；可安裝／造訪後離線／本機分數；Header「更多」＝本機溢流（已下載／分層清除）≠ 僅推薦；Invite `/i/`＝臨時 session（不能離線、不換片、無本機選單）；**登入（DEC-052）＝玩家身分；後續玩家主場互邀（GO-INVITE）**。
 
 ---
 
@@ -14,7 +14,7 @@
 - 掃系統條碼／相機開邀請常落在**受限瀏覽情境**（in-app WebView、預覽殼）：場殼快樂路徑要 `install_if_missing` → **寫 OPFS**，於此常失敗；同一連結用標準 Safari 開場殼則可玩。
 - 無法可靠「自動跳出改開標準 Safari」；場殼上的「請用 Safari 開啟」只是降級文案，不是產品主路徑。
 - 既有 `view=canvas`／藏 IDE 仍是**同一份場殼**，掃碼與型錄「分享」仍載入開發面假設與 OPFS 管線——接收者並不期望立刻成為作者。
-- Guest／傳閱接收者本來就只該「加入並玩」或「打開這顆小品」——不需要 Files、編輯器、密鑰庫、鑄邀請。
+- 玩家／傳閱接收者本來就只該「加入並玩」或「打開這顆小品」——不需要 Files、編輯器、密鑰庫、作者面鑄邀請。
 
 因此：**純玩＝獨立客戶端＋獨立 origin**，不是場殼的另一個 UI 模式；**傳閱與入座都落在 go，但 URL／模式分開。**
 
@@ -38,7 +38,8 @@
 
 - 把場殼改成「無 OPFS 也能完整 IDE」。
 - 在純玩版提供 Files／編輯器／匯入匯出／SecretStore／「看原始碼」當主 CTA。
-- Guest 註冊、場內 SSO、鑄 Invite、provision、點數／dash UI。
+- Guest 註冊、場內 SSO、provision、點數／dash UI 當主故事——go 的登入是**既存 Platform 使用者的通行證**（DEC-052），非新帳號系統。
+- **作者面** author Invite／provision 管理／TURN／後台——go **不**做作者 session 權威；但 go **支援玩家主場互邀**（GO-INVITE，後續階段；見 §6.2／auth plan §5.3）。
 - 通用縮址；以 `/i/` 或 Platform short map 服務非 Invite URL。
 - **以 `source`／完整 Git URL／`?open=` 當 go 傳閱主形**（只認型錄 `id`；見 §5.4）。
 - 在 go 上複製完整型錄 UX（搜尋／filter／貨架）；換片僅 §5.6；「已下載」不是第二型錄。
@@ -56,8 +57,8 @@
 
 | 面 | Origin | 誰用 | 職責 |
 | --- | --- | --- | --- |
-| **場殼** | `play.samkuo.me`（及任意場） | Host；作者／實驗 | OPFS、編輯、鑄 Invite、session 權威、作答；型錄「一鍵開」 |
-| **純玩版** | **`go.samkuo.me`** | Guest／傳閱接收者 | `/i/` 入座；`/s/` 單機＋game 換片；consent（僅 Invite）；Header 傳閱；「更多」本機溢流（僅 `/`／`/s/`） |
+| **場殼** | `play.samkuo.me`（及任意場） | **作者**（Host） | OPFS、編輯、author 鑄 Invite、session 權威、作答；型錄「一鍵開」 |
+| **純玩版（玩家主場）** | **`go.samkuo.me`** | **玩家** | `/i/` 入座；`/s/` 單機＋game 換片；登入（DEC-052）＝身分；**後續**玩家主場互邀（GO-INVITE）；Header 傳閱；「更多」本機溢流（僅 `/`／`/s/`） |
 | **Platform API** | `api.samkuo.me` | 雙方間接 | Invite／short map／signal／TURN cred；**不當**邀人 QR 主面；**不**管型錄 `/s/` |
 | **dash** | `dash.samkuo.me` | Host 帳號 | provision；**不**鑄場 Invite |
 
@@ -222,7 +223,7 @@ GET go.samkuo.me/i/<short_id>
 
 ---
 
-## 6. 產品定義（純玩版）
+## 6. 產品定義（純玩版＝玩家主場）
 
 ### 6.1 能做
 
@@ -256,7 +257,8 @@ GET go.samkuo.me/i/<short_id>
 ### 6.2 不能做（硬）
 
 - 編輯原始碼、Files 側欄、匯入／匯出 `.sam`、SecretStore、fleet、WASI／Python dock。
-- 鑄 Invite、provision、「登入我的遊樂場」。
+- 作者面 Host 功能（編輯原始碼、Files、匯入匯出、SecretStore、「把我的場當 go 主場」、TURN／後台）。
+- **作者才有的 author Invite 權威**（session 權威、作答、撤獎）；但 go 本身**支援玩家主場互邀**（GO-INVITE，後續）——已登入玩家在單局內邀另一位玩家入座，回 `go/i/<short>`，**不**等同 author session。登入（DEC-052）先落地身分（Header profile／avatar），並保留記憶體 field API key 供 GO-INVITE 使用；見 [PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md) §5.3。
 - 把「看原始碼」當預設出口（若有連出場殼，須明確次要、且不阻掃碼／傳閱快樂路徑）。
 - 假設持久 OPFS／`createProject` 成功才能玩。
 - 同時多 SAM／沙盒庫；把「已下載」做成第二遊樂場／「我的遊戲庫」產品面。
@@ -283,10 +285,11 @@ GET go.samkuo.me/i/<short_id>
 | **「山姆鍋遊樂場」文案** | 頂列文案可點 → **`https://play.samkuo.me/sam/?kind=game`**（小品型錄**遊戲**分類；query 契約見型錄 UX）。若露出網址副標，**固定＝`play.samkuo.me`**（遊樂場主網址；**勿**寫成 `/sam/…` 長路徑）。**勿**只寫程式名 Playgrounds 當品牌。 |
 | **開啟意圖** | 點 mark／型錄鏈時，**在可行範圍內**優先讓使用者進**系統瀏覽器／標準 Safari**（跳出相機／App 內嵌 WebView）。實作採盡力而為（例：新分頁／外開）；**不**宣稱、也**無法**保證所有 in-app WebView 都能自動跳出。 |
 | **分享** | 頂列右側（§5.5）；與 mark／遊樂場並列為 chrome 一等元件。 |
+| **Profile（登入；DEC-052）** | 頂列最右（分享旁）：未登入＝profile icon（→ dash `?field=go…` 登入）；已登入＝使用者 avatar（→ 頁內身分面板，可登出）。與 play 同一 `#pg_provision=` 協定接收。**可選**身分顯示，未登入不阻玩。見 [PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md)。 |
 | **換片（僅 `/s/` 且 `kind: game`）** | 頂列「下一個」一級；「試試這些」≤3 次要（可在「更多」第二段，§5.6／§6.6）。非 game／Invite／首頁不出現換片。 |
 | **更多（本機溢流）** | Header「更多」／⋯＝**本機與次要動作**（§6.6），**不是**「只有推薦」。首頁 `/` 與 `/s/` 可開；**Invite `/i/` 不開**本機段。長說明（加主畫面／in-app 瀏覽器）→ 靜態 **`/help`**，更多內只放連結。 |
-| **呈現** | 極簡 chrome：**logo（→ play `/`）＋「山姆鍋遊樂場」（→ `/sam/?kind=game`）＋分享**（＋`/s/` game「下一個」＋「更多」）；勿堆滿場相關導覽搶主視線。對弈中：往下捲／滑自動收起頂列（含 logo）、往上／下拉自動展開（盡力監聽同 origin iframe 內手勢；跨域 canvas 僅父頁手勢）。**展開後若 3 秒內未點擊頂列 → 自動再收起**（點頂列則重計時；**分享面或「更多」面板開啟期間不自動收起**）。收起時**不**留單獨 logo／角標；展開後仍須露出身分與型錄鏈。 |
-| **窄屏** | logo／「山姆鍋遊樂場」／分享／下一個／更多觸控可點（約 ≥44×44px 熱區）；已下載列表／清除用**頁內面板**（底部 sheet 或全高），勿加長頂列 dropdown。 |
+| **呈現** | 極簡 chrome：**logo（→ play `/`）＋「山姆鍋遊樂場」（→ `/sam/?kind=game`）＋分享＋profile**（＋`/s/` game「下一個」＋「更多」）；勿堆滿場相關導覽搶主視線。對弈中：往下捲／滑自動收起頂列（含 logo）、往上／下拉自動展開（盡力監聽同 origin iframe 內手勢；跨域 canvas 僅父頁手勢）。**展開後若 3 秒內未點擊頂列 → 自動再收起**（點頂列則重計時；**分享面、「更多」面板或 profile 面板開啟期間不自動收起**）。收起時**不**留單獨 logo／角標；展開後仍須露出身分與型錄鏈。 |
+| **窄屏** | logo／「山姆鍋遊樂場」／分享／下一個／更多／profile 觸控可點（約 ≥44×44px 熱區）；已下載列表／清除／身分面板用**頁內面板**（底部 sheet 或全高），勿加長頂列 dropdown。 |
 | **敘事** | 對齊 DEC-004：個人遊樂場站群，非產品／SaaS 品牌腔。 |
 
 **品牌測試：** 拿掉對弈／小品 UI 後，仍須讀出「山姆鍋／遊樂場」與可點的型錄／場入口；不可看成無主的通用 game lobby。
@@ -510,6 +513,8 @@ dash provision → 場殼記憶體 API key
 | **5. 型錄 `/s/`** | 嵌入 catalog（含 kind）；`/s/:id` 單機可玩；型錄分享改 go；Header **分享面**（系統分享／QR／複製；§5.5）；同 kind「下一個」＋推薦≤3；**每 id 分享／OG title**（§5.5.1） | 開 `/s/pg-*` 可玩；分享＝`/s/<id>`＋小品名 title；現場可掃 QR；換片不跨 kind；社群預覽可分辨小品；`/i/` 無換片 | **進行中**（prerender＋OG／title＋分享面／QR 已落地；手測預覽／掃碼待） |
 | **6. `/s/` 可安裝／離線／分數** | Manifest＋主畫面；造訪後離線再開 `/s/<id>`；**functions.js＋env.KV／DB**（IDB／localStorage；鍵＝`catalog_id`）；SW 與畫布職責共存（§6.5／§7.4） | 標準瀏覽器可加主畫面；曾開過的 `/s/pg-*` 斷網可再玩且 KV 分數仍在；`/i/` 斷網不可入座；無雲存檔／無 OPFS | **進行中**（manifest／SW／FileMap offline；**functions＋goWebKv／goWebDb**；舊 score shim 相容） |
 | **6b. 「更多」本機溢流** | Header「更多」＝已下載列表＋分層清除；試試這些可選第二段；Invite 不露（§6.6） | `/`／`/s/` 可開已下載面板；清除分層＋頁內確認；`/i/` 無本機選單；非迷你型錄 | **已落地**（`GoMorePanel`） |
+| **6c. 登入＋Header profile（DEC-052）** | go consume `#pg_provision=`（redeem→記憶體 key→`/v1/field/me`）；Header profile icon/avatar＋身分面板；Platform 放行 go＋`/v1/field/me` | dash 可登入 go；「已登入」avatar 顯示、可登出；key 關頁即失；未登入不阻玩（見 [PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md)） | 未排程（auth plan 本刀） |
+| **6d. 玩家主場互邀（GO-INVITE）** | 已登入玩家在單局內邀另一位玩家（回 `go/i/<short>`）；用同一把記憶體 field API key 走 `invite.compose`；**不**等同 author session | 玩家 A 在 go 開一局→邀玩家 B→B 入座對戰；A／B 不需作者面 | 未排程（後續；見 auth plan §5.3） |
 | **7.（可選）** | short 不進 hash（B）；文件站導讀；場殼 `#pg=`／`view=canvas` 標「進階／除錯」或汰除 | 另議 | — |
 
 ---
@@ -531,7 +536,7 @@ dash provision → 場殼記憶體 API key
 
 - [ ] `go` 在場網保留名表；不當場殼
 - [x] 露出山姆鍋 logo／mark（→ **`https://play.samkuo.me/`**）與「山姆鍋遊樂場」（→ **`https://play.samkuo.me/sam/?kind=game`**）（§6.4；可行時優先外開系統瀏覽器／Safari）
-- [ ] 無編輯環境／Files／鑄邀請入口
+- [ ] 無編輯環境／Files／**作者面**入口（GO-INVITE 玩家主場互邀為**後續**，見 §6.2／auth plan §5.3）
 - [ ] 無原生 `alert`／`confirm`／`prompt`；窄屏可完成
 - [ ] 同時只跑一個 SAM
 
@@ -582,7 +587,7 @@ dash provision → 場殼記憶體 API key
 
 | 用 | 不用 |
 | --- | --- |
-| 純玩版、`go.samkuo.me`、短網址（Invite）、型錄傳閱／`/s/<id>` | 把 go 叫成「場」、第二遊樂場、Guest IDE |
+| 純玩版、`go.samkuo.me`、短網址（Invite）、型錄傳閱／`/s/<id>`；玩家主場（go）／作者主場（play） | 把 go 叫成「場」、第二遊樂場、Guest IDE、把 go 當作者面 |
 | 當下 Invite／session（**臨時**；局數由 SAM 定） | 暗示純玩＝只能一局；Invite 離線；雲存檔、我的小品庫（在 go 上） |
 | `/s/` 造訪後離線、本機分數、加到主畫面 | Invite 離線對弈；全型錄預先離線包；雲排行榜 |
 | 「更多」＝本機溢流；已下載；分層清除 | 「更多」＝只有推薦；我的遊戲庫；含糊一鍵全砍 |

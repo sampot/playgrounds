@@ -1,6 +1,6 @@
 # 我是山姆鍋 — 架構與工程決策
 
-> **最後更新：** 2026-08-08（DEC-051 Accepted：API scopes Phase 1–3 ＋ §8.4）
+> **最後更新：** 2026-08-11（DEC-052 Proposed：純玩版登入＋Header profile；玩家主場＝go、作者＝play、共用型錄）
 > **對象：** 作者、AI agents；必要時給之後的自己讀
 
 本文件以輕量 **ADR**（Architecture Decision Record）記錄本站**顯著且耐久**的架構／工程選擇：選了什麼、為何不選其他、後續工作不可踩破的後果。細節規格仍以 [AGENTS.md](./AGENTS.md)、[TOOLS-PLAN.md](./TOOLS-PLAN.md) 等為準；此檔是可掃讀的決策索引，避免只活在 PR 與聊天裡。
@@ -90,6 +90,7 @@
 | [DEC-048](#dec-048-playgrounds-宿主-sveltekit-靜態-pwa) | Playgrounds 宿主：SvelteKit 靜態 PWA（卸根 Astro） | Accepted |
 | [DEC-050](#dec-050-playgrounds-純玩版客戶端-gosamkuome) | Playgrounds 純玩版客戶端＠`go.samkuo.me` | Proposed |
 | [DEC-051](#dec-051-playgrounds-api-scopes環境能力準入) | Playgrounds API scopes（環境能力準入） | Accepted |
+| [DEC-052](#dec-052-純玩版登入與-header-profile) | 純玩版登入（play 相容協定；玩家主場 go）＋ Header profile | Proposed |
 
 ---
 
@@ -1048,6 +1049,7 @@
 - **Revision（2026-08-08）：** 換片／首頁推薦**僅 `kind: game`**（非 game 的 `/s/` 不換片；首頁不跨 kind）。
 - **Revision（2026-08-08）：** go 頂列「山姆鍋遊樂場」→ `play…/sam/?kind=game`；mark 仍 → play `/`。
 - **Revision（2026-08-08）：** Header「更多」＝本機溢流（已下載／分層清除）；≠ 只有推薦；Invite 不露。
+- **Revision（2026-08-11）：** 登入（play 相容 `#pg_provision=`）＋ Header profile 見 **DEC-052**／[PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md)；`go` 仍為保留名，僅作為 **provision target** 例外放行。站群定位：**go＝玩家主場**（作者＝場 `play.samkuo.me`；兩 UI 共用同一份型錄）；後續玩家主場互邀＝**GO-INVITE**（見 DEC-052）。
 
 ### DEC-051: Playgrounds API scopes（環境能力準入）
 
@@ -1072,7 +1074,30 @@
 - **Revision（2026-08-07）：** 建立即自動 grant；納管＝明示 grant；一律 HOST 形子集。
 - **Revision（2026-08-07）：** 對口＝全目錄自動準入；自動 grant 不隨建立者刪而撤內容。
 - **Revision（2026-08-08）：** Accepted — Phase 1–3 ＋ §8.4 場殼義務落地；Phase 4 Git SAM 仍待。
-- **Revision（2026-08-08）：** Phase 4 — 型錄 `pg-git`／`sampot/pg-git`；HOST `writeFileBase64` 單檔上限 32 MiB＋append（packfile）。
+- **Revision（2026-08-08）：** Phase 4 — 型錄 `pg-git`／`sampot/pg-git`；HOST `writeFileBase64` 單檔上限 32 MiB＋append（packfile）。
+
+### DEC-052: 純玩版登入（play 相容協定）＋ Header profile
+
+- **Status:** Proposed（2026-08-11；契約草案；見 [PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md)）
+- **Context:** 場殼「登入我的遊樂場」主路徑（dash SSO → `/v1/field/provision` → `#pg_provision=` → redeem → **頁面記憶體 API key**）目前只認官方場，`go` 在 `FIELD_RESERVED_SUBDOMAINS` → dash 無法以 go 為 target。站群分兩群：**作者主 UI＝場 `play.samkuo.me`、玩家主 UI＝純玩版 `go.samkuo.me`，兩 UI 共用同一份型錄**。納入既有登入協定能把「身分」面延伸到 go、在 Header 顯示 avatar，並為**玩家主場互邀（GO-INVITE，後續）**建立憑證基礎。
+- **Decision:**
+  1. **相容協定：** go **不另造**登入；完全複用 play 的 `#pg_provision=`→`POST /v1/field/provision/redeem`→**頁面記憶體 API key** 流程。dash「登入我的遊樂場」`target_field`／`?field=` 可指向 `go.samkuo.me`。
+  2. **go 的 key 用途＝身分＋玩家能力憑證：** 本刀 go 純玩，key 僅用於 `GET /v1/field/me` 解析身分顯示；**保留記憶體 key** 供後續 **GO-INVITE**（玩家在 go 開一局、邀另一位玩家入座）使用（`invite.compose`）；**不**把 go 變成「第二個場」。
+  3. **Platform 放行：** `normalizeFieldOrigin()` 特判允許 `go.samkuo.me`（僅 https、無 path、單一 sub）；其他保留名不變仍拒。
+  4. **`/v1/field/me`（新端點）：** 吃 **field API key**（`requireApiKey`）回傳 self-profile（`user_id`／`role`／`github.login`／`google.email`／**avatarUrl**／`default_field_url`）。既有 `GET /v1/me` 只吃 access token，go 拿不到，故需此面。
+  5. **avatarUrl 持久：** `PlatformUser` 存 `github.avatarUrl?`／`google.avatarUrl?`（OAuth profile 已有）；舊資料回 null、go 以 profile icon fallback。
+  6. **Header profile（硬）：** 右側 profile 入口——未登入＝profile icon（→ dash `?field=go…`）；已登入＝avatar（→ 頁內身分面板，可登出）。Mobile-first、≥44×44px、禁原生 dialog；登出不需多層確認。chrome 收合時隨頂列隱藏。
+  7. **安全性：** field API key **僅記憶體**（關頁即失）；avatar／profile 可 `localStorage`（跨 session 顯示）；`#pg_provision` consume 後清 hash。
+  8. **不阻玩：** 登入純加值，`/i/`／`/s/`／離線等快樂路徑不受影響。
+  - 細節／階段見 [PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md)（§5.3＝GO-INVITE 輪廓）。
+- **Consequences:**
+  - 勿為 go 另造帳號／SSO／第二套登入；go 只認 DEC-047 既存使用者。
+  - 勿把 field API key 落 localStorage／IndexedDB／OPFS；維持關頁即失。
+  - 勿在 go 暴露**作者面**（「把我的場當 go 主場」、TURN／後台、author session 權威）；玩家主場互邀（GO-INVITE）為**後續**，且仍**不**等同 author session。
+  - `/v1/field/me` 走 `requireApiKey`（self-profile），勿混入 `requireAccessToken` 面或 DEC-051 scope-gated 管理面混淆。
+  - 登入不阻擋未登入也能玩（DEC-050 快樂路徑）。
+  - 同步 GLOSSARY、[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)、[PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md)。
+- **Revision（2026-08-11）：** 初版 Proposed；同日補玩家主場定位（作者＝play／玩家＝go／共用型錄）＋GO-INVITE 後續輪廓。
 
 ---
 
@@ -1118,6 +1143,7 @@
 | [PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md) | Platform 點數制與官方 TURN（Draft；非訂閱；**否決**自備 TURN） |
 | [PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md) | 場邀請 E2E MVP（載體五子棋／`gomoku.v1`；DEC-047／045／023） |
 | [PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md) | 純玩版客戶端＠`go.samkuo.me`（短網址 canonical；DEC-050） |
+| [PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md) | 純玩版登入（play 相容協定）＋ Header profile（DEC-052 Proposed） |
 | [PG-STANDALONE-PLAN.md](./PG-STANDALONE-PLAN.md) | 場網／Workers／開源／舊場暫留（DEC-041／042） |
 | [PG-CATALOG-PLAN.md](./PG-CATALOG-PLAN.md) | 小品型錄 YAML／PR 投稿（`catalog/entries/`） |
 | [PG-CATALOG-QUERY-PLAN.md](./PG-CATALOG-QUERY-PLAN.md) | 型錄結構化 JSON＋Playgrounds 查詢／lazy install（DEC-046 Draft） |
