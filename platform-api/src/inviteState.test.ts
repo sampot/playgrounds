@@ -14,10 +14,12 @@ import {
   getUser,
   getUserIdByGithub,
   getUserIdByGoogle,
+  getUserIdByLine,
   isBootstrapped,
   issueAccessToken,
   linkGithub,
   linkGoogle,
+  linkLine,
   lookupAccessToken,
   lookupApiKey,
   markBootstrapped,
@@ -253,6 +255,37 @@ describe("google oauth link + sso flow", () => {
     expect(after?.github?.avatarUrl).toBe(
       "https://avatars.githubusercontent.com/u/123?v=4"
     );
+  });
+
+  it("completeSsoIntent login after line link", async () => {
+    const store = memoryStore();
+    await ensureUser(store, "u1", "user");
+    await linkLine(store, "u1", { id: "line1", displayName: "太郎" });
+    let token = "";
+    const res = await completeSsoIntent({
+      env: { STORE: store },
+      state: {
+        intent: "login",
+        n: "x",
+        exp: Date.now() + 60_000,
+      },
+      subject: {
+        provider: "line",
+        id: "line1",
+        label: "太郎",
+        avatarUrl: "https://example.com/line.png",
+      },
+      fail: (c) => new Response(c, { status: 400 }),
+      success: async (accessToken) => {
+        token = accessToken;
+        return new Response("ok");
+      },
+    });
+    expect(await res.text()).toBe("ok");
+    expect(token.startsWith("pg_at_")).toBe(true);
+    const after = await getUser(store, "u1");
+    expect(after?.line?.displayName).toBe("太郎");
+    expect(after?.line?.avatarUrl).toBe("https://example.com/line.png");
   });
 });
 

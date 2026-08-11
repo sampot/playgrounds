@@ -9,10 +9,12 @@ import {
   getUser,
   getUserIdByGithub,
   getUserIdByGoogle,
+  getUserIdByLine,
   isBootstrapped,
   issueAccessToken,
   linkGithub,
   linkGoogle,
+  linkLine,
   markBootstrapped,
   putApiKey,
   putUser,
@@ -21,7 +23,7 @@ import {
 import { apiKeyPlaintext } from "./ids.js";
 import type { OAuthIntent } from "./githubOAuth.js";
 
-export type SsoProvider = "github" | "google";
+export type SsoProvider = "github" | "google" | "line";
 
 export type SsoSubject = {
   provider: SsoProvider;
@@ -46,22 +48,32 @@ export type SsoEnv = {
 };
 
 function alreadyLinkedError(provider: SsoProvider): string {
-  return provider === "github" ? "github_already_linked" : "google_already_linked";
+  return provider === "github"
+    ? "github_already_linked"
+    : provider === "google"
+      ? "google_already_linked"
+      : "line_already_linked";
 }
 
 function adminMismatchError(provider: SsoProvider): string {
   return provider === "github"
     ? "admin_github_mismatch"
-    : "admin_google_mismatch";
+    : provider === "google"
+      ? "admin_google_mismatch"
+      : "admin_line_mismatch";
 }
 
 async function getUserIdBySso(
   store: EnvStore,
   subject: SsoSubject
 ): Promise<string | null> {
-  return subject.provider === "github"
-    ? getUserIdByGithub(store, subject.id)
-    : getUserIdByGoogle(store, subject.id);
+  if (subject.provider === "github") {
+    return getUserIdByGithub(store, subject.id);
+  }
+  if (subject.provider === "google") {
+    return getUserIdByGoogle(store, subject.id);
+  }
+  return getUserIdByLine(store, subject.id);
 }
 
 async function linkSso(
@@ -76,9 +88,16 @@ async function linkSso(
       avatarUrl: subject.avatarUrl,
     });
   }
-  return linkGoogle(store, userId, {
+  if (subject.provider === "google") {
+    return linkGoogle(store, userId, {
+      id: subject.id,
+      email: subject.label,
+      avatarUrl: subject.avatarUrl,
+    });
+  }
+  return linkLine(store, userId, {
     id: subject.id,
-    email: subject.label,
+    displayName: subject.label,
     avatarUrl: subject.avatarUrl,
   });
 }
@@ -102,11 +121,14 @@ async function syncSsoAvatar(
       user.github.avatarUrl = url;
       await putUser(store, user);
     }
-  } else {
+  } else if (subject.provider === "google") {
     if (user.google && user.google.avatarUrl !== url) {
       user.google.avatarUrl = url;
       await putUser(store, user);
     }
+  } else if (user.line && user.line.avatarUrl !== url) {
+    user.line.avatarUrl = url;
+    await putUser(store, user);
   }
 }
 
@@ -115,7 +137,9 @@ function linkedIdOnUser(
   provider: SsoProvider
 ): string | undefined {
   if (!user) return undefined;
-  return provider === "github" ? user.github?.id : user.google?.id;
+  if (provider === "github") return user.github?.id;
+  if (provider === "google") return user.google?.id;
+  return user.line?.id;
 }
 
 /**

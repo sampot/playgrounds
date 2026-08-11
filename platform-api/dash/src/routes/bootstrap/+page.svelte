@@ -38,7 +38,7 @@
     <h2>設定用密碼</h2>
     <p class="lede">
       填入部署時準備的一次性密碼，再以 GitHub 完成綁定。若先前已建立管理者、尚未連結
-      GitHub，可用同一組密碼再綁一次。
+      GitHub，可用同一組密碼再綁一次。LINE 亦可完成設定，但建議保留 GitHub／Google 為對照方式。
     </p>
     <label for="boot-token">設定用密碼</label>
     <input
@@ -50,6 +50,7 @@
     />
     <div class="row">
       <button type="button" onclick={startGithub}>以 GitHub 完成設定</button>
+      <a class="btn secondary" href="/auth/line?intent=bootstrap&bootstrap_token={encodeURIComponent(token)}">以 LINE 完成設定</a>
       <a class="btn secondary" href="/">回後台</a>
     </div>
   </div>

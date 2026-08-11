@@ -164,9 +164,11 @@
         </header>
         <p class="meta">
           {#if u.github}GitHub @{u.github.login}{/if}
-          {#if u.github && u.google}·{/if}
+          {#if (u.github && (u.google || u.line)) || (u.google && u.line)}·{/if}
           {#if u.google}Google {u.google.email}{/if}
-          {#if !u.github && !u.google}尚未連結登入方式{/if}
+          {#if u.google && u.line}·{/if}
+          {#if u.line}LINE {u.line.display_name}{/if}
+          {#if !u.github && !u.google && !u.line}尚未連結登入方式{/if}
           · {u.key ? `${u.key.prefix}…` : "尚無通行證"}
           · 點數 {u.credits ?? 0}
           · {formatTime(u.created_at)}

@@ -23,6 +23,7 @@
         <a class="btn secondary" href="/auth/google?intent=login"
           >使用 Google 進入</a
         >
+        <a class="btn secondary" href="/auth/line?intent=login">使用 LINE 進入</a>
       </div>
     </div>
   </section>

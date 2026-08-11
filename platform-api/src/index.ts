@@ -26,6 +26,7 @@ import {
   setUserDisabled,
   unlinkGithub,
   unlinkGoogle,
+  unlinkLine,
 } from "./auth.js";
 import {
   addCredits,
@@ -64,6 +65,15 @@ import {
   googleAuthorizeUrl,
   googleOAuthConfigured,
 } from "./googleOAuth.js";
+import {
+  exchangeLineCode,
+  fetchLineProfile,
+  generateCodeVerifier,
+  generateOAuthNonce,
+  lineAuthorizeUrl,
+  lineOAuthConfigured,
+  sha256CodeChallenge,
+} from "./lineOAuth.js";
 import { completeSsoIntent } from "./ssoFlow.js";
 import {
   ACCESS_TOKEN_TTL_MS,
@@ -97,6 +107,8 @@ export type Env = {
   GITHUB_CLIENT_SECRET?: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
+  LINE_CLIENT_ID?: string;
+  LINE_CLIENT_SECRET?: string;
   OAUTH_STATE_SECRET?: string;
   /** Cloudflare Realtime TURN key id (not secret). */
   TURN_KEY_ID?: string;
@@ -246,6 +258,19 @@ function dashErrorRedirect(
     `${origin}${base}?auth_error=${encodeURIComponent(code)}`,
     302
   );
+}
+
+/** Route SSO failures back to the most relevant page (join → its invite page). */
+function ssoErrorRedirect(
+  state: OAuthIntent & { n?: string; exp?: number; v?: string },
+  origin: string,
+  code: string
+): Response {
+  let path = "/";
+  if (state.intent === "bootstrap") path = "/bootstrap/";
+  else if (state.intent === "join")
+    path = `/join/${encodeURIComponent(state.inviteToken)}`;
+  return dashErrorRedirect(origin, code, path);
 }
 
 async function putSessionHandoff(
@@ -457,6 +482,7 @@ async function route(
       service: "playgrounds-platform-api",
       github_oauth: githubOAuthConfigured(env),
       google_oauth: googleOAuthConfigured(env),
+      line_oauth: lineOAuthConfigured(env),
     });
   }
 
@@ -529,6 +555,33 @@ async function route(
     );
   }
 
+  if (request.method === "GET" && pathname === "/auth/line") {
+    if (!lineOAuthConfigured(env)) {
+      return json({ error: "line_oauth_not_configured" }, 503);
+    }
+    const parsed = await parseOAuthIntent();
+    if (!parsed.ok) return parsed.res;
+    const verifier = generateCodeVerifier();
+    const codeChallenge = await sha256CodeChallenge(verifier);
+    const state = await encodeOAuthState(
+      env.OAUTH_STATE_SECRET!,
+      parsed.intent,
+      10 * 60 * 1000,
+      verifier
+    );
+    const redirectUri = oauthCallbackUri(request, "line");
+    return Response.redirect(
+      lineAuthorizeUrl({
+        clientId: env.LINE_CLIENT_ID!,
+        redirectUri,
+        state,
+        codeChallenge,
+        nonce: generateOAuthNonce(),
+      }),
+      302
+    );
+  }
+
   if (request.method === "GET" && pathname === "/auth/github/callback") {
     const origin = new URL(request.url).origin;
     if (!githubOAuthConfigured(env)) {
@@ -542,8 +595,7 @@ async function route(
     const state = await decodeOAuthState(env.OAUTH_STATE_SECRET!, stateRaw);
     if (!state) return dashErrorRedirect(origin, "invalid_state");
 
-    const errPath = state.intent === "bootstrap" ? "/bootstrap/" : "/";
-    const fail = (c: string) => dashErrorRedirect(origin, c, errPath);
+    const fail = (c: string) => ssoErrorRedirect(state, origin, c);
 
     const redirectUri = oauthCallbackUri(request, "github");
     const exchanged = await exchangeGithubCode({
@@ -584,8 +636,7 @@ async function route(
     const state = await decodeOAuthState(env.OAUTH_STATE_SECRET!, stateRaw);
     if (!state) return dashErrorRedirect(origin, "invalid_state");
 
-    const errPath = state.intent === "bootstrap" ? "/bootstrap/" : "/";
-    const fail = (c: string) => dashErrorRedirect(origin, c, errPath);
+    const fail = (c: string) => ssoErrorRedirect(state, origin, c);
 
     const redirectUri = oauthCallbackUri(request, "google");
     const exchanged = await exchangeGoogleCode({
@@ -606,6 +657,48 @@ async function route(
         id: profile.id,
         label: profile.email,
         avatarUrl: profile.avatarUrl,
+      },
+      fail,
+      success: (accessToken, expiresAt, extra) =>
+        dashSuccessRedirect(env, request, accessToken, expiresAt, extra),
+    });
+  }
+
+  if (request.method === "GET" && pathname === "/auth/line/callback") {
+    const origin = new URL(request.url).origin;
+    if (!lineOAuthConfigured(env)) {
+      return dashErrorRedirect(origin, "line_oauth_not_configured");
+    }
+    const oauthErr = url.searchParams.get("error");
+    if (oauthErr) return dashErrorRedirect(origin, oauthErr);
+    const code = url.searchParams.get("code");
+    const stateRaw = url.searchParams.get("state");
+    if (!code || !stateRaw) return dashErrorRedirect(origin, "missing_code");
+    const state = await decodeOAuthState(env.OAUTH_STATE_SECRET!, stateRaw);
+    if (!state) return dashErrorRedirect(origin, "invalid_state");
+
+    const fail = (c: string) => ssoErrorRedirect(state, origin, c);
+
+    const redirectUri = oauthCallbackUri(request, "line");
+    const exchanged = await exchangeLineCode({
+      clientId: env.LINE_CLIENT_ID!,
+      clientSecret: env.LINE_CLIENT_SECRET!,
+      code,
+      redirectUri,
+      codeVerifier: state.v ?? "",
+    });
+    if ("error" in exchanged) return fail("token_exchange_failed");
+    const profile = await fetchLineProfile(exchanged.accessToken);
+    if ("error" in profile) return fail("line_user_failed");
+
+    return completeSsoIntent({
+      env,
+      state,
+      subject: {
+        provider: "line",
+        id: profile.id,
+        label: profile.displayName,
+        avatarUrl: profile.pictureUrl,
       },
       fail,
       success: (accessToken, expiresAt, extra) =>
@@ -726,6 +819,9 @@ async function route(
         : null,
       google: user?.google
         ? { id: user.google.id, email: user.google.email, avatar_url: user.google.avatarUrl ?? null }
+        : null,
+      line: user?.line
+        ? { id: user.line.id, display_name: user.line.displayName, avatar_url: user.line.avatarUrl ?? null }
         : null,
       key: key
         ? { prefix: key.prefix, created_at: key.createdAt }
@@ -874,6 +970,9 @@ async function route(
       google: user.google
         ? { email: user.google.email, avatar_url: user.google.avatarUrl ?? null }
         : null,
+      line: user.line
+        ? { display_name: user.line.displayName, avatar_url: user.line.avatarUrl ?? null }
+        : null,
       default_field_url: defaultFieldOriginOrFallback(user.defaultFieldUrl),
       credits: userCredits(user),
       turn_hosted: userTurnHosted(user),
@@ -898,7 +997,7 @@ async function route(
   }
 
   // Unlink Social SSO (keep ≥1)
-  const unlinkSsoMatch = /^\/v1\/me\/sso\/(github|google)$/.exec(pathname);
+  const unlinkSsoMatch = /^\/v1\/me\/sso\/(github|google|line)$/.exec(pathname);
   if (request.method === "DELETE" && unlinkSsoMatch) {
     const auth = await requireAccessToken(env, request);
     if (!auth.ok) return auth.res;
@@ -906,7 +1005,9 @@ async function route(
     const result =
       provider === "github"
         ? await unlinkGithub(env.STORE, auth.userId)
-        : await unlinkGoogle(env.STORE, auth.userId);
+        : provider === "google"
+          ? await unlinkGoogle(env.STORE, auth.userId)
+          : await unlinkLine(env.STORE, auth.userId);
     if (!result.ok) {
       const status =
         result.error === "last_sso"
@@ -940,6 +1041,9 @@ async function route(
             : null,
           google: u.google
             ? { id: u.google.id, email: u.google.email }
+            : null,
+          line: u.line
+            ? { id: u.line.id, display_name: u.line.displayName }
             : null,
           key: key
             ? { prefix: key.prefix, created_at: key.createdAt }

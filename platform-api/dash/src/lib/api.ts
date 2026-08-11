@@ -5,6 +5,7 @@ export type Me = {
   role: "admin" | "user";
   github: { id: string; login: string } | null;
   google: { id: string; email: string } | null;
+  line: { id: string; display_name: string } | null;
   key: { prefix: string; created_at: number } | null;
   default_field_url?: string;
   credits?: number;
@@ -19,6 +20,7 @@ export type AdminUser = {
   created_at: number;
   github: { id: string; login: string } | null;
   google: { id: string; email: string } | null;
+  line: { id: string; display_name: string } | null;
   key: { prefix: string; created_at: number } | null;
   credits?: number;
   turn_hosted?: boolean;

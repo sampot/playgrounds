@@ -3,8 +3,9 @@
 
   const ssoCount = $derived(dash.ssoCount);
 
-  async function unlink(provider: "github" | "google") {
-    const label = provider === "github" ? "GitHub" : "Google";
+  async function unlink(provider: "github" | "google" | "line") {
+    const label =
+      provider === "github" ? "GitHub" : provider === "google" ? "Google" : "LINE";
     dash.askConfirm({
       title: "解除連結",
       message: `解除後無法再用 ${label} 進入。請至少保留一種登入方式。`,
@@ -104,6 +105,28 @@
           >
         {:else}
           <a class="btn secondary" href="/auth/google?intent=link">連結 Google</a>
+        {/if}
+      </div>
+    </div>
+    <div class="user-row">
+      <header>
+        <strong>LINE</strong>
+        {#if dash.me?.line}
+          <span class="meta">{dash.me.line.display_name}</span>
+        {:else}
+          <span class="badge">未連結</span>
+        {/if}
+      </header>
+      <div class="row">
+        {#if dash.me?.line}
+          <button
+            type="button"
+            class="secondary"
+            disabled={ssoCount <= 1 || dash.busy}
+            onclick={() => unlink("line")}>解除連結</button
+          >
+        {:else}
+          <a class="btn secondary" href="/auth/line?intent=link">連結 LINE</a>
         {/if}
       </div>
     </div>

@@ -3,6 +3,7 @@
   import { onMount } from "svelte";
   import Flash from "$lib/components/Flash.svelte";
   import { api, formatTime } from "$lib/api";
+  import { authErrorMessage } from "$lib/authErrors";
 
   let status = $state<"loading" | "valid" | "expired" | "used" | "not_found">(
     "loading"
@@ -14,6 +15,16 @@
   const token = $derived(page.params.token || "");
 
   onMount(() => {
+    const authErr = new URLSearchParams(location.search).get("auth_error");
+    if (authErr) {
+      const { message, known } = authErrorMessage(authErr);
+      flashMsg = message;
+      flashKind = "err";
+      if (known) {
+        status = "not_found";
+        return;
+      }
+    }
     void (async () => {
       const { res, data } = await api<{
         ok?: boolean;
@@ -71,6 +82,11 @@
           class="btn secondary"
           href="/auth/google?intent=join&token={encodeURIComponent(token)}"
           >以 Google 註冊</a
+        >
+        <a
+          class="btn secondary"
+          href="/auth/line?intent=join&token={encodeURIComponent(token)}"
+          >以 LINE 註冊</a
         >
       </div>
     {:else}

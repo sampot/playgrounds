@@ -42,6 +42,7 @@ const AT_BY_USER = (userId: string) => `at:user:${userId}`;
 const USER_REC = (userId: string) => `user:${userId}`;
 const SSO_GITHUB = (subject: string) => `sso:github:${subject}`;
 const SSO_GOOGLE = (subject: string) => `sso:google:${subject}`;
+const SSO_LINE = (subject: string) => `sso:line:${subject}`;
 const SHORT_TO_INVITE = (shortId: string) => `short:${shortId}`;
 const PROVISION_BY_HASH = (hash: string) => `prov:hash:${hash}`;
 const PROVISION_BY_USER = (userId: string) => `prov:user:${userId}`;
@@ -55,6 +56,7 @@ export type PlatformUser = {
   defaultFieldUrl?: string;
   github?: { id: string; login: string; linkedAt: number; avatarUrl?: string };
   google?: { id: string; email: string; linkedAt: number; avatarUrl?: string };
+  line?: { id: string; displayName: string; linkedAt: number; avatarUrl?: string };
   /** Point balance (PG-PLATFORM-CREDITS-PLAN). */
   credits?: number;
   /** Admin: may use official TURN when credits allow. */
@@ -189,7 +191,9 @@ export async function setUserDisabled(
 }
 
 export function ssoLinkCount(user: PlatformUser): number {
-  return (user.github ? 1 : 0) + (user.google ? 1 : 0);
+  return (
+    (user.github ? 1 : 0) + (user.google ? 1 : 0) + (user.line ? 1 : 0)
+  );
 }
 
 export async function getUserIdByGithub(
@@ -256,6 +260,38 @@ export async function linkGoogle(
   return { ok: true };
 }
 
+export async function getUserIdByLine(
+  store: EnvStore,
+  lineId: string
+): Promise<string | null> {
+  return store.get(SSO_LINE(lineId));
+}
+
+export async function linkLine(
+  store: EnvStore,
+  userId: string,
+  profile: { id: string; displayName: string; avatarUrl?: string | null }
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const existing = await getUserIdByLine(store, profile.id);
+  if (existing && existing !== userId) {
+    return { ok: false, error: "line_already_linked" };
+  }
+  const user = await getUser(store, userId);
+  if (!user) return { ok: false, error: "user_not_found" };
+  if (user.line && user.line.id !== profile.id) {
+    await store.delete(SSO_LINE(user.line.id));
+  }
+  user.line = {
+    id: profile.id,
+    displayName: profile.displayName,
+    linkedAt: Date.now(),
+    avatarUrl: profile.avatarUrl ?? undefined,
+  };
+  await putUser(store, user);
+  await store.put(SSO_LINE(profile.id), userId);
+  return { ok: true };
+}
+
 export async function unlinkGithub(
   store: EnvStore,
   userId: string
@@ -280,6 +316,20 @@ export async function unlinkGoogle(
   if (ssoLinkCount(user) <= 1) return { ok: false, error: "last_sso" };
   await store.delete(SSO_GOOGLE(user.google.id));
   delete user.google;
+  await putUser(store, user);
+  return { ok: true };
+}
+
+export async function unlinkLine(
+  store: EnvStore,
+  userId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await getUser(store, userId);
+  if (!user) return { ok: false, error: "user_not_found" };
+  if (!user.line) return { ok: false, error: "not_linked" };
+  if (ssoLinkCount(user) <= 1) return { ok: false, error: "last_sso" };
+  await store.delete(SSO_LINE(user.line.id));
+  delete user.line;
   await putUser(store, user);
   return { ok: true };
 }
@@ -451,6 +501,7 @@ export async function deleteUserAccount(
   }
   if (user.github) await store.delete(SSO_GITHUB(user.github.id));
   if (user.google) await store.delete(SSO_GOOGLE(user.google.id));
+  if (user.line) await store.delete(SSO_LINE(user.line.id));
   await invalidateUserProvision(store, userId);
   await deleteApiKey(store, userId);
   await revokeAllAccessTokensForUser(store, userId);

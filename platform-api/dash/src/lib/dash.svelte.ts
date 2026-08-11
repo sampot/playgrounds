@@ -11,6 +11,7 @@ import {
   type CreditSessionRow,
   type Me,
 } from "./api";
+import { authErrorMessage } from "./authErrors";
 
 export type ConfirmState = {
   title: string;
@@ -35,7 +36,7 @@ class DashStore {
 
   isAdmin = $derived(this.me?.role === "admin");
   ssoCount = $derived(
-    (this.me?.github ? 1 : 0) + (this.me?.google ? 1 : 0)
+    (this.me?.github ? 1 : 0) + (this.me?.google ? 1 : 0) + (this.me?.line ? 1 : 0)
   );
 
   flash(msg: string, kind: "ok" | "warn" | "err" = "ok") {
@@ -127,7 +128,10 @@ class DashStore {
     const authError = params.get("auth_error");
     const linked = params.get("linked");
     const claimed = params.get("claimed");
-    if (authError) this.flash("進入失敗，請再試一次", "err");
+    if (authError) {
+      const { message } = authErrorMessage(authError);
+      this.flash(message, "err");
+    }
 
     if (session) {
       const { res, data } = await api<{ access_token?: string; error?: string }>(

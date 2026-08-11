@@ -43,5 +43,6 @@
     <span class="chip meta">尚未進入</span>
     <a class="btn" href="/auth/github?intent=login">使用 GitHub 進入</a>
     <a class="btn secondary" href="/auth/google?intent=login">使用 Google 進入</a>
+    <a class="btn secondary" href="/auth/line?intent=login">使用 LINE 進入</a>
   {/if}
 </div>

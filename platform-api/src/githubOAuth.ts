@@ -20,7 +20,12 @@ export type OAuthIntent =
   | { intent: "link"; userId: string }
   | { intent: "bootstrap"; bootstrapToken: string };
 
-type StatePayload = OAuthIntent & { n: string; exp: number };
+type StatePayload = OAuthIntent & {
+  n: string;
+  exp: number;
+  /** PKCE code_verifier (LINE only; optional for other providers) */
+  v?: string;
+};
 
 function b64url(bytes: ArrayBuffer | Uint8Array): string {
   const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
@@ -69,13 +74,15 @@ export function githubOAuthConfigured(env: GithubOAuthEnv): boolean {
 export async function encodeOAuthState(
   secret: string,
   intent: OAuthIntent,
-  ttlMs = 10 * 60 * 1000
+  ttlMs = 10 * 60 * 1000,
+  verifier?: string
 ): Promise<string> {
   const payload: StatePayload = {
     ...intent,
     n: randomId(12),
     exp: Date.now() + ttlMs,
   };
+  if (verifier) payload.v = verifier;
   const body = b64urlJson(payload);
   const sig = await hmacSign(secret, body);
   return `${body}.${sig}`;
@@ -177,7 +184,7 @@ export async function fetchGithubProfile(
 
 export function oauthCallbackUri(
   request: Request,
-  provider: "github" | "google" = "github"
+  provider: "github" | "google" | "line" = "github"
 ): string {
   const url = new URL(request.url);
   return `${url.origin}/auth/${provider}/callback`;

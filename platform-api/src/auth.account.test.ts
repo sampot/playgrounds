@@ -8,6 +8,7 @@ import {
   issueAccessToken,
   linkGithub,
   linkGoogle,
+  linkLine,
   listUsers,
   lookupAccessToken,
   lookupApiKey,
@@ -16,6 +17,7 @@ import {
   setUserDisabled,
   unlinkGithub,
   unlinkGoogle,
+  unlinkLine,
   type EnvStore,
 } from "./auth.js";
 import { apiKeyPlaintext } from "./ids.js";
@@ -88,6 +90,44 @@ describe("account lifecycle", () => {
 
     const lastG = await unlinkGoogle(store, "u1");
     expect(lastG).toEqual({ ok: false, error: "last_sso" });
+  });
+
+  it("links and unlinks LINE as an SSO provider", async () => {
+    const store = memoryStore();
+    await ensureUser(store, "u1", "user");
+    const linked = await linkLine(store, "u1", {
+      id: "line1",
+      displayName: "太郎",
+      avatarUrl: "https://example.com/line.png",
+    });
+    expect(linked).toEqual({ ok: true });
+    expect((await getUser(store, "u1"))?.line?.displayName).toBe("太郎");
+    expect((await getUser(store, "u1"))?.line?.avatarUrl).toBe(
+      "https://example.com/line.png"
+    );
+
+    const dup = await linkLine(store, "u1", {
+      id: "line1",
+      displayName: "太郎",
+    });
+    expect(dup).toEqual({ ok: true });
+
+    // Same subject already bound to u1 → rejected for another user (binding checked before user existence)
+    const other = await linkLine(store, "u2", {
+      id: "line1",
+      displayName: "太郎",
+    });
+    expect(other).toEqual({ ok: false, error: "line_already_linked" });
+
+    // Only LINE linked → cannot unlink (keep ≥1)
+    const last = await unlinkLine(store, "u1");
+    expect(last).toEqual({ ok: false, error: "last_sso" });
+
+    await linkGithub(store, "u1", { id: "gh1", login: "alice" });
+    const ok = await unlinkLine(store, "u1");
+    expect(ok).toEqual({ ok: true });
+    expect((await getUser(store, "u1"))?.line).toBeUndefined();
+    expect((await getUser(store, "u1"))?.github?.login).toBe("alice");
   });
 
   it("claim registration does not create an API key", async () => {
