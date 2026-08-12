@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <title>Hello SDK (custom functions)</title>
+    <!--
+      自訂 functions.js 範本（PG-UI-SDK-PLAN §5.1b）：
+      - SAM 自帶 functions.js；主機的預設 handler 不會自動接管。
+      - 想用 PG.kv / PG.db / PG.vars 對應的內建 routes，SAM 必須自己用
+        /playgrounds/functions-runtime.js 的 `intrinsicRoutes` + `compose`。
+      - 這份範本展示 SAM 「自己寫 subset routes」也是合法；不需要 helper。
+        Reference 取捨見 PG-UI-SDK-SPEC §4.1 / §5.1。
+    -->
+  </head>
+  <body>
+    <main>
+      <h1>Hello SDK — 自訂 functions.js</h1>
+      <button id="bump" type="button">+1 hit (走自訂 /api/hit)</button>
+      <button id="read" type="button">讀取 KV (走自訂 /api/kv)</button>
+      <button id="ping" type="button">呼叫 /api/ping</button>
+      <pre id="out">(等待互動)</pre>
+    </main>
+    <script type="module">
+      await window.PG.ready;
+      const out = document.getElementById("out");
+      const show = (label, v) => {
+        out.textContent = `${label}: ${typeof v === "string" ? v : JSON.stringify(v)}`;
+      };
+      document.getElementById("bump").addEventListener("click", async () => {
+        const r = await fetch("/api/hit", { method: "POST" });
+        show("hit", r.status);
+      });
+      document.getElementById("read").addEventListener("click", async () => {
+        const r = await fetch("/api/kv");
+        const v = r.status === 404 ? null : await r.text();
+        show("kv.hits", v);
+      });
+      document.getElementById("ping").addEventListener("click", async () => {
+        const r = await fetch("/api/ping");
+        show("ping", await r.json());
+      });
+    </script>
+  </body>
+</html>

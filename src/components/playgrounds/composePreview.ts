@@ -89,6 +89,32 @@ function isCssPath(path: string): boolean {
   return /\.css$/iu.test(path);
 }
 
+/**
+ * Absolute path prefixes that the loader should rewrite to a runtime-resolved
+ * `new URL(spec, import.meta.url).href` expression so they can be loaded from
+ * ESM modules that are otherwise constrained to a blob URL base.
+ *
+ * `import.meta.url` resolution is the ESM-blessed way to resolve absolute
+ * paths inside a module record (the literal must be a string, so the path
+ * is preserved verbatim and the runtime does the resolution). The result
+ * is dynamic-imported via top-level await, so the module worker must be
+ * created with `type: "module"` (DEC-038) and the SAM must be async.
+ */
+export const HOST_IMPORT_PREFIXES = ["/playgrounds/"] as const;
+
+function isHostAbsoluteImport(spec: string): boolean {
+  return HOST_IMPORT_PREFIXES.some((p) => spec.startsWith(p));
+}
+
+/**
+ * Build a runtime-resolved URL expression for an absolute path specifier.
+ * The output is a JS expression (not a string literal) that, when evaluated,
+ * yields the same-origin URL of the spec relative to the host origin.
+ */
+function hostImportExpression(spec: string): string {
+  return `new URL(${JSON.stringify(spec)}, import.meta.url).href`;
+}
+
 /** Rewrite relative ESM imports to mapped bare specifiers (or blob URLs). */
 export function rewriteJsImports(
   content: string,
@@ -115,7 +141,92 @@ export function rewriteJsImports(
       return url ? `import(${quote}${url}${quote})` : full;
     }
   );
+
+  // ---- Host absolute paths (e.g. /playgrounds/functions-runtime.js) -----
+  // These can't be resolved from a `blob:` module base ("base scheme isn't
+  // hierarchical"). We rewrite them to a dynamic `import()` of an URL
+  // expression that resolves via `import.meta.url`. The module becomes
+  // async (top-level await), which is supported by module workers.
+  out = rewriteHostAbsoluteImports(out);
   return out;
+}
+
+/**
+ * Rewrite ESM imports of host-absolute paths to dynamic imports of a
+ * `new URL(…, import.meta.url).href` expression. Supports the four common
+ * forms: `import { X } from "spec"`, `import X from "spec"`,
+ * `import * as X from "spec"`, `import "spec"`, and inline `import("spec")`.
+ */
+export function rewriteHostAbsoluteImports(content: string): string {
+  // Static import / export … from "spec"
+  let out = content.replace(
+    /\b(import|export)(\s*[\s\S]*?\s+from\s+|\s+)(["'])(\/playgrounds\/[^"']+)\3/gu,
+    (full, kw: string, mid: string, quote: string, spec: string) => {
+      if (!isHostAbsoluteImport(spec)) return full;
+      const expr = hostImportExpression(spec);
+      // We deliberately turn top-level `import` into an awaited dynamic
+      // import wrapped in a `const` declaration so the module is async.
+      // The original binding syntax is preserved where unambiguous.
+      return shapeStaticImport(kw, mid, expr);
+    }
+  );
+  // Side-effect import "spec" (no `from`)
+  out = out.replace(
+    /\bimport\s+(["'])(\/playgrounds\/[^"']+)\1\s*;?/gu,
+    (full, _quote: string, spec: string) => {
+      if (!isHostAbsoluteImport(spec)) return full;
+      const expr = hostImportExpression(spec);
+      return `void import(${expr});`;
+    }
+  );
+  // Dynamic import("spec")
+  out = out.replace(
+    /\bimport\s*\(\s*(["'])(\/playgrounds\/[^"']+)\1\s*\)/gu,
+    (_full, _quote: string, spec: string) => {
+      const expr = hostImportExpression(spec);
+      return `import(${expr})`;
+    }
+  );
+  return out;
+}
+
+/**
+ * Translate `import { X } from "spec"` (and named/default/namespace variants)
+ * into `const { X } = await import(SPEC)`. Falls back to side-effect form
+ * for `import "spec"` (already handled by caller). For export `from` forms
+ * we always return `await import(SPEC)` and let the caller ignore the value.
+ */
+function shapeStaticImport(
+  kw: string,
+  mid: string,
+  expr: string
+): string {
+  const trimmed = mid.trim();
+  // `import "spec"` — no binding. We treat this as a side-effect.
+  if (trimmed === "") return `void import(${expr});`;
+  // `import X from "spec"` — default import.
+  const defaultMatch = /^([A-Za-z_$][\w$]*)\s*$/.exec(trimmed);
+  if (defaultMatch && kw === "import") {
+    return `const ${defaultMatch[1]!}_mod = await import(${expr});\nconst ${defaultMatch[1]!} = ${defaultMatch[1]!}_mod.default;`;
+  }
+  // `import * as X from "spec"` — namespace.
+  const nsMatch = /^\*\s+as\s+([A-Za-z_$][\w$]*)\s*$/.exec(trimmed);
+  if (nsMatch && kw === "import") {
+    return `const ${nsMatch[1]!} = await import(${expr});`;
+  }
+  // `import { a, b as c } from "spec"` — named.
+  const namedMatch = /^\{([\s\S]*)\}\s*$/.exec(trimmed);
+  if (namedMatch && kw === "import") {
+    const bindings = namedMatch[1]!.trim();
+    return `const { ${bindings} } = await import(${expr});`;
+  }
+  // `export { a, b } from "spec"` — re-export.
+  if (kw === "export") {
+    const bindings = trimmed.replace(/^\{/u, "{").replace(/\}$/u, "}");
+    return `const __reexports = await import(${expr});\nexport { ${bindings.slice(1, -1)} } from ${JSON.stringify(expr)};`;
+  }
+  // Fallback: emit the original (shouldn't happen for import/export … from).
+  return `const __x = await import(${expr});`;
 }
 
 export function rewriteCssUrls(

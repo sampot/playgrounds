@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <title>Hello SDK</title>
+    <!--
+      純 UI 範本（PG-UI-SDK-PLAN §5.1a）：
+      - 無 functions.js：由主機安裝預設 `/api/*` 處理器（PG-UI-SDK-SPEC §4）。
+      - 經主機注入的 `window.PG` 存取 intrinsic（KV/DB/vars）。
+      - 注意：`/playgrounds/sdk.js` 是由 CANVAS_BRIDGE_SCRIPT 注入的，
+        SAM 自己不要手動加（會重複）。
+    -->
+  </head>
+  <body>
+    <main>
+      <h1>Hello SDK</h1>
+      <p>這是一個純 UI 範本；後端由主機的預設 <code>functions.js</code> 提供。</p>
+      <button id="bump" type="button">+1 hit</button>
+      <button id="read" type="button">讀取 KV</button>
+      <pre id="out">(等待互動)</pre>
+    </main>
+    <script type="module">
+      // SDK 注入後 `window.PG` 已存在；等 ready 確保 capabilities+vars 已奉入。
+      await window.PG.ready;
+
+      const out = document.getElementById("out");
+      const show = (label, v) => {
+        out.textContent = `${label}: ${typeof v === "string" ? v : JSON.stringify(v)}`;
+      };
+
+      document.getElementById("bump").addEventListener("click", async () => {
+        const cur = await window.PG.kv.get("hits");
+        const next = Number(cur || 0) + 1;
+        await window.PG.kv.put("hits", String(next));
+        show("hits", next);
+      });
+
+      document.getElementById("read").addEventListener("click", async () => {
+        const v = await window.PG.kv.get("hits");
+        show("hits", v);
+      });
+    </script>
+  </body>
+</html>
