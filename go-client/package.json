@@ -7,8 +7,9 @@
   "scripts": {
     "vendor:sqljs": "node scripts/vendor-sqljs.mjs",
     "sitemap": "node scripts/generate-sitemap.mjs",
-    "dev": "npm run vendor:sqljs && npm run sitemap && vite dev --port 5174",
-    "prebuild": "npm run vendor:sqljs && npm run catalog:gen --prefix .. && npm run sitemap",
+    "sync:playgrounds-static": "node --experimental-strip-types --experimental-transform-types ../scripts/copy-go-playgrounds-static.ts --root ..",
+    "dev": "npm run vendor:sqljs && npm run sitemap && npm run sync:playgrounds-static && vite dev --port 5174",
+    "prebuild": "npm run vendor:sqljs && npm run catalog:gen --prefix .. && npm run sitemap && npm run sync:playgrounds-static",
     "build": "svelte-kit sync && vite build",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "prepare": "svelte-kit sync || echo ''",

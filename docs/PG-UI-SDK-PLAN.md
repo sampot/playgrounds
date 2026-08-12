@@ -167,11 +167,13 @@
 || 5.4 secrets 不外洩 | [x] `scripts/sdk-static-check.ts` 確認 `public/playgrounds/sdk.js` 無 `env.*` 直連、無 `secrets[...].get()` 暴露值；`/api/secrets` 僅回 names |
 || 5.5 DEC-053 §可攜性 | [x] 後端 routing 邏輯同源於 `functionsRouting.ts`（TS 權威）+ `functions-runtime.js`（JS 鏡像），parity fixture 鎖線；`pg-gomoku` 等既有 SAM 不破（920 測試綠，0 regression） |
 
-### Phase 6（**非本刀**）— 後續增強
+### Phase 6 — 後續增強
 
-- SDK 動態 import 與 chunk 切（O2）。
-- 為 `play` 與 `go` 各自的 Runtime 補 helper（同源於 `functions-runtime.js`；go 端的 functionsRuntime 已存在，需對齊 §4 路由表）。
-- SDK type definitions（`.d.ts`）給願意強型別的 SAM；非破壞性新增。
+|| 工作 | 檔案 | 狀態 |
+|| --- | --- | --- |
+|| 6.1 SDK 動態 import／chunk 切（O2） | `public/playgrounds/sdk.js` | [x] 暫不切 — 當前 gzip 3.2 KiB，遠低於 8 KiB 上限；超標再切（O2 留作 follow-up） |
+|| 6.2 go 端 helper 對齊 §4 路由表 | `go-client/static/playgrounds/{sdk.js,functions-runtime.js}` | [x] 靜態檔經 `scripts/copy-go-playgrounds-static.ts` 自動同步（`go:build` prebuild hook）；go 端 `handleGoFunctionsApi` 裝 default handler fallback（測試見 `goFunctionsRuntimeDefault.test.ts`） |
+|| 6.3 SDK `.d.ts` type definitions | `public/playgrounds/sdk.d.ts` | [x] SPEC §3 全介面（含 `PgSdk`／`PgKv`／`PgDb`／`PgVars`／`PgSession`／`PgCompute`／`PgDelegate`／`PgHost`／`PgError`）已 land；`declare global { interface Window { PG: PgSdk } }`；`tests/sdkDts.test.ts` 9 個 case 鎖定 contract + no-drift vs `sdk.js` 表面 |
 
 ---
 

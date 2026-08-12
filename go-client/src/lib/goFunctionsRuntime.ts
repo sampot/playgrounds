@@ -23,6 +23,7 @@ import {
   type LoadedFunctionsModule,
 } from "@pg/functionsRuntime";
 import type { FileMap } from "@pg/projectTypes";
+import { createDefaultFunctionsHandler } from "../../../src/sam-runtime/defaultFunctionsHandler.ts";
 import { createGoWebDb } from "./goWebDb";
 import {
   createGoWebKv,
@@ -42,6 +43,13 @@ export type GoFunctionsApiContext = {
   getCatalogId?: () => string | null;
   getSandboxId: () => string | null;
   /**
+   * Optional: parsed `.env` Record<string,string>. Wired in `mountGoCanvas`
+   * when the SAM ships a `.env`. The default handler reads env.vars via
+   * this getter so the host can surface DEC-035 secrets-less vars
+   * without holding a module-scope reference.
+   */
+  getEnvVars?: () => Readonly<Record<string, string>>;
+  /**
    * Resolve the active `HostRuntime` for this sandbox (DEC-053 env.HOST).
    * When non-null, `env.HOST` is injected into functions.js so its
    * `/api/host/*` routes have a backing implementation. When null (single-
@@ -55,9 +63,71 @@ export type GoFunctionsApiContext = {
 type CacheEntry = {
   fingerprint: string;
   mod: LoadedFunctionsModule;
+  isDefault: boolean;
 };
 
 const moduleCache = new Map<string, CacheEntry>();
+
+/**
+ * Build a LoadedFunctionsModule that wraps `createDefaultFunctionsHandler`
+ * with the SAM's intrinsic env (KV/DB/vars/SESSION/HOST). The env is
+ * computed at request time so the latest state is always reflected
+ * (matters for SESSION/HOST which can attach later).
+ */
+async function wrapDefaultHandler(
+  _files: FileMap,
+  ctx: GoFunctionsApiContext,
+): Promise<LoadedFunctionsModule | null> {
+  const buildHandler = () => {
+    const sandboxId = ctx.getSandboxId() || "go";
+    const { key, durable } = storageFor(ctx);
+    const hostRuntime = ctx.getHostRuntime?.() ?? null;
+    const env: Record<string, unknown> = {
+      KV: createGoWebKv(key, { durable }),
+      DB: createGoWebDb(key, { durable }),
+      // env.vars — parsed by the host from SAM's .env at request time.
+      // We read it lazily from the WebKV-free slot: env.vars is exposed
+      // as a Record via the runtime; for go we accept the surface from
+      // ctx.getEnvVars?.() (optional) or fall back to an empty object.
+      ...(typeof ctx.getEnvVars === "function" ? { vars: ctx.getEnvVars() } : {}),
+      ...(getSessionSeatIdForProject(sandboxId)
+        ? { SESSION: createSessionBinding(sandboxId) }
+        : {}),
+      ...(hostRuntime
+        ? {
+            HOST: createGoHostBinding({
+              getHostRuntime: () => hostRuntime,
+            }),
+          }
+        : {}),
+    };
+    return createDefaultFunctionsHandler(() => env);
+  };
+  // We build a fresh handler per call because env references mutable state
+  // and the SAM may receive different bindings across requests. The
+  // cached module shape wraps a function that re-evaluates env on each
+  // fetch.
+  return {
+    // LoadedFunctionsModule's signature is 2-arg (request, env); the
+    // default handler ignores the ctx slot and resolves on the env it
+    // builds per request. We discard the ctx param to satisfy the
+    // LoadedFunctionsModule shape.
+    fetch: async (request, _env) =>
+      buildHandler().fetch(
+        request,
+        _env,
+        createNoopSamExecutionContext(),
+      ),
+    dispose: () => {},
+  };
+}
+
+function createNoopSamExecutionContext(): import("../../../src/sam-runtime/types.ts").SamExecutionContext {
+  return {
+    waitUntil: () => {},
+    schedule: () => ({ cancel: () => {} }),
+  };
+}
 
 function jsonBytesResponse(body: string, status: number): SerializedResponse {
   const bytes = new TextEncoder().encode(body);
@@ -100,7 +170,7 @@ async function getModule(
   }
   const mod = await loadFunctionsModule(files);
   if (!mod) return null;
-  moduleCache.set(cacheKey, { fingerprint: fp, mod });
+  moduleCache.set(cacheKey, { fingerprint: fp, mod, isDefault: false });
   return mod;
 }
 
@@ -113,7 +183,16 @@ export async function handleGoFunctionsApi(
     return jsonBytesResponse(functionsUnavailableBody(), 503);
   }
   const sandboxId = ctx.getSandboxId() || "go";
-  const mod = await getModule(sandboxId, files);
+  let mod = await getModule(sandboxId, files);
+  let isDefaultHandler = false;
+  if (!mod) {
+    // Phase 6 (2): mirror the field shell — when the SAM has no
+    // functions.js, host-install the default handler so /api/kv/...,
+    // /api/db/..., /api/vars, /api/capabilities all work without SAM
+    // plumbing. SAM-supplied functions.js always wins (PG-UI-SDK-SPEC §4).
+    isDefaultHandler = true;
+    mod = await wrapDefaultHandler(files, ctx);
+  }
   if (!mod) {
     return jsonBytesResponse(functionsUnavailableBody(), 503);
   }

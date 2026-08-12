@@ -39,7 +39,8 @@ Reader-facing narrative stays personal／non-product (blog DEC-004).
 - `npm run platform:dev` / `platform:test` / `platform:deploy` — Platform API／dashboard (`api.samkuo.me`／`dash.samkuo.me`；`platform-api/`；dash UI＝`platform-api/dash` SvelteKit 5)
 - `npm run go:dev` / `go:build` / `go:deploy` — 純玩版 Guest（`go.samkuo.me`；`go-client/`；DEC-050）
 - `npm run sdk:check` — UI SDK 靜態檢查：grep 確認 `public/playgrounds/sdk.js` 無 `env.*` 直連、無 `secrets[...].get()` 暴露值；svelte-check 與 vitest 仍走 `npm run check`／`npm test`
-- `npm run sdk:test` — Vitest 跑 `*.sdk*.test.ts` / `tests/sdk.test.ts` / `defaultFunctionsHandler.test.ts`（pattern `-t sdk` 或 `vitest run sdk` 入口）
+- `npm run sdk:test` — Vitest 跑 `*.sdk*.test.ts` / `tests/sdk.test.ts` / `tests/sdkDts.test.ts` / `defaultFunctionsHandler.test.ts`（pattern `-t sdk` 或 `vitest run sdk` 入口）
+- `node --experimental-strip-types scripts/copy-go-playgrounds-static.ts --root .` — 同步 `public/playgrounds/{sdk.js,functions-runtime.js,sdk.d.ts}` → `go-client/static/playgrounds/`（`go:build` prebuild 自動跑）
 
 ## Layout
 
