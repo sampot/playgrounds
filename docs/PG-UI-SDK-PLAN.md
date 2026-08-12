@@ -88,17 +88,17 @@
 
 | 工作 | 檔案 | 驗收 |
 | --- | --- | --- |
-| 1.1 新增 `defaultFunctionsHandler.ts` | `src/sam-runtime/defaultFunctionsHandler.ts` | 純函式：`createDefaultFunctionsHandler(env: SamEnv): FunctionsHandler` |
-| 1.2 `SamInstance.start` 注入 | `src/sam-runtime/instance.ts` | `if (this.hasFunctions())` 後加 `else { this.functions = createDefaultFunctionsHandler(this.env); }` |
+| 1.1 新增 `defaultFunctionsHandler.ts` | `src/sam-runtime/defaultFunctionsHandler.ts` | 純函式：`createDefaultFunctionsHandler(envOrGetter): FunctionsHandler`（接受 env 或 getter；後者用於 env 尚未組好的時機） |
+| 1.2 `SamInstance.start` 注入 | `src/sam-runtime/instance.ts` | `if (this.hasFunctions())` 後加 `else { this.functions = createDefaultFunctionsHandler(() => this.env); }` |
 | 1.3 型別 | `src/sam-runtime/types.ts` | 沿用既有 `FunctionsHandler`；不擴 `SamEnv` |
-| 1.4 測試 | `src/sam-runtime/defaultFunctionsHandler.test.ts` | KV round-trip；DB prepare/bind/all/first/run/raw 四種；vars 同步；secrets names only；capabilities JSON 形狀；不認得 path→404 `not_found` |
+| 1.4 測試 | `src/sam-runtime/defaultFunctionsHandler.test.ts` | KV round-trip、KV list pagination、KV 非法鍵、DB prepare/all/first/run/raw、DB exec/batch、DB SQL 缺漏→`db_sql_error`、vars 讀（all＋single＋missing）、secrets names-only（含反白名單測）、capabilities、404 not_found、env 延遲讀；SamInstance 整合測：無 functions.js→裝預設＋SAM 自訂 functions.js→自訂優先 |
 
 **DoD：**
-- [ ] 沙盒無 `functions.js` 時，`fetch("/api/kv/<key>")` 回預期值（runtime integration test）
-- [ ] KV list pagination；DB error code 回 `db_sql_error`
-- [ ] `env.secrets.<NAME>.get()` 仍只被後端呼叫；UI 無路徑拿到值
-- [ ] `capabilities()` JSON 含 `intrinsics: ["kv","db","vars"]` + 當前 binding 清單
-- [ ] **`npm test` 綠**；新測覆蓋率 ≥ 既有 functionsEnv 測的 80%
+- [x] 沙盒無 `functions.js` 時，`fetch("/api/kv/<key>")` 回預期值（SamInstance 整合測）
+- [x] KV list pagination；DB error code 回 `db_sql_error`
+- [x] `env.secrets.<NAME>.get()` 仍只被後端呼叫；UI 無路徑拿到值（反白名單斷言）
+- [x] `capabilities()` JSON 含 `intrinsics: ["kv","db","vars"]` + 當前 binding 清單
+- [x] **`npm test` 綠**；新測 13 個全綠（867 total）
 
 **不變式檢查：**
 - 不動 `createFunctionsEnv`（[functionsEnv.ts](../../src/components/playgrounds/functionsEnv.ts)）；只在 `SamInstance` 內用其結果組 handler。

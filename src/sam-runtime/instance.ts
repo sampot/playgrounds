@@ -7,6 +7,7 @@ import type { AgentMessage } from "./message.ts";
 import { parseSamHead, resolveSamMeta } from "./parseSamHead.ts";
 import type { AgentRuntime } from "./runtime.ts";
 import { SamScheduler } from "./scheduler.ts";
+import { createDefaultFunctionsHandler } from "./defaultFunctionsHandler.ts";
 import {
   CONTROLLER_ENTRY,
   FUNCTIONS_ENTRY,
@@ -173,6 +174,13 @@ export class SamInstance {
         throw new Error("functions.js 須 export default { fetch }");
       }
       this.functions = h;
+    } else {
+      // No SAM-supplied functions.js → host installs a default handler that
+      // exposes the sandbox's intrinsic bindings (env.KV / env.DB / env.vars /
+      // env.secrets.*) under the standard /api/* routes (PG-UI-SDK-SPEC §4).
+      // The handler reads `env` lazily per request so it can be installed
+      // before createEnv runs (env is assigned afterwards).
+      this.functions = createDefaultFunctionsHandler(() => this.env);
     }
 
     if (this.hasController()) {
