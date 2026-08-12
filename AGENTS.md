@@ -20,6 +20,12 @@ Reader-facing narrative stays personal／non-product (blog DEC-004).
 - **Svelte 5 runes（DEC-005）：** 本 repo 的 Svelte／SvelteKit 元件**必須**用 runes（`$state`／`$derived`／`$effect`／`$props` 等）。**禁止** legacy `export let`、`$:`、隱式 `let` 反應性。維持 `compilerOptions.runes: true`。
 - **game-assets 署名：** 開發 `pg-*` 可用本機 [`game-assets/`](./game-assets/)；須按授權署名，**不要求署名也署名**。見該目錄 README 與 `.cursor/rules/game-assets-attribution.mdc`。
 
+## 流程（硬）
+
+- **Test-driven development：** 新增／修改可執行程式邏輯（含 helper、reducer、route handler、binding factory、validation 等），**先寫失敗的測試**，再寫讓測試通過的最小實作，最後重構。例外（純刪除、純檔名／import 整理、單純把常數搬到 config 檔、文件 only）不在此限，但若改動引入新分支條件仍須先有測試。
+- **Commit 顆粒度：** 建議「測試 + 實作」同一 commit（或緊鄰兩 commit）；不要把測試留到「之後補」。`npm test` 必須在 push 前綠。
+- **不走 TDD 的場景：** 文件、樣式（CSS 變更）、搬檔、重新命名、type-only 變更——這些不需先寫測試。
+
 ## Commands
 
 - `npm run dev` — local host (standalone paths: `/` + `/sam/` + `/canvas/`)
