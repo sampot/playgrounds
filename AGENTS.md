@@ -51,6 +51,7 @@ Reader-facing narrative stays personal／non-product (blog DEC-004).
 - `public/catalog/v1.json` — machine-readable catalog（same gen as typed module）
 - `src/sam-runtime/` — portable SAM runtime
 - `src/sam-host/` — Node headless host
+- `src/sam-host/fixtures/` — 範本 SAM 目錄（`hello-sdk/` 純 UI + 預設 handler；`hello-sdk-functions/` 自訂 functions.js + helper；`ping-a`／`ping-b` 既有多實例 KV 範例）
 - `public/sw.js` — canvas SW + offline shell
 - `docs-site/` — Starlight docs (DEC-043; separate Worker; **not** SvelteKit)
 - `platform-api/` — Platform API Invite／signaling (DEC-047; separate Worker)

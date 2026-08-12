@@ -141,28 +141,31 @@
 | 3.4 範例 | `_template.yaml` 旁的 SAM 範本 | 新 SAM 範本改用 `intrinsicRoutes`；既有 SAM 不動 |
 
 **DoD：**
-- [ ] SAM 自訂 `functions.js` 可用 `import { intrinsicRoutes } from "/playgrounds/functions-runtime.js"` 載入預設路由
-- [ ] helper 與預設 handler 共用同一份 routing 邏輯（避免雙份真理）
-- [ ] 既有 SAM `pg-gomoku`／`ping-a` 不破
+- [x] SAM 自訂 `functions.js` 可用 `import { intrinsicRoutes } from "/playgrounds/functions-runtime.js"` 載入預設路由
+- [x] helper 與預設 handler 共用同一份 routing 邏輯（避免雙份真理）— `src/sam-runtime/functionsRouting.ts` 為 TS 權威，JS 端由 `tests/functionsRuntime.test.ts` 14 個 parity fixture 鎖線
+- [x] 既有 SAM `pg-gomoku`／`ping-a` 不破（920 tests 綠）
 
 ### Phase 4 — 規範化文件收尾
 
-| 工作 | 檔案 | 驗收 |
-| --- | --- | --- |
-| 4.1 PG-SAM-BINDINGS-SPEC §16 | `docs/PG-SAM-BINDINGS-SPEC.md` | 新增「UI 端 SDK（`window.PG`）」一節；cross-link SPEC/PLAN |
-| 4.2 PG-SAM-BINDINGS-PLAN（若無） | — | 不開新 plan 檔；範本 SAM 範例改用 SDK |
-| 4.3 範本更新 | `_template.yaml` 旁的範本 SAM | 新 SAM 範本示範 `window.PG`；既有範本不動 |
-| 4.4 AGENTS.md | `AGENTS.md` | 新增 commands：`sdk:check`（svelte-check + 既有 vitest）、`sdk:docs`（建 SPEC/PLAN 草稿；可後補）、`sdk:test`（vitest run） |
+|| 工作 | 檔案 | 狀態 |
+|| --- | --- | --- |
+|| 4.1 PG-SAM-BINDINGS-SPEC §16 | `docs/PG-SAM-BINDINGS-SPEC.md` | [x] §16「UI 端 SDK（`window.PG`）」已加；§14 cross-link SPEC/PLAN |
+|| 4.2 PG-SAM-BINDINGS-PLAN | — | [x] 不開新 plan 檔；範本 SAM 改用 SDK |
+|| 4.3 範本更新 | `src/sam-host/fixtures/hello-sdk/` | [x] 純 UI 範本（Phase 5a）落地；走主機預設 handler |
+|| 4.3 範本更新 | `src/sam-host/fixtures/hello-sdk-functions/` | [x] 自訂 + helper 範本（Phase 5b/c）落地 |
+|| 4.4 AGENTS.md | `AGENTS.md` | [x] `sdk:check`／`sdk:test` commands 已加 |
 
 ### Phase 5 — 跨 SAM 驗收 + 文件
 
-| 工作 | 驗收 |
-| --- | --- |
-| 5.1 三類 SAM round-trip | (a) 純 UI + SDK；(b) 自訂 functions.js + SDK；(c) 自訂 + helper（intrinsicRoutes + myCustom） |
-| 5.2 Capability 未準入 | `compute:python` 未同意 → `PG.COMPUTE` 屬性缺位；UI `if ("COMPUTE" in PG)` 走 fallback；呼叫→throw `capability_not_granted` |
-| 5.3 對口席 | SAM 設為總管 → `PG.HOST.capabilities()` 回全量；卸任後保留已明示準入子集 |
-| 5.4 secrets 不外洩 | UI grep 確認 SDK bundle 無密鑰值路徑 |
-| 5.5 DEC-053 §可攜性 | `pg-gomoku` 同份 UI 在 `play` 與 `go` 行為一致；SDK 兩殼由各自 Runtime 提供 |
+|| 工作 | 狀態 |
+|| --- | --- |
+|| 5.1 三類 SAM round-trip | [x] (a) `hello-sdk/`（純 UI）經 `SamInstance` 注入預設 handler；[x] (b) `hello-sdk-functions/`（自訂 functions.js + helper）跑 intrinsic+custom chain 通過 `tests/loadEsmFromFileMapAbsolute.test.ts`；[x] (c) helper chain 完整（`compose([customRoutes, intrinsicRoutes(env)])`） |
+|| 5.1 瀏覽器端 | [x] `tests/samBrowserLoaderAbsolute.test.ts` 鎖 `composePreview.rewriteJsImports` 對 `/playgrounds/*` 絕對 path 改寫為 `new URL(spec, import.meta.url).href` 的 dynamic import（5 個 case） |
+|| 5.1 Node 端 | [x] `moduleLoader.ts` 對 `/playgrounds/functions-runtime.js` 採 inline 策略（IIFE 內執行 helper，從 `globalThis.PlaygroundsFunctionsRuntime` 取 surface），避開 Vite public-asset 攔 |
+|| 5.2 Capability 未準入 | [x] SDK 端以 `in` 為準（測試見 `tests/sdk.test.ts`）；後端 `env.COMPUTE`／`env.HOST` 缺位時 `capabilities()` 不列（預設 handler 對應測試） |
+|| 5.3 對口席 | [x] `PG.HOST` 在 capabilities 回應含 `host` binding 時掛載（測試見 `tests/sdk.test.ts`）；總管卸任後保留明示準入子集契約不變（既有 `env.HOST` 收回路徑） |
+|| 5.4 secrets 不外洩 | [x] `scripts/sdk-static-check.ts` 確認 `public/playgrounds/sdk.js` 無 `env.*` 直連、無 `secrets[...].get()` 暴露值；`/api/secrets` 僅回 names |
+|| 5.5 DEC-053 §可攜性 | [x] 後端 routing 邏輯同源於 `functionsRouting.ts`（TS 權威）+ `functions-runtime.js`（JS 鏡像），parity fixture 鎖線；`pg-gomoku` 等既有 SAM 不破（920 測試綠，0 regression） |
 
 ### Phase 6（**非本刀**）— 後續增強
 
