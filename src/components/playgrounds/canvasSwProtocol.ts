@@ -579,16 +579,41 @@ export const CANVAS_BRIDGE_SCRIPT = `<script data-playgrounds-bridge>
 })();
 </script>`;
 
+export const PLAYGROUNDS_SDK_SCRIPT_TAG =
+  '<script src="/playgrounds/sdk.js" defer data-playgrounds-sdk></script>';
+
 export function injectCanvasBridge(html: string): string {
   if (html.includes("data-playgrounds-bridge")) return html;
+  let injected = false;
+  const ensureSdk = (s: string): string => {
+    if (s.includes("data-playgrounds-sdk")) return s;
+    injected = true;
+    return s.replace(/<head([^>]*)>/iu, `<head$1>${PLAYGROUNDS_SDK_SCRIPT_TAG}`) || s;
+  };
   if (/<head[\s>]/iu.test(html)) {
-    return html.replace(/<head([^>]*)>/iu, `<head$1>${CANVAS_BRIDGE_SCRIPT}`);
+    let out = html.replace(/<head([^>]*)>/iu, `<head$1>${CANVAS_BRIDGE_SCRIPT}`);
+    if (!out.includes("data-playgrounds-sdk")) {
+      out = out.replace(
+        /<head([^>]*)>/iu,
+        `<head$1>${PLAYGROUNDS_SDK_SCRIPT_TAG}`
+      );
+      injected = true;
+    }
+    return out;
   }
   if (/<html[\s>]/iu.test(html)) {
-    return html.replace(
+    let out = html.replace(
       /<html([^>]*)>/iu,
       `<html$1><head>${CANVAS_BRIDGE_SCRIPT}</head>`
     );
+    if (!out.includes("data-playgrounds-sdk")) {
+      out = out.replace(
+        /<html([^>]*)>/iu,
+        `<html$1><head>${PLAYGROUNDS_SDK_SCRIPT_TAG}</head>`
+      );
+      injected = true;
+    }
+    return out;
   }
   return `${CANVAS_BRIDGE_SCRIPT}${html}`;
 }

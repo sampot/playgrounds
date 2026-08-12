@@ -171,4 +171,17 @@ describe("api stub + HTML bridge", () => {
     expect(out).toContain("groupEnd");
     expect(injectCanvasBridge(out)).toBe(out);
   });
+
+  it("injects UI SDK script tag alongside the bridge", () => {
+    const out = injectCanvasBridge(
+      "<!doctype html><html><head><title>t</title></head><body></body></html>"
+    );
+    // SDK script must load before user code so `window.PG` is available at
+    // first paint. `defer` lets the parser continue; SDK is self-mounting.
+    expect(out).toContain(
+      '<script src="/playgrounds/sdk.js" defer data-playgrounds-sdk>'
+    );
+    // Idempotent: re-injecting does not duplicate the SDK tag.
+    expect(injectCanvasBridge(out)).toBe(out);
+  });
 });

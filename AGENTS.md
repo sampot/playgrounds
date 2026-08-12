@@ -39,7 +39,7 @@ Reader-facing narrative stays personal／non-product (blog DEC-004).
 - `npm run platform:dev` / `platform:test` / `platform:deploy` — Platform API／dashboard (`api.samkuo.me`／`dash.samkuo.me`；`platform-api/`；dash UI＝`platform-api/dash` SvelteKit 5)
 - `npm run go:dev` / `go:build` / `go:deploy` — 純玩版 Guest（`go.samkuo.me`；`go-client/`；DEC-050）
 - `npm run sdk:check` — UI SDK 靜態檢查：grep 確認 `public/playgrounds/sdk.js` 無 `env.*` 直連、無 `secrets[...].get()` 暴露值；svelte-check 與 vitest 仍走 `npm run check`／`npm test`
-- `npm run sdk:test` — Vitest 跑 `*.sdk*.test.ts` 與 `defaultFunctionsHandler.test.ts`；不另開 jest config，pattern filter via `vitest run -t sdk` 或新增 `npm test -- sdk` 入口（Phase 2 落地時補 npm script）
+- `npm run sdk:test` — Vitest 跑 `*.sdk*.test.ts` / `tests/sdk.test.ts` / `defaultFunctionsHandler.test.ts`（pattern `-t sdk` 或 `vitest run sdk` 入口）
 
 ## Layout
 
