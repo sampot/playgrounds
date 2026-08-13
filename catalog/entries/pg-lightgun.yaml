@@ -1,0 +1,7 @@
+title: 光槍射擊
+kind: game
+series: 街機
+blurb: 鼠標瞄準射击、即時反擊，街機光槍射击 Web 版。
+source: sampot/pg-lightgun
+license: MIT
+status: unlisted

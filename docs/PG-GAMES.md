@@ -74,17 +74,19 @@
 | `pg-wanzai` | 尪仔標 | 選牌對拍、翻牌收穫 |
 | `pg-wingrace` | 翼途競飛 | 簡化飛行棋 |
 
-### 機台（7＋1 unlisted）
+### 機台（7＋5 unlisted）
 
 | id | 標題 | 一句話 |
 | --- | --- | --- |
 | `pg-bingolite` | 賓果閃燈 | 五五賓果燈板 |
 | `pg-clawgrab` | 夾娃娃 | 搖爪落下夾取 |
-| `pg-coinpush` | 推幣機 | 落幣堆疊、推板擠落 |
+| **`pg-coinpusherer`** | **推幣機** | **按鈕推落金幣、堆疊獲獎，日式推幣機 Web 版** |
 | `pg-guaguale` | 刮刮樂 | **unlisted**；刮開洞看中獎開關、集齊符號中獎；純娛樂非博弈 |
 | `pg-horselit` | 賽馬機 | 六軌燈光賽馬 |
 | `pg-mali` | 小瑪莉 | 復古燈圈跑燈 |
-| `pg-pinfall` | 釘雨落珠 | 發射撞釘入洞 |
+| **`pg-pinball`** | **彈珠台** | **扳機發射鋼珠、彈跳得分，經典彈珠台 Web 版** |
+| **`pg-lightgun`** | **光槍射擊** | **鼠標瞄準射击、即時反擊，街機光槍射击 Web 版** |
+| **`pg-ticketgrab`** | **彩票機** | **投幣抓取彩球、組合獲獎，街機經典紅利系統 Web 版** |
 
 ### 桌遊（14＋6 unlisted）
 
@@ -127,7 +129,13 @@
 
 | 就緒 | 台灣味 | 建議 id | 標題（暫） | 系列（暫） | 主要 `game-assets/` | 備註 |
 | --- | --- | --- | --- | --- | --- | --- |
-| — | — | — | — | — | — | 目前無排程中 backlog（全部已上架，見「已實作」） |
+| 高 | ❌ | `pg-poker` | Texas Hold'em Poker | 撲克牌 | `art/playing-cards-pack/`<br>`sfx/casino-audio/` | 四人牌桌、 betting AI、翻牌節奏 |
+| 高 | ❌ | `pg-hearts` | Hearts (黑心) | 撲克牌 | `art/playing-cards-pack/`<br>`sfx/casino-audio/` | 四人避分、傳牌、Shoot the Moon |
+| 高 | ❌ | `pg-snackbar` | Catch 22 (點心桌) | 撲克牌 | `art/playing-cards-pack/`<br>`sfx/casino-audio/` | 吹牛玩法、懷舊街機風 |
+| 高 | ❌ | `pg-cheat` | Cheat (我懷疑) | 撲克牌 bluff | `art/playing-cards-pack/`<br>`sfx/casino-audio/` | 2-4人、吹牛+抓騙、wild card |
+| 高 | ❌ | `pg-bridge` | Contract Bridge | 橋牌 | `art/playing-cards-pack/`<br>`sfx/casino-audio/` | 4人 partnership、叫牌系統 |
+
+已就緒 pack：`playing-cards-pack/` 完整牌組（三尺寸含 Joker）<br>`casino-audio/` 洗牌／發牌／籌碼音效<br>台灣味非限制，通用小品亦可排程 |
 
 ### 已涵蓋、不必再做一顆複製品
 
@@ -135,7 +143,7 @@
 | --- | --- |
 | 尪仔標、路名地產、成語、暗棋、鬥獸棋、軍棋、象棋、大老二、撿紅點、台灣麻將、新接龍 | `pg-wanzai`、`pg-twland`、`pg-chengyu`、`pg-banqi`、`pg-jungle`、`pg-junqi`、`pg-xiangqi`、`pg-big2`、`pg-redpick`、`pg-mahjong`、`pg-freecell` |
 | 夜市射氣球／套圈／打地鼠／切水果 | `pg-popshot`、`pg-ringtoss`、`pg-moletap`、`pg-fruitcut` |
-| 小瑪莉、夾娃娃、推幣、釘珠、賽馬燈、賓果燈 | `pg-mali`、`pg-clawgrab`、`pg-coinpush`、`pg-pinfall`、`pg-horselit`、`pg-bingolite` |
+| 小瑪莉、夾娃娃、推幣機、彈珠台、光槍射擊、彩票機、釘珠、賽馬燈、賓果燈 | `pg-mali`、`pg-clawgrab`、`pg-coinpusher`、`pg-pinfall`、`pg-horselit`、`pg-bingolite` |
 | 跳房子／踢毽子、木頭人、飛行棋簡化、躍階平台 | `pg-hopkick`、`pg-statue`、`pg-wingrace`、`pg-leaptrail`、`pg-pixelhop` |
 | 短關地城探索／戰鬥節奏 | `pg-microdungeon` |
 | 小地圖收集／避開 | `pg-cityroam` |
@@ -144,6 +152,10 @@
 
 ### 候補想法（未排程 id）
 
+- **夜市小遊戲候補**：
+  - 小馬過河：節奏平台，避開移動障礙（如 `pg-frogcross` 是過河但無移動障礙）
+  - 打地鼠／敲敲樂：節奏敲擊，類 `pg-moletap`
+  - 糖果投掷：瞄準投擲進桶，類 `pg-popshot`
 - 官兵捉強盜／躲貓貓：輕量對戰，UI／AI 成本高
 - 電子雞／育成：偏長期養成，可另開 `toy` 評估
 - 熱血系列／跑跑卡丁：授權與體量不適合 SAM 小品

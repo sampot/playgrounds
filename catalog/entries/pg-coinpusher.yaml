@@ -1,0 +1,7 @@
+title: 推幣機
+kind: game
+series: 機台
+blurb: 按鈕推落金幣、堆疊獲獎，日式推幣機 Web 版。
+source: sampot/pg-coinpusher
+license: MIT
+status: unlisted

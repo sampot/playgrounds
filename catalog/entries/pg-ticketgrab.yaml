@@ -1,0 +1,7 @@
+title: 彩票機
+kind: game
+series: 機台
+blurb: 投幣抓取彩球、組合獲獎，街機經典紅利系統 Web 版。
+source: sampot/pg-ticketgrab
+license: MIT
+status: unlisted

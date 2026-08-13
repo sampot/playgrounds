@@ -1,0 +1,7 @@
+title: 彈珠台
+kind: game
+series: 懷舊
+blurb: 扳機發射鋼珠、彈跳得分，經典彈珠台 Web 版。
+source: sampot/pg-pinball
+license: MIT
+status: unlisted
