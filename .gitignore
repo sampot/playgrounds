@@ -17,3 +17,6 @@ platform-api/.dev.vars
 /game-assets/**
 !/game-assets/README.md
 !/game-assets/ATTRIBUTION.md
+
+# Playwright MCP browser session artifacts
+.playwright-mcp/

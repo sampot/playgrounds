@@ -114,23 +114,11 @@ export function createSoloRuntime(opts?: {
       let files: FileMap;
       let fromCache = false;
       const cached = await getGoSamOfflineCache(entry.id);
-      if (cached && seq === bootSeq) {
-        files = cached.files;
-        fromCache = true;
-        assertSamHasIndex(files);
-        if (seq !== bootSeq) return;
-        set({
-          loadProgress: { ratio: 1, detail: "離線快取" },
-          message: `正在開啟「${entry.title}」…`,
-        });
-        loadSamFiles(entry.source)
-          .then(async newFiles => {
-            if (seq !== bootSeq) return;
-            assertSamHasIndex(newFiles);
-            await putGoSamOfflineCache(entry.id, entry.source, newFiles);
-          })
-          .catch(() => {});
-      } else {
+      // Network-first: always try a fresh fetch so a new SAM push is picked up
+      // on the next load (branch-tip trees are cache-busted in fetchGithubProject).
+      // Fall back to the offline cache only when the network fetch fails
+      // (offline／rate-limit), preserving visit-then-offline behaviour.
+      if (!cached) {
         files = await loadSamFiles(entry.source, {
           onProgress: p => {
             if (seq !== bootSeq) return;
@@ -144,13 +132,36 @@ export function createSoloRuntime(opts?: {
         if (seq !== bootSeq) return;
         assertSamHasIndex(files);
         await putGoSamOfflineCache(entry.id, entry.source, files);
+      } else {
+        try {
+          files = await loadSamFiles(entry.source, {
+            onProgress: p => {
+              if (seq !== bootSeq) return;
+              const loadProgress = goLoadProgressFromFiles(p);
+              set({
+                loadProgress,
+                message: `正在更新「${entry.title}」… ${loadProgress.detail}`,
+              });
+            },
+          });
+          if (seq !== bootSeq) return;
+          assertSamHasIndex(files);
+          await putGoSamOfflineCache(entry.id, entry.source, files);
+        } catch {
+          // Network failed — serve the offline cache.
+          files = cached.files;
+          fromCache = true;
+          assertSamHasIndex(files);
+          if (seq !== bootSeq) return;
+          set({
+            loadProgress: { ratio: 1, detail: "離線快取" },
+            message: `正在開啟「${entry.title}」…`,
+          });
+        }
       }
       if (seq !== bootSeq) return;
       set({
-        loadProgress: {
-          ratio: 1,
-          detail: fromCache ? "離線快取" : "下載完成",
-        },
+        loadProgress: { ratio: 1, detail: fromCache ? "離線快取" : "下載完成" },
         message: `正在開啟「${entry.title}」…`,
       });
       generation += 1;

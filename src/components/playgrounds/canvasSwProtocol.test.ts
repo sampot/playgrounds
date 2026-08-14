@@ -190,7 +190,7 @@ describe("api stub + HTML bridge", () => {
       "<!doctype html><html><head><title>t</title></head><body></body></html>"
     );
     expect(out).toContain("data-playgrounds-ls-shim");
-    expect(out).toContain("ls-shim-rev:1");
+    expect(out).toContain("ls-shim-rev:2");
     // shim installs before the bridge so first paint sees the proxy
     const shimIdx = out.indexOf("data-playgrounds-ls-shim");
     const bridgeIdx = out.indexOf("data-playgrounds-bridge");

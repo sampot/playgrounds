@@ -61,6 +61,29 @@ function deserialize(bundle: WireBundle): FileMap {
   return files;
 }
 
+export function fileMapsEqual(a: FileMap, b: FileMap): boolean {
+  const aKeys = Object.keys(a).sort();
+  const bKeys = Object.keys(b).sort();
+  if (aKeys.length !== bKeys.length) return false;
+  for (let i = 0; i < aKeys.length; i++) {
+    if (aKeys[i] !== bKeys[i]) return false;
+    const av = a[aKeys[i]!];
+    const bv = b[bKeys[i]!];
+    if (isTextContent(av) !== isTextContent(bv)) return false;
+    if (isTextContent(av)) {
+      if (av !== bv) return false;
+    } else {
+      const ab = av as Uint8Array;
+      const bb = bv as Uint8Array;
+      if (ab.length !== bb.length) return false;
+      for (let j = 0; j < ab.length; j++) {
+        if (ab[j] !== bb[j]) return false;
+      }
+    }
+  }
+  return true;
+}
+
 export async function putGoSamOfflineCache(
   catalogId: string,
   source: string,

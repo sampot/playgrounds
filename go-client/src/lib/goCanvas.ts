@@ -26,6 +26,7 @@ import {
   handleGoFunctionsApi,
   type GoFunctionsApiContext,
 } from "./goFunctionsRuntime";
+import { handleGoBuiltInKv } from "./goBuiltInKv";
 import { handleGoShellPlatformApi } from "./goShellPlatform";
 import { handleGoShellSessionApi } from "./goShellSession";
 
@@ -208,6 +209,14 @@ export async function handleGoSessionApi(
 
 export type GoCanvasApiListenerOptions = GoFunctionsApiContext;
 
+/** Durable goWebKv namespace for a sandbox — mirrors `storageFor` in goFunctionsRuntime. */
+function kvNamespaceFor(ctx: GoFunctionsApiContext): string {
+  const catalogId = ctx.getCatalogId?.()?.trim() || null;
+  if (catalogId) return `catalog:${catalogId}`;
+  const sandboxId = ctx.getSandboxId()?.trim() || "anonymous";
+  return `ephemeral:${sandboxId}`;
+}
+
 async function dispatchGoCanvasApi(
   ctx: GoCanvasApiListenerOptions,
   sandboxId: string,
@@ -225,6 +234,14 @@ async function dispatchGoCanvasApi(
   }
   if (path.includes("/api/session")) {
     return handleGoSessionApi(sandboxId, request);
+  }
+  // Shell-built-in /api/kv/*: serve from the durable goWebKv namespace
+  // before delegating to the SAM's functions.js (games must not re-implement
+  // KV plumbing; this also backs the localStorage→KV high-score shim).
+  if (path.startsWith("/api/kv")) {
+    const ns = kvNamespaceFor(ctx);
+    const kv = await handleGoBuiltInKv(ns, request);
+    if (kv) return kv;
   }
   return handleGoFunctionsApi(ctx, request);
 }

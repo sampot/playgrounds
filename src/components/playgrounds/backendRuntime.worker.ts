@@ -21,6 +21,7 @@ import {
 } from "./functionsRuntime";
 import { createMockDb } from "./mockDb";
 import { createMockKvNamespace, type MockKvNamespace } from "./mockKv";
+import { route as routeBuiltInApi } from "../../sam-runtime/functionsRouting.ts";
 import { createOpfsRuntimeStorage } from "./opfsRuntimeStorage";
 import {
   cloneProject,
@@ -495,6 +496,33 @@ async function handleFunctionsFetch(
   msg: Extract<BackendRuntimeIn, { type: "functionsFetch" }>
 ): Promise<void> {
   try {
+    const request = deserializeRequest(msg.request);
+    // Shell-built-in /api/kv/* (PG-UI-SDK-SPEC §4): serve from the sandbox's
+    // own env.KV before delegating to the SAM's functions.js. Games must not
+    // re-implement KV plumbing; this also backs the localStorage→KV shim
+    // (high-score persistence) consistently across play and go shells.
+    const reqPath = (() => {
+      try {
+        return new URL(request.url).pathname;
+      } catch {
+        return "";
+      }
+    })();
+    if (/^\/api\/kv(\/|$)/u.test(reqPath)) {
+      const env = buildEnv(msg.sandboxId, msg);
+      const response = await routeBuiltInApi(request, env);
+      const serialized = await serializeResponse(response);
+      post(
+        {
+          type: "functionsFetchResult",
+          requestId: msg.requestId,
+          ok: true,
+          response: serialized,
+        },
+        serializedResponseTransferables(serialized)
+      );
+      return;
+    }
     const mod = await getFunctionsModule(msg.sandboxId, msg.files);
     if (!mod) {
       post({
@@ -505,7 +533,6 @@ async function handleFunctionsFetch(
       });
       return;
     }
-    const request = deserializeRequest(msg.request);
     const env = buildEnv(msg.sandboxId, msg);
     const response = await invokeFunctionsFetch(mod, request, env);
     const serialized = await serializeResponse(response);

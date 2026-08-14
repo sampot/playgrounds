@@ -142,4 +142,33 @@ describe("createLocalStorageShim", () => {
     // before hydrate, getItem falls back to native ls: keys
     expect(shim.getItem("legacy")).toBe("old");
   });
+
+  it("mirrors writes to native localStorage so a fresh shim reads them synchronously (no reset to 0 on refresh)", () => {
+    const native = new Map<string, string>();
+    const putNative = (k: string, v: string) => {
+      // empty string signals deletion (mirrors removeItem/clear)
+      if (v === "") native.delete(k);
+      else native.set(k, v);
+    };
+    const getNative = (k: string) => native.get(k) ?? null;
+    const { fetchMock } = makeKvFetch();
+    // First load: write a high score, mirror to native.
+    const a = createLocalStorageShim({
+      fetch: fetchMock,
+      now: () => 0,
+      readNative: getNative,
+      writeNative: putNative,
+    });
+    a.setItem("high-score", "1500");
+    a.flush();
+    // Second load (simulating refresh): brand-new shim, KV not yet hydrated.
+    const b = createLocalStorageShim({
+      fetch: fetchMock,
+      now: () => 0,
+      readNative: getNative,
+      writeNative: putNative,
+    });
+    // Synchronous startup read must return the persisted value, not 0/null.
+    expect(b.getItem("high-score")).toBe("1500");
+  });
 });

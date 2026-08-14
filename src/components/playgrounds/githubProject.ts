@@ -100,7 +100,13 @@ async function fetchRepoTree(
   treeRef: string,
   signal?: AbortSignal
 ): Promise<{ ok: true; tree: GhTreeItem[] } | { ok: false; status: number }> {
-  const treeUrl = `https://api.github.com/repos/${owner}/${repo}/git/trees/${encodeURIComponent(treeRef)}?recursive=1`;
+  // Branch tips are mutable, so the tree API response is HTTP-cached by the
+  // browser／SW and would otherwise serve a stale tree (with old blob SHAs)
+  // indefinitely — keeping go pinned to a pre-push SAM version. Append a
+  // cache-busting query so a new push is actually fetched. Immutable refs
+  // (40-char SHA／tag) skip the bust to keep legitimate HTTP caching.
+  const isBranch = !/^[0-9a-f]{40}$/i.test(treeRef);
+  const treeUrl = `https://api.github.com/repos/${owner}/${repo}/git/trees/${encodeURIComponent(treeRef)}?recursive=1${isBranch ? `&_=${Date.now()}` : ""}`;
   const treeRes = await fetch(treeUrl, {
     headers: GH_JSON,
     signal,

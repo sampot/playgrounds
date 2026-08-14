@@ -338,7 +338,7 @@ export function serializedResponseTransferables(
  */
 export const LOCALSTORAGE_SHIM_SCRIPT = `<script data-playgrounds-ls-shim>
 (function () {
-  /* ls-shim-rev:1 */
+  /* ls-shim-rev:2 */
   try {
     if (window.__pgLsShimInstalled) return;
     window.__pgLsShimInstalled = true;
@@ -349,6 +349,28 @@ export const LOCALSTORAGE_SHIM_SCRIPT = `<script data-playgrounds-ls-shim>
     var lastFlush = Date.now();
     var flushing = false;
     var currentFlush = null;
+    // Capture the real localStorage so we can mirror writes synchronously.
+    // The shell's async /api/kv round-trip (hydrate/flush) is slower than a
+    // SAM's synchronous startup read, so without the native mirror the first
+    // read after a page refresh returns null and persisted values (e.g. high
+    // scores) appear to reset to 0. Native localStorage survives refreshes and
+    // is read synchronously as a fallback until the KV hydrate lands.
+    var nativeLS = (function () {
+      try { return window.localStorage; } catch (_) { return null; }
+    })();
+    function nativeKey(k) { return PREFIX + k; }
+    function nativeGet(k) {
+      if (!nativeLS) return null;
+      try { return nativeLS.getItem(nativeKey(k)); } catch (_) { return null; }
+    }
+    function nativeSet(k, v) {
+      if (!nativeLS) return;
+      try { nativeLS.setItem(nativeKey(k), v); } catch (_) { /* quota/private */ }
+    }
+    function nativeDel(k) {
+      if (!nativeLS) return;
+      try { nativeLS.removeItem(nativeKey(k)); } catch (_) { /* ignore */ }
+    }
     function apiPath(k) { return "/api/kv/" + encodeURIComponent(PREFIX + k); }
     function doFlush() {
       if (flushing) return currentFlush || Promise.resolve();
@@ -378,21 +400,31 @@ export const LOCALSTORAGE_SHIM_SCRIPT = `<script data-playgrounds-ls-shim>
       return {
         getItem: function (k) {
           if (k in cache) return cache[k];
+          // Fall back to the synchronous native mirror so a SAM's startup
+          // read (e.g. high score) returns the last persisted value before
+          // the async KV hydrate lands — otherwise refresh shows 0.
+          var n = nativeGet(k);
+          if (n != null) { cache[k] = n; return n; }
           return null;
         },
         setItem: function (k, v) {
           v = String(v);
           cache[k] = v;
           pending[k] = v;
+          nativeSet(k, v);
           scheduleFlush();
         },
         removeItem: function (k) {
           delete cache[k];
           pending[k] = null;
+          nativeDel(k);
           scheduleFlush();
         },
         clear: function () {
-          Object.keys(cache).forEach(function (k) { pending[k] = null; });
+          Object.keys(cache).forEach(function (k) {
+            pending[k] = null;
+            nativeDel(k);
+          });
           Object.keys(cache).forEach(function (k) { delete cache[k]; });
           doFlush();
         },

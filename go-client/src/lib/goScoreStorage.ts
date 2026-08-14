@@ -79,6 +79,17 @@ export function clearAllGoScores(): number {
 }
 
 /**
+ * Clear the localStorage→KV shim's native mirror (`ls:`-prefixed keys).
+ * The shim mirrors writes to native localStorage as a synchronous speed-up;
+ * the shell "清分" clears the authoritative KV but must also drop this mirror
+ * or the cleared score resurrects on next load. The mirror is flat (`ls:<key>`,
+ * not catalog-scoped), so we sweep every `ls:` key — only the shim uses it.
+ */
+export function clearNativeLsMirror(): number {
+  return removeLocalStorageByPrefix("ls:");
+}
+
+/**
  * §6.6.3 layer 1: legacy score localStorage＋env.KV／DB for catalog id.
  */
 export async function clearGoProgressForCatalog(
@@ -89,6 +100,7 @@ export async function clearGoProgressForCatalog(
   let n = clearGoScoresForCatalog(id);
   n += await clearGoWebKvForCatalog(id);
   n += await clearGoWebDbForCatalog(id);
+  n += clearNativeLsMirror();
   return n;
 }
 

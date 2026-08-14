@@ -19,6 +19,8 @@ export type ShimNow = () => number;
 
 export type ReadNative = (lsKey: string) => string | null;
 
+export type WriteNative = (lsKey: string, value: string) => void;
+
 export type LocalStorageShimOptions = {
   /** fetch to the host /api/kv contract. Injected for testability. */
   fetch: ShimFetch;
@@ -34,6 +36,14 @@ export type LocalStorageShimOptions = {
    * that already stored under `ls:<key>` is not blind on first paint.
    */
   readNative?: ReadNative;
+  /**
+   * Write-through to native localStorage (synchronous mirror). Without it a
+   * SAM's synchronous startup read (e.g. high score) returns null on the
+   * first paint after refresh because the async KV hydrate has not landed
+   * yet, making persisted values appear to reset to 0. The native mirror
+   * survives refresh and is read by `getItem` until hydration completes.
+   */
+  writeNative?: WriteNative;
 };
 
 const KV_LIST_PATH = "/api/kv/list";
@@ -57,6 +67,7 @@ export function createLocalStorageShim(
   const prefix = opts.prefix ?? "ls:";
   const flushMs = opts.flushMs ?? 250;
   const readNative = opts.readNative;
+  const writeNative = opts.writeNative;
   const cache = new Map<string, string>();
   // pending writes: key (without prefix) → value; delete represented as null
   const pending = new Map<string, string | null>();
@@ -117,15 +128,38 @@ export function createLocalStorageShim(
       const v = String(value);
       cache.set(key, v);
       pending.set(key, v);
+      if (writeNative) {
+        try {
+          writeNative(kvKey(key), v);
+        } catch {
+          /* quota / private */
+        }
+      }
       scheduleFlush();
     },
     removeItem(key) {
       cache.delete(key);
       pending.set(key, null);
+      if (writeNative) {
+        try {
+          writeNative(kvKey(key), "");
+        } catch {
+          /* ignore */
+        }
+      }
       scheduleFlush();
     },
     clear() {
-      for (const k of cache.keys()) pending.set(k, null);
+      for (const k of cache.keys()) {
+        pending.set(k, null);
+        if (writeNative) {
+          try {
+            writeNative(kvKey(k), "");
+          } catch {
+            /* ignore */
+          }
+        }
+      }
       cache.clear();
       // explicit clear intent: flush deletes immediately, not debounced
       void doFlush();

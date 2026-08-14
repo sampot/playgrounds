@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { FileMap } from "@pg/projectTypes";
 
 describe("goSamOfflineCache list／delete", () => {
   beforeEach(() => {
@@ -56,5 +57,53 @@ describe("goSamOfflineCache list／delete", () => {
     expect(await listGoSamOfflineCatalogIds()).toEqual([]);
 
     vi.unstubAllGlobals();
+  });
+});
+
+describe("fileMapsEqual", () => {
+  it("returns true for identical maps", async () => {
+    const { fileMapsEqual } = await import("./goSamOfflineCache");
+    const a = { "index.html": "<html>", "style.css": "body {}" } as FileMap;
+    const b = { "index.html": "<html>", "style.css": "body {}" } as FileMap;
+    expect(fileMapsEqual(a, b)).toBe(true);
+  });
+
+  it("returns false for different text content", async () => {
+    const { fileMapsEqual } = await import("./goSamOfflineCache");
+    const a = { "index.html": "<html>" } as FileMap;
+    const b = { "index.html": "<body>" } as FileMap;
+    expect(fileMapsEqual(a, b)).toBe(false);
+  });
+
+  it("returns false for different keys", async () => {
+    const { fileMapsEqual } = await import("./goSamOfflineCache");
+    const a = { "index.html": "<html>" } as FileMap;
+    const b = { "about.html": "<html>" } as FileMap;
+    expect(fileMapsEqual(a, b)).toBe(false);
+  });
+
+  it("returns false for different lengths", async () => {
+    const { fileMapsEqual } = await import("./goSamOfflineCache");
+    const a = { "index.html": "<html>" } as FileMap;
+    const b = { "index.html": "<html>", "style.css": "body {}" } as FileMap;
+    expect(fileMapsEqual(a, b)).toBe(false);
+  });
+
+  it("compares binary content", async () => {
+    const { fileMapsEqual } = await import("./goSamOfflineCache");
+    const a = { "img.png": new Uint8Array([1, 2, 3]) } as FileMap;
+    const b = { "img.png": new Uint8Array([1, 2, 3]) } as FileMap;
+    const c = { "img.png": new Uint8Array([1, 2, 4]) } as FileMap;
+    expect(fileMapsEqual(a, b)).toBe(true);
+    expect(fileMapsEqual(a, c)).toBe(false);
+  });
+
+  it("returns false for mixed text/binary mismatch", async () => {
+    const { fileMapsEqual } = await import("./goSamOfflineCache");
+    const a = { "file": "<html>" } as FileMap;
+    const b = {
+      "file": new Uint8Array([60, 104, 116, 109, 108, 62]),
+    } as FileMap;
+    expect(fileMapsEqual(a, b)).toBe(false);
   });
 });
