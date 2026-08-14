@@ -202,3 +202,24 @@ export function recommendHome(
   );
   return pool.slice(0, Math.min(limit, pool.length));
 }
+
+/**
+ * 搜尋部分 catalog id，回傳最多 limit 個符合的遊戲（只搜 game 類型）。
+ * 搜尋邏輯：輸入字串出現在 id 的任何位置即視為匹配（不區分大小寫）。
+ * 包含 listed 和 unlisted 的遊戲。
+ */
+export function searchGoCatalogById(
+  query: string,
+  limit = 3
+): GoCatalogEntry[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  
+  const pool = GO_CATALOG.filter(
+    e =>
+      e.kind === GO_RECOMMEND_KIND &&
+      e.id.toLowerCase().includes(q)
+  );
+  
+  return pool.slice(0, Math.min(limit, pool.length));
+}

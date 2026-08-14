@@ -5,10 +5,12 @@
     GO_HOME_LEAD,
     goOgMeta,
   } from "$lib/goShareMeta";
-  import { recommendHome, type GoCatalogEntry } from "$lib/goCatalog";
+  import { recommendHome, searchGoCatalogById, type GoCatalogEntry } from "$lib/goCatalog";
   import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
 
+  let input = $state("");
   let recs = $state<GoCatalogEntry[]>(recommendHome(3));
+  let isSearching = $state(false);
   const og = goOgMeta({
     title: GO_HOME_DOCUMENT_TITLE,
     description: GO_HOME_DESCRIPTION,
@@ -16,7 +18,22 @@
   });
 
   function reshuffle() {
+    input = "";
     recs = recommendHome(3);
+    isSearching = false;
+  }
+
+  function handleSearch(event: Event) {
+    const target = event.target as HTMLInputElement;
+    input = target.value.trim();
+    
+    if (input.length === 0) {
+      recs = recommendHome(3);
+      isSearching = false;
+    } else {
+      recs = searchGoCatalogById(input, 3);
+      isSearching = true;
+    }
   }
 </script>
 
@@ -43,9 +60,20 @@
 <p class="lead">{GO_HOME_LEAD}</p>
 <p class="status">選一個遊戲直接玩。造訪過的離線也能再開。</p>
 
-{#if recs.length}
-  <section class="home-rec" aria-label="推薦試試">
-    <h2 class="home-rec-title">推薦試試</h2>
+<section class="home-rec" aria-label="推薦試試">
+  <h2 class="home-rec-title">推薦試試</h2>
+  
+  <div class="search-box">
+    <input
+      type="text"
+      class="search-input"
+      placeholder="輸入部分遊戲 ID 搜尋（例如：break）"
+      value={input}
+      oninput={handleSearch}
+    />
+  </div>
+  
+  {#if recs.length}
     <ul class="home-rec-list">
       {#each recs as entry (entry.id)}
         <li>
@@ -58,8 +86,12 @@
         </li>
       {/each}
     </ul>
-  </section>
+  {:else if isSearching}
+    <p class="search-no-results">沒有找到符合的遊戲</p>
+  {:else}
+    <p class="search-placeholder-text">輸入部分遊戲 ID 搜尋，或點擊「再次推薦」隨機選取</p>
   {/if}
+</section>
 
 <button type="button" class="home-reshuffle" onclick={reshuffle}>
   再次推薦
@@ -91,6 +123,28 @@
     font-size: 0.95rem;
     font-weight: 700;
   }
+  .search-box {
+    margin-bottom: 0.65rem;
+  }
+  .search-input {
+    width: 100%;
+    padding: 0.65rem 0.9rem;
+    border: 1px solid rgb(var(--line));
+    border-radius: var(--radius);
+    background: rgb(var(--card));
+    color: rgb(var(--ink));
+    font: inherit;
+    font-size: 0.95rem;
+    box-sizing: border-box;
+  }
+  .search-input:hover,
+  .search-input:focus-visible {
+    border-color: rgb(var(--accent));
+    outline: none;
+  }
+  .search-input::placeholder {
+    color: rgb(var(--muted));
+  }
   .home-rec-list {
     list-style: none;
     margin: 0;
@@ -98,6 +152,13 @@
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+  }
+  .search-no-results,
+  .search-placeholder-text {
+    font-size: 0.9rem;
+    color: rgb(var(--muted));
+    text-align: center;
+    padding: 1rem;
   }
   .home-rec-card {
     display: flex;

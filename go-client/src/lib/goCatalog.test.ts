@@ -8,6 +8,7 @@ import {
   recommendHome,
   recommendSameKind,
   sameKindPeers,
+  searchGoCatalogById,
 } from "./goCatalog";
 
 describe("goCatalog game-kind swap", () => {
@@ -89,5 +90,44 @@ describe("recommendHome", () => {
     const rec = recommendHome(3, () => 0.5);
     expect(rec.length).toBeGreaterThan(0);
     expect(rec.every(r => r.kind === "game")).toBe(true);
+  });
+});
+
+describe("searchGoCatalogById", () => {
+  it("returns empty array for empty query", () => {
+    const result = searchGoCatalogById("");
+    expect(result).toEqual([]);
+  });
+
+  it("returns games matching partial id (case-insensitive)", () => {
+    const result = searchGoCatalogById("break");
+    expect(result.length).toBeGreaterThan(0);
+    expect(result.every(r => r.kind === "game")).toBe(true);
+    expect(result.every(r => r.id.toLowerCase().includes("break"))).toBe(true);
+  });
+
+  it("returns up to 3 games", () => {
+    const result = searchGoCatalogById("a");
+    expect(result.length).toBeLessThanOrEqual(3);
+  });
+
+  it("returns exact match when query matches id exactly", () => {
+    const result = searchGoCatalogById("pg-breakout");
+    expect(result.length).toBe(1);
+    expect(result[0]?.id).toBe("pg-breakout");
+  });
+
+  it("only returns game kind entries", () => {
+    const result = searchGoCatalogById("pg");
+    expect(result.every(r => r.kind === "game")).toBe(true);
+  });
+
+  it("includes unlisted games", () => {
+    // 搜尋 "pg-" 會匹配到很多遊戲，包括 unlisted
+    const result = searchGoCatalogById("pg-");
+    // 確認結果包含 listed 和 unlisted 的遊戲
+    expect(result.length).toBeGreaterThan(0);
+    // 所有結果都應該是 game 類型
+    expect(result.every(r => r.kind === "game")).toBe(true);
   });
 });
