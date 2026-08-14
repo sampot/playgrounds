@@ -351,18 +351,7 @@ import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
     <p class="lead">連上網路後再試；成功開過一次的小品，之後就能離線玩。</p>
   {:else}
     <p class="lead">
-      可回
-      <a href={`${PLAYGROUNDS_GO_ORIGIN}/sam/`} target="_blank" rel="noopener noreferrer"
-        >型錄</a
-      >
-      或
-      <a
-        href={`${PLAYGROUNDS_GO_ORIGIN}/`}
-        target="_blank"
-        rel="noopener noreferrer"
-        >山姆鍋遊樂場</a
-      >
-      挑選其他小品。
+      可回 <a href={`${PLAYGROUNDS_GO_ORIGIN}/`}>山姆鍋遊樂場</a> 挑選其他小品。
     </p>
   {/if}
 {:else}
