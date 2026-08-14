@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { getGoCatalogEntry, seriesIcon } from "$lib/goCatalog";
+  import { getGoCatalogEntry } from "$lib/goCatalog";
+  import GoSeriesIcon from "$lib/GoSeriesIcon.svelte";
   import {
     clearAllGoProgress,
     clearGoProgressForCatalog,
@@ -157,12 +158,24 @@
 {/if}
 
 {#if apps.length === 0}
-  <p class="empty">還沒有安裝任何應用。連線玩過一次後就會出現在這裡。</p>
+  <div class="empty-pixel">
+    <svg width="72" height="72" viewBox="0 0 12 12" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true">
+      <rect x="2" y="4" width="8" height="5" />
+      <rect x="3" y="3" width="6" height="1" />
+      <rect x="3" y="9" width="6" height="1" />
+      <rect x="4" y="6" width="1" height="1" fill="rgb(var(--fill))" />
+      <rect x="7" y="6" width="1" height="1" fill="rgb(var(--fill))" />
+      <rect x="5" y="7" width="2" height="1" fill="rgb(var(--fill))" />
+    </svg>
+    <p>還沒有安裝任何遊戲。連線玩過一次後就會出現在這裡。</p>
+  </div>
 {:else}
   <ul class="app-list">
     {#each apps as app (app.id)}
        <li class="app-row">
-         <span class="app-icon" aria-hidden="true">{seriesIcon(app.series)}</span>
+          <span class="app-icon" aria-hidden="true">
+            <GoSeriesIcon series={app.series} size={20} />
+          </span>
          <a
            class="app-name"
            href={`/s/${encodeURIComponent(app.id)}`}
@@ -229,9 +242,10 @@
     line-height: 1.4;
     color: rgb(var(--muted));
   }
-  .empty {
+  .empty-pixel p {
     margin: 0;
     font-size: 0.9rem;
+    line-height: 1.45;
     color: rgb(var(--muted));
   }
   .confirm {
@@ -280,6 +294,10 @@
   }
   .app-icon {
     flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: rgb(var(--accent));
     font-size: 1.3rem;
     line-height: 1;
   }

@@ -1,12 +1,14 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { browser } from "$app/environment";
+  import { page } from "$app/state";
   import Chrome from "$lib/Chrome.svelte";
   import GoUnsupported from "$lib/GoUnsupported.svelte";
   import { chromeSession } from "$lib/chromeSession.svelte";
   import { goAuth } from "$lib/goAuth.svelte";
   import { goBrowserSupports } from "$lib/goCanvasSupport";
   import { registerGoServiceWorker } from "$lib/registerGoSw";
+  import { pixelWipe } from "$lib/goTransition";
   import "$lib/styles.css";
 
   let { children } = $props();
@@ -34,7 +36,17 @@
     {#if browserUnsupported}
       <GoUnsupported />
     {:else}
-      {@render children()}
+      {#key page.url.pathname}
+        <div class="page-wipe" in:pixelWipe>
+          {@render children()}
+        </div>
+      {/key}
     {/if}
   </main>
 </div>
+
+<style>
+  .page-wipe {
+    min-height: 100%;
+  }
+</style>

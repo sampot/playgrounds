@@ -470,12 +470,12 @@
    </header>
 
    {#if chromeSession.flash && !(canvasActive && chromeHidden && !shareOpen && !moreOpen && !profileOpen)}
-    <p
-      class={["chrome-flash", canvasActive && "chrome-flash--toast"]
-        .filter(Boolean)
-        .join(" ")}
-      role="status"
-    >
+     <p
+       class={["chrome-flash", canvasActive && "chrome-flash--toast"]
+         .filter(Boolean)
+         .join(" ")}
+       role="status"
+     >
       {chromeSession.flash}
     </p>
   {/if}

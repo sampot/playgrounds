@@ -5,7 +5,8 @@
     GO_HOME_LEAD,
     goOgMeta,
   } from "$lib/goShareMeta";
-  import { recommendHome, searchGoCatalogById, seriesIcon, type GoCatalogEntry } from "$lib/goCatalog";
+  import { recommendHome, searchGoCatalogById, type GoCatalogEntry } from "$lib/goCatalog";
+  import GoSeriesIcon from "$lib/GoSeriesIcon.svelte";
   import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
 
   let input = $state("");
@@ -74,17 +75,19 @@
   </div>
   
   {#if recs.length}
-    <ul class="home-rec-list">
+    <ul class="home-grid">
       {#each recs as entry (entry.id)}
         <li>
-          <a class="home-rec-card" href={`/s/${encodeURIComponent(entry.id)}`}>
-            <span class="home-rec-icon" aria-hidden="true">{seriesIcon(entry.series)}</span>
-            <span class="home-rec-text">
-              <span class="home-rec-name">{entry.title}</span>
-              {#if entry.blurb}
-                <span class="home-rec-blurb">{entry.blurb}</span>
-              {/if}
+          <a class="home-grid-card" href={`/s/${encodeURIComponent(entry.id)}`}>
+            <span class="home-grid-cover" aria-hidden="true">
+              <span class="home-grid-cover-icon">
+                <GoSeriesIcon series={entry.series} size={34} />
+              </span>
             </span>
+            <span class="home-grid-name">{entry.title}</span>
+            {#if entry.blurb}
+              <span class="home-grid-blurb">{entry.blurb}</span>
+            {/if}
           </a>
         </li>
       {/each}
@@ -164,69 +167,11 @@
   .search-input::placeholder {
     color: rgb(var(--muted));
   }
-  .home-rec-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-  }
   .search-no-results,
   .search-placeholder-text {
     font-size: 0.9rem;
     color: rgb(var(--muted));
     text-align: center;
     padding: 1rem;
-  }
-  .home-rec-card {
-    display: flex;
-    align-items: center;
-    gap: 0.7rem;
-    min-height: 2.75rem;
-    padding: 0.75rem 0.9rem;
-    border: var(--pixel-edge) solid rgb(var(--ink));
-    border-radius: var(--radius);
-    background: rgb(var(--card));
-    color: rgb(var(--ink));
-    text-decoration: none;
-    box-shadow: var(--pixel-shadow);
-    animation: pixel-pop 0.22s steps(3) both;
-    -webkit-tap-highlight-color: color-mix(
-      in oklab,
-      rgb(var(--accent)) 24%,
-      transparent
-    );
-  }
-  .home-rec-card:hover,
-  .home-rec-card:focus-visible {
-    border-color: rgb(var(--accent));
-    outline: none;
-    animation: pixel-blink 0.9s steps(2) infinite;
-  }
-  .home-rec-icon {
-    flex-shrink: 0;
-    font-size: 1.4rem;
-    line-height: 1;
-  }
-  .home-rec-text {
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-    min-width: 0;
-  }
-  .home-rec-name {
-    font-weight: 650;
-    font-size: 0.95rem;
-  }
-  .home-rec-blurb {
-    font-size: 0.8rem;
-    color: rgb(var(--muted));
-    line-height: 1.35;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
   }
 </style>
