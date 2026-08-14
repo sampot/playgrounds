@@ -491,12 +491,12 @@ a {
   content: "";
   position: absolute;
   left: 1.1rem;
-  bottom: calc(-1 * var(--pixel-edge) - 7px);
+  top: calc(-1 * var(--pixel-edge) - 7px);
   width: 12px;
   height: 12px;
   background: rgb(var(--fill));
-  border-right: var(--pixel-edge) solid rgb(var(--ink));
-  border-bottom: var(--pixel-edge) solid rgb(var(--ink));
+  border-left: var(--pixel-edge) solid rgb(var(--ink));
+  border-top: var(--pixel-edge) solid rgb(var(--ink));
   transform: rotate(45deg);
 }
 .swap {
