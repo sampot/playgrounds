@@ -805,9 +805,9 @@ html[data-theme="dark"] .err {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-@media (min-width: 30rem) {
+@media (min-width: 48rem) {
   .home-grid {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
   }
 }
 
