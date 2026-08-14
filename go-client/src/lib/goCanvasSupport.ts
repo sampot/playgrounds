@@ -16,13 +16,11 @@ export interface GoBrowserSupport {
   missing: GoBrowserMissing[];
 }
 
-/** Required browser APIs for go-client games to run / persist. */
-const REQUIRED: ReadonlyArray<GoBrowserMissing> = [
-  "localStorage",
-  "indexedDB",
-  "webassembly",
-  "serviceWorker",
-];
+/** Required browser APIs for go-client games to run / persist.
+ * Service Worker is intentionally NOT a hard requirement: the shell falls back
+ * to an in-memory canvas (see mountGoCanvas / buildGoMemoryCanvas) when SW is
+ * unavailable, so its absence degrades but does not block play. */
+
 
 function hasLocalStorage(): boolean {
   try {
@@ -50,7 +48,9 @@ export function goBrowserSupports(): GoBrowserSupport {
   if (!hasLocalStorage()) missing.push("localStorage");
   if (!hasIndexedDB()) missing.push("indexedDB");
   if (!hasWebAssembly()) missing.push("webassembly");
-  if (!isGoCanvasSwUsable()) missing.push("serviceWorker");
+  // serviceWorker is intentionally excluded: the shell falls back to an
+  // in-memory canvas when SW is unavailable, so its absence degrades but does
+  // not block play (see mountGoCanvas / buildGoMemoryCanvas).
   return { supported: missing.length === 0, missing };
 }
 
@@ -85,13 +85,6 @@ export function goCanvasSwUnavailableMessage(): string {
   return "此瀏覽器無法載入遊戲畫面（缺少 Service Worker）。請改用 Safari 或 Chrome 開啟邀請連結。";
 }
 
-const MISSING_LABEL: Record<GoBrowserMissing, string> = {
-  localStorage: "localStorage",
-  indexedDB: "IndexedDB",
-  webassembly: "WebAssembly",
-  serviceWorker: "Service Worker",
-};
-
 /**
  * Friendly, in-page recovery copy. Does not enumerate which API is missing —
  * just tells the player this browser can't run games and to open the link in a
@@ -106,8 +99,4 @@ export function goBrowserUnsupportedMessage(
   }
   return "此瀏覽器缺少播放遊戲所需的功能。請用 Safari／Chrome／Edge 開啟下方連結。";
 }
-
-/** Label map kept for diagnostics / future use. */
-export const GO_MISSING_LABEL = MISSING_LABEL;
-
 

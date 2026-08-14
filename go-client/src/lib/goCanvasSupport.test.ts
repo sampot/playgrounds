@@ -84,11 +84,11 @@ describe("goCanvasSupport", () => {
       expect(r.missing).toContain("webassembly");
     });
 
-    it("flags missing serviceWorker", () => {
+    it("does not flag missing serviceWorker (soft fallback to memory canvas)", () => {
       withServiceWorker(false);
       const r = goBrowserSupports();
-      expect(r.supported).toBe(false);
-      expect(r.missing).toContain("serviceWorker");
+      expect(r.supported).toBe(true);
+      expect(r.missing).not.toContain("serviceWorker");
     });
   });
 
@@ -111,7 +111,7 @@ describe("goCanvasSupport", () => {
         "Mozilla/5.0 (Linux; Android 10) Line/10.0"
       );
       expect(likelyInAppBrowser()).toBe(true);
-      withServiceWorker(false);
+      clearGlobal("localStorage");
       const msg = goBrowserUnsupportedMessage(goBrowserSupports());
       expect(msg).not.toBeNull();
       expect(msg).toContain("App 內建瀏覽器");
