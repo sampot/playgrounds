@@ -757,7 +757,6 @@ html[data-theme="dark"] .err {
   color: rgb(var(--ink));
   text-decoration: none;
   box-shadow: var(--pixel-shadow);
-  animation: pixel-pop 0.22s steps(3) both;
   -webkit-tap-highlight-color: color-mix(
     in oklab,
     rgb(var(--accent)) 24%,
@@ -768,7 +767,7 @@ html[data-theme="dark"] .err {
 .home-grid-card:focus-visible {
   border-color: rgb(var(--accent));
   outline: none;
-  animation: pixel-blink 0.9s steps(2) infinite;
+  animation: pixel-pop 0.22s steps(3) both;
 }
 .home-grid-cover {
   position: relative;
