@@ -6,17 +6,10 @@
   import GoShareSheet from "$lib/GoShareSheet.svelte";
   import { goAuth } from "$lib/goAuth.svelte";
   import { nextSameKind, recommendSameKind } from "$lib/goCatalog";
-  import {
-    openPlaygroundCatalog,
-    PLAY_CATALOG_HREF,
-    PLAY_ORIGIN,
-  } from "$lib/openPlayground";
+  import { PLAY_ORIGIN } from "$lib/openPlayground";
   import { goSamShareHref, PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
-  import { goSamShareTitle } from "$lib/goShareMeta";
+  import { goSamShareTitle, GO_SITE_NAME } from "$lib/goShareMeta";
   import { getGoCatalogEntry } from "$lib/goCatalog";
-
-  /** Visible host in chrome — playground home, not catalog path (DEC-050 §6.4). */
-  const playHost = PLAY_ORIGIN.replace(/^https:\/\//, "");
 
   function goOrigin(): string {
     if (typeof location !== "undefined" && location.origin) {
@@ -66,9 +59,10 @@
   const catalogId = $derived(chromeSession.catalogId);
   const mode = $derived(chromeSession.mode);
   const canvasActive = $derived(chromeSession.canvasActive);
-  const shareEnabled = $derived(Boolean(catalogId));
   /** §6.6：本機溢流 — `/`／`/s/`；Invite 不露. */
   const showMore = $derived(mode !== "invite");
+  /** 分享：遊戲頁分享該小品；其餘（含首頁）分享 go client 本身. Invite 不露. */
+  const shareEnabled = $derived(mode !== "invite");
   /** §5.6：僅當前小品為 `kind: game` 時露出換片／試試這些. */
   const showSwap = $derived(
     mode === "solo" &&
@@ -78,7 +72,7 @@
   const nextEntry = $derived(catalogId ? nextSameKind(catalogId) : null);
 
   const shareTitle = $derived.by(() => {
-    if (!catalogId) return "";
+    if (!catalogId) return GO_SITE_NAME;
     const entry =
       getGoCatalogEntry(catalogId) ||
       (chromeSession.title
@@ -88,7 +82,7 @@
   });
 
   const shareUrl = $derived(
-    catalogId ? goSamShareHref(catalogId, goOrigin()) : ""
+    catalogId ? goSamShareHref(catalogId, goOrigin()) : goOrigin()
   );
 
   const shareSpoken = $derived.by(() => {
@@ -110,11 +104,10 @@
   });
 
   $effect(() => {
-    if (!catalogId) shareOpen = false;
-  });
-
-  $effect(() => {
-    if (mode === "invite") moreOpen = false;
+    if (mode === "invite") {
+      shareOpen = false;
+      moreOpen = false;
+    }
   });
 
   $effect(() => {
@@ -239,7 +232,7 @@
   });
 
   function openShare() {
-    if (!catalogId || !shareUrl) return;
+    if (!shareEnabled || !shareUrl) return;
     moreOpen = false;
     profileOpen = false;
     clearChromeAutoHide();
@@ -323,16 +316,15 @@
     </a>
     <a
       class="play-link"
-      href={PLAY_CATALOG_HREF}
-      title={`山姆鍋遊樂場（${playHost}）· 遊戲小品`}
-      target="_blank"
-      rel="noopener noreferrer"
-      onclick={openPlaygroundCatalog}
+      href="/"
+      title="純玩首頁"
+      onclick={() => {
+        moreOpen = false;
+        shareOpen = false;
+        profileOpen = false;
+      }}
     >
       <span class="play-label">山姆鍋遊樂場</span>
-      {#if !canvasActive}
-        <span class="host">{playHost}</span>
-      {/if}
     </a>
     {#if showSwap && canvasActive}
       <button
@@ -359,7 +351,11 @@
       type="button"
       class="share-btn"
       disabled={!shareEnabled}
-      title={shareEnabled ? "分享此小品" : "尚無可分享的小品"}
+      title={shareEnabled
+        ? catalogId
+          ? "分享此小品"
+          : "分享純玩首頁"
+        : "邀請中不支援分享"}
       onclick={openShare}
     >
       分享
