@@ -277,6 +277,14 @@
       chromeSession.setFlash(flash);
     });
   }
+
+  function goHomeAfterRemovedOffline(flash: string) {
+    moreOpen = false;
+    shareOpen = false;
+    void goto("/").then(() => {
+      chromeSession.setFlash(flash);
+    });
+  }
 </script>
 
 <div
@@ -463,7 +471,8 @@
     onClose={() => (moreOpen = false)}
     onPick={goToId}
     onFlash={msg => chromeSession.setFlash(msg)}
-    onClearedAll={goHomeAfterClearAll}
+      onClearedAll={goHomeAfterClearAll}
+      onRemovedOffline={goHomeAfterRemovedOffline}
   />
 {/if}
 
