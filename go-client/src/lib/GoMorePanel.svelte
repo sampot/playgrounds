@@ -4,7 +4,6 @@
   import {
     clearAllGoSamOfflineCache,
     deleteGoSamOfflineCache,
-    listGoSamOfflineCatalogIds,
   } from "$lib/goSamOfflineCache";
   import {
     clearAllGoProgress,
@@ -38,12 +37,9 @@
     onClearedAll,
   }: Props = $props();
 
-  type DownloadedRow = { id: string; title: string };
   type ConfirmKind = "scores" | "offline" | "all";
 
   let dialogEl = $state<HTMLDialogElement | null>(null);
-  let downloaded = $state<DownloadedRow[]>([]);
-  let listBusy = $state(false);
   let actionBusy = $state(false);
   let confirm = $state<{
     kind: ConfirmKind;
@@ -58,21 +54,6 @@
     if (!id) return "";
     return getGoCatalogEntry(id)?.title ?? id;
   });
-
-  async function refreshDownloaded() {
-    listBusy = true;
-    try {
-      const ids = await listGoSamOfflineCatalogIds();
-      downloaded = ids.map(id => ({
-        id,
-        title: getGoCatalogEntry(id)?.title ?? id,
-      }));
-    } catch {
-      downloaded = [];
-    } finally {
-      listBusy = false;
-    }
-  }
 
   $effect(() => {
     const el = dialogEl;
@@ -89,7 +70,6 @@
       if (!wasOpen) {
         wasOpen = true;
         confirm = null;
-        void refreshDownloaded();
         queueMicrotask(() => {
           el.querySelector<HTMLButtonElement>(".go-more-close")?.focus();
         });
@@ -144,7 +124,6 @@
             ? `已移除「${c.title}」的離線下載`
             : `找不到「${c.title}」的離線下載`
         );
-        await refreshDownloaded();
       } else if (c.kind === "all") {
         const scores = await clearAllGoProgress();
         const packs = await clearAllGoSamOfflineCache();
@@ -265,45 +244,13 @@
           </section>
         {/if}
 
-        <section class="go-more-section" aria-labelledby="go-more-dl-title">
-          <h3 id="go-more-dl-title" class="go-more-section-title">可離線玩</h3>
-          {#if listBusy && !downloaded.length}
-            <p class="go-more-empty">載入中…</p>
-          {:else if !downloaded.length}
-            <p class="go-more-empty">連線玩過一次後會出現在這裡。</p>
-          {:else}
-            <ul class="go-more-list">
-              {#each downloaded as row (row.id)}
-                <li class="go-more-row">
-                  <button
-                    type="button"
-                    class="go-more-row-main"
-                    onclick={() => onPick(row.id)}
-                  >
-                    {row.title}
-                  </button>
-                  <button
-                    type="button"
-                    class="go-more-row-act"
-                    title={`清除「${row.title}」進度／分數`}
-                    aria-label={`清除「${row.title}」進度／分數`}
-                    onclick={() => askClearScores(row.id, row.title)}
-                  >
-                    清分
-                  </button>
-                  <button
-                    type="button"
-                    class="go-more-row-act"
-                    title={`移除「${row.title}」離線下載`}
-                    aria-label={`移除「${row.title}」離線下載`}
-                    onclick={() => askRemoveOffline(row.id, row.title)}
-                  >
-                    卸包
-                  </button>
-                </li>
-              {/each}
-            </ul>
-          {/if}
+        <section class="go-more-section" aria-labelledby="go-more-apps-title">
+          <h3 id="go-more-apps-title" class="go-more-section-title">
+            已安裝應用
+          </h3>
+          <a class="go-more-btn go-more-link" href="/apps" onclick={onClose}>
+            管理已安裝應用
+          </a>
         </section>
 
         {#if currentCatalogId}
@@ -473,7 +420,6 @@
     letter-spacing: 0.02em;
     color: rgb(var(--gm-muted));
   }
-  .go-more-empty,
   .go-more-hint,
   .go-more-confirm-body {
     margin: 0;
@@ -481,7 +427,6 @@
     line-height: 1.45;
     color: rgb(var(--gm-muted));
   }
-  .go-more-list,
   .go-more-try {
     list-style: none;
     margin: 0;
@@ -489,56 +434,6 @@
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
-  }
-  .go-more-row {
-    display: flex;
-    align-items: stretch;
-    gap: 0.25rem;
-    min-width: 0;
-  }
-  .go-more-row-main {
-    flex: 1;
-    min-width: 0;
-    min-height: 2.75rem;
-    padding: 0.45rem 0.75rem;
-    border: 1px solid rgb(var(--gm-line));
-    border-radius: var(--gm-radius);
-    background: rgb(var(--gm-fill));
-    color: rgb(var(--gm-ink));
-    font: inherit;
-    font-size: 0.9rem;
-    font-weight: 600;
-    text-align: start;
-    cursor: pointer;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .go-more-row-main:hover,
-  .go-more-row-main:focus-visible {
-    border-color: rgb(var(--gm-accent));
-    color: rgb(var(--gm-accent));
-    outline: none;
-  }
-  .go-more-row-act {
-    flex-shrink: 0;
-    min-width: 2.75rem;
-    min-height: 2.75rem;
-    padding: 0.25rem 0.45rem;
-    border: 1px solid rgb(var(--gm-line));
-    border-radius: var(--gm-radius);
-    background: transparent;
-    color: rgb(var(--gm-muted));
-    font: inherit;
-    font-size: 0.7rem;
-    font-weight: 650;
-    cursor: pointer;
-  }
-  .go-more-row-act:hover,
-  .go-more-row-act:focus-visible {
-    border-color: rgb(var(--gm-accent));
-    color: rgb(var(--gm-accent));
-    outline: none;
   }
   .go-more-stack {
     display: flex;
