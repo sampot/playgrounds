@@ -6,15 +6,18 @@
     goOgMeta,
   } from "$lib/goShareMeta";
   import { recommendHome, type GoCatalogEntry } from "$lib/goCatalog";
-  import { openPlaygroundHome, PLAY_ORIGIN } from "$lib/openPlayground";
   import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
 
-  const recs: GoCatalogEntry[] = recommendHome(3);
+  let recs = $state<GoCatalogEntry[]>(recommendHome(3));
   const og = goOgMeta({
     title: GO_HOME_DOCUMENT_TITLE,
     description: GO_HOME_DESCRIPTION,
     url: `${PLAYGROUNDS_GO_ORIGIN}/`,
   });
+
+  function reshuffle() {
+    recs = recommendHome(3);
+  }
 </script>
 
 <svelte:head>
@@ -56,21 +59,32 @@
       {/each}
     </ul>
   </section>
-{/if}
+  {/if}
 
-<p class="status">
-  完整山姆鍋遊樂場在
-  <a
-    href={`${PLAY_ORIGIN}/`}
-    target="_blank"
-    rel="noopener noreferrer"
-    onclick={openPlaygroundHome}>{PLAY_ORIGIN}</a
-  >
-</p>
+<button type="button" class="home-reshuffle" onclick={reshuffle}>
+  再次推薦
+</button>
 
 <style>
   .home-rec {
-    margin: 0 0 1.25rem;
+    margin: 0 0 1rem;
+  }
+  .home-reshuffle {
+    min-height: 2.75rem;
+    padding: 0.55rem 1rem;
+    border: 1px solid rgb(var(--accent));
+    border-radius: var(--radius);
+    background: rgb(var(--card));
+    color: rgb(var(--accent));
+    font: inherit;
+    font-size: 0.9rem;
+    font-weight: 650;
+    cursor: pointer;
+  }
+  .home-reshuffle:hover,
+  .home-reshuffle:focus-visible {
+    filter: brightness(0.97);
+    outline: none;
   }
   .home-rec-title {
     margin: 0 0 0.65rem;
