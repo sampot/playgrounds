@@ -1,60 +1,78 @@
 <script lang="ts">
   import { goBrowserSupports, goBrowserUnsupportedMessage } from "$lib/goCanvasSupport";
+  import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
   import { openPlaygroundHome, PLAY_ORIGIN } from "$lib/openPlayground";
 
-  /** Recomputed on each render: the browser may not have changed, but props
-   * are cheap and this keeps the message authoritative. */
-  const support = goBrowserSupports();
-  const message = goBrowserUnsupportedMessage(support) ?? "";
+  /** @param {Text} - for display of copied state */
+  let copied = $state(false);
 
-  /** Copy the canonical go host URL to clipboard so the user can paste into a
-   * system browser (works in-app when the share sheet is the only option). */
-  function copyHome() {
-    if (typeof navigator?.clipboard?.writeText === "function") {
-      void navigator.clipboard.writeText(`${PLAY_ORIGIN}/`);
+  /** Copy the go-client URL so the player can paste it into a system browser
+   * (e.g. from an in-app WebView where the current browser can't run games). */
+  function copyGoUrl() {
+    if (typeof navigator?.clipboard?.writeText !== "function") {
+      fallbackCopy(`${PLAYGROUNDS_GO_ORIGIN}/`);
+      return;
     }
-    openPlaygroundHome();
+    void navigator.clipboard.writeText(`${PLAYGROUNDS_GO_ORIGIN}/`).then(
+      () => (copied = true),
+      () => fallbackCopy(`${PLAYGROUNDS_GO_ORIGIN}/`)
+    );
   }
 
-  const missingList = support.missing.map(m => ({
-    localStorage: "localStorage",
-    indexedDB: "IndexedDB",
-    webassembly: "WebAssembly",
-    serviceWorker: "Service Worker",
-  })[m]);
+  function fallbackCopy(text: string) {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      document.body.append(ta);
+      ta.select();
+      document.execCommand("copy");
+      ta.remove();
+      copied = true;
+    } catch {
+      /* clipboard unavailable — the user can still use the new-tab link */
+    }
+  }
+
+  const message = goBrowserUnsupportedMessage(goBrowserSupports()) ?? "";
+  const homeUrl = `${PLAYGROUNDS_GO_ORIGIN}/`;
 </script>
 
 <div class="go-unsupported" role="alert" aria-live="assertive">
-  <h1 class="go-unsupported-title">抱歉，瀏覽器不支援</h1>
+  <h1 class="go-unsupported-title">目前的瀏覽器無法玩遊戲</h1>
   <p class="go-unsupported-msg">{message}</p>
-  {#if missingList.length}
-    <ul class="go-unsupported-list">
-      {#each missingList as m}
-        <li>缺少：{m}</li>
-      {/each}
-    </ul>
-  {/if}
   <p class="go-unsupported-hint">
-    純玩需要 Service Worker、localStorage、IndexedDB 與 WebAssembly。
-    在 App 內建瀏覽器中打不開請改用系統 Safari／Chrome。
+    請複製下方連結，到 <strong>Safari／Chrome／Edge</strong> 等完整瀏覽器重新開啟。
+    App 內建瀏覽器（如 LINE／Instagram）請點「在新分頁開啟」，再用系統瀏覽器接續。
   </p>
+  <div class="go-unsupported-url">
+    <code class="go-unsupported-code">{homeUrl}</code>
+    <button
+      type="button"
+      class="go-unsupported-copy"
+      onclick={copyGoUrl}
+      aria-label={copied ? "已複製" : "複製連結"}
+      title={copied ? "已複製至剪贴簿" : "複製連結到剪貼簿"}
+    >
+      {copied ? "已複製" : "複製連結"}
+    </button>
+  </div>
   <div class="go-unsupported-actions">
     <a
       class="go-unsupported-btn"
-      href="/"
-      onclick={() => {
-        copyHome();
-      }}
+      href={homeUrl}
+      target="_blank"
+      rel="noopener noreferrer"
     >
-      前往首頁
+      在新分頁／系統瀏覽器開啟
     </a>
     <a
       class="go-unsupported-btn go-unsupported-btn--outline"
       href={PLAY_ORIGIN}
       target="_blank"
       rel="noopener noreferrer"
+      onclick={openPlaygroundHome}
     >
-      在新分頁開啟遊樂場
+      前往完整遊樂場
     </a>
   </div>
 </div>
@@ -66,7 +84,7 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0.75rem;
+    gap: 0.85rem;
     padding: 2rem 1rem;
     text-align: center;
     background: rgb(var(--fill));
@@ -83,16 +101,45 @@
     color: rgb(var(--muted));
     max-width: 26rem;
   }
-  .go-unsupported-list {
-    list-style: disc inside;
-    margin: 0;
-    padding: 0;
-    color: rgb(var(--muted));
-  }
   .go-unsupported-hint {
     margin: 0;
     font-size: 0.85rem;
     color: rgb(var(--muted));
+    max-width: 26rem;
+    line-height: 1.45;
+  }
+  .go-unsupported-url {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid rgb(var(--line));
+    border-radius: var(--radius);
+    background: rgb(var(--card));
+  }
+  .go-unsupported-code {
+    font-family: ui-monospace, "SF Mono", "Noto Sans TC", monospace;
+    font-size: 0.8rem;
+    word-break: break-all;
+    color: rgb(var(--ink));
+  }
+  .go-unsupported-copy {
+    flex-shrink: 0;
+    min-height: 2.25rem;
+    padding: 0.3rem 0.7rem;
+    border: 1px solid rgb(var(--accent));
+    border-radius: var(--radius);
+    background: rgb(var(--accent));
+    color: #fff;
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 650;
+    cursor: pointer;
+  }
+  .go-unsupported-copy:hover,
+  .go-unsupported-copy:focus-visible {
+    filter: brightness(1.05);
+    outline: none;
   }
   .go-unsupported-actions {
     display: flex;

@@ -97,12 +97,13 @@ describe("goCanvasSupport", () => {
       expect(goBrowserUnsupportedMessage(goBrowserSupports())).toBeNull();
     });
 
-    it("mentions the missing feature and system-browser guidance", () => {
+    it("returns friendly system-browser guidance (no feature enumeration)", () => {
       clearGlobal("localStorage");
       const msg = goBrowserUnsupportedMessage(goBrowserSupports());
       expect(msg).not.toBeNull();
-      expect(msg).toContain("localStorage");
       expect(msg).toContain("Safari");
+      expect(msg).not.toContain("localStorage");
+      expect(msg).not.toContain("Service Worker");
     });
 
     it("gives in-app browser guidance for in-app browsers", () => {

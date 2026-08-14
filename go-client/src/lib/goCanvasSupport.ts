@@ -92,16 +92,22 @@ const MISSING_LABEL: Record<GoBrowserMissing, string> = {
   serviceWorker: "Service Worker",
 };
 
+/**
+ * Friendly, in-page recovery copy. Does not enumerate which API is missing —
+ * just tells the player this browser can't run games and to open the link in a
+ * system browser (handling the in-app WebView case with iOS-specific guidance).
+ */
 export function goBrowserUnsupportedMessage(
   support: GoBrowserSupport
 ): string | null {
   if (support.supported) return null;
-  const list = support.missing
-    .map(m => MISSING_LABEL[m])
-    .join("、");
   if (likelyInAppBrowser()) {
-    return `目前的 App 內建瀏覽器缺少 ${list}，無法載入遊戲。請用系統瀏覽器開啟此連結（iPhone：右上角⋯ → 在 Safari 開啟）。`;
+    return "目前的 App 內建瀏覽器無法播放遊戲。請將下方連結貼到 Safari／Chrome，或點「在新分頁開啟」後在系統瀏覽器接續。";
   }
-  return `此瀏覽器缺少 ${list}，無法順暢運行遊戲。請改用 Safari 或 Chrome 開啟純玩首頁。`;
+  return "此瀏覽器缺少播放遊戲所需的功能。請用 Safari／Chrome／Edge 開啟下方連結。";
 }
+
+/** Label map kept for diagnostics / future use. */
+export const GO_MISSING_LABEL = MISSING_LABEL;
+
 
