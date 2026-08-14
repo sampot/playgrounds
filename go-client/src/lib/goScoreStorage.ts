@@ -1,6 +1,10 @@
 /**
  * Legacy UI localStorage score shim (pre–env.KV games)＋§6.6 clear helpers.
  * New SAMs should persist via functions.js → env.KV／env.DB (goWebKv／goWebDb).
+ *
+ * @deprecated Score persistence is unified by the canvas `localStorage`→KV
+ * shim (PG-LOCALSTORAGE-SHIM-SPEC §7). `mountGoCanvas` no longer injects this
+ * shim; it remains only for the §6.6 clear paths and old-field backwards compat.
  */
 
 import { clearGoWebDbForCatalog } from "./goWebDb";
@@ -15,7 +19,7 @@ export function goScorePrefixFor(catalogId: string): string {
   return `${GO_SCORE_KEY_ROOT}${catalogId.trim()}:`;
 }
 
-/** Inject into HTML before canvas serves the SAM (same-origin `/canvas/…`). */
+/** @deprecated See module note — go no longer injects this shim. */
 export function injectGoScoreStorage(html: string, catalogId: string): string {
   const id = catalogId.trim();
   if (!id || html.includes(MARK)) return html;

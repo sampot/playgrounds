@@ -329,6 +329,127 @@ export function serializedResponseTransferables(
   return response.body ? [response.body] : [];
 }
 
+/**
+ * localStorage → env.KV proxy shim (PG-LOCALSTORAGE-SHIM-SPEC §3).
+ * Installed before user code so existing single-page apps persist to SAM
+ * `env.KV` via the standard synchronous `localStorage` API. Inline IIFE
+ * mirrors `localStorageShim.ts`; runs in the canvas realm (no module access).
+ * Idempotent via the `data-playgrounds-ls-shim` marker.
+ */
+export const LOCALSTORAGE_SHIM_SCRIPT = `<script data-playgrounds-ls-shim>
+(function () {
+  /* ls-shim-rev:1 */
+  try {
+    if (window.__pgLsShimInstalled) return;
+    window.__pgLsShimInstalled = true;
+    var PREFIX = "ls:";
+    var FLUSH_MS = 250;
+    var cache = Object.create(null);
+    var pending = Object.create(null);
+    var lastFlush = Date.now();
+    var flushing = false;
+    var currentFlush = null;
+    function apiPath(k) { return "/api/kv/" + encodeURIComponent(PREFIX + k); }
+    function doFlush() {
+      if (flushing) return currentFlush || Promise.resolve();
+      flushing = true;
+      lastFlush = Date.now();
+      currentFlush = (function () {
+        var batch = Object.keys(pending).map(function (k) { return [k, pending[k]]; });
+        Object.keys(pending).forEach(function (k) { delete pending[k]; });
+        return batch.reduce(function (chain, kv) {
+          var k = kv[0], v = kv[1];
+          return chain.then(function () {
+            var method = v == null ? "DELETE" : "PUT";
+            var init = v == null ? { method: "DELETE" } : { method: "PUT", body: String(v) };
+            return window.fetch(apiPath(k), init).catch(function (e) {
+              console.warn("[localStorage-shim] flush failed:", e);
+            });
+          });
+        }, Promise.resolve());
+      })();
+      currentFlush.then(function () { flushing = false; currentFlush = null; }, function () { flushing = false; currentFlush = null; });
+      return currentFlush;
+    }
+    function scheduleFlush() {
+      if (Date.now() - lastFlush >= FLUSH_MS && !flushing) doFlush();
+    }
+    function makeStorage() {
+      return {
+        getItem: function (k) {
+          if (k in cache) return cache[k];
+          return null;
+        },
+        setItem: function (k, v) {
+          v = String(v);
+          cache[k] = v;
+          pending[k] = v;
+          scheduleFlush();
+        },
+        removeItem: function (k) {
+          delete cache[k];
+          pending[k] = null;
+          scheduleFlush();
+        },
+        clear: function () {
+          Object.keys(cache).forEach(function (k) { pending[k] = null; });
+          Object.keys(cache).forEach(function (k) { delete cache[k]; });
+          doFlush();
+        },
+        key: function (i) {
+          var ks = Object.keys(cache);
+          return i >= 0 && i < ks.length ? ks[i] : null;
+        },
+        get length() { return Object.keys(cache).length; },
+        _hydrate: function () {
+          return window.fetch("/api/kv/list", {
+            method: "POST",
+            body: JSON.stringify({ prefix: PREFIX }),
+          }).then(function (res) {
+            if (res.status !== 200) return;
+            return res.json();
+          }).then(function (body) {
+            if (!body || !body.keys) return;
+            return body.keys.reduce(function (chain, entry) {
+              var name = entry.name;
+              if (name.indexOf(PREFIX) !== 0) return chain;
+              return chain.then(function () {
+                return window.fetch("/api/kv/" + encodeURIComponent(name)).then(function (r) {
+                  if (r.status !== 200) return;
+                  return r.text().then(function (val) {
+                    var plain = name.slice(PREFIX.length);
+                    if (!(plain in cache)) cache[plain] = val;
+                  });
+                });
+              });
+            }, Promise.resolve());
+          }).catch(function (e) { console.warn("[localStorage-shim] hydrate failed:", e); });
+        },
+        _flush: function () { return doFlush(); },
+      };
+    }
+    var shim = makeStorage();
+    // install before user code reads localStorage
+    Object.defineProperty(window, "localStorage", {
+      value: shim, configurable: true, writable: false,
+    });
+    // cold-load: hydrate cache so first paint can read persisted values
+    shim._hydrate();
+    // best-effort final flush on hide / unload
+    function onHide() { shim._flush(); }
+    if (document.visibilityState === "hidden") onHide();
+    else if (document.addEventListener) {
+      document.addEventListener("visibilitychange", function () {
+        if (document.visibilityState === "hidden") onHide();
+      });
+      window.addEventListener("pagehide", onHide);
+    }
+  } catch (e) {
+    console.warn("[localStorage-shim] install failed:", e);
+  }
+})();
+</script>`;
+
 /** Injected into HTML so the shell console panel still receives logs/errors,
  * `fetch("/api/…")` resolves under the canvas project path, same-origin fetch
  * is summarized for HOST.getNetworkLog, and DOM snapshots can be requested. */
@@ -583,39 +704,40 @@ export const PLAYGROUNDS_SDK_SCRIPT_TAG =
   '<script src="/playgrounds/sdk.js" defer data-playgrounds-sdk></script>';
 
 export function injectCanvasBridge(html: string): string {
-  if (html.includes("data-playgrounds-bridge")) return html;
-  let injected = false;
-  const ensureSdk = (s: string): string => {
-    if (s.includes("data-playgrounds-sdk")) return s;
-    injected = true;
-    return s.replace(/<head([^>]*)>/iu, `<head$1>${PLAYGROUNDS_SDK_SCRIPT_TAG}`) || s;
-  };
+  // Idempotent guards: each marker is unique, so re-injection is a no-op.
+  if (html.includes("data-playgrounds-ls-shim") &&
+      html.includes("data-playgrounds-bridge") &&
+      html.includes("data-playgrounds-sdk")) {
+    return html;
+  }
+  // Headers we want injected before user code: shim first (installs
+  // localStorage before the SAM reads it), then bridge, then SDK.
+  const headInjections: Array<{ marker: string; script: string }> = [
+    { marker: "data-playgrounds-ls-shim", script: LOCALSTORAGE_SHIM_SCRIPT },
+    { marker: "data-playgrounds-bridge", script: CANVAS_BRIDGE_SCRIPT },
+    { marker: "data-playgrounds-sdk", script: PLAYGROUNDS_SDK_SCRIPT_TAG },
+  ];
+  const needs = (s: string) =>
+    headInjections.filter((i) => !s.includes(i.marker));
+  const buildHead = (extra: string) =>
+    headInjections
+      .filter((i) => !html.includes(i.marker))
+      .map((i) => i.script)
+      .join("") + extra;
+
   if (/<head[\s>]/iu.test(html)) {
-    let out = html.replace(/<head([^>]*)>/iu, `<head$1>${CANVAS_BRIDGE_SCRIPT}`);
-    if (!out.includes("data-playgrounds-sdk")) {
-      out = out.replace(
-        /<head([^>]*)>/iu,
-        `<head$1>${PLAYGROUNDS_SDK_SCRIPT_TAG}`
-      );
-      injected = true;
-    }
-    return out;
+    const inject = needs(html)
+      .map((i) => i.script)
+      .join("");
+    return html.replace(/<head([^>]*)>/iu, `<head$1>${inject}`) || html;
   }
   if (/<html[\s>]/iu.test(html)) {
-    let out = html.replace(
+    return html.replace(
       /<html([^>]*)>/iu,
-      `<html$1><head>${CANVAS_BRIDGE_SCRIPT}</head>`
+      `<html$1><head>${buildHead("")}</head>`
     );
-    if (!out.includes("data-playgrounds-sdk")) {
-      out = out.replace(
-        /<html([^>]*)>/iu,
-        `<html$1><head>${PLAYGROUNDS_SDK_SCRIPT_TAG}</head>`
-      );
-      injected = true;
-    }
-    return out;
   }
-  return `${CANVAS_BRIDGE_SCRIPT}${html}`;
+  return `${buildHead("")}${html}`;
 }
 
 export function isCanvasServiceWorkerRegistration(

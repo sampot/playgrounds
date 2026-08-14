@@ -184,4 +184,33 @@ describe("api stub + HTML bridge", () => {
     // Idempotent: re-injecting does not duplicate the SDK tag.
     expect(injectCanvasBridge(out)).toBe(out);
   });
+
+  it("injects localStorage→KV shim before user code (idempotent)", () => {
+    const out = injectCanvasBridge(
+      "<!doctype html><html><head><title>t</title></head><body></body></html>"
+    );
+    expect(out).toContain("data-playgrounds-ls-shim");
+    expect(out).toContain("ls-shim-rev:1");
+    // shim installs before the bridge so first paint sees the proxy
+    const shimIdx = out.indexOf("data-playgrounds-ls-shim");
+    const bridgeIdx = out.indexOf("data-playgrounds-bridge");
+    expect(shimIdx).toBeGreaterThanOrEqual(0);
+    expect(shimIdx).toBeLessThan(bridgeIdx);
+    // namespace + best-effort flush markers present
+    expect(out).toContain('PREFIX = "ls:"');
+    expect(out).toContain("localStorage-shim");
+    // Idempotent: re-injecting does not duplicate the shim marker.
+    expect(injectCanvasBridge(out)).toBe(out);
+  });
+
+  it("does not inject shim into go's legacy score-shim-only HTML again", () => {
+    // go injects its own `data-go-score-ns` marker; the ls-shim must not
+    // double-wrap. Idempotency is keyed on its own marker.
+    const go = injectCanvasBridge(
+      '<!doctype html><html><head><script data-go-score-ns></script></head><body></body></html>'
+    );
+    const again = injectCanvasBridge(go);
+    const count = (again.match(/data-playgrounds-ls-shim/g) || []).length;
+    expect(count).toBe(1);
+  });
 });

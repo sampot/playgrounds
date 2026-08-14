@@ -1,5 +1,4 @@
 import type { FileMap } from "@pg/projectTypes";
-import { isTextContent } from "@pg/projectTypes";
 import {
   canvasEntryUrl,
   installGoCanvasApiListener,
@@ -12,13 +11,10 @@ import {
   installGoMemoryApiListener,
   revokeGoMemoryBlobs,
 } from "./goMemoryCanvas";
-import { injectGoScoreStorage } from "./goScoreStorage";
 import type { HostRuntime } from "./hostRuntime";
 
-export type GoCanvasMode = "sw" | "memory";
-
 export type MountGoCanvasOptions = {
-  /** Solo `/s/<id>` — durable KV／DB ns＋legacy score localStorage shim. */
+  /** Solo `/s/<id>` — durable KV／DB namespace for intrinsics (env.KV／env.DB). */
   catalogId?: string | null;
   /**
    * Optional: the HostRuntime backing this canvas (hostable SAMs only).
@@ -37,19 +33,6 @@ export type MountedGoCanvas = {
   canvasGeneration: number;
   dispose: () => void;
 };
-
-function withSoloScoreNs(files: FileMap, catalogId: string | null | undefined): FileMap {
-  const id = catalogId?.trim();
-  if (!id) return files;
-  const out: FileMap = { ...files };
-  for (const [path, content] of Object.entries(files)) {
-    const lower = path.toLowerCase();
-    if (!lower.endsWith(".html") && !lower.endsWith(".htm")) continue;
-    if (!isTextContent(content)) continue;
-    out[path] = injectGoScoreStorage(content, id);
-  }
-  return out;
-}
 
 function apiCtx(
   sandboxId: string,
@@ -79,7 +62,9 @@ export async function mountGoCanvas(
   options: MountGoCanvasOptions = {}
 ): Promise<MountedGoCanvas> {
   const sandboxId = `go-${crypto.randomUUID().slice(0, 8)}`;
-  const prepared = withSoloScoreNs(files, options.catalogId);
+  // Score/localStorage persistence is unified by the canvas `localStorage`→KV
+  // shim (PG-LOCALSTORAGE-SHIM-SPEC §7); go no longer injects its own shim.
+  const prepared = files;
   let unlisten: (() => void) | null = null;
   let memoryBlobUrls: string[] = [];
 
