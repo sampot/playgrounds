@@ -8,7 +8,6 @@
 
 import {
   GENERATED_SAM_CATALOG,
-  GENERATED_SAM_PLAYGROUNDS_PICK_IDS,
   type GeneratedSamEntry,
   type GeneratedSamEntryStatus,
   type GeneratedSamKind,
@@ -188,43 +187,18 @@ function shuffleInPlace<T>(arr: T[], rng: () => number): T[] {
 }
 
 /**
- * Home `/` recommendations (DEC-050): up to `limit` **listed game** entries.
- * Prefer field picks (shuffled, games only), then pad from other listed games.
+ * Home `/` recommendations (DEC-050): up to `limit` **listed game** entries,
+ * drawn uniformly at random from ALL listed games (not a fixed curated set),
+ * so a reshuffle surfaces different titles each time.
  */
 export function recommendHome(
   limit = 3,
   rng: () => number = Math.random
 ): GoCatalogEntry[] {
   if (limit <= 0) return [];
-  const byId = new Map(GO_LISTED_CATALOG.map(e => [e.id, e]));
-  const picked: GoCatalogEntry[] = [];
-  const seen = new Set<string>();
-
-  const pickPool = shuffleInPlace(
-    GENERATED_SAM_PLAYGROUNDS_PICK_IDS.map(id => byId.get(id)).filter(
-      (e): e is GoCatalogEntry =>
-        e != null && e.kind === GO_RECOMMEND_KIND
-    ),
+  const pool = shuffleInPlace(
+    GO_LISTED_CATALOG.filter(e => e.kind === GO_RECOMMEND_KIND),
     rng
   );
-  for (const e of pickPool) {
-    if (picked.length >= limit) break;
-    picked.push(e);
-    seen.add(e.id);
-  }
-
-  if (picked.length < limit) {
-    const rest = shuffleInPlace(
-      GO_LISTED_CATALOG.filter(
-        e => e.kind === GO_RECOMMEND_KIND && !seen.has(e.id)
-      ),
-      rng
-    );
-    for (const e of rest) {
-      if (picked.length >= limit) break;
-      picked.push(e);
-    }
-  }
-
-  return picked;
+  return pool.slice(0, Math.min(limit, pool.length));
 }

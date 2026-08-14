@@ -9,7 +9,6 @@ import {
   recommendSameKind,
   sameKindPeers,
 } from "./goCatalog";
-import { GENERATED_SAM_PLAYGROUNDS_PICK_IDS } from "@data/samCatalog.generated";
 
 describe("goCatalog game-kind swap", () => {
   it("embeds published catalog with kind", () => {
@@ -67,7 +66,7 @@ describe("goCatalog game-kind swap", () => {
 });
 
 describe("recommendHome", () => {
-  it("returns up to 3 games preferring picks", () => {
+  it("returns up to 3 games drawn from all listed games", () => {
     let i = 0;
     const rng = () => {
       i += 0.13;
@@ -77,12 +76,13 @@ describe("recommendHome", () => {
     expect(rec.length).toBe(3);
     expect(rec.every(r => r.kind === "game")).toBe(true);
     expect(new Set(rec.map(r => r.id)).size).toBe(3);
-    const gamePicks = GENERATED_SAM_PLAYGROUNDS_PICK_IDS.filter(id =>
-      GO_CATALOG.some(e => e.id === id && e.kind === "game")
-    );
-    if (gamePicks.length >= 3) {
-      expect(rec.every(r => gamePicks.includes(r.id))).toBe(true);
-    }
+    // Every recommendation must be a listed game; a reshuffle can surface any
+    // listed game, not just the curated field picks.
+    expect(
+      rec.every(r =>
+        GO_CATALOG.some(e => e.id === r.id && e.kind === "game" && e.status === "listed")
+      )
+    ).toBe(true);
   });
 
   it("never recommends non-game kinds", () => {
