@@ -107,6 +107,10 @@
     }, 2200);
     return () => clearTimeout(t);
   });
+
+  $effect(() => {
+    void refresh();
+  });
 </script>
 
 <svelte:head>
