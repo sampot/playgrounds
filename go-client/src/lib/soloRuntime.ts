@@ -113,7 +113,24 @@ export function createSoloRuntime(opts?: {
     try {
       let files: FileMap;
       let fromCache = false;
-      try {
+      const cached = await getGoSamOfflineCache(entry.id);
+      if (cached && seq === bootSeq) {
+        files = cached.files;
+        fromCache = true;
+        assertSamHasIndex(files);
+        if (seq !== bootSeq) return;
+        set({
+          loadProgress: { ratio: 1, detail: "離線快取" },
+          message: `正在開啟「${entry.title}」…`,
+        });
+        loadSamFiles(entry.source)
+          .then(async newFiles => {
+            if (seq !== bootSeq) return;
+            assertSamHasIndex(newFiles);
+            await putGoSamOfflineCache(entry.id, entry.source, newFiles);
+          })
+          .catch(() => {});
+      } else {
         files = await loadSamFiles(entry.source, {
           onProgress: p => {
             if (seq !== bootSeq) return;
@@ -126,18 +143,7 @@ export function createSoloRuntime(opts?: {
         });
         if (seq !== bootSeq) return;
         assertSamHasIndex(files);
-        void putGoSamOfflineCache(entry.id, entry.source, files);
-      } catch (netErr) {
-        const cached = await getGoSamOfflineCache(entry.id);
-        if (!cached) throw netErr;
-        files = cached.files;
-        fromCache = true;
-        assertSamHasIndex(files);
-        if (seq !== bootSeq) return;
-        set({
-          loadProgress: { ratio: 1, detail: "離線快取" },
-          message: `正在開啟「${entry.title}」（離線）…`,
-        });
+        await putGoSamOfflineCache(entry.id, entry.source, files);
       }
       if (seq !== bootSeq) return;
       set({
