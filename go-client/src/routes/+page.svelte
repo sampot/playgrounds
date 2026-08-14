@@ -10,7 +10,10 @@
   import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
 
   let input = $state("");
-  let recs = $state<GoCatalogEntry[]>(recommendHome(homeRecCount()));
+  // 穩定推薦池：只在「再次推薦」時重新產生，捲動不改變內容。
+  let pool = $state<GoCatalogEntry[]>(recommendHome(4));
+  let recCount = $state(homeRecCount());
+  let recs = $state<GoCatalogEntry[]>(pool.slice(0, recCount));
   let isSearching = $state(false);
   const og = goOgMeta({
     title: GO_HOME_DOCUMENT_TITLE,
@@ -26,13 +29,19 @@
     return 2;
   }
 
-  function loadRecs() {
-    recs = recommendHome(homeRecCount());
+  // 只在跨越斷點時調整「顯示數量」，從穩定池中切片——不重新洗牌。
+  function syncCount() {
+    const n = homeRecCount();
+    if (n === recCount) return;
+    recCount = n;
+    if (!isSearching) recs = pool.slice(0, recCount);
   }
 
   function reshuffle() {
     input = "";
-    loadRecs();
+    pool = recommendHome(4);
+    recCount = homeRecCount();
+    recs = pool.slice(0, recCount);
     isSearching = false;
   }
 
@@ -41,7 +50,7 @@
     input = target.value.trim();
 
     if (input.length === 0) {
-      loadRecs();
+      syncCount();
       isSearching = false;
     } else {
       recs = searchGoCatalogById(input, 3);
@@ -49,10 +58,11 @@
     }
   }
 
-  // 視窗寬度變化時重算推薦數量（非搜尋態）。
+  // 視窗寬度變化時只調整顯示數量（非搜尋態）；手機網址列收合觸發的
+  // resize 不會跨越斷點，因此推薦內容保持不變。
   $effect(() => {
     function update() {
-      if (!isSearching) loadRecs();
+      syncCount();
     }
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
