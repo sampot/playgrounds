@@ -43,7 +43,10 @@
 
   /** After reveal: hide again if header idle for 3s (paused while share／more／profile open). */
   function scheduleChromeAutoHide() {
-    clearChromeAutoHide();
+    // Idempotent: if a countdown is already pending, don't restart it — an
+    // effect that re-runs frequently (e.g. canvas scroll binding) must not
+    // keep resetting the 3s timer, or it would never elapse.
+    if (chromeAutoHideTimer != null) return;
     if (!chromeHideable || chromeHidden || shareOpen || moreOpen || profileOpen) return;
     chromeAutoHideTimer = setTimeout(() => {
       chromeAutoHideTimer = null;
@@ -117,23 +120,41 @@
     }
   });
 
+  /**
+   * Auto-hide timer owner. Runs whenever hideability／visibility／panel state
+   * changes; uses a null-guard so a frequently re-running effect (canvas
+   * scroll binding re-binds often) never resets the 3s countdown. The timer is
+   * cleared only when leaving a hideable context or when a panel opens.
+   */
   $effect(() => {
-    if (shareOpen || moreOpen || profileOpen) {
+    const panelOpen = shareOpen || moreOpen || profileOpen;
+    if (!chromeHideable || chromeHidden || panelOpen) {
       clearChromeAutoHide();
+      if (!chromeHideable) chromeHidden = false;
       return;
     }
-    if (chromeHideable && !chromeHidden) scheduleChromeAutoHide();
+    if (chromeAutoHideTimer == null) {
+      chromeAutoHideTimer = setTimeout(() => {
+        chromeAutoHideTimer = null;
+        if (!(shareOpen || moreOpen || profileOpen)) chromeHidden = true;
+      }, CHROME_AUTO_HIDE_MS);
+    }
   });
 
+  // Scroll/gesture listener binding for chrome hide/reveal. Bound once while
+  // hideable (timer lifecycle is owned by the auto-hide effect above). Using an
+  // outer handle avoids re-binding on every internal effect re-run, which would
+  // reset gesture accumulation and leak listeners.
+  let scrollTeardown: (() => void) | null = null;
   $effect(() => {
     if (!chromeHideable) {
-      clearChromeAutoHide();
-      chromeHidden = false;
+      if (scrollTeardown) {
+        scrollTeardown();
+        scrollTeardown = null;
+      }
       return;
     }
-
-    chromeHidden = false;
-    clearChromeAutoHide();
+    if (scrollTeardown) return; // already bound for this hideable session
 
     let acc = 0;
     let touchY = 0;
@@ -231,13 +252,17 @@
     if (main) mo.observe(main, { childList: true, subtree: true });
     cleanups.push(() => mo.disconnect());
 
-    return () => {
+    scrollTeardown = () => {
       for (const c of cleanups) c();
-      clearChromeAutoHide();
-      chromeHidden = false;
+    };
+    return () => {
+      if (scrollTeardown) {
+        const t = scrollTeardown;
+        scrollTeardown = null;
+        t();
+      }
     };
   });
-
   // On a solo game page (no canvas scroll), reveal the hidden chrome on any
   // page tap — mirrors canvas scroll-up reveal. Canvas uses its own gesture
   // binding above, so skip when canvas is active.
@@ -359,6 +384,7 @@
     >
       <span class="play-label">山姆鍋遊樂場</span>
     </a>
+    <div class="chrome-actions">
     {#if showSwap && canvasActive}
       <button
         type="button"
@@ -446,9 +472,10 @@
         aria-label="登入"
         onclick={onProfileClick}
       >
-        登入
+         登入
       </button>
     {/if}
+    </div>
   </header>
 
   {#if chromeSession.flash && !(canvasActive && chromeHidden && !shareOpen && !moreOpen && !profileOpen)}

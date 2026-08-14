@@ -105,6 +105,16 @@ a {
   opacity: 0;
   pointer-events: none;
 }
+.chrome-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: nowrap;
+  margin-left: auto;
+}
+.chrome--compact .chrome-actions {
+  gap: 0.35rem;
+}
 .chrome a.mark-link {
   display: inline-flex;
   align-items: center;
