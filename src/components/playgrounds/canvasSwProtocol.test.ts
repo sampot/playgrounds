@@ -199,6 +199,9 @@ describe("api stub + HTML bridge", () => {
     // namespace + best-effort flush markers present
     expect(out).toContain('PREFIX = "ls:"');
     expect(out).toContain("localStorage-shim");
+    // _hydrate is deferred via setTimeout so the canvas bridge's fetch override
+    // is installed before the POST /api/kv/list goes out (fixes 405 on go-client).
+    expect(out).toContain("setTimeout(function () { shim._hydrate(); }, 0);");
     // Idempotent: re-injecting does not duplicate the shim marker.
     expect(injectCanvasBridge(out)).toBe(out);
   });

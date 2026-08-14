@@ -433,8 +433,12 @@ export const LOCALSTORAGE_SHIM_SCRIPT = `<script data-playgrounds-ls-shim>
     Object.defineProperty(window, "localStorage", {
       value: shim, configurable: true, writable: false,
     });
-    // cold-load: hydrate cache so first paint can read persisted values
-    shim._hydrate();
+    // cold-load: hydrate cache so first paint can read persisted values.
+    // Defer to macrotask queue so the canvas bridge script (injected after
+    // this shim) has installed its fetch override before the POST /api/kv/list
+    // goes out — otherwise the native fetch leaks to the origin root and the
+    // go-client Worker returns 405.
+    setTimeout(function () { shim._hydrate(); }, 0);
     // best-effort final flush on hide / unload
     function onHide() { shim._flush(); }
     if (document.visibilityState === "hidden") onHide();
