@@ -4,7 +4,6 @@
   import { chromeSession } from "$lib/chromeSession.svelte";
   import { findGoCatalogBySource } from "$lib/goCatalog";
   import GoSamLoadBar from "$lib/GoSamLoadBar.svelte";
-  import { openPlaygroundHome, PLAY_ORIGIN } from "$lib/openPlayground";
   import {
     createGuestRuntime,
     type GuestStatus,
@@ -157,10 +156,10 @@
   <p class="status" style="margin-top: 1rem">
     若在 LINE 等 App 內開啟失敗，請用系統瀏覽器開啟連結（iPhone：⋯ → 在 Safari 開啟）。也可請主持重新邀請，或開啟
     <a
-      href={`${PLAY_ORIGIN}/`}
+      href={`${PLAYGROUNDS_GO_ORIGIN}/`}
       target="_blank"
       rel="noopener noreferrer"
-      onclick={openPlaygroundHome}>山姆鍋遊樂場主頁</a
+      >山姆鍋遊樂場主頁</a
     >
   </p>
 {:else if status.phase === "consent"}

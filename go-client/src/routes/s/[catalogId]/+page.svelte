@@ -2,7 +2,6 @@
   import { onMount } from "svelte";
   import { chromeSession } from "$lib/chromeSession.svelte";
   import GoSamLoadBar from "$lib/GoSamLoadBar.svelte";
-  import { openPlaygroundHome, PLAY_ORIGIN } from "$lib/openPlayground";
   import {
     GO_SAM_UNKNOWN_DESCRIPTION,
     GO_SAM_UNKNOWN_DOCUMENT_TITLE,
@@ -330,7 +329,7 @@ import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
   <p class="err" role="alert">型錄沒有這項小品（可能已下架）</p>
   <p class="lead">
     可回
-    <a href={`${PLAY_ORIGIN}/sam/`} target="_blank" rel="noopener noreferrer"
+    <a href={`${PLAYGROUNDS_GO_ORIGIN}/sam/`} target="_blank" rel="noopener noreferrer"
       >型錄</a
     >
     挑選其他小品。
@@ -353,15 +352,15 @@ import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
   {:else}
     <p class="lead">
       可回
-      <a href={`${PLAY_ORIGIN}/sam/`} target="_blank" rel="noopener noreferrer"
+      <a href={`${PLAYGROUNDS_GO_ORIGIN}/sam/`} target="_blank" rel="noopener noreferrer"
         >型錄</a
       >
       或
       <a
-        href={`${PLAY_ORIGIN}/`}
+        href={`${PLAYGROUNDS_GO_ORIGIN}/`}
         target="_blank"
         rel="noopener noreferrer"
-        onclick={openPlaygroundHome}>山姆鍋遊樂場</a
+        >山姆鍋遊樂場</a
       >
       挑選其他小品。
     </p>

@@ -6,7 +6,6 @@
   import GoShareSheet from "$lib/GoShareSheet.svelte";
   import { goAuth } from "$lib/goAuth.svelte";
   import { recommendSameKind } from "$lib/goCatalog";
-  import { PLAY_ORIGIN } from "$lib/openPlayground";
   import { goSamShareHref, PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
   import { goSamShareTitle, GO_SITE_NAME } from "$lib/goShareMeta";
   import { getGoCatalogEntry } from "$lib/goCatalog";
