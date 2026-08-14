@@ -479,6 +479,7 @@ a {
   position: absolute;
   left: 0.75rem;
   right: 0.75rem;
+  max-width: 412px;
   top: 3.1rem;
   border: var(--pixel-edge) solid rgb(var(--ink));
   border-radius: var(--radius);
