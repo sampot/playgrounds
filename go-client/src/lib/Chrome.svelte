@@ -385,16 +385,6 @@
       <span class="play-label">山姆鍋遊樂場</span>
     </a>
     <div class="chrome-actions">
-    {#if showSwap && canvasActive}
-      <button
-        type="button"
-        class="hdr-next"
-        disabled={!nextEntry}
-        onclick={() => nextEntry && goToId(nextEntry.id)}
-      >
-        下一個
-      </button>
-    {/if}
     {#if showMore}
       <button
         type="button"
