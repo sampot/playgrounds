@@ -740,7 +740,8 @@ html[data-theme="dark"] .err {
   padding: 0;
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-columns: minmax(0, 15rem);
+  justify-content: center;
   gap: 0.6rem;
 }
 .home-grid-card {
@@ -748,6 +749,7 @@ html[data-theme="dark"] .err {
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.6rem;
+  max-width: 15rem;
   border: var(--pixel-edge) solid rgb(var(--ink));
   border-radius: var(--radius);
   background: rgb(var(--card));
@@ -770,6 +772,7 @@ html[data-theme="dark"] .err {
 .home-grid-cover {
   position: relative;
   aspect-ratio: 4 / 3;
+  max-height: 11rem;
   border: 2px solid rgb(var(--ink));
   border-radius: var(--radius);
   overflow: hidden;
