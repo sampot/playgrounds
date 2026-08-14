@@ -739,7 +739,8 @@ html[data-theme="dark"] .err {
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   gap: 0.6rem;
 }
 .home-grid-card {
@@ -805,11 +806,7 @@ html[data-theme="dark"] .err {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-@media (min-width: 48rem) {
-  .home-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
-}
+
 
 /* 空狀態像素插圖（已安裝遊戲為空）。 */
 .empty-pixel {

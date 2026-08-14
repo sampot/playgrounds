@@ -10,7 +10,7 @@
   import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
 
   let input = $state("");
-  let recs = $state<GoCatalogEntry[]>(recommendHome(4));
+  let recs = $state<GoCatalogEntry[]>(recommendHome(homeRecCount()));
   let isSearching = $state(false);
   const og = goOgMeta({
     title: GO_HOME_DOCUMENT_TITLE,
@@ -18,24 +18,45 @@
     url: `${PLAYGROUNDS_GO_ORIGIN}/`,
   });
 
+  // 首頁推薦：單列顯示，數量依螢幕寬度 2/3/4（手機→平板→寬螢幕）。
+  function homeRecCount(): number {
+    if (typeof window === "undefined" || !window.matchMedia) return 4;
+    if (window.matchMedia("(min-width: 48rem)").matches) return 4;
+    if (window.matchMedia("(min-width: 30rem)").matches) return 3;
+    return 2;
+  }
+
+  function loadRecs() {
+    recs = recommendHome(homeRecCount());
+  }
+
   function reshuffle() {
     input = "";
-    recs = recommendHome(4);
+    loadRecs();
     isSearching = false;
   }
 
   function handleSearch(event: Event) {
     const target = event.target as HTMLInputElement;
     input = target.value.trim();
-    
+
     if (input.length === 0) {
-    recs = recommendHome(4);
+      loadRecs();
       isSearching = false;
     } else {
       recs = searchGoCatalogById(input, 3);
       isSearching = true;
     }
   }
+
+  // 視窗寬度變化時重算推薦數量（非搜尋態）。
+  $effect(() => {
+    function update() {
+      if (!isSearching) loadRecs();
+    }
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  });
 </script>
 
 <svelte:head>
