@@ -317,7 +317,7 @@
                     currentTitle || currentCatalogId
                   )}
               >
-                清除進度／分數
+                清除進度
               </button>
               <button
                 type="button"
@@ -329,7 +329,7 @@
                     currentTitle || currentCatalogId
                   )}
               >
-                移除離線下載
+                移除離線
               </button>
               <button
                 type="button"
@@ -494,8 +494,11 @@
   }
   .go-more-stack {
     display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
+    flex-direction: row;
+    gap: 0.5rem;
+  }
+  .go-more-stack .go-more-btn {
+    flex: 1;
   }
   .go-more-btn,
   .go-more-link {
