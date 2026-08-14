@@ -143,7 +143,8 @@
   // Scroll/gesture listener binding for chrome hide/reveal. Bound once while
   // hideable (timer lifecycle is owned by the auto-hide effect above). Using an
   // outer handle avoids re-binding on every internal effect re-run, which would
-  // reset gesture accumulation and leak listeners.
+  // reset gesture accumulation and leak listeners. Touch pull-down reveals;
+  // mouse wheel-up reveals (wheel delta inverted in onWheel).
   let scrollTeardown: (() => void) | null = null;
   $effect(() => {
     if (!chromeHideable) {
@@ -179,14 +180,17 @@
       // Ignore tiny jitter.
       if (Math.abs(dy) < 2) return;
       acc += dy;
-      // Scroll-down (pull) reveals the chrome; scroll-up hides it. Either
-      // direction interrupts the auto-hide countdown; idle re-hides after 3s.
+      // Touch pull-down (finger moves down, dy > 0) reveals the chrome.
+      // Mouse wheel is fed inverted (see onWheel) so wheel-up reveals it.
+      // Either direction interrupts the auto-hide countdown; idle re-hides
+      // after 3s.
       if (acc > THRESH) setHidden(false);
       else if (acc < -THRESH) setHidden(true);
     }
 
     function onWheel(e: WheelEvent) {
-      onDelta(e.deltaY);
+      // 桌面滑鼠：向上捲動（deltaY < 0）才顯現 header；故傳入反向值。
+      onDelta(-e.deltaY);
     }
 
     function onTouchStart(e: TouchEvent) {
@@ -195,7 +199,7 @@
 
     function onTouchMove(e: TouchEvent) {
       const y = e.touches[0]?.clientY ?? touchY;
-      // Finger down (y increases) → positive delta → reveal chrome (scroll-down).
+      // 觸控下拉（手指向下移動，dy > 0）顯現 header，保持原行為。
       onDelta(y - touchY);
       touchY = y;
     }
