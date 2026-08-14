@@ -269,11 +269,12 @@
   .input {
     min-height: 2.75rem;
     padding: 0.5rem 0.75rem;
-    border: 1px solid rgb(var(--line));
+    border: var(--pixel-edge) solid rgb(var(--ink));
     border-radius: var(--radius);
     background: rgb(var(--fill));
     color: rgb(var(--ink));
     font: inherit;
+    box-shadow: inset 0 2px 0 0 color-mix(in oklab, rgb(var(--ink)) 10%, transparent);
   }
   .actions {
     display: flex;
@@ -284,15 +285,17 @@
     min-height: 2.75rem;
     padding: 0.5rem 1rem;
     border-radius: var(--radius);
-    border: 1px solid rgb(var(--line));
+    border: var(--pixel-edge) solid rgb(var(--ink));
     background: rgb(var(--card));
     color: rgb(var(--ink));
+    font-family: var(--pixel);
     font: inherit;
-    font-weight: 600;
+    font-weight: 700;
     cursor: pointer;
+    box-shadow: var(--pixel-shadow);
   }
   .btn.primary {
-    border-color: transparent;
+    border-color: rgb(var(--ink));
     background: rgb(var(--accent));
     color: #fff;
   }
@@ -313,13 +316,15 @@
     gap: 0.5rem;
     min-height: min(50vh, 20rem);
     padding: 1.25rem 1rem;
-    border: 1px solid rgb(var(--line));
+    border: var(--pixel-edge) solid rgb(var(--ink));
     border-radius: var(--radius);
     background: rgb(var(--card));
+    box-shadow: var(--pixel-shadow);
     text-align: center;
   }
   .wait-title {
     margin: 0;
+    font-family: var(--pixel);
     font-size: 1.05rem;
     font-weight: 700;
   }
@@ -332,7 +337,7 @@
     margin: 0 0 0.75rem;
     padding: 0.65rem 0.75rem;
     border-radius: var(--radius);
-    border: 1px solid rgb(var(--line));
+    border: var(--pixel-edge) solid rgb(var(--ink));
     background: rgb(var(--fill));
     color: rgb(var(--muted));
     font-size: 0.85rem;
@@ -341,7 +346,7 @@
   .stage {
     flex: 1;
     min-height: min(70vh, 36rem);
-    border: 1px solid rgb(var(--line));
+    border: var(--pixel-edge) solid rgb(var(--ink));
     border-radius: var(--radius);
     overflow: hidden;
     background: #0a1210;

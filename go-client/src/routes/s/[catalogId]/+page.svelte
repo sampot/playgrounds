@@ -151,8 +151,7 @@ import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
   });
 
   $effect(() => {
-    // 邀請對弈開場後保留頁內操作（Host bar ／分享面），不進入全屏畫布模式；
-    // 閒置時只是浮動 chip，維持全屏畫布。
+    // 邀請對弈開場後保留頁內操作（Host bar ／分享面），不進入全屏畫布模式。
     chromeSession.setCanvasActive(showCanvas && !hostLiving);
     return () => chromeSession.setCanvasActive(false);
   });
@@ -436,22 +435,24 @@ import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
     min-width: 2.75rem;
     padding: 0.55rem 1rem;
     border-radius: var(--radius);
-    border: 1px solid rgb(var(--line));
+    border: var(--pixel-edge) solid rgb(var(--ink));
     background: rgb(var(--card));
     color: rgb(var(--ink));
+    font-family: var(--pixel);
     font: inherit;
-    font-weight: 650;
+    font-weight: 700;
     cursor: pointer;
+    box-shadow: var(--pixel-shadow);
   }
   .btn.primary {
     background: rgb(var(--accent));
-    border-color: rgb(var(--accent));
+    border-color: rgb(var(--ink));
     color: #fff;
   }
   .stage {
     flex: 1;
     min-height: min(70vh, 36rem);
-    border: 1px solid rgb(var(--line));
+    border: var(--pixel-edge) solid rgb(var(--ink));
     border-radius: var(--radius);
     overflow: hidden;
     background: #0a1210;
