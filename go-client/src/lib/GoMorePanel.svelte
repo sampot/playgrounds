@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { GoCatalogEntry } from "$lib/goCatalog";
   import type { FileMap } from "@pg/projectTypes";
-  import { getGoCatalogEntry } from "$lib/goCatalog";
+  import { getGoCatalogEntry, seriesIcon } from "$lib/goCatalog";
   import {
     clearAllGoSamOfflineCache,
     deleteGoSamOfflineCache,
@@ -280,10 +280,13 @@
                 <li>
                   <button
                     type="button"
-                    class="go-more-btn"
+                    class="go-more-btn go-more-btn--icon"
                     onclick={() => onPick(rec.id)}
                   >
-                    {rec.title}
+                    <span class="go-more-btn-icon" aria-hidden="true"
+                      >{seriesIcon(rec.series)}</span
+                    >
+                    <span class="go-more-btn-label">{rec.title}</span>
                   </button>
                 </li>
               {/each}
@@ -528,6 +531,23 @@
     border-color: rgb(var(--gm-accent));
     color: rgb(var(--gm-accent));
     outline: none;
+  }
+  .go-more-btn--icon {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    text-align: start;
+  }
+  .go-more-btn-icon {
+    flex-shrink: 0;
+    font-size: 1.25rem;
+    line-height: 1;
+  }
+  .go-more-btn-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .go-more-btn:disabled {
     opacity: 0.45;

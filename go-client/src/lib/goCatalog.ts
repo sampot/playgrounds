@@ -16,8 +16,32 @@ import {
 
 export type GoCatalogEntry = Pick<
   GeneratedSamEntry,
-  "id" | "title" | "kind" | "source" | "blurb" | "status" | "protocols"
+  | "id"
+  | "title"
+  | "kind"
+  | "series"
+  | "source"
+  | "blurb"
+  | "status"
+  | "protocols"
 >;
+
+/**
+ * 分類（catalog `series`）→ 顯示用 icon。go 無 icon 相依庫，用 emoji 當分類
+ * 標記，輕量且符合小品原創風格。未知分類退回預設遊戲 icon。
+ */
+const GO_SERIES_ICON: Record<string, string> = {
+  精緻可玩: "🎯",
+  街機: "🕹️",
+  懷舊: "📺",
+  機台: "🎰",
+  桌遊: "🃏",
+};
+
+export function seriesIcon(series: string | undefined | null): string {
+  if (!series) return "🎮";
+  return GO_SERIES_ICON[series] ?? "🎮";
+}
 
 export type GoSamKind = GeneratedSamKind;
 export type GoEntryStatus = GeneratedSamEntryStatus;
@@ -70,6 +94,7 @@ function toGoEntry(e: GeneratedSamEntry): GoCatalogEntry {
     id: e.id,
     title: e.title,
     kind: e.kind,
+    series: e.series,
     source: e.source,
     blurb: e.blurb,
     status: e.status ?? "listed",

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getGoCatalogEntry } from "$lib/goCatalog";
+  import { getGoCatalogEntry, seriesIcon } from "$lib/goCatalog";
   import {
     clearAllGoProgress,
     clearGoProgressForCatalog,
@@ -22,15 +22,18 @@
   } | null>(null);
   let flash = $state("");
 
-  let apps = $state<{ id: string; title: string }[]>([]);
+  let apps = $state<{ id: string; title: string; series?: string }[]>([]);
 
   async function refresh() {
     const ids: string[] = await listGoSamOfflineCatalogIds();
     apps = ids
-      .map((id: string) => ({ id, title: getGoCatalogEntry(id)?.title ?? id }))
-      .filter((a: { id: string; title: string }) => a.title.trim().length > 0);
+      .map((id: string) => {
+        const e = getGoCatalogEntry(id);
+        return { id, title: e?.title ?? id, series: e?.series ?? undefined };
+      })
+      .filter((a: { id: string; title: string; series?: string }) => a.title.trim().length > 0);
     if (apps.length === 0) {
-      apps = ids.map((id: string) => ({ id, title: id }));
+      apps = ids.map((id: string) => ({ id, title: id, series: undefined }));
     }
   }
 
@@ -158,13 +161,14 @@
 {:else}
   <ul class="app-list">
     {#each apps as app (app.id)}
-      <li class="app-row">
-        <a
-          class="app-name"
-          href={`/s/${encodeURIComponent(app.id)}`}
-        >
-          {app.title}
-        </a>
+       <li class="app-row">
+         <span class="app-icon" aria-hidden="true">{seriesIcon(app.series)}</span>
+         <a
+           class="app-name"
+           href={`/s/${encodeURIComponent(app.id)}`}
+         >
+           {app.title}
+         </a>
         <div class="app-acts">
           <button
             type="button"
@@ -270,6 +274,11 @@
     border-radius: var(--radius);
     background: rgb(var(--card));
     min-width: 0;
+  }
+  .app-icon {
+    flex-shrink: 0;
+    font-size: 1.3rem;
+    line-height: 1;
   }
   .app-name {
     flex: 1;

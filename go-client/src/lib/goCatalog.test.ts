@@ -9,6 +9,7 @@ import {
   recommendSameKind,
   sameKindPeers,
   searchGoCatalogById,
+  seriesIcon,
 } from "./goCatalog";
 
 describe("goCatalog game-kind swap", () => {
@@ -90,6 +91,27 @@ describe("recommendHome", () => {
     const rec = recommendHome(3, () => 0.5);
     expect(rec.length).toBeGreaterThan(0);
     expect(rec.every(r => r.kind === "game")).toBe(true);
+  });
+});
+
+describe("seriesIcon", () => {
+  it("maps known series to an emoji icon", () => {
+    expect(seriesIcon("街機")).toBe("🕹️");
+    expect(seriesIcon("桌遊")).toBe("🃏");
+    expect(seriesIcon("懷舊")).toBe("📺");
+  });
+
+  it("falls back to default game icon for unknown or empty series", () => {
+    expect(seriesIcon("")).toBe("🎮");
+    expect(seriesIcon(undefined)).toBe("🎮");
+    expect(seriesIcon("不存在的分類")).toBe("🎮");
+  });
+
+  it("game catalog entries carry a series used for icons", () => {
+    const game = GO_LISTED_CATALOG.find(e => e.kind === "game");
+    expect(game).toBeTruthy();
+    expect(typeof game!.series).toBe("string");
+    expect(seriesIcon(game!.series)).toMatch(/\p{Extended_Pictographic}/u);
   });
 });
 

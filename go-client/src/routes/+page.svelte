@@ -5,7 +5,7 @@
     GO_HOME_LEAD,
     goOgMeta,
   } from "$lib/goShareMeta";
-  import { recommendHome, searchGoCatalogById, type GoCatalogEntry } from "$lib/goCatalog";
+  import { recommendHome, searchGoCatalogById, seriesIcon, type GoCatalogEntry } from "$lib/goCatalog";
   import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
 
   let input = $state("");
@@ -78,10 +78,13 @@
       {#each recs as entry (entry.id)}
         <li>
           <a class="home-rec-card" href={`/s/${encodeURIComponent(entry.id)}`}>
-            <span class="home-rec-name">{entry.title}</span>
-            {#if entry.blurb}
-              <span class="home-rec-blurb">{entry.blurb}</span>
-            {/if}
+            <span class="home-rec-icon" aria-hidden="true">{seriesIcon(entry.series)}</span>
+            <span class="home-rec-text">
+              <span class="home-rec-name">{entry.title}</span>
+              {#if entry.blurb}
+                <span class="home-rec-blurb">{entry.blurb}</span>
+              {/if}
+            </span>
           </a>
         </li>
       {/each}
@@ -162,8 +165,8 @@
   }
   .home-rec-card {
     display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
+    align-items: center;
+    gap: 0.7rem;
     min-height: 2.75rem;
     padding: 0.75rem 0.9rem;
     border: 1px solid rgb(var(--line));
@@ -181,6 +184,17 @@
   .home-rec-card:focus-visible {
     border-color: rgb(var(--accent));
     outline: none;
+  }
+  .home-rec-icon {
+    flex-shrink: 0;
+    font-size: 1.4rem;
+    line-height: 1;
+  }
+  .home-rec-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
   }
   .home-rec-name {
     font-weight: 650;
