@@ -10,7 +10,6 @@
   import { goSamShareHref, PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
   import { goSamShareTitle, GO_SITE_NAME } from "$lib/goShareMeta";
   import { getGoCatalogEntry } from "$lib/goCatalog";
-  import GoBrowserBanner from "$lib/GoBrowserBanner.svelte";
 
   function goOrigin(): string {
     if (typeof location !== "undefined" && location.origin) {
@@ -468,8 +467,6 @@
     {/if}
     </div>
    </header>
-
-   <GoBrowserBanner />
 
    {#if chromeSession.flash && !(canvasActive && chromeHidden && !shareOpen && !moreOpen && !profileOpen)}
     <p
