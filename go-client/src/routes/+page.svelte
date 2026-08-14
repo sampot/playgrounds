@@ -108,6 +108,9 @@
     margin: 0 0 1rem;
   }
   .home-reshuffle {
+    display: block;
+    width: fit-content;
+    margin: 0 auto;
     min-height: 2.75rem;
     padding: 0.55rem 1rem;
     border: var(--pixel-edge) solid rgb(var(--ink));
