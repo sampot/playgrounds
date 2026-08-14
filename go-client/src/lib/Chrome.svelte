@@ -63,12 +63,12 @@
   const mode = $derived(chromeSession.mode);
   const canvasActive = $derived(chromeSession.canvasActive);
   /**
-   * Header auto-hide applies on canvas play AND on a solo game page: after
-   * entering the game the chrome hides after 3s idle (revealed on interact).
+   * Header auto-hide applies when the canvas is active (canvas play or solo
+   * game page after the game has booted). Using `canvasActive` ensures the
+   * scroll listener only binds after the iframe exists in the DOM, avoiding
+   * a premature bind that would skip iframe event attachment.
    */
-  const chromeHideable = $derived(
-    canvasActive || (mode === "solo" && chromeSession.kind === "game")
-  );
+  const chromeHideable = $derived(canvasActive);
   /** §6.6：本機溢流 — `/`／`/s/`；Invite 不露. */
   const showMore = $derived(mode !== "invite");
   /** 分享：遊戲頁分享該小品；其餘（含首頁）分享 go client 本身. Invite 不露. */
@@ -196,8 +196,8 @@
 
     function onTouchMove(e: TouchEvent) {
       const y = e.touches[0]?.clientY ?? touchY;
-      // Finger up → content moves down → reveal chrome (scroll-down).
-      onDelta(touchY - y);
+      // Finger down (y increases) → positive delta → reveal chrome (scroll-down).
+      onDelta(y - touchY);
       touchY = y;
     }
 
