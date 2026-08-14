@@ -117,7 +117,7 @@
 </script>
 
 <svelte:head>
-  <title>已安裝應用</title>
+  <title>已安裝遊戲</title>
   <meta name="description" content="管理已安裝的遊戲與小品" />
 </svelte:head>
 
@@ -125,7 +125,7 @@
   <a href="/">← 回純玩首頁</a>
 </p>
 
-<h1>已安裝應用</h1>
+<h1>已安裝遊戲</h1>
 
 {#if flash}
   <p class="flash" role="status">{flash}</p>
@@ -237,12 +237,14 @@
   .confirm {
     margin: 0 0 1rem;
     padding: 1rem;
-    border: 1px solid rgb(var(--line));
+    border: var(--pixel-edge) solid rgb(var(--ink));
     border-radius: var(--radius);
     background: rgb(var(--card));
+    box-shadow: var(--pixel-shadow);
   }
   .confirm-title {
     margin: 0 0 0.35rem;
+    font-family: var(--pixel);
     font-size: 1rem;
     font-weight: 700;
   }
@@ -270,9 +272,10 @@
     align-items: center;
     gap: 0.5rem;
     padding: 0.6rem 0.75rem;
-    border: 1px solid rgb(var(--line));
+    border: var(--pixel-edge) solid rgb(var(--ink));
     border-radius: var(--radius);
     background: rgb(var(--card));
+    box-shadow: var(--pixel-shadow);
     min-width: 0;
   }
   .app-icon {
@@ -305,31 +308,37 @@
     min-height: 2.5rem;
     min-width: 2.5rem;
     padding: 0.35rem 0.55rem;
-    border: 1px solid rgb(var(--line));
+    border: var(--pixel-edge) solid rgb(var(--ink));
     border-radius: var(--radius);
-    background: transparent;
-    color: rgb(var(--muted));
+    background: rgb(var(--fill));
+    color: rgb(var(--ink));
+    font-family: var(--pixel);
     font: inherit;
     font-size: 0.75rem;
-    font-weight: 650;
+    font-weight: 700;
     cursor: pointer;
+    box-shadow: var(--pixel-shadow);
+    transition:
+      transform 0.06s steps(2),
+      box-shadow 0.06s steps(2);
   }
-  .act-btn:hover,
-  .act-btn:focus-visible {
+  .act-btn:hover:not(:disabled),
+  .act-btn:focus-visible:not(:disabled) {
     border-color: rgb(var(--accent));
     color: rgb(var(--accent));
     outline: none;
+    animation: pixel-blink 0.9s steps(2) infinite;
+  }
+  .act-btn:active:not(:disabled) {
+    transform: translateY(3px);
+    box-shadow: 0 0 0 0 rgb(var(--ink));
   }
   .act-btn--danger {
     color: rgb(var(--danger));
-    border-color: color-mix(
-      in oklab,
-      rgb(var(--danger)) 55%,
-      rgb(var(--line))
-    );
+    border-color: rgb(var(--danger));
   }
-  .act-btn--danger:hover,
-  .act-btn--danger:focus-visible {
+  .act-btn--danger:hover:not(:disabled),
+  .act-btn--danger:focus-visible:not(:disabled) {
     color: rgb(var(--danger));
     border-color: rgb(var(--danger));
   }
@@ -341,30 +350,28 @@
     min-width: 2.75rem;
     padding: 0.55rem 1rem;
     border-radius: var(--radius);
-    border: 1px solid rgb(var(--line));
+    border: var(--pixel-edge) solid rgb(var(--ink));
     background: rgb(var(--card));
     color: rgb(var(--ink));
+    font-family: var(--pixel);
     font: inherit;
-    font-weight: 650;
+    font-weight: 700;
     cursor: pointer;
+    box-shadow: var(--pixel-shadow);
   }
   .btn-danger {
     background: rgb(var(--danger));
-    border-color: rgb(var(--danger));
+    border-color: rgb(var(--ink));
     color: #fff;
     text-align: center;
   }
   .btn-danger:hover:not(:disabled),
   .btn-danger:focus-visible:not(:disabled) {
-    filter: brightness(1.05);
+    filter: brightness(1.08);
     color: #fff;
   }
   .btn-danger-outline {
-    border-color: color-mix(
-      in oklab,
-      rgb(var(--danger)) 55%,
-      rgb(var(--line))
-    );
+    border-color: rgb(var(--danger));
     color: rgb(var(--danger));
   }
 </style>

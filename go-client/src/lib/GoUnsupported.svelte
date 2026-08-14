@@ -77,8 +77,11 @@
   }
   .go-unsupported-title {
     margin: 0;
+    font-family: var(--pixel);
     font-size: 1.3rem;
     font-weight: 700;
+    letter-spacing: 0.02em;
+    text-shadow: 2px 2px 0 color-mix(in oklab, rgb(var(--ink)) 22%, transparent);
   }
   .go-unsupported-msg {
     margin: 0;
@@ -98,9 +101,10 @@
     align-items: center;
     gap: 0.4rem;
     padding: 0.4rem 0.6rem;
-    border: 1px solid rgb(var(--line));
+    border: var(--pixel-edge) solid rgb(var(--ink));
     border-radius: var(--radius);
     background: rgb(var(--card));
+    box-shadow: var(--pixel-shadow);
   }
   .go-unsupported-code {
     font-family: ui-monospace, "SF Mono", "Noto Sans TC", monospace;
@@ -112,18 +116,23 @@
     flex-shrink: 0;
     min-height: 2.25rem;
     padding: 0.3rem 0.75rem;
-    border: 1px solid rgb(var(--accent));
+    border: var(--pixel-edge) solid rgb(var(--ink));
     border-radius: var(--radius);
     background: rgb(var(--accent));
     color: #fff;
+    font-family: var(--pixel);
     font: inherit;
     font-size: 0.78rem;
-    font-weight: 650;
+    font-weight: 700;
     cursor: pointer;
+    box-shadow: var(--pixel-shadow);
+  }
+  html[data-theme="dark"] .go-unsupported-copy {
+    color: #042f2e;
   }
   .go-unsupported-copy:hover,
   .go-unsupported-copy:focus-visible {
-    filter: brightness(1.05);
+    filter: brightness(1.08);
     outline: none;
   }
 </style>

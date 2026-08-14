@@ -184,13 +184,13 @@
     flex: 0 1 auto;
     min-height: 0;
     max-height: min(88svh, 30rem);
-    border: 1px solid rgb(var(--gp-line));
+    border: var(--pixel-edge) solid rgb(var(--gp-ink));
     border-bottom: none;
     border-radius: calc(var(--gp-radius) + 0.35rem)
       calc(var(--gp-radius) + 0.35rem) 0 0;
     background: rgb(var(--gp-fill));
-    box-shadow: 0 -8px 28px
-      color-mix(in oklab, rgb(var(--gp-ink)) 16%, transparent);
+    box-shadow: 0 -6px 0 0 rgb(var(--gp-ink)),
+      0 -12px 24px color-mix(in oklab, rgb(var(--gp-ink)) 22%, transparent);
     overflow: hidden;
   }
   .go-profile-head {
@@ -217,8 +217,10 @@
   .go-profile-title {
     margin: 0;
     flex: 1;
+    font-family: var(--pixel);
     font-size: 1.05rem;
     font-weight: 700;
+    letter-spacing: 0.02em;
     line-height: 1.3;
   }
   .go-profile-close {
@@ -226,14 +228,16 @@
     min-width: 2.75rem;
     min-height: 2.75rem;
     padding: 0.35rem 0.75rem;
-    border: 1px solid rgb(var(--gp-line));
+    border: var(--pixel-edge) solid rgb(var(--gp-ink));
     border-radius: var(--gp-radius);
     background: rgb(var(--gp-fill));
     color: rgb(var(--gp-ink));
+    font-family: var(--pixel);
     font: inherit;
     font-size: 0.875rem;
-    font-weight: 600;
+    font-weight: 700;
     cursor: pointer;
+    box-shadow: 0 3px 0 0 rgb(var(--gp-ink));
   }
   .go-profile-close:hover,
   .go-profile-close:focus-visible {
@@ -250,9 +254,9 @@
     flex-shrink: 0;
     width: 3rem;
     height: 3rem;
-    border-radius: 999px;
+    border-radius: var(--gp-radius);
     object-fit: cover;
-    border: 1px solid rgb(var(--gp-line));
+    border: var(--pixel-edge) solid rgb(var(--gp-ink));
     background: rgb(var(--gp-fill));
   }
   .go-profile-avatar--fallback {
@@ -297,16 +301,21 @@
     min-height: 2.75rem;
     width: 100%;
     padding: 0.45rem 0.75rem;
-    border: 1px solid rgb(var(--gp-line));
+    border: var(--pixel-edge) solid rgb(var(--gp-ink));
     border-radius: var(--gp-radius);
     background: rgb(var(--gp-fill));
     color: rgb(var(--gp-ink));
+    font-family: var(--pixel);
     font: inherit;
     font-size: 0.875rem;
-    font-weight: 650;
+    font-weight: 700;
     cursor: pointer;
     box-sizing: border-box;
     text-align: start;
+    box-shadow: 0 3px 0 0 rgb(var(--gp-ink));
+    transition:
+      transform 0.06s steps(2),
+      box-shadow 0.06s steps(2);
   }
   .go-profile-link {
     display: flex;
@@ -318,6 +327,11 @@
     border-color: rgb(var(--gp-accent));
     color: rgb(var(--gp-accent));
     outline: none;
+    animation: pixel-blink 0.9s steps(2) infinite;
+  }
+  .go-profile-btn:active:not(:disabled) {
+    transform: translateY(3px);
+    box-shadow: 0 0 0 0 rgb(var(--gp-ink));
   }
   .go-profile-btn:disabled {
     opacity: 0.45;

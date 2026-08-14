@@ -62,8 +62,8 @@
   const busyAll = $derived(busySelf || busy);
 </script>
 
-{#if live}
-  <div class="hostbar hostbar--live" role="region" aria-label="邀請對弈狀態">
+<div class="hostbar {live ? 'hostbar--live' : ''}" role="region" aria-label="邀請對弈狀態">
+  {#if live}
     <p class="hostbar-msg" role="status">
       {#if phase === "waiting" || phase === "open"}
         已開場 — 按「邀請對弈」取得短網址
@@ -77,50 +77,56 @@
         等待對手入座…
       {/if}
     </p>
-    <div class="hostbar-actions">
-      {#if phase === "active" || phase === "ended"}
-        <button
-          type="button"
-          class="hostbtn"
-          disabled={busyAll}
-          onclick={onReset}
-        >
-          再來一局
-        </button>
-      {:else if phase === "ready"}
-        <button
-          type="button"
-          class="hostbtn hostbtn--primary"
-          disabled={busyAll}
-          onclick={onStart}
-        >
-          開始
-        </button>
-      {:else}
-        <button
-          type="button"
-          class="hostbtn hostbtn--primary"
-          disabled={busyAll}
-          onclick={onPrimary}
-        >
-          {busyAll ? "產生中…" : "邀請對手"}
-        </button>
-      {/if}
+  {:else}
+    <p class="hostbar-msg" role="status">
+      {loggedIn ? "想找人對弈？開一局並取得邀請短網址" : "登入後可開局邀請對弈"}
+    </p>
+  {/if}
+  <div class="hostbar-actions">
+    {#if phase === "active" || phase === "ended"}
+      <button
+        type="button"
+        class="hostbtn"
+        disabled={busyAll}
+        onclick={onReset}
+      >
+        再來一局
+      </button>
+    {:else if phase === "ready"}
+      <button
+        type="button"
+        class="hostbtn hostbtn--primary"
+        disabled={busyAll}
+        onclick={onStart}
+      >
+        開始
+      </button>
+    {:else if live}
+      <button
+        type="button"
+        class="hostbtn hostbtn--primary"
+        disabled={busyAll}
+        onclick={onPrimary}
+      >
+        {busyAll ? "產生中…" : "邀請對手"}
+      </button>
+    {:else}
+      <button
+        type="button"
+        class="hostbtn hostbtn--primary"
+        disabled={busyAll}
+        onclick={onPrimary}
+      >
+        {busyAll ? "產生中…" : loggedIn ? "邀請對弈" : "登入後邀請對弈"}
+      </button>
+    {/if}
+    {#if live}
       <button type="button" class="hostbtn" disabled={busyAll} onclick={onClose}>
         結束
       </button>
-    </div>
+    {/if}
   </div>
-{:else}
-  <button
-    type="button"
-    class="hostchip"
-    disabled={busyAll}
-    onclick={onPrimary}
-  >
-    {busyAll ? "產生中…" : loggedIn ? "邀請對弈" : "登入後邀請對弈"}
-  </button>
-{/if}
+</div>
 
 <style>
   .hostbar {
@@ -153,24 +159,35 @@
     min-height: 2.75rem;
     min-width: 2.75rem;
     padding: 0.4rem 0.9rem;
-    border: 1px solid rgb(var(--line));
+    border: var(--pixel-edge) solid rgb(var(--ink));
     border-radius: var(--radius);
     background: rgb(var(--fill));
     color: rgb(var(--ink));
+    font-family: var(--pixel);
     font: inherit;
-    font-weight: 650;
+    font-weight: 700;
     cursor: pointer;
+    box-shadow: var(--pixel-shadow);
     -webkit-tap-highlight-color: color-mix(
       in oklab,
-      rgb(var(--accent)) 18%,
+      rgb(var(--accent)) 24%,
       transparent
     );
+    transition:
+      transform 0.06s steps(2),
+      box-shadow 0.06s steps(2),
+      border-color 0.12s steps(2);
   }
   .hostbtn:hover:not(:disabled),
   .hostbtn:focus-visible:not(:disabled) {
     border-color: rgb(var(--accent));
     color: rgb(var(--accent));
     outline: none;
+    animation: pixel-blink 0.9s steps(2) infinite;
+  }
+  .hostbtn:active:not(:disabled) {
+    transform: translateY(3px);
+    box-shadow: 0 0 0 0 rgb(var(--ink));
   }
   .hostbtn:disabled {
     opacity: 0.45;
@@ -178,52 +195,19 @@
   }
   .hostbtn--primary {
     background: rgb(var(--accent));
-    border-color: rgb(var(--accent));
+    border-color: rgb(var(--ink));
     color: #fff;
+  }
+  html[data-theme="dark"] .hostbtn--primary {
+    color: #042f2e;
   }
   .hostbtn--primary:hover:not(:disabled),
   .hostbtn--primary:focus-visible:not(:disabled) {
     color: #fff;
     background: color-mix(in oklab, rgb(var(--accent)) 86%, #000);
   }
-  /* Float: 不佔版面，留在全屏畫布角落（mobile-first）。 */
-  .hostchip {
-    position: fixed;
-    right: 0.75rem;
-    bottom: calc(0.9rem + env(safe-area-inset-bottom, 0px));
-    z-index: 30;
-    min-height: 2.9rem;
-    max-width: min(18rem, calc(100vw - 1.5rem));
-    padding: 0.5rem 1.05rem;
-    border: 1px solid color-mix(in oklab, rgb(var(--accent)) 55%, rgb(var(--line)));
-    border-radius: 999px;
-    background: color-mix(in oklab, rgb(var(--fill)) 92%, transparent);
-    backdrop-filter: blur(8px);
-    color: rgb(var(--accent));
-    font: inherit;
-    font-size: 0.925rem;
-    font-weight: 700;
-    cursor: pointer;
-    box-shadow: 0 6px 18px color-mix(in oklab, rgb(var(--ink)) 24%, transparent);
-    -webkit-tap-highlight-color: color-mix(
-      in oklab,
-      rgb(var(--accent)) 24%,
-      transparent
-    );
-  }
-  .hostchip:hover:not(:disabled),
-  .hostchip:focus-visible:not(:disabled) {
-    background: color-mix(in oklab, rgb(var(--accent)) 10%, rgb(var(--fill)));
-    outline: none;
-  }
-  .hostchip:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-  @media (min-width: 40rem) {
-    .hostchip {
-      right: 1.25rem;
-      bottom: 1.25rem;
-    }
+  html[data-theme="dark"] .hostbtn--primary:hover:not(:disabled),
+  html[data-theme="dark"] .hostbtn--primary:focus-visible:not(:disabled) {
+    color: #042f2e;
   }
 </style>

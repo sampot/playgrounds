@@ -135,11 +135,18 @@
   }
   .help-section {
     margin: 0 0 1.5rem;
+    padding: 0.85rem 0.95rem;
+    border: var(--pixel-edge) solid rgb(var(--ink));
+    border-radius: var(--radius);
+    background: rgb(var(--card));
+    box-shadow: var(--pixel-shadow);
   }
   .help-section h2 {
     margin: 0 0 0.5rem;
+    font-family: var(--pixel);
     font-size: 1.05rem;
     font-weight: 700;
+    letter-spacing: 0.02em;
   }
   .help-section p {
     margin: 0 0 0.65rem;

@@ -2,6 +2,7 @@
   import type { GoCatalogEntry } from "$lib/goCatalog";
   import type { FileMap } from "@pg/projectTypes";
   import { getGoCatalogEntry, seriesIcon } from "$lib/goCatalog";
+  import { goTheme } from "$lib/goTheme.svelte";
   import {
     clearAllGoSamOfflineCache,
     deleteGoSamOfflineCache,
@@ -294,12 +295,31 @@
           </section>
         {/if}
 
+        <section class="go-more-section" aria-labelledby="go-more-theme-title">
+          <h3 id="go-more-theme-title" class="go-more-section-title">
+            顯示
+          </h3>
+          <button
+            type="button"
+            class="go-more-btn go-more-theme-toggle"
+            onclick={() => goTheme.toggle()}
+            aria-pressed={goTheme.current === "dark"}
+          >
+            <span class="go-more-theme-icon" aria-hidden="true"
+              >{goTheme.current === "dark" ? "🌙" : "☀️"}</span
+            >
+            <span class="go-more-theme-label">
+              畫面色系：{goTheme.current === "dark" ? "深色" : "淺色"}
+            </span>
+          </button>
+        </section>
+
         <section class="go-more-section" aria-labelledby="go-more-apps-title">
           <h3 id="go-more-apps-title" class="go-more-section-title">
-            已安裝應用
+            已安裝遊戲
           </h3>
           <a class="go-more-btn go-more-link" href="/apps" onclick={onClose}>
-            管理已安裝應用
+            管理已安裝遊戲
           </a>
         </section>
 
@@ -412,12 +432,13 @@
     flex: 0 1 auto;
     min-height: 0;
     max-height: min(88svh, 36rem);
-    border: 1px solid rgb(var(--gm-line));
+    border: var(--pixel-edge) solid rgb(var(--gm-ink));
     border-bottom: none;
     border-radius: calc(var(--gm-radius) + 0.35rem)
       calc(var(--gm-radius) + 0.35rem) 0 0;
     background: rgb(var(--gm-fill));
-    box-shadow: 0 -8px 28px color-mix(in oklab, rgb(var(--gm-ink)) 16%, transparent);
+    box-shadow: 0 -6px 0 0 rgb(var(--gm-ink)),
+      0 -12px 24px color-mix(in oklab, rgb(var(--gm-ink)) 22%, transparent);
     overflow: hidden;
   }
   .go-more-head {
@@ -453,14 +474,16 @@
     min-width: 2.75rem;
     min-height: 2.75rem;
     padding: 0.35rem 0.75rem;
-    border: 1px solid rgb(var(--gm-line));
+    border: var(--pixel-edge) solid rgb(var(--gm-ink));
     border-radius: var(--gm-radius);
     background: rgb(var(--gm-fill));
     color: rgb(var(--gm-ink));
+    font-family: var(--pixel);
     font: inherit;
     font-size: 0.875rem;
-    font-weight: 600;
+    font-weight: 700;
     cursor: pointer;
+    box-shadow: 0 3px 0 0 rgb(var(--gm-ink));
   }
   .go-more-close:hover,
   .go-more-close:focus-visible {
@@ -475,6 +498,7 @@
   }
   .go-more-section-title {
     margin: 0;
+    font-family: var(--pixel);
     font-size: 0.8rem;
     font-weight: 700;
     letter-spacing: 0.02em;
@@ -508,16 +532,22 @@
     min-height: 2.75rem;
     width: 100%;
     padding: 0.45rem 0.75rem;
-    border: 1px solid rgb(var(--gm-line));
+    border: var(--pixel-edge) solid rgb(var(--gm-ink));
     border-radius: var(--gm-radius);
     background: rgb(var(--gm-fill));
     color: rgb(var(--gm-ink));
+    font-family: var(--pixel);
     font: inherit;
     font-size: 0.875rem;
-    font-weight: 650;
+    font-weight: 700;
     cursor: pointer;
     text-align: start;
     box-sizing: border-box;
+    box-shadow: 0 3px 0 0 rgb(var(--gm-ink));
+    transition:
+      transform 0.06s steps(2),
+      box-shadow 0.06s steps(2),
+      border-color 0.12s steps(2);
   }
   .go-more-link {
     display: flex;
@@ -531,12 +561,35 @@
     border-color: rgb(var(--gm-accent));
     color: rgb(var(--gm-accent));
     outline: none;
+    animation: pixel-blink 0.9s steps(2) infinite;
+  }
+  .go-more-btn:active:not(:disabled),
+  .go-more-link:active {
+    transform: translateY(3px);
+    box-shadow: 0 0 0 0 rgb(var(--gm-ink));
   }
   .go-more-btn--icon {
     display: flex;
     align-items: center;
     gap: 0.6rem;
     text-align: start;
+  }
+  .go-more-theme-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    text-align: start;
+  }
+  .go-more-theme-icon {
+    flex-shrink: 0;
+    font-size: 1.25rem;
+    line-height: 1;
+  }
+  .go-more-theme-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .go-more-btn-icon {
     flex-shrink: 0;
@@ -555,21 +608,17 @@
   }
   .go-more-btn--danger {
     background: rgb(var(--gm-danger));
-    border-color: rgb(var(--gm-danger));
+    border-color: rgb(var(--gm-ink));
     color: #fff;
     text-align: center;
   }
   .go-more-btn--danger:hover:not(:disabled),
   .go-more-btn--danger:focus-visible:not(:disabled) {
-    filter: brightness(1.05);
+    filter: brightness(1.08);
     color: #fff;
   }
   .go-more-btn--danger-outline {
-    border-color: color-mix(
-      in oklab,
-      rgb(var(--gm-danger)) 55%,
-      rgb(var(--gm-line))
-    );
+    border-color: rgb(var(--gm-danger));
     color: rgb(var(--gm-danger));
   }
   .go-more-confirm {

@@ -107,24 +107,39 @@
   .home-reshuffle {
     min-height: 2.75rem;
     padding: 0.55rem 1rem;
-    border: 1px solid rgb(var(--accent));
+    border: var(--pixel-edge) solid rgb(var(--ink));
     border-radius: var(--radius);
-    background: rgb(var(--card));
-    color: rgb(var(--accent));
+    background: rgb(var(--accent));
+    color: #fff;
+    font-family: var(--pixel);
     font: inherit;
     font-size: 0.9rem;
-    font-weight: 650;
+    font-weight: 700;
+    letter-spacing: 0.02em;
     cursor: pointer;
+    box-shadow: var(--pixel-shadow);
+    transition:
+      transform 0.06s steps(2),
+      box-shadow 0.06s steps(2);
+  }
+  html[data-theme="dark"] .home-reshuffle {
+    color: #042f2e;
   }
   .home-reshuffle:hover,
   .home-reshuffle:focus-visible {
-    filter: brightness(0.97);
     outline: none;
+    animation: pixel-blink 0.9s steps(2) infinite;
+  }
+  .home-reshuffle:active {
+    transform: translateY(3px);
+    box-shadow: 0 0 0 0 rgb(var(--ink));
   }
   .home-rec-title {
     margin: 0 0 0.65rem;
+    font-family: var(--pixel);
     font-size: 0.95rem;
     font-weight: 700;
+    letter-spacing: 0.02em;
   }
   .search-box {
     margin-bottom: 0.65rem;
@@ -132,13 +147,14 @@
   .search-input {
     width: 100%;
     padding: 0.65rem 0.9rem;
-    border: 1px solid rgb(var(--line));
+    border: var(--pixel-edge) solid rgb(var(--ink));
     border-radius: var(--radius);
-    background: rgb(var(--card));
+    background: rgb(var(--fill));
     color: rgb(var(--ink));
     font: inherit;
     font-size: 0.95rem;
     box-sizing: border-box;
+    box-shadow: inset 0 2px 0 0 color-mix(in oklab, rgb(var(--ink)) 10%, transparent);
   }
   .search-input:hover,
   .search-input:focus-visible {
@@ -169,14 +185,16 @@
     gap: 0.7rem;
     min-height: 2.75rem;
     padding: 0.75rem 0.9rem;
-    border: 1px solid rgb(var(--line));
+    border: var(--pixel-edge) solid rgb(var(--ink));
     border-radius: var(--radius);
     background: rgb(var(--card));
     color: rgb(var(--ink));
     text-decoration: none;
+    box-shadow: var(--pixel-shadow);
+    animation: pixel-pop 0.22s steps(3) both;
     -webkit-tap-highlight-color: color-mix(
       in oklab,
-      rgb(var(--accent)) 18%,
+      rgb(var(--accent)) 24%,
       transparent
     );
   }
@@ -184,6 +202,7 @@
   .home-rec-card:focus-visible {
     border-color: rgb(var(--accent));
     outline: none;
+    animation: pixel-blink 0.9s steps(2) infinite;
   }
   .home-rec-icon {
     flex-shrink: 0;
