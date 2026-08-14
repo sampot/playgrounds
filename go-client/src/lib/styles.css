@@ -80,6 +80,10 @@ a {
   border-bottom: 1px solid rgb(var(--line));
   background: color-mix(in oklab, rgb(var(--fill)) 90%, transparent);
   backdrop-filter: blur(10px);
+  transition:
+    transform 0.22s ease,
+    opacity 0.22s ease;
+  will-change: transform, opacity;
 }
 .chrome--compact {
   padding: 0.35rem 0.5rem;

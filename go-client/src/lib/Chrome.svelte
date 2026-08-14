@@ -44,7 +44,7 @@
   /** After reveal: hide again if header idle for 3s (paused while share／more／profile open). */
   function scheduleChromeAutoHide() {
     clearChromeAutoHide();
-    if (!canvasActive || chromeHidden || shareOpen || moreOpen || profileOpen) return;
+    if (!chromeHideable || chromeHidden || shareOpen || moreOpen || profileOpen) return;
     chromeAutoHideTimer = setTimeout(() => {
       chromeAutoHideTimer = null;
       if (shareOpen || moreOpen || profileOpen) return;
@@ -53,12 +53,19 @@
   }
 
   function onChromeInteract() {
-    if (canvasActive && !chromeHidden) scheduleChromeAutoHide();
+    if (chromeHideable && !chromeHidden) scheduleChromeAutoHide();
   }
 
   const catalogId = $derived(chromeSession.catalogId);
   const mode = $derived(chromeSession.mode);
   const canvasActive = $derived(chromeSession.canvasActive);
+  /**
+   * Header auto-hide applies on canvas play AND on a solo game page: after
+   * entering the game the chrome hides after 3s idle (revealed on interact).
+   */
+  const chromeHideable = $derived(
+    canvasActive || (mode === "solo" && chromeSession.kind === "game")
+  );
   /** §6.6：本機溢流 — `/`／`/s/`；Invite 不露. */
   const showMore = $derived(mode !== "invite");
   /** 分享：遊戲頁分享該小品；其餘（含首頁）分享 go client 本身. Invite 不露. */
@@ -115,11 +122,11 @@
       clearChromeAutoHide();
       return;
     }
-    if (canvasActive && !chromeHidden) scheduleChromeAutoHide();
+    if (chromeHideable && !chromeHidden) scheduleChromeAutoHide();
   });
 
   $effect(() => {
-    if (!canvasActive) {
+    if (!chromeHideable) {
       clearChromeAutoHide();
       chromeHidden = false;
       return;
@@ -231,6 +238,24 @@
     };
   });
 
+  // On a solo game page (no canvas scroll), reveal the hidden chrome on any
+  // page tap — mirrors canvas scroll-up reveal. Canvas uses its own gesture
+  // binding above, so skip when canvas is active.
+  $effect(() => {
+    if (!chromeHideable || canvasActive) return;
+    function onDocPointer(e: PointerEvent) {
+      // Ignore taps that originate inside the chrome itself (handled there).
+      const t = e.target as Node | null;
+      if (t && document.querySelector(".chrome")?.contains(t)) return;
+      if (chromeHidden) {
+        chromeHidden = false;
+        scheduleChromeAutoHide();
+      }
+    }
+    document.addEventListener("pointerdown", onDocPointer, true);
+    return () => document.removeEventListener("pointerdown", onDocPointer, true);
+  });
+
   function openShare() {
     if (!shareEnabled || !shareUrl) return;
     moreOpen = false;
@@ -296,12 +321,12 @@
     class={[
       "chrome",
       canvasActive && "chrome--compact",
-      canvasActive && chromeHidden && "chrome--hidden",
+      chromeHideable && chromeHidden && "chrome--hidden",
     ]
       .filter(Boolean)
       .join(" ")}
     aria-label="站群"
-    aria-hidden={canvasActive && chromeHidden ? "true" : undefined}
+    aria-hidden={chromeHideable && chromeHidden ? "true" : undefined}
     onpointerdown={onChromeInteract}
   >
     <a
