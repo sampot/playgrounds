@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { browser } from "$app/environment";
   import Chrome from "$lib/Chrome.svelte";
   import GoUnsupported from "$lib/GoUnsupported.svelte";
   import { chromeSession } from "$lib/chromeSession.svelte";
@@ -10,9 +11,13 @@
 
   let { children } = $props();
 
-  /** Static browser capability gate: when unsupported, replace the main
-   * content with an in-shell recovery screen (shell chrome still renders). */
-  const browserUnsupported = !goBrowserSupports().supported;
+  /**
+   * Browser capability gate. Computed synchronously when running client-side so
+   * the very first paint already shows the right content (no unsupported→content
+   * flash on capable browsers). On SSR/prerender `browser` is false so we assume
+   * capable and render the real page; the client then re-decides on hydration.
+   */
+  const browserUnsupported = $state(browser && !goBrowserSupports().supported);
   const playing = $derived(chromeSession.canvasActive);
 
   onMount(() => {
