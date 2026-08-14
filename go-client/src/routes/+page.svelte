@@ -10,7 +10,7 @@
   import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
 
   let input = $state("");
-  let recs = $state<GoCatalogEntry[]>(recommendHome(3));
+  let recs = $state<GoCatalogEntry[]>(recommendHome(4));
   let isSearching = $state(false);
   const og = goOgMeta({
     title: GO_HOME_DOCUMENT_TITLE,
@@ -20,7 +20,7 @@
 
   function reshuffle() {
     input = "";
-    recs = recommendHome(3);
+    recs = recommendHome(4);
     isSearching = false;
   }
 
@@ -29,7 +29,7 @@
     input = target.value.trim();
     
     if (input.length === 0) {
-      recs = recommendHome(3);
+    recs = recommendHome(4);
       isSearching = false;
     } else {
       recs = searchGoCatalogById(input, 3);
