@@ -75,7 +75,8 @@ a {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
+  row-gap: 0.4rem;
   padding: 0.5rem 0.75rem;
   border-bottom: 1px solid rgb(var(--line));
   background: color-mix(in oklab, rgb(var(--fill)) 90%, transparent);
