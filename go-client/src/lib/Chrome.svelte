@@ -5,7 +5,7 @@
   import GoProfilePanel from "$lib/GoProfilePanel.svelte";
   import GoShareSheet from "$lib/GoShareSheet.svelte";
   import { goAuth } from "$lib/goAuth.svelte";
-  import { nextSameKind, recommendSameKind } from "$lib/goCatalog";
+  import { recommendSameKind } from "$lib/goCatalog";
   import { PLAY_ORIGIN } from "$lib/openPlayground";
   import { goSamShareHref, PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
   import { goSamShareTitle, GO_SITE_NAME } from "$lib/goShareMeta";
@@ -79,7 +79,6 @@
       Boolean(catalogId) &&
       chromeSession.kind === "game"
   );
-  const nextEntry = $derived(catalogId ? nextSameKind(catalogId) : null);
 
   const shareTitle = $derived.by(() => {
     if (!catalogId) return GO_SITE_NAME;
@@ -481,18 +480,6 @@
     </p>
   {/if}
 
-  {#if showSwap && !canvasActive}
-    <nav class="swap" aria-label="換片">
-      <button
-        type="button"
-        class="swap-next"
-        disabled={!nextEntry}
-        onclick={() => nextEntry && goToId(nextEntry.id)}
-      >
-        下一個
-      </button>
-    </nav>
-  {/if}
 </div>
 
 {#if shareEnabled && shareUrl}
