@@ -180,8 +180,10 @@
       // Ignore tiny jitter.
       if (Math.abs(dy) < 2) return;
       acc += dy;
-      if (acc > THRESH) setHidden(true);
-      else if (acc < -THRESH) setHidden(false);
+      // Scroll-down (pull) reveals the chrome; scroll-up hides it. Either
+      // direction interrupts the auto-hide countdown; idle re-hides after 3s.
+      if (acc > THRESH) setHidden(false);
+      else if (acc < -THRESH) setHidden(true);
     }
 
     function onWheel(e: WheelEvent) {
@@ -194,7 +196,7 @@
 
     function onTouchMove(e: TouchEvent) {
       const y = e.touches[0]?.clientY ?? touchY;
-      // Finger up → content moves down → hide chrome.
+      // Finger up → content moves down → reveal chrome (scroll-down).
       onDelta(touchY - y);
       touchY = y;
     }
