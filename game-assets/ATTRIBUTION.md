@@ -68,6 +68,13 @@
 | `art/food-kit/` | Food Kit | https://kenney.nl/assets/food-kit | 切水果等 |
 | `art/holiday-kit/` | Holiday Kit | https://kenney.nl/assets/holiday-kit | |
 | `art/roguelike-modern-city/` | Roguelike Modern City | https://kenney.nl/assets/roguelike-modern-city | |
+| `art/sports-pack/` | Sports Pack | https://kenney.nl/assets/sports-pack | 投籃／射門／滾球／拳套；見下方機台 backlog |
+| `art/fish-pack/` | Fish Pack 2.0 | https://kenney.nl/assets/fish-pack | 釣魚機魚群／水草 |
+| `art/physics-assets/` | Physics Assets | https://kenney.nl/assets/physics-assets | 木塊／幾何；滾球／疊疊／力氣錘 |
+| `art/rolling-ball-assets/` | Rolling Ball Assets | https://kenney.nl/assets/rolling-ball-assets | 滾球軌道／洞 |
+| `art/puzzle-pack-2/` | Puzzle Pack II | https://kenney.nl/assets/puzzle-pack-2 | 疊疊機彩磚／球 |
+| `art/generic-items/` | Generic Items | https://kenney.nl/assets/generic-items | 雜件／工具 |
+| `art/boardgame-pack/` | Boardgame pack v2 | https://kenney.nl/assets/boardgame-pack | 籌碼／棋子；含 Bonus ogg |
 
 ### RTS／軍事（`art/rts/`；`pg-sandrts` 沙丘皮）
 
@@ -124,6 +131,28 @@
 
 ---
 
+## 湯姆熊／機台 backlog（2026-08-15 入庫）
+
+皆 **CC0**；進 `pg-*` 仍須署名（專案硬規則）。對應 `docs/PG-GAMES.md` backlog id。
+
+| 本地路徑 | Pack | 授權 | URL | 主要對應 |
+| --- | --- | --- | --- | --- |
+| `art/sports-pack/` | Sports Pack（Kenney） | CC0 | https://kenney.nl/assets/sports-pack | `pg-hoopshot`／`pg-goalshot`／`pg-skeeball`／`pg-punchpad`（籃球／足球／保齡球／拳套＋場地磚） |
+| `art/oga-basketball-pack/` | Basketball Pack（looneybits） | CC0 | https://opengameart.org/content/basketball-pack | `pg-hoopshot`（側視投籃／接球向精靈；`alleyapp/`） |
+| `art/fish-pack/` | Fish Pack 2.0（Kenney） | CC0 | https://kenney.nl/assets/fish-pack | `pg-fishcab`（魚／海草／沙地 HUD） |
+| `art/physics-assets/` | Physics Assets（Kenney） | CC0 | https://kenney.nl/assets/physics-assets | `pg-skeeball`／`pg-stacker`／`pg-strongman`（木塊／幾何碰撞元件） |
+| `art/rolling-ball-assets/` | Rolling Ball Assets（Kenney） | CC0 | https://kenney.nl/assets/rolling-ball-assets | `pg-skeeball`（滾球／洞／方塊軌道） |
+| `art/puzzle-pack-2/` | Puzzle Pack II（Kenney） | CC0 | https://kenney.nl/assets/puzzle-pack-2 | `pg-stacker`（彩磚／球／粒子；停燈堆疊皮） |
+| `art/generic-items/` | Generic Items（Kenney） | CC0 | https://kenney.nl/assets/generic-items | `pg-strongman`／通用道具（工具／雜件；編號 PNG＋spritesheet） |
+| `art/boardgame-pack/` | Boardgame pack v2（Kenney） | CC0 | https://kenney.nl/assets/boardgame-pack | `pg-prizewheel`（籌碼／棋子／骰；`Bonus/` 含 chips collide ogg） |
+| `art/oga-roulette-casino/` | Roulette Casino（looneybits） | CC0 | https://opengameart.org/content/roulette-casino | `pg-prizewheel`（輪盤 SVG；純娛樂轉盤皮） |
+
+音效可併用庫內既有：`sfx/impact-sounds/`（錘／拳撞擊）、`sfx/ui-audio/`／`sfx/interface-sounds/`（停燈／得點）、`sfx/casino-audio/`（籌碼感）、`art/medals/`／`art/pixel-ui-pack/`（結算 UI）。
+
+**未入庫（授權或體量不符）：** Admurin Fishing Items（OGA；**GPL 3.0**，不宜進 MIT 小品）、LPC Hand Tools（CC-BY-SA）、itch 大型付費／非 CC0 carnival 包。力氣錘專用「大槌＋鈴柱」美術仍薄，可先以 `physics-assets` 木塊＋`game-icons`/`generic-items` 拼皮。
+
+---
+
 ## 仍缺／慎用
 
 | 題材 | 狀態 |
@@ -132,6 +161,7 @@
 | 可免署名字型 | 多數開源字型為 OFL／需署名；未收入 `fonts/` |
 | 真麻將「花牌／十六張台規 UI」 | 已由 `sampot/pg-mahjong` 採 Gemini AI 花牌＋桌面 UI；庫內仍僅基礎牌 |
 | 沙丘戰線採收機／香料工人／統一美術 | `art/rts/` 坦克／空中／塔／沙漠已有；步行兵與「沙蟲風」生物仍薄 |
+| 力氣錘專用槌／鈴柱、機台魚竿／捲線器 | 尚無成套 CC0；`pg-strongman`／`pg-fishcab` 需自繪或拼皮 |
 | 磁碟空間 | itch 包含 wav 全套時體積大；進 `pg-*` 只拷需要的 **ogg**（或 mp3）即可 |
 
 捐助（非義務）：https://kenney.nl/donate
