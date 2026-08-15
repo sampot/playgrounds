@@ -16,7 +16,6 @@
     type SoloStatus,
   } from "$lib/soloRuntime";
   import { setGoMemoryCanvasWindow } from "$lib/goMemoryCanvas";
-  import GoHostBar from "$lib/GoHostBar.svelte";
   import GoShareSheet from "$lib/GoShareSheet.svelte";
   import {
     subscribeGoShellPlatformEvents,
@@ -27,10 +26,10 @@
     type HostInviteController,
     type HostInviteShare,
   } from "$lib/hostInviteBind.svelte";
-import { goAuth } from "$lib/goAuth.svelte";
-import { hostableProtocolFor } from "$lib/goCatalog";
-import type { HostRuntime } from "$lib/hostRuntime";
-import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
+  import { goAuth } from "$lib/goAuth.svelte";
+  import { hostableProtocolFor } from "$lib/goCatalog";
+  import type { HostRuntime } from "$lib/hostRuntime";
+  import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
   import {
     endGoPlay,
     startGoAnalyticsFlusher,
@@ -150,8 +149,7 @@ import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
   });
 
   $effect(() => {
-    // 邀請對弈開場後保留頁內操作（Host bar ／分享面），不進入全屏畫布模式。
-    chromeSession.setCanvasActive(showCanvas && !hostLiving);
+    chromeSession.setCanvasActive(showCanvas);
     return () => chromeSession.setCanvasActive(false);
   });
 
@@ -173,30 +171,13 @@ import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
     void runtime.bootFromCatalogId(id);
   }
 
-  // —— GO-INVITE：玩家主場（框架，protocol 由 catalog 決定）——
+  // —— GO-INVITE：殼只提供分享面／登入閘／env.HOST；邀請 CTA 在 SAM 內（pg-gomoku）——
 
-  const hostProtocol = $derived(hostableProtocolFor(entry));
-  const hostable = $derived(Boolean(hostProtocol));
+  const hostable = $derived(Boolean(hostableProtocolFor(entry)));
 
   let hostInvite: HostInviteController | null = $state(null);
-  let hostBusy = $state(false);
   let hostShareOpen = $state(false);
   let hostShare: HostInviteShare | null = $state(null);
-  /** Host runtime phase mirror (reactive). */
-  let hostPhase = $state<"idle" | "open" | "waiting" | "ready" | "active" | "ended" | "error">("idle");
-
-  const hostLiving = $derived(hostPhase !== "idle" && hostPhase !== "error");
-
-  $effect(() => {
-    const c = hostInvite;
-    if (!c) {
-      hostPhase = "idle";
-      return;
-    }
-    return c.subscribe(s => {
-      hostPhase = s.phase;
-    });
-  });
 
   $effect(() => {
     const id = catalogId;
@@ -215,8 +196,7 @@ import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
     bind.bind();
     hostInvite = bind;
     // DEC-053: hand `soloRuntime` the live HostRuntime so mounted canvases can
-    // resolve `env.HOST` (functions.js sees the same singleton the host bar
-    // uses — no split state).
+    // resolve `env.HOST` (functions.js sees the same singleton — no split state).
     hostRuntimeRef = bind.getHostRuntime();
     return () => {
       bind.unbind();
@@ -239,7 +219,6 @@ import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
   }
 
   function routeLoginNeeded(_ev: GoShellPlatformLoginNeededEvent) {
-    hostBusy = false;
     chromeSession.setFlash("要邀請對弈需先登入遊樂場通行證");
     goAuth.login();
   }
@@ -258,47 +237,8 @@ import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
     });
   });
 
-  async function inviteOpponent() {
-    const b = hostInvite;
-    if (!b) return;
-    hostBusy = true;
-    try {
-      const share = await b.mintShare();
-      if (share) openHostShare(share);
-    } catch (e) {
-      const code =
-        e && typeof e === "object" && "code" in e
-          ? String((e as { code: unknown }).code)
-          : "";
-      if (code === "not_provisioned") {
-        routeLoginNeeded({
-          kind: "login_needed",
-          message: e instanceof Error ? e.message : "請先登入",
-        });
-      } else {
-        chromeSession.setFlash(
-          e instanceof Error ? e.message : "邀請失敗，請稍後再試"
-        );
-      }
-    } finally {
-      hostBusy = false;
-    }
-  }
-
   function closeHostShareSheet() {
     hostShareOpen = false;
-  }
-
-  /** 開始一局：generic opaque host act（framework 不解讀 payload）。 */
-  function hostStart() {
-    void hostInvite?.act({ type: "start", firstRole: "host" });
-  }
-  function hostRestart() {
-    void hostInvite?.act({ type: "reset", firstRole: "host" });
-  }
-  function hostClose() {
-    void hostInvite?.close();
-    chromeSession.setFlash("已結束這一場");
   }
 </script>
 
@@ -363,24 +303,8 @@ import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
   </div>
 {:else}
   <h1 class="sr-only">{status.entry?.title || entry?.title || "小品"}</h1>
-  {#if hostable}
-    <GoHostBar
-      loggedIn={goAuth.loggedIn}
-      controller={hostInvite}
-      busy={hostBusy}
-      onInvite={inviteOpponent}
-      onLoginNeeded={() => goAuth.login()}
-      onStart={hostStart}
-      onReset={hostRestart}
-      onClose={hostClose}
-    />
-  {/if}
   {#if showCanvas}
-    <div
-      class={["stage", hostLiving ? "" : "stage--fill"]
-        .filter(Boolean)
-        .join(" ")}
-    >
+    <div class="stage stage--fill">
       {#if status.canvasMode === "memory" && status.canvasSrcdoc}
         {#key status.canvasGeneration}
           <iframe
