@@ -7,4 +7,8 @@ Allow: /s/
 # Invite short links are temporary／session-scoped (DEC-050).
 Disallow: /i/
 
+# Device-local offline library — not a public catalog.
+Disallow: /apps
+Disallow: /apps/
+
 Sitemap: https://go.samkuo.me/sitemap.xml

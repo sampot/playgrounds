@@ -5,6 +5,7 @@
     GO_HELP_DESCRIPTION,
     GO_HELP_DOCUMENT_TITLE,
     goOgMeta,
+    goWebPageJsonLd,
   } from "$lib/goShareMeta";
   import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
 
@@ -13,7 +14,13 @@
     description: GO_HELP_DESCRIPTION,
     url: `${PLAYGROUNDS_GO_ORIGIN}/help`,
   });
-
+  const pageLdJson = JSON.stringify(
+    goWebPageJsonLd({
+      title: og.title,
+      description: og.description,
+      url: og.url,
+    })
+  );
   let backHref = $state("/");
   let backLabel = $state("← 回純玩首頁");
 
@@ -63,10 +70,14 @@
   <meta property="og:image" content={og.image} />
   <meta property="og:image:width" content={String(og.imageWidth)} />
   <meta property="og:image:height" content={String(og.imageHeight)} />
+  <meta property="og:image:alt" content={og.imageAlt} />
   <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:site" content={og.twitterSite} />
   <meta name="twitter:title" content={og.title} />
   <meta name="twitter:description" content={og.description} />
   <meta name="twitter:image" content={og.image} />
+  <meta name="twitter:image:alt" content={og.imageAlt} />
+  {@html `<script type="application/ld+json">${pageLdJson}</script>`}
 </svelte:head>
 
 <p class="help-back">

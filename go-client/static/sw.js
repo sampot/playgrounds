@@ -312,6 +312,8 @@ function isShellCacheablePath(pathname) {
     pathname === "/robots.txt" ||
     pathname === "/sitemap.xml" ||
     pathname === "/favicon.svg" ||
+    pathname === "/favicon.ico" ||
+    pathname === "/favicon-32x32.png" ||
     pathname === "/og.png" ||
     pathname === "/apple-touch-icon.png" ||
     pathname === "/icons/apple-touch-icon.png" ||
@@ -351,6 +353,8 @@ function extractShellAssetUrls(html, origin) {
   add("/robots.txt");
   add("/sitemap.xml");
   add("/favicon.svg");
+  add("/favicon.ico");
+  add("/favicon-32x32.png");
   add("/og.png");
   add("/apple-touch-icon.png");
   add("/icons/apple-touch-icon.png");

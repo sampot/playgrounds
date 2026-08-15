@@ -1,7 +1,7 @@
 {
   "name": "山姆鍋遊樂場 · 純玩",
   "short_name": "純玩",
-  "description": "山姆鍋遊樂場 · 純玩 — Let's dash, go, and play!",
+  "description": "免安裝、無編輯器的玩家主場：挑一款瀏覽器小品打開就玩，造訪過的還能離線再開。",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

@@ -18,12 +18,20 @@ describe("go sitemap", () => {
   });
 
   it("builds urlset with home, help, and /s/ paths", () => {
-    const xml = buildSitemapXml("https://go.samkuo.me", ["pg-breakout"]);
+    const xml = buildSitemapXml("https://go.samkuo.me", ["pg-breakout"], {
+      lastmod: "2026-08-15",
+    });
     expect(xml).toContain("<loc>https://go.samkuo.me/</loc>");
     expect(xml).toContain("<loc>https://go.samkuo.me/help</loc>");
     expect(xml).toContain("<loc>https://go.samkuo.me/s/pg-breakout</loc>");
+    expect(xml).toContain("<lastmod>2026-08-15</lastmod>");
     expect(xml).not.toContain("/i/");
     expect(xml).toContain('xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"');
+  });
+
+  it("omits lastmod when not provided", () => {
+    const xml = buildSitemapXml("https://go.samkuo.me", ["pg-breakout"]);
+    expect(xml).not.toContain("<lastmod>");
   });
 
   it("encodes catalog ids in loc", () => {

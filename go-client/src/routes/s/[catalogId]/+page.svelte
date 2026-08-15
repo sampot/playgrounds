@@ -9,6 +9,10 @@
     goSamCanonicalUrl,
     goSamDescription,
     goSamDocumentTitle,
+    goSamIsIndexable,
+    goSamJsonLd,
+    goSamKindLabel,
+    goWebPageJsonLd,
   } from "$lib/goShareMeta";
   import { isLikelyOffline } from "$lib/goFriendlyError";
   import {
@@ -56,8 +60,18 @@
         : `${PLAYGROUNDS_GO_ORIGIN}/`,
     })
   );
-
-  let status = $state<SoloStatus | null>(null);
+  const indexable = $derived(goSamIsIndexable(entry));
+  const pageLdJson = $derived(
+    JSON.stringify(
+      entry
+        ? goSamJsonLd(entry, PLAYGROUNDS_GO_ORIGIN)
+        : goWebPageJsonLd({
+            title: og.title,
+            description: og.description,
+            url: og.url,
+          })
+    )
+  );  let status = $state<SoloStatus | null>(null);
   // Mutable slot for the host-runtime getter (DEC-053 env.HOST). `hostInvite`
   // is created in a `$effect` and binds a `HostRuntime` later than the canvas
   // mounts, so we hand `soloRuntime` a getter that reads the latest binding.
@@ -245,6 +259,9 @@
 <svelte:head>
   <title>{og.title}</title>
   <meta name="description" content={og.description} />
+  {#if !indexable}
+    <meta name="robots" content="noindex, nofollow" />
+  {/if}
   <link rel="canonical" href={og.url} />
   <meta property="og:type" content="website" />
   <meta property="og:locale" content="zh_TW" />
@@ -255,10 +272,16 @@
   <meta property="og:image" content={og.image} />
   <meta property="og:image:width" content={String(og.imageWidth)} />
   <meta property="og:image:height" content={String(og.imageHeight)} />
+  <meta property="og:image:alt" content={og.imageAlt} />
   <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:site" content={og.twitterSite} />
   <meta name="twitter:title" content={og.title} />
   <meta name="twitter:description" content={og.description} />
   <meta name="twitter:image" content={og.image} />
+  <meta name="twitter:image:alt" content={og.imageAlt} />
+  {#if indexable}
+    {@html `<script type="application/ld+json">${pageLdJson}</script>`}
+  {/if}
 </svelte:head>
 
 {#if !catalogId}
@@ -279,6 +302,17 @@
   </div>
 {:else if !status || status.phase === "idle" || status.phase === "loading"}
   <h1 class="pixel-text">{entry?.title || status?.entry?.title || "開啟小品"}</h1>
+  {#if entry?.blurb}
+    <p class="sam-blurb">{entry.blurb}</p>
+  {/if}
+  <p class="sam-lede">在純玩開啟即玩，免安裝。</p>
+  {#if entry?.series || entry?.kind}
+    <p class="sam-meta">
+      {#if entry.series}<span>{entry.series}</span>{/if}
+      {#if entry.series && entry.kind}<span aria-hidden="true"> · </span>{/if}
+      {#if entry.kind}<span>{goSamKindLabel(entry.kind)}</span>{/if}
+    </p>
+  {/if}
   <div class="pixel-status" role="status">
     <p class="pixel-status-title">{status?.message || "正在載入…"}</p>
     <GoSamLoadBar
@@ -303,6 +337,9 @@
   </div>
 {:else}
   <h1 class="sr-only">{status.entry?.title || entry?.title || "小品"}</h1>
+  {#if entry?.blurb}
+    <p class="sr-only">{entry.blurb}</p>
+  {/if}
   {#if showCanvas}
     <div class="stage stage--fill">
       {#if status.canvasMode === "memory" && status.canvasSrcdoc}
@@ -345,6 +382,22 @@
     flex-wrap: wrap;
     gap: 0.65rem;
     margin: 0.75rem 0 0;
+  }
+  .sam-blurb {
+    margin: 0.35rem 0 0;
+    font-size: 0.95rem;
+    line-height: 1.45;
+    color: rgb(var(--ink) / 0.88);
+  }
+  .sam-lede {
+    margin: 0.35rem 0 0;
+    font-size: 0.85rem;
+    color: rgb(var(--ink) / 0.72);
+  }
+  .sam-meta {
+    margin: 0.25rem 0 0.75rem;
+    font-size: 0.78rem;
+    color: rgb(var(--ink) / 0.58);
   }
   .stage {
     flex: 1;

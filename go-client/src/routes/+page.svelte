@@ -5,6 +5,7 @@
     GO_HOME_DOCUMENT_TITLE,
     GO_HOME_LEAD,
     goOgMeta,
+    goWebsiteJsonLd,
   } from "$lib/goShareMeta";
   import {
     claimBossWelcome,
@@ -35,7 +36,8 @@
     description: GO_HOME_DESCRIPTION,
     url: `${PLAYGROUNDS_GO_ORIGIN}/`,
   });
-
+  const websiteLd = goWebsiteJsonLd();
+  const websiteLdJson = JSON.stringify(websiteLd);
   onMount(() => {
     let authChecks = 0;
     let timer: ReturnType<typeof setTimeout>;
@@ -133,10 +135,14 @@
   <meta property="og:image" content={og.image} />
   <meta property="og:image:width" content={String(og.imageWidth)} />
   <meta property="og:image:height" content={String(og.imageHeight)} />
+  <meta property="og:image:alt" content={og.imageAlt} />
   <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:site" content={og.twitterSite} />
   <meta name="twitter:title" content={og.title} />
   <meta name="twitter:description" content={og.description} />
   <meta name="twitter:image" content={og.image} />
+  <meta name="twitter:image:alt" content={og.imageAlt} />
+  {@html `<script type="application/ld+json">${websiteLdJson}</script>`}
 </svelte:head>
 
 <h1 class="pixel-text">純玩</h1>

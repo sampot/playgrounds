@@ -15,7 +15,7 @@ const config = {
       // Cloudflare `not_found_handling: single-page-application` still serves index.html
       // for unknown paths — listed `/s/<id>` are static `s/<id>.html` with per-entry meta.
       fallback: "200.html",
-      precompress: false,
+      precompress: true,
       strict: true,
     }),
     alias: {

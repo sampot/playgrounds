@@ -176,6 +176,7 @@
 <svelte:head>
   <title>可離線玩的遊戲</title>
   <meta name="description" content="管理這台裝置可離線玩的遊戲與小品" />
+  <meta name="robots" content="noindex, nofollow" />
 </svelte:head>
 
 <p class="back">

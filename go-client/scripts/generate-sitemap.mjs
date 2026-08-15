@@ -29,21 +29,30 @@ export function listedCatalogIds(entries) {
 /**
  * @param {string} origin
  * @param {string[]} catalogIds
+ * @param {{ lastmod?: string }} [opts]
  * @returns {string}
  */
-export function buildSitemapXml(origin = GO_SITEMAP_ORIGIN, catalogIds = []) {
+export function buildSitemapXml(
+  origin = GO_SITEMAP_ORIGIN,
+  catalogIds = [],
+  opts = {}
+) {
   const base = origin.replace(/\/$/, "");
+  const lastmod =
+    typeof opts.lastmod === "string" && /^\d{4}-\d{2}-\d{2}/.test(opts.lastmod)
+      ? opts.lastmod.slice(0, 10)
+      : "";
   const urls = [
     `${base}/`,
     `${base}/help`,
     ...catalogIds.map(id => `${base}/s/${encodeURIComponent(id)}`),
   ];
   const body = urls
-    .map(
-      loc => `  <url>
-    <loc>${escapeXml(loc)}</loc>
-  </url>`
-    )
+    .map(loc => {
+      const lines = [`    <loc>${escapeXml(loc)}</loc>`];
+      if (lastmod) lines.push(`    <lastmod>${lastmod}</lastmod>`);
+      return `  <url>\n${lines.join("\n")}\n  </url>`;
+    })
     .join("\n");
   return `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -63,12 +72,19 @@ function escapeXml(s) {
 }
 
 /**
- * @param {{ catalogJsonPath: string, outPath: string, origin?: string }} opts
+ * @param {{ catalogJsonPath: string, outPath: string, origin?: string, lastmod?: string }} opts
  */
-export function generateGoSitemap({ catalogJsonPath, outPath, origin = GO_SITEMAP_ORIGIN }) {
+export function generateGoSitemap({
+  catalogJsonPath,
+  outPath,
+  origin = GO_SITEMAP_ORIGIN,
+  lastmod,
+}) {
   const raw = JSON.parse(readFileSync(catalogJsonPath, "utf8"));
   const ids = listedCatalogIds(raw.entries ?? []);
-  const xml = buildSitemapXml(origin, ids);
+  const xml = buildSitemapXml(origin, ids, {
+    lastmod: lastmod ?? new Date().toISOString().slice(0, 10),
+  });
   writeFileSync(outPath, xml, "utf8");
   return { count: 2 + ids.length, listed: ids.length, outPath };
 }
