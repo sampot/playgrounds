@@ -28,9 +28,12 @@ describe("goFunctionsRuntime — host default handler fallback (Phase 6)", () =>
     };
   }
 
-  function ctx(extra: Record<string, unknown> = {}) {
+  function ctx(
+    extra: Record<string, unknown> = {},
+    files: Record<string, string> = filesWithoutFunctionsJs(),
+  ) {
     return {
-      getFiles: () => filesWithoutFunctionsJs(),
+      getFiles: () => files,
       getCatalogId: () => "pg-hello-sdk",
       getSandboxId: () => "hello-sdk",
       ...extra,
@@ -113,6 +116,31 @@ describe("goFunctionsRuntime — host default handler fallback (Phase 6)", () =>
     ) as { intrinsics: string[]; bindings: string[] };
     // env.KV/env.DB are always wired; env.vars only appears when the
     // host supplies a parsed .env via getEnvVars.
+    expect(data.intrinsics).toEqual(expect.arrayContaining(["kv", "db"]));
+  });
+
+  it("treats a legacy empty functions.js stub as no custom handler", async () => {
+    const response = await handleGoFunctionsApi(
+      ctx(
+        {},
+        {
+          "index.html": "<!doctype html><html><body>hi</body></html>",
+          "functions.js": `
+            /* Legacy game template: storage was called directly from the UI. */
+            export default {};
+          `,
+        },
+      ),
+      serializeRequest({
+        method: "GET",
+        url: "https://go.local/api/capabilities",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const data = JSON.parse(
+      new TextDecoder().decode(response.body ?? new ArrayBuffer(0)),
+    ) as { intrinsics: string[] };
     expect(data.intrinsics).toEqual(expect.arrayContaining(["kv", "db"]));
   });
 

@@ -11,6 +11,7 @@
 
 import {
   deserializeRequest,
+  FUNCTIONS_ENTRY,
   functionsUnavailableBody,
   serializeResponse,
   type SerializedRequest,
@@ -22,7 +23,7 @@ import {
   loadFunctionsModule,
   type LoadedFunctionsModule,
 } from "@pg/functionsRuntime";
-import type { FileMap } from "@pg/projectTypes";
+import { isTextContent, type FileMap } from "@pg/projectTypes";
 import { createDefaultFunctionsHandler } from "../../../src/sam-runtime/defaultFunctionsHandler.ts";
 import { createGoWebDb } from "./goWebDb";
 import {
@@ -129,6 +130,21 @@ function createNoopSamExecutionContext(): import("../../../src/sam-runtime/types
   };
 }
 
+/**
+ * Early game templates sometimes shipped `export default {}` only to mark the
+ * optional Functions slot. Treat that exact no-op shape as absent so the host
+ * default routes remain available; malformed non-empty handlers still fail.
+ */
+function isLegacyEmptyFunctionsStub(files: FileMap): boolean {
+  const source = files[FUNCTIONS_ENTRY];
+  if (!isTextContent(source)) return false;
+  const code = source
+    .replace(/\/\*[\s\S]*?\*\//gu, "")
+    .replace(/^\s*\/\/.*$/gmu, "")
+    .trim();
+  return /^export\s+default\s*\{\s*\}\s*;?$/u.test(code);
+}
+
 function jsonBytesResponse(body: string, status: number): SerializedResponse {
   const bytes = new TextEncoder().encode(body);
   const copy = new Uint8Array(bytes.byteLength);
@@ -168,6 +184,7 @@ async function getModule(
     }
     moduleCache.delete(cacheKey);
   }
+  if (isLegacyEmptyFunctionsStub(files)) return null;
   const mod = await loadFunctionsModule(files);
   if (!mod) return null;
   moduleCache.set(cacheKey, { fingerprint: fp, mod, isDefault: false });
