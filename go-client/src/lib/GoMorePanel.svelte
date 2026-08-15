@@ -397,7 +397,7 @@
     --gm-line: var(--line, 214 222 219);
     --gm-muted: var(--muted, 100 116 112);
     --gm-danger: 180 35 45;
-    --gm-radius: 0.5rem;
+    --gm-radius: var(--radius, 8px);
     margin: 0;
     padding: 0;
     border: none;

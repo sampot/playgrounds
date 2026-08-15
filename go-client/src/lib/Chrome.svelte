@@ -3,6 +3,7 @@
   import { chromeSession } from "$lib/chromeSession.svelte";
   import GoMorePanel from "$lib/GoMorePanel.svelte";
   import GoProfilePanel from "$lib/GoProfilePanel.svelte";
+  import GoWordmark from "$lib/GoWordmark.svelte";
   import GoShareSheet from "$lib/GoShareSheet.svelte";
   import { goAuth } from "$lib/goAuth.svelte";
   import { recommendSameKind } from "$lib/goCatalog";
@@ -386,7 +387,7 @@
         profileOpen = false;
       }}
     >
-      <span class="play-label">山姆鍋遊樂場</span>
+      <GoWordmark />
     </a>
     <div class="chrome-actions">
     {#if showMore}

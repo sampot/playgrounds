@@ -11,7 +11,7 @@
     "Microsoft JhengHei", "Noto Sans TC", sans-serif;
   --pixel: "DotGothic16", "Zpix", "Courier New", ui-monospace,
     "SFMono-Regular", Menlo, Consolas, monospace;
-  --radius: 2px;
+  --radius: 8px;
   --pixel-shadow: 0 3px 0 0 rgb(var(--ink));
   --pixel-edge: 3px;
   /* 像素描邊：單向輕描邊，保留 8-bit 感但不壓字（CJK 不宜多向硬描邊）。 */
@@ -302,9 +302,13 @@ a {
   min-height: 2.5rem;
   text-align: left;
 }
-.chrome--compact .play-label {
-  text-align: left;
-  white-space: nowrap;
+ .chrome a.play-link .go-wordmark {
+  width: auto;
+  height: 2rem;
+  max-width: 100%;
+}
+.chrome--compact a.play-link .go-wordmark {
+  height: 1.6rem;
 }
 .chrome--compact .share-btn,
 .chrome--compact .hdr-next,
@@ -343,9 +347,6 @@ a {
 }
 .chrome a.play-link:focus-visible {
   box-shadow: 0 0 0 2px color-mix(in oklab, rgb(var(--accent)) 45%, transparent);
-}
-.chrome .play-label {
-  line-height: 1.2;
 }
 .chrome .host {
   font-size: 0.7rem;
@@ -398,6 +399,59 @@ a {
   padding: 0.25rem 0.6rem;
   min-height: 2rem;
   font-size: 0.72rem;
+}
+/* 手機：wordmark 放大填滿行高、取消 play-link 的 flex:1 留白，
+   並縮小 logo／按鈕／間距，避免換行同時消除 logo 與按鈕間的空隙。 */
+@media (max-width: 30rem) {
+  .chrome {
+    gap: 0.3rem;
+    row-gap: 0.2rem;
+    padding: 0.4rem 0.5rem;
+  }
+  .chrome a.mark-link {
+    min-width: 2rem;
+    min-height: 2rem;
+  }
+  .chrome .mark {
+    width: 1.15rem;
+    height: 1.15rem;
+  }
+  .chrome a.play-link {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: auto;
+    padding: 0;
+    display: flex;
+    align-items: center;
+  }
+  .chrome a.play-link .go-wordmark {
+    width: 100%;
+    max-width: 11rem;
+    height: auto;
+  }
+  .chrome--compact a.play-link .go-wordmark {
+    max-width: 9rem;
+  }
+  .chrome-actions {
+    gap: 0.25rem;
+  }
+  .chrome .share-btn,
+  .chrome .hdr-more-btn,
+  .chrome .hdr-next,
+  .chrome .profile-btn {
+    min-width: 2.2rem;
+    min-height: 2.15rem;
+    padding: 0.25rem 0.4rem;
+    font-size: 0.72rem;
+  }
+  .chrome--compact .share-btn,
+  .chrome--compact .hdr-next,
+  .chrome--compact .hdr-more-btn,
+  .chrome--compact .profile-btn {
+    min-height: 2rem;
+    padding: 0.2rem 0.4rem;
+    font-size: 0.7rem;
+  }
 }
 .chrome .profile-glyph {
   display: inline-flex;
@@ -601,7 +655,7 @@ a {
 }
 .go-load-bar-fill {
   height: 100%;
-  border-radius: 0;
+  border-radius: var(--radius);
   background:
     repeating-linear-gradient(
       90deg,
