@@ -664,7 +664,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     title: "台灣麻將",
     kind: "game",
     series: "桌遊",
-    blurb: "十六張台規簡化版：補花、吃碰槓胡、簡化台；四人人機。",
+    blurb: "十六張常見可配家規：補花吃碰槓胡、正花拉莊搶槓、可託管人機。",
     source: "sampot/pg-mahjong",
     status: "unlisted",
     license: "MIT",
