@@ -201,30 +201,34 @@
   }
   .game-drawer-rail {
     position: absolute;
+    top: 0;
+    /* 統一貼齊畫面最左邊。 */
+    left: 0;
+    /* 零尺寸定位錨；把手與面板各自絕對定位，展開時把手不位移。 */
+    width: 0;
+    height: 100%;
+    pointer-events: none;
+  }
+  .game-drawer-handle {
+    position: absolute;
     top: 50%;
     left: 0;
     transform: translateY(-50%);
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.5rem;
-    pointer-events: auto;
-  }
-  .game-drawer-handle {
-    width: 2.75rem;
-    height: 2.75rem;
+    width: 0.75rem;
+    height: 3.25rem;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     border: var(--pixel-edge) solid rgb(var(--ink));
-    border-left: none;
-    border-radius: 0 var(--radius) var(--radius) 0;
+    border-radius: var(--pixel-edge);
     background: rgb(var(--card));
     color: rgb(var(--ink));
     font-family: var(--pixel);
-    font-size: 1.1rem;
+    font-size: 0.5rem;
+    line-height: 1;
     cursor: pointer;
     box-shadow: var(--pixel-shadow);
+    pointer-events: auto;
     -webkit-tap-highlight-color: color-mix(
       in oklab,
       rgb(var(--accent)) 24%,
@@ -238,6 +242,13 @@
     outline: none;
   }
   .game-drawer-panel {
+    position: absolute;
+    /* 頂部對齊 FAB 頂部（FAB 高 3.25rem、半高 1.625rem），與 FAB 右緣
+       實際接觸、連成同一塊，而非只座標貼齊。 */
+    top: calc(50% - 1.625rem);
+    /* 貼齊 FAB 右緣（FAB 寬 0.75rem＋其右邊框 3px，避免兩邊框重疊）；
+       與把手寬度同步。 */
+    left: calc(0.75rem + var(--pixel-edge));
     width: 16rem;
     max-width: 78vw;
     display: flex;
@@ -248,6 +259,32 @@
     border-radius: var(--radius);
     background: rgb(var(--fill));
     box-shadow: var(--pixel-shadow);
+    pointer-events: auto;
+  }
+  /* 展開時 FAB 與選單連成一體：去掉相接的邊框與圓角，選單貼到 FAB 外緣，
+     兩者共享一條連續外框，看起來是同一塊。 */
+  .game-drawer--open .game-drawer-handle {
+    border-right: none;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+    /* 底色／邊框與選單一致，看起來是同一塊；強制邊框為黑（--ink），
+       避免手機觸控 lingering :hover 把邊框變成 accent 而與選單不一致。 */
+    background: rgb(var(--fill));
+    border-color: rgb(var(--ink));
+  }
+  .game-drawer--open .game-drawer-handle:hover,
+  .game-drawer--open .game-drawer-handle:focus-visible {
+    border-color: rgb(var(--ink));
+    color: rgb(var(--ink));
+    outline: none;
+  }
+  .game-drawer--open .game-drawer-panel {
+    top: calc(50% - 1.625rem);
+    /* 往右移 3px（FAB 右邊框寬），不與 FAB 外緣重疊。 */
+    left: calc(0.75rem + var(--pixel-edge));
+    border-left: none;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
   }
   .game-drawer-title {
     margin: 0 0 0.25rem;
@@ -329,14 +366,30 @@
   .game-drawer-confirm-actions .game-drawer-btn {
     text-align: center;
   }
-  /* 手機：把手放大、面板不超過視寬，維持可觸達。 */
+  /* 手機：把手縮窄並貼最左邊（視窗邊緣），面板不超過視寬。 */
   @media (max-width: 30rem) {
+    .game-drawer-rail {
+      left: 0;
+    }
     .game-drawer-handle {
-      width: 3rem;
+      width: 0.67rem;
       height: 3rem;
+      font-size: 0.45rem;
+      border-radius: var(--pixel-edge) 0 0 var(--pixel-edge);
+      border-right: none;
     }
     .game-drawer-panel {
+      top: calc(50% - 1.5rem);
+      left: calc(0.67rem + var(--pixel-edge));
       width: 14rem;
+    }
+    .game-drawer--open .game-drawer-panel {
+      /* 手機 FAB 高 3rem（半高 1.5rem）：頂部對齊 FAB，並右移 3px。 */
+      top: calc(50% - 1.5rem);
+      left: calc(0.67rem + var(--pixel-edge));
+      border-left: none;
+      border-top-left-radius: 0;
+      border-bottom-left-radius: 0;
     }
   }
   @media (prefers-reduced-motion: reduce) {

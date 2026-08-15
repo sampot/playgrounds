@@ -124,6 +124,14 @@
     }
   });
 
+  /** Drawer 展開時強制顯示 header（即便之前因 auto-hide 已隱藏）。 */
+  $effect(() => {
+    if (drawerOpen && chromeHidden) {
+      chromeHidden = false;
+      scheduleChromeAutoHide();
+    }
+  });
+
   /**
    * Auto-hide timer owner. Runs whenever hideability／visibility／panel state
    * changes; uses a null-guard so a frequently re-running effect (canvas
