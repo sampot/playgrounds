@@ -1380,6 +1380,16 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     license: "MIT",
   },
   {
+    id: "pg-yakyu",
+    title: "野球生涯",
+    kind: "game",
+    series: "精緻可玩",
+    blurb: "虛構青棒校隊生涯（台味應援／紅土全國賽）；關鍵打席揮棒、其餘快轉；短賽季決賽。",
+    source: "sampot/pg-yakyu",
+    status: "unlisted",
+    license: "MIT",
+  },
+  {
     id: "pg-yamlfmt",
     title: "YAML 整形",
     kind: "tool",

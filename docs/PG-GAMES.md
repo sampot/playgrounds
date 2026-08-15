@@ -13,9 +13,9 @@
 
 ---
 
-## 已實作（78）
+## 已實作（79）
 
-### 精緻可玩（10＋3 unlisted）
+### 精緻可玩（10＋4 unlisted）
 | id | 標題 | 一句話 |
 | --- | --- | --- |
 | `pg-chengyu` | 成語接龍 | 末字起頭接龍、挑戰計分與人機 |
@@ -28,6 +28,7 @@
 | `pg-sokoban` | 推箱子 | 十二關、復原、滑動操作 |
 | `pg-statue` | 一二三木頭人 | 移動／定格賽跑、人機裁判 |
 | `pg-sandrts` | 沙丘戰線 | **unlisted**；障礙繞行＋空襲；指揮部被毀即出局 |
+| `pg-yakyu` | 野球生涯 | **unlisted**；虛構青棒校隊、關鍵打席揮棒、其餘快轉、短賽季決賽 |
 | `pg-gongzhu` | 抽豬 | 夜市抽卡遊戲、避豬計分 |
 
 ### 街機（16＋3 unlisted）
@@ -152,6 +153,7 @@
 | 小瑪莉、夾娃娃、推幣機、彈珠台、光槍射擊、彩票機、釘珠、賽馬燈、賓果燈、投籃／射門／釣魚／轉轉樂／疊疊／滾球／測力拳／力氣錘 | `pg-mali`、`pg-clawgrab`、`pg-coinpush`、`pg-pinball`、`pg-lightgun`、`pg-ticketgrab`、`pg-pinfall`、`pg-horselit`、`pg-bingolite`、`pg-hoopshot`、`pg-goalshot`、`pg-fishcab`、`pg-prizewheel`、`pg-stacker`、`pg-skeeball`、`pg-punchpad`、`pg-strongman` |
 | 跳房子／踢毽子、木頭人、飛行棋簡化、躍階平台 | `pg-hopkick`、`pg-statue`、`pg-wingrace`、`pg-leaptrail`、`pg-pixelhop` |
 | 短關地城探索／戰鬥節奏 | `pg-microdungeon` |
+| 青棒／棒球生涯（關鍵打席＋快轉） | `pg-yakyu` |
 | 小地圖收集／避開 | `pg-cityroam` |
 | 固定畫面太空射擊 | `pg-starshot`（若做 `pg-spacepulse` 須機制明顯不同） |
 | 固定點線塔防 | `pg-towerdef`（`pg-sandrts`＝自由佈局＋出擊 AI，勿做成複製品） |
