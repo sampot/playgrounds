@@ -1,10 +1,19 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import {
     GO_HOME_DESCRIPTION,
     GO_HOME_DOCUMENT_TITLE,
     GO_HOME_LEAD,
     goOgMeta,
   } from "$lib/goShareMeta";
+  import {
+    claimBossWelcome,
+    pickBossWelcome,
+    readRecentBossWelcomes,
+    rememberBossWelcome,
+  } from "$lib/goBossWelcome";
+  import { chromeSession } from "$lib/chromeSession.svelte";
+  import { goAuth } from "$lib/goAuth.svelte";
   import { recommendHome, searchGoCatalogById, type GoCatalogEntry } from "$lib/goCatalog";
   import GoSeriesIcon from "$lib/GoSeriesIcon.svelte";
   import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
@@ -22,6 +31,40 @@
     title: GO_HOME_DOCUMENT_TITLE,
     description: GO_HOME_DESCRIPTION,
     url: `${PLAYGROUNDS_GO_ORIGIN}/`,
+  });
+
+  onMount(() => {
+    let authChecks = 0;
+    let timer: ReturnType<typeof setTimeout>;
+
+    function welcomeWhenAuthSettles() {
+      // Provision/login feedback owns the shared flash channel. Wait for auth
+      // to settle, then stay quiet if it produced a more important message.
+      if (goAuth.busy) {
+        if (authChecks < 50) {
+          authChecks += 1;
+          timer = setTimeout(welcomeWhenAuthSettles, 100);
+        } else {
+          // Auth feedback keeps priority even if its network request is slow.
+          claimBossWelcome(sessionStorage);
+        }
+        return;
+      }
+
+      if (!claimBossWelcome(sessionStorage)) return;
+      if (chromeSession.flash) return;
+
+      const welcome = pickBossWelcome({
+        recentIndices: readRecentBossWelcomes(localStorage),
+      });
+      rememberBossWelcome(localStorage, welcome.index);
+      chromeSession.setFlash(welcome.text, 3800);
+    }
+
+    // Let the root layout start goAuth.initFromLocation() before deciding
+    // whether the welcome or login feedback should use the flash channel.
+    timer = setTimeout(welcomeWhenAuthSettles, 250);
+    return () => clearTimeout(timer);
   });
 
   // 首頁推薦：單列顯示，數量依螢幕寬度 2/3/4（手機→平板→寬螢幕）。

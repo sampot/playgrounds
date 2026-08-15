@@ -387,7 +387,7 @@
         src="/favicon.svg"
         width="22"
         height="22"
-        alt="純玩"
+        alt="遊樂場老闆"
       />
     </a>
     <a
