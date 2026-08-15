@@ -13,7 +13,7 @@
 
 ---
 
-## 已實作（69）
+## 已實作（70）
 
 ### 精緻可玩（10＋3 unlisted）
 | id | 標題 | 一句話 |
@@ -89,11 +89,12 @@
 | **`pg-lightgun`** | **光槍射擊** | **鼠標瞄準射击、即時反擊，街機光槍射击 Web 版** |
 | **`pg-ticketgrab`** | **彩票機** | **投幣抓取彩球、組合獲獎，街機經典紅利系統 Web 版** |
 
-### 桌遊（14＋6 unlisted）
+### 桌遊（15＋6 unlisted）
 
 | id | 標題 | 一句話 |
 | --- | --- | --- |
 | `pg-big2` | 大老二 | 四人出牌人機 |
+| `pg-blackjack` | 21點 | 對莊家要牌／停牌／加倍、籌碼下注；S17、天然 3:2 |
 | `pg-gomoku` | 五子棋 | 雙人／人機；Invite `gomoku.v1` |
 | `pg-junqi` | 軍棋 | 陸戰棋暗棋對 AI |
 | `pg-liarsdice` | 大話骰 | **unlisted**；喊「N 個 X」可加喊或抓、1 點萬能、拔骰出局 |
@@ -128,13 +129,7 @@
 
 ### Backlog（依資源就緒度）
 
-| 就緒 | 台灣味 | 建議 id | 標題（暫） | 系列（暫） | 主要 `game-assets/` | 備註 |
-| --- | --- | --- | --- | --- | --- | --- |
-| 高 | ❌ | `pg-poker` | Texas Hold'em Poker | 撲克牌 | `art/playing-cards-pack/`<br>`sfx/casino-audio/` | 四人牌桌、 betting AI、翻牌節奏 |
-| 高 | ❌ | `pg-hearts` | Hearts (黑心) | 撲克牌 | `art/playing-cards-pack/`<br>`sfx/casino-audio/` | 四人避分、傳牌、Shoot the Moon |
-| 高 | ❌ | `pg-snackbar` | Catch 22 (點心桌) | 撲克牌 | `art/playing-cards-pack/`<br>`sfx/casino-audio/` | 吹牛玩法、懷舊街機風 |
-| 高 | ❌ | `pg-cheat` | Cheat (我懷疑) | 撲克牌 bluff | `art/playing-cards-pack/`<br>`sfx/casino-audio/` | 2-4人、吹牛+抓騙、wild card |
-| 高 | ❌ | `pg-bridge` | Contract Bridge | 橋牌 | `art/playing-cards-pack/`<br>`sfx/casino-audio/` | 4人 partnership、叫牌系統 |
+（空）
 
 已就緒 pack：`playing-cards-pack/` 完整牌組（三尺寸含 Joker）<br>`casino-audio/` 洗牌／發牌／籌碼音效<br>台灣味非限制，通用小品亦可排程 |
 
@@ -142,7 +137,7 @@
 
 | 題材 | 既有 id |
 | --- | --- |
-| 尪仔標、路名地產、成語、暗棋、鬥獸棋、軍棋、象棋、大老二、撿紅點、台灣麻將、新接龍 | `pg-wanzai`、`pg-twland`、`pg-chengyu`、`pg-banqi`、`pg-jungle`、`pg-junqi`、`pg-xiangqi`、`pg-big2`、`pg-redpick`、`pg-mahjong`、`pg-freecell` |
+| 尪仔標、路名地產、成語、暗棋、鬥獸棋、軍棋、象棋、大老二、21點、撿紅點、台灣麻將、新接龍 | `pg-wanzai`、`pg-twland`、`pg-chengyu`、`pg-banqi`、`pg-jungle`、`pg-junqi`、`pg-xiangqi`、`pg-big2`、`pg-blackjack`、`pg-redpick`、`pg-mahjong`、`pg-freecell` |
 | 夜市射氣球／套圈／打地鼠／切水果 | `pg-popshot`、`pg-ringtoss`、`pg-moletap`、`pg-fruitcut` |
 | 小瑪莉、夾娃娃、推幣機、彈珠台、光槍射擊、彩票機、釘珠、賽馬燈、賓果燈 | `pg-mali`、`pg-clawgrab`、`pg-coinpusher`、`pg-pinfall`、`pg-horselit`、`pg-bingolite` |
 | 跳房子／踢毽子、木頭人、飛行棋簡化、躍階平台 | `pg-hopkick`、`pg-statue`、`pg-wingrace`、`pg-leaptrail`、`pg-pixelhop` |

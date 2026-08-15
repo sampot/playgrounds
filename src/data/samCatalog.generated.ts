@@ -128,6 +128,16 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     license: "MIT",
   },
   {
+    id: "pg-blackjack",
+    title: "21點",
+    kind: "game",
+    series: "桌遊",
+    blurb: "對莊家要牌／停牌／加倍、籌碼下注；莊家 S17、天然黑傑克 3:2。",
+    source: "sampot/pg-blackjack",
+    status: "listed",
+    license: "MIT",
+  },
+  {
     id: "pg-bounceland",
     title: "彈珠沙盒",
     kind: "toy",
