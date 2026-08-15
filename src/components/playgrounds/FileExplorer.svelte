@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { FileTreeNode } from "./pathUtils";
   import PgIcon from "./PgIcon.svelte";
+  import FileExplorer from "./FileExplorer.svelte";
 
   interface Props {
     nodes: FileTreeNode[];
@@ -45,7 +46,7 @@
 >
   {#each nodes as node (node.path)}
     {@const selected = selectedPath === node.path}
-    <li role="treeitem" aria-expanded={node.kind === "dir" ? !!expanded[node.path] : undefined}>
+    <li role="treeitem" aria-expanded={node.kind === "dir" ? !!expanded[node.path] : undefined} aria-selected={selected}>
       {#if node.kind === "dir"}
         <div
           class="flex w-full items-stretch rounded hover:bg-skin-card {selected
@@ -117,7 +118,7 @@
           {/if}
         </div>
         {#if expanded[node.path]}
-          <svelte:self
+          <FileExplorer
             nodes={node.children}
             {openPath}
             {selectedPath}

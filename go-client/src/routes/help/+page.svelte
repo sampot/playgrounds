@@ -98,7 +98,7 @@
 <section class="help-section" aria-labelledby="help-offline">
   <h2 id="help-offline">離線再玩</h2>
   <p>
-    連線成功開過一次的遊戲，之後可在「更多 → 可離線玩」再開。邀請短連結（<span
+    連線成功開過一次的遊戲，之後可在「更多 → 已安裝遊戲」再開。邀請短連結（<span
       class="mono">/i/…</span
     >）是臨時的，不能當離線入口。
   </p>
