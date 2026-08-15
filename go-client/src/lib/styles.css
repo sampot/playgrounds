@@ -559,6 +559,9 @@ a {
   white-space: nowrap;
   -webkit-tap-highlight-color: color-mix(in oklab, rgb(var(--accent)) 24%, transparent);
 }
+.chrome .hdr-more-btn {
+  anchor-name: --go-more-trigger;
+}
 .chrome .profile-btn {
   margin-left: auto;
 }
