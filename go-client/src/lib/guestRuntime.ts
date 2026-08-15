@@ -73,6 +73,7 @@ export type GuestPhase =
   | "waiting_invite"
   | "seating"
   | "ready"
+  | "cancelled"
   | "error";
 
 export type GuestCanvasMode = "sw" | "memory";
@@ -587,7 +588,7 @@ export function createGuestRuntime() {
     unlistenApi = null;
     clearMemoryBlobs();
     set({
-      phase: "idle",
+      phase: "cancelled",
       message: "已取消",
       meta: null,
       canvasUrl: null,

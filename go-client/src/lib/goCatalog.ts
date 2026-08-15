@@ -229,22 +229,42 @@ export function recommendHome(
 }
 
 /**
- * 搜尋部分 catalog id，回傳最多 limit 個符合的遊戲（只搜 game 類型）。
- * 搜尋邏輯：輸入字串出現在 id 的任何位置即視為匹配（不區分大小寫）。
- * 包含 listed 和 unlisted 的遊戲。
+ * 搜尋小品：比對 id／title／blurb（不區分大小寫），回傳最多 limit 個 game。
+ * 排序：精確 id > id 包含 > title 包含 > blurb 包含。
+ * 含 listed 與 unlisted。
  */
-export function searchGoCatalogById(
+export function searchGoCatalog(
   query: string,
   limit = 3
 ): GoCatalogEntry[] {
   const q = query.trim().toLowerCase();
-  if (!q) return [];
-  
-  const pool = GO_CATALOG.filter(
-    e =>
-      e.kind === GO_RECOMMEND_KIND &&
-      e.id.toLowerCase().includes(q)
+  if (!q || limit <= 0) return [];
+
+  const scored: { entry: GoCatalogEntry; score: number }[] = [];
+  for (const entry of GO_CATALOG) {
+    if (entry.kind !== GO_RECOMMEND_KIND) continue;
+    const id = entry.id.toLowerCase();
+    const title = entry.title.toLowerCase();
+    const blurb = (entry.blurb || "").toLowerCase();
+    let score = 0;
+    if (id === q) score = 100;
+    else if (id.includes(q)) score = 80;
+    else if (title.includes(q)) score = 60;
+    else if (blurb.includes(q)) score = 40;
+    else continue;
+    scored.push({ entry, score });
+  }
+
+  scored.sort(
+    (a, b) => b.score - a.score || a.entry.id.localeCompare(b.entry.id)
   );
-  
-  return pool.slice(0, Math.min(limit, pool.length));
+  return scored.slice(0, Math.min(limit, scored.length)).map(s => s.entry);
+}
+
+/** @deprecated Prefer {@link searchGoCatalog}; kept as a thin alias. */
+export function searchGoCatalogById(
+  query: string,
+  limit = 3
+): GoCatalogEntry[] {
+  return searchGoCatalog(query, limit);
 }

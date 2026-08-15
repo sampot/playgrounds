@@ -8,6 +8,7 @@ import {
   recommendHome,
   recommendSameKind,
   sameKindPeers,
+  searchGoCatalog,
   searchGoCatalogById,
   seriesIcon,
 } from "./goCatalog";
@@ -115,6 +116,14 @@ describe("seriesIcon", () => {
   });
 });
 
+describe("searchGoCatalog", () => {
+  it("is the canonical alias used by the home page", () => {
+    expect(searchGoCatalog("打磚塊").map(e => e.id)).toEqual(
+      searchGoCatalogById("打磚塊").map(e => e.id)
+    );
+  });
+});
+
 describe("searchGoCatalogById", () => {
   it("returns empty array for empty query", () => {
     const result = searchGoCatalogById("");
@@ -151,5 +160,18 @@ describe("searchGoCatalogById", () => {
     expect(result.length).toBeGreaterThan(0);
     // 所有結果都應該是 game 類型
     expect(result.every(r => r.kind === "game")).toBe(true);
+  });
+
+  it("matches Chinese title and blurb, not only id", () => {
+    const byTitle = searchGoCatalogById("打磚");
+    expect(byTitle.some(r => r.id === "pg-breakout")).toBe(true);
+
+    const byBlurb = searchGoCatalogById("擋板反彈");
+    expect(byBlurb.some(r => r.id === "pg-breakout")).toBe(true);
+  });
+
+  it("prefers id hits over weaker title-only noise when both exist", () => {
+    const result = searchGoCatalogById("pg-breakout");
+    expect(result[0]?.id).toBe("pg-breakout");
   });
 });

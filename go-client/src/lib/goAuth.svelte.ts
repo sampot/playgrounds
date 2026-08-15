@@ -24,6 +24,7 @@ import {
   type MintInviteResult,
 } from "./platformClient";
 import { chromeSession } from "./chromeSession.svelte";
+import { BOSS_FLASH } from "./goBossWelcome";
 
 const PROFILE_STORAGE_KEY = "go_auth_profile";
 /** Session-scoped memory credential (cleared when the tab closes). */
@@ -177,7 +178,7 @@ class GoAuth {
 
   logout(): void {
     this.clear();
-    chromeSession.setFlash("已登出");
+    chromeSession.setFlash(BOSS_FLASH.loggedOut);
   }
 
   /**
@@ -211,10 +212,10 @@ class GoAuth {
         this.profile = profileFromFieldMe(me);
         writeStoredProfile(this.profile);
 
-        chromeSession.setFlash("已登入");
+        chromeSession.setFlash(BOSS_FLASH.loggedIn);
       } catch (err) {
         this.#clearApiKey();
-        chromeSession.setFlash("登入確認已失效，請從後台重新登入");
+        chromeSession.setFlash(BOSS_FLASH.loginExpired);
       } finally {
         this.busy = false;
       }

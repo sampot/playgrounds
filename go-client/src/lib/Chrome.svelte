@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { page } from "$app/state";
   import { goto } from "$app/navigation";
   import { chromeSession } from "$lib/chromeSession.svelte";
   import GoMorePanel from "$lib/GoMorePanel.svelte";
@@ -7,7 +8,12 @@
   import GoGameDrawer from "$lib/GoGameDrawer.svelte";
   import GoShareSheet from "$lib/GoShareSheet.svelte";
   import { goAuth } from "$lib/goAuth.svelte";
-  import { recommendSameKind } from "$lib/goCatalog";
+  import { recommendSameKind, nextSameKind } from "$lib/goCatalog";
+  import {
+    pickBossWelcome,
+    readRecentBossWelcomes,
+    rememberBossWelcome,
+  } from "$lib/goBossWelcome";
   import { goSamShareHref, PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
   import { goSamShareTitle, GO_SITE_NAME } from "$lib/goShareMeta";
   import { getGoCatalogEntry } from "$lib/goCatalog";
@@ -82,6 +88,10 @@
     mode === "solo" &&
       Boolean(catalogId) &&
       chromeSession.kind === "game"
+  );
+
+  const nextEntry = $derived(
+    showSwap && catalogId ? nextSameKind(catalogId) : null
   );
 
   const shareTitle = $derived.by(() => {
@@ -353,6 +363,29 @@
       chromeSession.setFlash(flash);
     });
   }
+
+  function speakBossLine(): void {
+    const offline =
+      typeof navigator !== "undefined" ? navigator.onLine === false : false;
+    const welcome = pickBossWelcome({
+      offline,
+      signedIn: goAuth.loggedIn,
+      recentIndices: readRecentBossWelcomes(localStorage),
+    });
+    rememberBossWelcome(localStorage, welcome.index);
+    chromeSession.setFlash(welcome.text, 3800);
+  }
+
+  function onMarkClick(event: MouseEvent): void {
+    moreOpen = false;
+    shareOpen = false;
+    profileOpen = false;
+    // Already on home: boss chatter instead of a no-op same-route nav.
+    if (page.url.pathname === "/") {
+      event.preventDefault();
+      speakBossLine();
+    }
+  }
 </script>
 
 <div
@@ -368,7 +401,7 @@
     ]
       .filter(Boolean)
       .join(" ")}
-    aria-label="站群"
+    aria-label="山姆鍋遊樂場"
     aria-hidden={chromeHideable && chromeHidden ? "true" : undefined}
     onpointerdown={onChromeInteract}
   >
@@ -376,14 +409,12 @@
       class="mark-link"
       href="/"
       title="純玩首頁"
-      onclick={() => {
-        moreOpen = false;
-        shareOpen = false;
-        profileOpen = false;
-      }}
+      onclick={onMarkClick}
     >
       <img
-        class="mark"
+        class={["mark", chromeSession.flash && "mark--speaking"]
+          .filter(Boolean)
+          .join(" ")}
         src="/favicon.svg"
         width="22"
         height="22"
@@ -414,19 +445,31 @@
         更多
       </button>
     {/if}
-    <button
-      type="button"
-      class="share-btn pixel-btn"
-      disabled={!shareEnabled}
-      title={shareEnabled
-        ? catalogId
-          ? "分享此小品"
-          : "分享純玩首頁"
-        : "邀請中不支援分享"}
-      onclick={openShare}
-    >
-      分享
-    </button>
+    {#if showSwap}
+      <button
+        type="button"
+        class="hdr-next pixel-btn"
+        disabled={!nextEntry}
+        title={nextEntry ? `下一款：${nextEntry.title}` : "沒有其他小品可換"}
+        onclick={() => {
+          if (!nextEntry) return;
+          onChromeInteract();
+          goToId(nextEntry.id);
+        }}
+      >
+        下一個
+      </button>
+    {/if}
+    {#if shareEnabled}
+      <button
+        type="button"
+        class="share-btn pixel-btn"
+        title={catalogId ? "分享此小品" : "分享純玩首頁"}
+        onclick={openShare}
+      >
+        分享
+      </button>
+    {/if}
     {#if goAuth.loggedIn}
       <button
         type="button"
@@ -486,9 +529,13 @@
     </div>
    </header>
 
-   {#if chromeSession.flash && !(canvasActive && chromeHidden && !shareOpen && !moreOpen && !profileOpen)}
+   {#if chromeSession.flash}
      <p
-       class={["chrome-flash", canvasActive && "chrome-flash--toast"]
+       class={[
+         "chrome-flash",
+         canvasActive && "chrome-flash--toast",
+         canvasActive && chromeHidden && "chrome-flash--toast-alone",
+       ]
          .filter(Boolean)
          .join(" ")}
        role="status"

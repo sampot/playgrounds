@@ -201,7 +201,10 @@
 >
   <div class="go-more-panel">
     <header class="go-more-head">
-      <h2 id="go-more-title" class="go-more-title">更多</h2>
+      <div class="go-more-heading">
+        <h2 id="go-more-title" class="go-more-title">更多</h2>
+        <p class="go-more-sub">殼層 · 本機與設定</p>
+      </div>
       <button
         type="button"
         class="go-more-close"
@@ -446,13 +449,26 @@
   }
   .go-more-title {
     margin: 0;
-    flex: 1;
     font-family: var(--pixel);
     font-size: 1.05rem;
     font-weight: 700;
     letter-spacing: 0.02em;
     line-height: 1.3;
     text-shadow: var(--pixel-text-shadow);
+  }
+  .go-more-heading {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+  .go-more-sub {
+    margin: 0;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: color-mix(in oklab, rgb(var(--gm-ink)) 62%, transparent);
+    line-height: 1.3;
   }
   .go-more-close {
     flex-shrink: 0;

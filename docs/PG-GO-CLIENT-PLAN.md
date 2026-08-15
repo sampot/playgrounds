@@ -3,7 +3,7 @@
 > **狀態：** Draft（2026-08-08）— 契約／階段草案；Invite 路徑實作進行中；型錄 `/s/<id>`／分享面／換片／§5.5.1 OG／§6.5 離線分數／**§6.6「更多」本機溢流**／**§6.7 架構硬規則**／**§6.7.1 `env.HOST` 注入（DEC-053）** 已定案  
 
 > **權威決策：** 建議 [DECISIONS.md](./DECISIONS.md) **DEC-050**（Proposed）／**DEC-053**（UI 只走 `/api/...`；shell/runtime 走 env binding）  
-> **相關：** [PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)（五子棋 E2E；Invite Guest 主路徑）、[PG-CATALOG-UX-PLAN.md](./PG-CATALOG-UX-PLAN.md)（型錄「分享」→ go）、[PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)、[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（官方 TURN；Guest 經 `join_cap`）、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)、[PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md)（go 登入＋Header profile；玩家主場；DEC-052）、DEC-004／009／023／025／042／045／047／048、[GLOSSARY.md](./GLOSSARY.md)
+> **相關：** [PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)（五子棋 E2E；Invite Guest 主路徑）、[PG-CATALOG-UX-PLAN.md](./PG-CATALOG-UX-PLAN.md)（型錄「分享」→ go）、[PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)、[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（官方 TURN；Guest 經 `join_cap`）、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)、[PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md)（go 登入＋Header profile；玩家主場；DEC-052）、[PG-GO-BOSS-FLASH-PLAN.md](./PG-GO-BOSS-FLASH-PLAN.md)（老闆歡迎氣泡）、[PG-GO-UX-POLISH-PLAN.md](./PG-GO-UX-POLISH-PLAN.md)（玩家 UX 打磨 Draft）、DEC-004／009／023／025／042／045／047／048、[GLOSSARY.md](./GLOSSARY.md)
 
 一句話：**玩家主場**——獨立於場殼的純玩客戶端＠`go.samkuo.me`（作者主場＝`play.samkuo.me`，兩 UI 共用同一份型錄）：同時只跑一個 SAM、無編輯環境、不依賴持久 OPFS；啟動不限 Invite（型錄 id 傳閱與 Invite 短鏈並列）；傳閱網址 `/s/<catalog_id>`（內嵌 catalog）；`/s/` game 可換片；可安裝／造訪後離線／本機分數；Header「更多」＝本機溢流（已下載／分層清除）≠ 僅推薦；Invite `/i/`＝臨時 session（不能離線、不換片、無本機選單）；**登入（DEC-052）＝玩家身分；後續玩家主場互邀（GO-INVITE）**。
 

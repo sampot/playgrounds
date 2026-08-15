@@ -18,9 +18,34 @@ export const GO_BOSS_WELCOMES = [
   "用 LINE 內建瀏覽器怪怪的？換系統瀏覽器通常就好。",
 ] as const;
 
+export const GO_BOSS_WELCOMES_OFFLINE = [
+  "線路不太穩？已下載的還能從「更多」開。",
+  "店裡燈還亮著。有離線包的，照常玩。",
+] as const;
+
+export const GO_BOSS_WELCOMES_SIGNED_IN = [
+  "通行證亮著。想找人對弈再跟我說。",
+  "入座過的旅客——今天想單機還是約戰？",
+] as const;
+
+/** Flat catalog: general, then offline, then signed-in (stable index space). */
+export const GO_BOSS_WELCOME_CATALOG = [
+  ...GO_BOSS_WELCOMES.map((text) => ({ text, kind: "general" as const })),
+  ...GO_BOSS_WELCOMES_OFFLINE.map((text) => ({
+    text,
+    kind: "offline" as const,
+  })),
+  ...GO_BOSS_WELCOMES_SIGNED_IN.map((text) => ({
+    text,
+    kind: "signedIn" as const,
+  })),
+] as const;
+
 type PickBossWelcomeOptions = {
   random?: () => number;
   recentIndices?: readonly number[];
+  offline?: boolean;
+  signedIn?: boolean;
 };
 
 export type BossWelcome = {
@@ -32,25 +57,54 @@ function isWelcomeIndex(value: unknown): value is number {
   return (
     Number.isInteger(value) &&
     (value as number) >= 0 &&
-    (value as number) < GO_BOSS_WELCOMES.length
+    (value as number) < GO_BOSS_WELCOME_CATALOG.length
   );
+}
+
+function isEligible(
+  kind: (typeof GO_BOSS_WELCOME_CATALOG)[number]["kind"],
+  offline: boolean,
+  signedIn: boolean
+): boolean {
+  if (kind === "general") return true;
+  if (kind === "offline") return offline;
+  return signedIn;
 }
 
 export function pickBossWelcome({
   random = Math.random,
   recentIndices = [],
+  offline = false,
+  signedIn = false,
 }: PickBossWelcomeOptions = {}): BossWelcome {
   const recent = new Set(recentIndices.filter(isWelcomeIndex));
-  let candidates = GO_BOSS_WELCOMES.map((_, index) => index).filter(
-    (index) => !recent.has(index)
+  let candidates = GO_BOSS_WELCOME_CATALOG.map((line, index) => ({
+    ...line,
+    index,
+  })).filter(
+    (line) =>
+      isEligible(line.kind, offline, signedIn) && !recent.has(line.index)
   );
+
   if (candidates.length === 0) {
-    candidates = GO_BOSS_WELCOMES.map((_, index) => index);
+    candidates = GO_BOSS_WELCOME_CATALOG.map((line, index) => ({
+      ...line,
+      index,
+    })).filter((line) => isEligible(line.kind, offline, signedIn));
+  }
+
+  if (candidates.length === 0) {
+    // Defensive: always at least the general pool.
+    candidates = GO_BOSS_WELCOMES.map((text, index) => ({
+      text,
+      kind: "general" as const,
+      index,
+    }));
   }
 
   const unit = Math.min(Math.max(random(), 0), 1 - Number.EPSILON);
-  const index = candidates[Math.floor(unit * candidates.length)];
-  return { index, text: GO_BOSS_WELCOMES[index] };
+  const chosen = candidates[Math.floor(unit * candidates.length)]!;
+  return { index: chosen.index, text: chosen.text };
 }
 
 export function claimBossWelcome(
@@ -100,3 +154,10 @@ export function rememberBossWelcome(
     // works, only cross-session repetition avoidance is unavailable.
   }
 }
+
+/** Auth / light shell feedback in boss voice (Phase D). */
+export const BOSS_FLASH = {
+  loggedIn: "通行證辦好了，歡迎入座。",
+  loggedOut: "通行證收起來了。隨時還能玩。",
+  loginExpired: "同意入座已失效，請從後台重新登入。",
+} as const;

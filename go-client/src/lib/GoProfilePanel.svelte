@@ -111,7 +111,12 @@
         <div class="go-profile-meta">
           <p class="go-profile-label">{label()}</p>
           <p class="go-profile-role">{identityLine}</p>
-          <p class="go-profile-id">{profile?.user_id ?? ""}</p>
+          {#if profile?.user_id}
+            <details class="go-profile-support">
+              <summary>支援用代號</summary>
+              <p class="go-profile-id">{profile.user_id}</p>
+            </details>
+          {/if}
         </div>
       </div>
 
@@ -297,13 +302,34 @@
     font-size: 0.8rem;
     color: rgb(var(--gp-accent));
   }
+  .go-profile-support {
+    margin: 0.15rem 0 0;
+    font-size: 0.75rem;
+    color: rgb(var(--gp-muted));
+  }
+  .go-profile-support summary {
+    cursor: pointer;
+    list-style: none;
+    min-height: 1.75rem;
+    display: inline-flex;
+    align-items: center;
+  }
+  .go-profile-support summary::-webkit-details-marker {
+    display: none;
+  }
+  .go-profile-support summary::before {
+    content: "▸ ";
+  }
+  .go-profile-support[open] summary::before {
+    content: "▾ ";
+  }
   .go-profile-id {
-    margin: 0;
+    margin: 0.25rem 0 0;
     font-size: 0.7rem;
     color: rgb(var(--gp-muted));
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    overflow-wrap: anywhere;
+    word-break: break-all;
   }
   .go-profile-actions {
     display: flex;

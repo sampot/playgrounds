@@ -14,7 +14,7 @@
   } from "$lib/goBossWelcome";
   import { chromeSession } from "$lib/chromeSession.svelte";
   import { goAuth } from "$lib/goAuth.svelte";
-  import { recommendHome, searchGoCatalogById, type GoCatalogEntry } from "$lib/goCatalog";
+  import { recommendHome, searchGoCatalog, type GoCatalogEntry } from "$lib/goCatalog";
   import GoSeriesIcon from "$lib/GoSeriesIcon.svelte";
   import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
 
@@ -56,6 +56,8 @@
 
       const welcome = pickBossWelcome({
         recentIndices: readRecentBossWelcomes(localStorage),
+        offline: navigator.onLine === false,
+        signedIn: goAuth.loggedIn,
       });
       rememberBossWelcome(localStorage, welcome.index);
       chromeSession.setFlash(welcome.text, 3800);
@@ -99,7 +101,7 @@
       syncCount();
       isSearching = false;
     } else {
-      recs = searchGoCatalogById(input, 3);
+      recs = searchGoCatalog(input, 3);
       isSearching = true;
     }
   }
@@ -140,6 +142,9 @@
   <span class="pixel-tag">多款小品</span>
   <span>選一個遊戲直接玩。造訪過的離線也能再開。</span>
 </p>
+<p class="home-help">
+  <a href="/help">使用說明 · 加入主畫面</a>
+</p>
 
 <section class="home-rec" aria-label="推薦試試">
   <h2 class="home-rec-title">推薦試試</h2>
@@ -148,7 +153,7 @@
     <input
       type="text"
       class="search-input pixel-input"
-      placeholder="輸入部分遊戲 ID 搜尋（例如：break）"
+      placeholder="搜尋遊戲名稱或 id（例如：打磚塊）"
       value={input}
       oninput={handleSearch}
     />
@@ -175,7 +180,7 @@
   {:else if isSearching}
     <p class="search-no-results">沒有找到符合的遊戲</p>
   {:else}
-    <p class="search-placeholder-text">輸入部分遊戲 ID 搜尋，或點擊「再次推薦」隨機選取</p>
+    <p class="search-placeholder-text">搜尋遊戲名稱或 id，或點「再次推薦」隨機選取</p>
   {/if}
 </section>
 
@@ -189,7 +194,22 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 0.5rem 0.65rem;
+    margin: 0 0 0.55rem;
+  }
+  .home-help {
     margin: 0 0 1.1rem;
+    font-size: 0.85rem;
+  }
+  .home-help a {
+    font-weight: 600;
+    text-decoration: none;
+    color: color-mix(in oklab, rgb(var(--ink)) 78%, transparent);
+  }
+  .home-help a:hover,
+  .home-help a:focus-visible {
+    color: rgb(var(--accent));
+    text-decoration: underline;
+    outline: none;
   }
   .home-rec {
     margin: 0 0 1rem;

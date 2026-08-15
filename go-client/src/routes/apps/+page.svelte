@@ -448,7 +448,7 @@
   }
   .app-summary {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
     align-items: center;
     gap: 0.65rem;
   }
@@ -490,7 +490,7 @@
     min-height: 44px;
   }
   .play-btn {
-    display: none;
+    display: inline-flex;
     align-items: center;
     text-decoration: none;
   }
@@ -523,12 +523,6 @@
   @media (min-width: 42rem) {
     .confirm-dialog {
       margin: auto;
-    }
-    .app-summary {
-      grid-template-columns: auto minmax(0, 1fr) auto auto;
-    }
-    .play-btn {
-      display: inline-flex;
     }
     .app-actions {
       grid-template-columns: repeat(3, minmax(0, 1fr));

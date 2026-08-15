@@ -14,10 +14,7 @@
     goInviteCanonicalUrl,
     goOgMeta,
   } from "$lib/goShareMeta";
-  import {
-    composeSamSource,
-    composeSessionProtocol,
-  } from "@pg/platform/platformCompose";
+  import { composeSamSource } from "@pg/platform/platformCompose";
   import {
     likelyInAppBrowser,
   } from "$lib/goCanvasSupport";
@@ -39,23 +36,21 @@
   const runtime = createGuestRuntime();
   const inAppHint = $derived(likelyInAppBrowser());
 
-  const protocolLabel = $derived.by(() => {
-    const meta = status?.meta;
-    if (!meta) return null;
-    const p = composeSessionProtocol(meta.intent);
-    if (p && typeof p === "object" && "protocolId" in p) {
-      return String((p as { protocolId: string }).protocolId);
-    }
-    return meta.kind;
-  });
-
   const samSource = $derived(
     status?.meta ? composeSamSource(status.meta.intent) : null
   );
 
+  const inviteEntry = $derived(
+    samSource ? findGoCatalogBySource(samSource) ?? null : null
+  );
+
   $effect(() => {
     const source = samSource;
-    if (!status || status.phase === "idle") {
+    if (
+      !status ||
+      status.phase === "idle" ||
+      status.phase === "cancelled"
+    ) {
       chromeSession.clear();
       return;
     }
@@ -103,6 +98,11 @@
     runtime.decline();
   }
 
+  function onReopenInvite() {
+    if (!shortId) return;
+    void runtime.bootFromShortId(shortId);
+  }
+
   async function copyInviteLink() {
     try {
       await navigator.clipboard.writeText(location.href);
@@ -146,6 +146,18 @@
   <div class="pixel-status" role="status">
     <p class="pixel-status-title">{status?.message || "正在讀取邀請…"}</p>
   </div>
+{:else if status.phase === "cancelled"}
+  <h1 class="pixel-text">已取消</h1>
+  <div class="pixel-status" role="status">
+    <p class="pixel-status-title">已取消這次邀請</p>
+    <p class="pixel-status-body">若要重新加入，可再開此連結，或回首頁挑別的小品。</p>
+    <div class="actions">
+      <a class="pixel-btn pixel-btn--primary" href="/">回純玩首頁</a>
+      <button type="button" class="pixel-btn" onclick={onReopenInvite}>
+        重新開啟此邀請
+      </button>
+    </div>
+  </div>
 {:else if status.phase === "error"}
   <h1 class="pixel-text">無法開始</h1>
   <div class="pixel-status" role="alert">
@@ -177,11 +189,10 @@
       </p>
     {/if}
     <p class="lead">
-      {#if protocolLabel}
-        協定 <span class="mono">{protocolLabel}</span>
-      {/if}
-      {#if samSource}
-        · 來源 <span class="mono">{samSource}</span>
+      {#if inviteEntry?.title}
+        邀請你玩「{inviteEntry.title}」
+      {:else}
+        有人邀請你加入這一場
       {/if}
     </p>
     <label class="field">
@@ -281,6 +292,13 @@
     flex-direction: column;
     gap: 0.5rem;
     margin: 0.75rem 0 0;
+  }
+  .actions .pixel-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    text-align: center;
   }
   .wait {
     display: flex;

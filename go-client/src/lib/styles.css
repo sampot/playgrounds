@@ -364,6 +364,10 @@ a {
 .chrome-root--overlay .chrome-flash--toast {
   pointer-events: auto;
 }
+.chrome-flash--toast-alone {
+  /* Header auto-hidden: keep the boss bubble readable near the top edge. */
+  top: 0.65rem;
+}
 
 /* 全寬 bar（背景＋底線＋毛玻璃）；內容用 padding-inline 收斂到與 .main
    同寬的 40rem 居中欄，故 bar 全寬、內容貼齊主內容左右緣。
@@ -437,6 +441,24 @@ a {
   display: block;
   width: 1.35rem;
   height: 1.35rem;
+}
+.chrome .mark--speaking {
+  animation: boss-mark-speak 0.7s steps(2) infinite;
+  transform-origin: center bottom;
+}
+@keyframes boss-mark-speak {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chrome .mark--speaking {
+    animation: none;
+  }
 }
 .chrome a.play-link {
   display: inline-flex;
@@ -562,28 +584,28 @@ a {
   font-size: 0.72rem;
 }
 /* 手機：wordmark 放大填滿行高、取消 play-link 的 flex:1 留白，
-   並縮小 logo／按鈕／間距，避免換行同時消除 logo 與按鈕間的空隙。 */
+   並收斂間距；主操作熱區仍盡量 ≥44×44。 */
 @media (max-width: 30rem) {
   .chrome {
     /* 手機不收斂：全寬貼邊，維持現狀。 */
     max-width: none;
     margin: 0;
-    gap: 0.3rem;
-    row-gap: 0.2rem;
+    gap: 0.35rem;
+    row-gap: 0.25rem;
     padding: 0.4rem 0.5rem;
   }
   .chrome a.mark-link {
-    min-width: 2rem;
-    min-height: 2rem;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
   }
   .chrome .mark {
-    width: 1.15rem;
-    height: 1.15rem;
+    width: 1.25rem;
+    height: 1.25rem;
   }
   .chrome a.play-link {
     flex: 1 1 0;
     min-width: 0;
-    min-height: auto;
+    min-height: 2.75rem;
     padding: 0;
     display: flex;
     align-items: center;
@@ -597,24 +619,32 @@ a {
     max-width: 9rem;
   }
   .chrome-actions {
-    gap: 0.25rem;
+    gap: 0.3rem;
   }
   .chrome .share-btn,
   .chrome .hdr-more-btn,
   .chrome .hdr-next,
   .chrome .profile-btn {
-    min-width: 2.2rem;
-    min-height: 2.15rem;
-    padding: 0.25rem 0.4rem;
-    font-size: 0.72rem;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    padding: 0.3rem 0.5rem;
+    font-size: 0.8rem;
   }
   .chrome--compact .share-btn,
   .chrome--compact .hdr-next,
   .chrome--compact .hdr-more-btn,
   .chrome--compact .profile-btn {
-    min-height: 2rem;
-    padding: 0.2rem 0.4rem;
-    font-size: 0.7rem;
+    min-width: 2.5rem;
+    min-height: 2.5rem;
+    padding: 0.25rem 0.45rem;
+    font-size: 0.75rem;
+  }
+  .chrome--compact a.mark-link {
+    min-width: 2.5rem;
+    min-height: 2.5rem;
+  }
+  .chrome--compact a.play-link {
+    min-height: 2.5rem;
   }
 }
 .chrome .profile-glyph {

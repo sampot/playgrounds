@@ -95,7 +95,7 @@
       class="game-drawer-scrim"
       role="button"
       tabindex="-1"
-      aria-label="關閉遊戲操作"
+      aria-label="關閉這一款的操作"
       onclick={() => {
         open = false;
         confirm = null;
@@ -114,7 +114,7 @@
       type="button"
       class="game-drawer-handle"
       aria-expanded={open}
-      aria-label={open ? "收合遊戲操作" : "展開遊戲操作"}
+      aria-label={open ? "收合這一款的操作" : "展開這一款的操作"}
       onclick={toggle}
     >
       <span class="game-drawer-handle-glyph" aria-hidden="true">☰</span>
@@ -124,8 +124,9 @@
       <div
         class="game-drawer-panel"
         role="menu"
-        aria-label="這個遊戲的操作"
+        aria-label="這一款 · 遊戲操作"
       >
+        <p class="game-drawer-kicker">這一款</p>
         <p class="game-drawer-title">{title}</p>
 
         {#if confirm}
@@ -292,20 +293,27 @@
     border-top-left-radius: 0;
     border-bottom-left-radius: 0;
   }
-  .game-drawer-title {
-    margin: 0 0 0.25rem;
+  .game-drawer-kicker {
+    margin: 0;
     font-family: var(--pixel);
-    font-size: 0.8rem;
+    font-size: 0.7rem;
     font-weight: 700;
     letter-spacing: 0.04em;
-    color: rgb(var(--muted));
+    color: rgb(var(--gold));
+  }
+  .game-drawer-kicker::before {
+    content: "▸ ";
+  }
+  .game-drawer-title {
+    margin: 0 0 0.35rem;
+    font-family: var(--pixel);
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: rgb(var(--ink));
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-  .game-drawer-title::before {
-    content: "▸ ";
-    color: rgb(var(--gold));
   }
   .game-drawer-btn {
     min-height: 2.75rem;
