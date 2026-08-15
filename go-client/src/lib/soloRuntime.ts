@@ -114,24 +114,16 @@ export function createSoloRuntime(opts?: {
       let files: FileMap;
       let fromCache = false;
       const cached = await getGoSamOfflineCache(entry.id);
-      // Network-first: always try a fresh fetch so a new SAM push is picked up
-      // on the next load (branch-tip trees are cache-busted in fetchGithubProject).
-      // Fall back to the offline cache only when the network fetch fails
-      // (offline／rate-limit), preserving visit-then-offline behaviour.
-      if (!cached) {
-        files = await loadSamFiles(entry.source, {
-          onProgress: p => {
-            if (seq !== bootSeq) return;
-            const loadProgress = goLoadProgressFromFiles(p);
-            set({
-              loadProgress,
-              message: `正在下載「${entry.title}」… ${loadProgress.detail}`,
-            });
-          },
-        });
-        if (seq !== bootSeq) return;
+      // A downloaded catalog game is the playable local copy. Reuse it across
+      // page sessions; explicit「檢查更新」refreshes branch-tip content.
+      if (cached?.source === entry.source) {
+        files = cached.files;
         assertSamHasIndex(files);
-        await putGoSamOfflineCache(entry.id, entry.source, files);
+        if (seq !== bootSeq) return;
+        set({
+          loadProgress: { ratio: 1, detail: "已下載" },
+          message: `正在開啟「${entry.title}」…`,
+        });
       } else {
         try {
           files = await loadSamFiles(entry.source, {
@@ -140,15 +132,17 @@ export function createSoloRuntime(opts?: {
               const loadProgress = goLoadProgressFromFiles(p);
               set({
                 loadProgress,
-                message: `正在更新「${entry.title}」… ${loadProgress.detail}`,
+                message: `正在下載「${entry.title}」… ${loadProgress.detail}`,
               });
             },
           });
           if (seq !== bootSeq) return;
           assertSamHasIndex(files);
           await putGoSamOfflineCache(entry.id, entry.source, files);
-        } catch {
-          // Network failed — serve the offline cache.
+        } catch (e) {
+          if (!cached) throw e;
+          // A catalog source change could not be fetched — keep the previous
+          // downloaded copy playable until the network is available.
           files = cached.files;
           fromCache = true;
           assertSamHasIndex(files);
@@ -161,7 +155,14 @@ export function createSoloRuntime(opts?: {
       }
       if (seq !== bootSeq) return;
       set({
-        loadProgress: { ratio: 1, detail: fromCache ? "離線快取" : "下載完成" },
+        loadProgress: {
+          ratio: 1,
+          detail: fromCache
+            ? "離線快取"
+            : cached?.source === entry.source
+              ? "已下載"
+              : "下載完成",
+        },
         message: `正在開啟「${entry.title}」…`,
       });
       generation += 1;
