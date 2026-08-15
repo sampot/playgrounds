@@ -13,7 +13,7 @@
 
 ---
 
-## 已實作（70）
+## 已實作（68）
 
 ### 精緻可玩（10＋3 unlisted）
 | id | 標題 | 一句話 |
@@ -74,14 +74,13 @@
 | `pg-wanzai` | 尪仔標 | 選牌對拍、翻牌收穫 |
 | `pg-wingrace` | 翼途競飛 | 簡化飛行棋 |
 
-### 機台（7＋5 unlisted）
+### 機台（7＋4 unlisted）
 
 | id | 標題 | 一句話 |
 | --- | --- | --- |
 | `pg-bingolite` | 賓果閃燈 | 五五賓果燈板 |
 | `pg-clawgrab` | 夾娃娃 | 搖爪落下夾取 |
 | `pg-coinpush` | 推幣機 | 落幣堆疊、推板擠落得分；致敬推幣機玩法類型。（已上架） |
-| **`pg-coinpusher`** | **日式推幣機** | **按鈕推落金幣、堆疊獲獎，日式推幣機 Web 版** |
 | `pg-guaguale` | 刮刮樂 | **unlisted**；刮開洞看中獎開關、集齊符號中獎；純娛樂非博弈 |
 | `pg-horselit` | 賽馬機 | 六軌燈光賽馬 |
 | `pg-mali` | 小瑪莉 | 復古燈圈跑燈 |
@@ -139,7 +138,7 @@
 | --- | --- |
 | 尪仔標、路名地產、成語、暗棋、鬥獸棋、軍棋、象棋、大老二、21點、撿紅點、台灣麻將、新接龍 | `pg-wanzai`、`pg-twland`、`pg-chengyu`、`pg-banqi`、`pg-jungle`、`pg-junqi`、`pg-xiangqi`、`pg-big2`、`pg-blackjack`、`pg-redpick`、`pg-mahjong`、`pg-freecell` |
 | 夜市射氣球／套圈／打地鼠／切水果 | `pg-popshot`、`pg-ringtoss`、`pg-moletap`、`pg-fruitcut` |
-| 小瑪莉、夾娃娃、推幣機、彈珠台、光槍射擊、彩票機、釘珠、賽馬燈、賓果燈 | `pg-mali`、`pg-clawgrab`、`pg-coinpusher`、`pg-pinfall`、`pg-horselit`、`pg-bingolite` |
+| 小瑪莉、夾娃娃、推幣機、彈珠台、光槍射擊、彩票機、釘珠、賽馬燈、賓果燈 | `pg-mali`、`pg-clawgrab`、`pg-coinpush`、`pg-pinfall`、`pg-horselit`、`pg-bingolite` |
 | 跳房子／踢毽子、木頭人、飛行棋簡化、躍階平台 | `pg-hopkick`、`pg-statue`、`pg-wingrace`、`pg-leaptrail`、`pg-pixelhop` |
 | 短關地城探索／戰鬥節奏 | `pg-microdungeon` |
 | 小地圖收集／避開 | `pg-cityroam` |

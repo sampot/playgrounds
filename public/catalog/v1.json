@@ -238,16 +238,6 @@
       "license": "MIT"
     },
     {
-      "id": "pg-coinpusher",
-      "title": "推幣機",
-      "kind": "game",
-      "series": "機台",
-      "blurb": "按鈕推落金幣、堆疊獲獎，日式推幣機 Web 版。",
-      "source": "sampot/pg-coinpusher",
-      "status": "unlisted",
-      "license": "MIT"
-    },
-    {
       "id": "pg-colorcast",
       "title": "色票互轉",
       "kind": "tool",
@@ -763,16 +753,6 @@
       "series": "資料",
       "blurb": "依簡易 schema 產 JSON；可選種子重現。",
       "source": "sampot/pg-mockdata",
-      "status": "listed",
-      "license": "MIT"
-    },
-    {
-      "id": "pg-molehit",
-      "title": "打地鼠",
-      "kind": "game",
-      "series": "懷舊",
-      "blurb": "隱藏地鼠敲頭計分，限時連擊挑战。",
-      "source": "sampot/pg-molehit",
       "status": "listed",
       "license": "MIT"
     },
