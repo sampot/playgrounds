@@ -1401,7 +1401,7 @@
       "title": "野球生涯",
       "kind": "game",
       "series": "精緻可玩",
-      "blurb": "虛構青棒校隊生涯（台味應援／紅土全國賽）；關鍵打席揮棒、其餘快轉；短賽季決賽。",
+      "blurb": "虛構青棒校隊生涯；打者揮棒或投手兩用投打、其餘快轉；短賽季拚紅土全國賽。",
       "source": "sampot/pg-yakyu",
       "status": "unlisted",
       "license": "MIT"
