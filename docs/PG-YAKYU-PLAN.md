@@ -1,6 +1,6 @@
 # Playgrounds 野球生涯小品（`pg-yakyu`）
 
-> **狀態：** Draft（2026-08-15）— **Phase 0–2 baseline 已實作**於本機 `~/dev/sampot/pg-yakyu`；Playgrounds KV／上架 E2E 待做  
+> **狀態：** Draft（2026-08-15）— **Phase 0–2 閉環＋Phase 3 手感打磨（無投球）已實作**於本機 `~/dev/sampot/pg-yakyu`；場殼／go KV E2E 與 `listed` 仍待人工驗收  
 > **權威決策：** 從屬 [PG-GAMES.md](./PG-GAMES.md) 遊戲交付約束；不另開 DEC  
 > **相關：** [playgrounds-host-api.md](./playgrounds-host-api.md)（`/api/kv`）、`.cursor/rules/no-native-dialogs.mdc`、`.cursor/rules/mobile-first-ux.mdc`、[`game-assets/ATTRIBUTION.md`](../game-assets/ATTRIBUTION.md)  
 > **程式庫（預定）：** [`sampot/pg-yakyu`](https://github.com/sampot/pg-yakyu) · 本地 `~/dev/sampot/pg-yakyu`
@@ -357,15 +357,23 @@ pg-yakyu/
 - Phase 0：比賽狀態機、壘包／出局／得分與快轉模擬；單測完成。
 - Phase 1：mobile-first 時機揮棒、九局流程、比分／壘包 HUD；瀏覽器走完一場。
 - Phase 2 baseline：建角、8+3 賽程、虛構校隊台味包、成長、`/api/kv/career` adapter 與頁內覆寫確認；獨立靜態環境已驗，場殼 KV E2E 尚待。
+- Phase 2／3 閉環打磨（同日）：
+  - 對手 `power` 進入半局模擬權重；測例鎖定強／弱差異。
+  - 平手延長（最多＋2）＋再一局；移除隨機加分決勝。
+  - 季末「開新賽季」＋能力 >70 衰減；單季成長上限 12。
+  - 賽後個人 PA／H／HR／RBI＋生涯 `records`；台味 `flavor` 詞庫；場地標籤。
+  - `settings` KV（靜音）；空白鍵／Enter 揮棒；首打席教學提示；隊色／左打鏡像；`prefers-reduced-motion` 縮短投球時長。
+  - vitest 22 例綠。
 
 ### 上架檢查（對齊 PG-GAMES）
 
 - [x] 獨立 repo；無 `node_modules`／無 build（`~/dev/sampot/pg-yakyu`）
 - [x] `catalog/entries/pg-yakyu.yaml`（`status: unlisted`）＋`catalog:gen`
 - [x] `PG-GAMES.md` 自候補移入已實作（unlisted）
-- [x] ATTRIBUTION 完整（幾何自製；尚無外部 pack）
+- [x] ATTRIBUTION 完整（looneybits＋Kenney CC0）
 - [ ] go `/s/pg-yakyu` 與場殼可開（需 GitHub `sampot/pg-yakyu` 可解析）
-- [ ] `listed` 打磨後再升
+- [ ] 場殼／go：開新→打一場→重整→繼續（KV E2E）
+- [ ] `listed` 打磨後再升（建議人工走完通關／淘汰各一）
 
 ---
 
@@ -388,8 +396,8 @@ status: unlisted # 先 unlisted，打磨後 listed
 | # | 問題 | 目前定案 | 可選替代 |
 | --- | --- | --- | --- |
 | 1 | 球數 | MVP 每球即決 | 兩好三壞 |
-| 2 | 延長賽 | 最多＋2 再定勝 | 直接互射／再戰一場 |
-| 3 | 投手操作 | Phase 3 | 若要 MVP 雙線，提前插入 Phase 2 |
+| 2 | 延長賽 | **最多＋2，再一局；仍平記敗** | 直接互射／再戰一場 |
+| 3 | 投手操作 | Phase 3（尚未做；listed 可不擋） | 若要 MVP 雙線，提前插入 |
 | 4 | 中文標題 | **野球生涯**（敘事已鎖抽象校隊＋台味包，標題不需改成真實盃賽名） | 青砂盃物語／紅土揮擊 等（仍須虛構） |
 
 **已關閉：** 敘事＝抽象校隊＋台味包（§4.1）；不用真實校／聯盟皮。
@@ -408,3 +416,4 @@ status: unlisted # 先 unlisted，打磨後 listed
 | 2026-08-15 | 型錄 `pg-yakyu` 以 `status: unlisted` 入庫；`PG-GAMES` 移入已實作 |
 | 2026-08-15 | 加入 looneybits「2D Baseball Pack」CC0 精選素材；來源與檔案對照寫入遊戲 repo |
 | 2026-08-15 | 美術／音效打磨：球場 FX、揮棒動畫、Kenney CC0 SFX＋靜音鈕 |
+| 2026-08-15 | 可玩閉環：power 模擬、延長賽、新賽季衰減、賽後成績、台味詞庫、settings KV、鍵盤揮棒 |
