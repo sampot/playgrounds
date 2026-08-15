@@ -15,25 +15,23 @@ export type ShimFetch = (
   init?: { method?: string; body?: string | null }
 ) => Promise<{ status: number; text(): Promise<string> }>;
 
-export type ShimNow = () => number;
-
 export type ReadNative = (lsKey: string) => string | null;
 
 export type WriteNative = (lsKey: string, value: string) => void;
 
+export type DeleteNative = (lsKey: string) => void;
+
 export type LocalStorageShimOptions = {
   /** fetch to the host /api/kv contract. Injected for testability. */
   fetch: ShimFetch;
-  /** current time in ms (injected for testability / debounce). */
-  now: ShimNow;
-  /** background flush debounce window (ms). Default 250. */
+  /** Deprecated compatibility inputs; writes are no longer debounced. */
+  now?: () => number;
   flushMs?: number;
-  /** KV key prefix. Default "ls:" (localStorage). */
-  prefix?: string;
+  /** Stable application scope used only for the native synchronous mirror. */
+  mirrorScope?: string;
   /**
    * Read a pre-existing native localStorage value (e.g. go's legacy
-   * `pg-go-score:` shim). Used as a fallback before hydration, so a SAM
-   * that already stored under `ls:<key>` is not blind on first paint.
+   * Used as a fallback before hydration so synchronous startup reads work.
    */
   readNative?: ReadNative;
   /**
@@ -44,6 +42,10 @@ export type LocalStorageShimOptions = {
    * survives refresh and is read by `getItem` until hydration completes.
    */
   writeNative?: WriteNative;
+  /** Remove one value from the native synchronous mirror. */
+  deleteNative?: DeleteNative;
+  /** Remove all native mirror entries for this application scope. */
+  clearNative?: (prefix: string) => void;
 };
 
 const KV_LIST_PATH = "/api/kv/list";
@@ -55,68 +57,91 @@ export interface LocalStorageShim {
   clear(): void;
   key(index: number): string | null;
   readonly length: number;
-  /** Async cold-load: pull `prefix:*` keys from /api/kv/list into cache. */
+  /** Async cold-load: pull all application keys from /api/kv/list into cache. */
   hydrate(): Promise<void>;
-  /** Force a background flush of pending writes (visibilitychange / pagehide). */
-  flush(): void;
+  /** Wait for all KV mutations issued so far. */
+  flush(): Promise<void>;
+}
+
+export const LOCALSTORAGE_MIRROR_ROOT = "__pg_kv_mirror__:";
+
+export function localStorageMirrorPrefix(scope: string): string {
+  return `${LOCALSTORAGE_MIRROR_ROOT}${encodeURIComponent(scope.trim() || "default")}:`;
 }
 
 export function createLocalStorageShim(
   opts: LocalStorageShimOptions
 ): LocalStorageShim {
-  const prefix = opts.prefix ?? "ls:";
-  const flushMs = opts.flushMs ?? 250;
   const readNative = opts.readNative;
   const writeNative = opts.writeNative;
+  const deleteNative = opts.deleteNative;
+  const clearNative = opts.clearNative;
+  const mirrorPrefix = localStorageMirrorPrefix(opts.mirrorScope ?? "default");
   const cache = new Map<string, string>();
-  // pending writes: key (without prefix) → value; delete represented as null
-  const pending = new Map<string, string | null>();
-  let lastFlush = opts.now();
-  let flushing = false;
-  let currentFlush: Promise<void> | null = null;
+  const touched = new Set<string>();
+  let currentWrite: Promise<void> | null = null;
 
-  const kvKey = (key: string) => `${prefix}${key}`;
-  const apiPath = (key: string) =>
-    `/api/kv/${encodeURIComponent(kvKey(key))}`;
+  const nativeKey = (key: string) => `${mirrorPrefix}${key}`;
+  const apiPath = (key: string) => `/api/kv/${encodeURIComponent(key)}`;
 
-  function scheduleFlush() {
-    const t = opts.now();
-    if (t - lastFlush >= flushMs && !flushing) {
-      void doFlush();
-    }
+  function enqueueTask(task: () => Promise<void>): void {
+    const previous = currentWrite;
+    const operation = previous ? previous.then(task, task) : task();
+    const tracked = operation.finally(() => {
+      if (currentWrite === tracked) currentWrite = null;
+    });
+    currentWrite = tracked;
   }
 
-  function doFlush(): Promise<void> {
-    if (flushing) return currentFlush ?? Promise.resolve();
-    flushing = true;
-    lastFlush = opts.now();
-    currentFlush = (async () => {
-      const batch = [...pending.entries()];
-      pending.clear();
-      for (const [key, value] of batch) {
-        try {
-          if (value == null) {
-            await opts.fetch(apiPath(key), { method: "DELETE" });
-          } else {
-            await opts.fetch(apiPath(key), { method: "PUT", body: String(value) });
-          }
-        } catch (e) {
-          console.warn("[localStorage-shim] flush failed:", e);
+  function enqueueWrite(key: string, value: string | null): void {
+    enqueueTask(async () => {
+      try {
+        const response =
+          value == null
+            ? await opts.fetch(apiPath(key), { method: "DELETE" })
+            : await opts.fetch(apiPath(key), { method: "PUT", body: value });
+        if (response.status < 200 || response.status >= 300) {
+          throw new Error(`KV ${value == null ? "DELETE" : "PUT"} returned ${response.status}`);
         }
+      } catch (e) {
+        console.warn("[localStorage-shim] sync failed:", e);
       }
-    })();
-    currentFlush.finally(() => {
-      flushing = false;
-      currentFlush = null;
     });
-    return currentFlush;
+  }
+
+  function enqueueClear(): void {
+    enqueueTask(async () => {
+      try {
+        const list = await opts.fetch(KV_LIST_PATH, {
+          method: "POST",
+          body: JSON.stringify({ prefix: "" }),
+        });
+        if (list.status !== 200) {
+          throw new Error(`KV list returned ${list.status}`);
+        }
+        const body = JSON.parse(await list.text()) as {
+          keys: { name: string }[];
+        };
+        for (const { name } of body.keys) {
+          const response = await opts.fetch(
+            `/api/kv/${encodeURIComponent(name)}`,
+            { method: "DELETE" }
+          );
+          if (response.status < 200 || response.status >= 300) {
+            throw new Error(`KV DELETE returned ${response.status}`);
+          }
+        }
+      } catch (e) {
+        console.warn("[localStorage-shim] clear failed:", e);
+      }
+    });
   }
 
   return {
     getItem(key) {
       if (cache.has(key)) return cache.get(key) as string;
       if (readNative) {
-        const native = readNative(kvKey(key));
+        const native = readNative(nativeKey(key));
         if (native != null) {
           cache.set(key, native);
           return native;
@@ -127,42 +152,48 @@ export function createLocalStorageShim(
     setItem(key, value) {
       const v = String(value);
       cache.set(key, v);
-      pending.set(key, v);
+      touched.add(key);
       if (writeNative) {
         try {
-          writeNative(kvKey(key), v);
+          writeNative(nativeKey(key), v);
         } catch {
           /* quota / private */
         }
       }
-      scheduleFlush();
+      enqueueWrite(key, v);
     },
     removeItem(key) {
       cache.delete(key);
-      pending.set(key, null);
-      if (writeNative) {
+      touched.add(key);
+      if (deleteNative) {
         try {
-          writeNative(kvKey(key), "");
+          deleteNative(nativeKey(key));
         } catch {
           /* ignore */
         }
       }
-      scheduleFlush();
+      enqueueWrite(key, null);
     },
     clear() {
       for (const k of cache.keys()) {
-        pending.set(k, null);
-        if (writeNative) {
+        touched.add(k);
+        if (deleteNative) {
           try {
-            writeNative(kvKey(k), "");
+            deleteNative(nativeKey(k));
           } catch {
             /* ignore */
           }
         }
       }
       cache.clear();
-      // explicit clear intent: flush deletes immediately, not debounced
-      void doFlush();
+      if (clearNative) {
+        try {
+          clearNative(mirrorPrefix);
+        } catch {
+          /* ignore */
+        }
+      }
+      enqueueClear();
     },
     key(index) {
       const keys = [...cache.keys()];
@@ -173,32 +204,31 @@ export function createLocalStorageShim(
     },
     async hydrate() {
       try {
+        await (currentWrite ?? Promise.resolve());
         const res = await opts.fetch(KV_LIST_PATH, {
           method: "POST",
-          body: JSON.stringify({ prefix }),
+          body: JSON.stringify({ prefix: "" }),
         });
         if (res.status !== 200) return;
         const body = JSON.parse(await res.text()) as {
           keys: { name: string }[];
         };
         for (const { name } of body.keys) {
-          if (!name.startsWith(prefix)) continue;
           const raw = await opts.fetch(
             `/api/kv/${encodeURIComponent(name)}`,
             { method: "GET" }
           );
           if (raw.status !== 200) continue;
           const value = await raw.text();
-          const plain = name.slice(prefix.length);
           // local write wins over hydrated value
-          if (!cache.has(plain)) cache.set(plain, value);
+          if (!touched.has(name) && !cache.has(name)) cache.set(name, value);
         }
       } catch (e) {
         console.warn("[localStorage-shim] hydrate failed:", e);
       }
     },
     flush() {
-      void doFlush();
+      return currentWrite ?? Promise.resolve();
     },
   };
 }

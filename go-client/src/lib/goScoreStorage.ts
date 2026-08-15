@@ -9,6 +9,10 @@
 
 import { clearGoWebDbForCatalog } from "./goWebDb";
 import { clearGoWebKvForCatalog } from "./goWebKv";
+import {
+  LOCALSTORAGE_MIRROR_ROOT,
+  localStorageMirrorPrefix,
+} from "@pg/localStorageShim";
 
 const MARK = "data-go-score-ns";
 
@@ -78,15 +82,16 @@ export function clearAllGoScores(): number {
   return removeLocalStorageByPrefix(GO_SCORE_KEY_ROOT);
 }
 
-/**
- * Clear the localStorage→KV shim's native mirror (`ls:`-prefixed keys).
- * The shim mirrors writes to native localStorage as a synchronous speed-up;
- * the shell "清分" clears the authoritative KV but must also drop this mirror
- * or the cleared score resurrects on next load. The mirror is flat (`ls:<key>`,
- * not catalog-scoped), so we sweep every `ls:` key — only the shim uses it.
- */
-export function clearNativeLsMirror(): number {
-  return removeLocalStorageByPrefix("ls:");
+export function goLocalStorageMirrorPrefix(catalogId: string): string {
+  return localStorageMirrorPrefix(`catalog:${catalogId.trim()}`);
+}
+
+/** Clear one catalog's native synchronous mirror without affecting other games. */
+export function clearNativeLsMirror(catalogId?: string): number {
+  const id = catalogId?.trim();
+  return removeLocalStorageByPrefix(
+    id ? goLocalStorageMirrorPrefix(id) : LOCALSTORAGE_MIRROR_ROOT
+  );
 }
 
 /**
@@ -100,7 +105,7 @@ export async function clearGoProgressForCatalog(
   let n = clearGoScoresForCatalog(id);
   n += await clearGoWebKvForCatalog(id);
   n += await clearGoWebDbForCatalog(id);
-  n += clearNativeLsMirror();
+  n += clearNativeLsMirror(id);
   return n;
 }
 
@@ -110,6 +115,9 @@ export async function clearGoProgressForCatalog(
  */
 export async function clearAllGoProgress(): Promise<number> {
   let n = clearAllGoScores();
+  n += clearNativeLsMirror();
+  // Legacy unscoped mirror from the rolled-back shim.
+  n += removeLocalStorageByPrefix("ls:");
   // Clear every catalog:* KV／DB we can discover from localStorage kv／db prefixes
   // plus in-memory; IDB catalog keys require iteration.
   try {

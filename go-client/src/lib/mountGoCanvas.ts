@@ -64,6 +64,9 @@ export async function mountGoCanvas(
   options: MountGoCanvasOptions = {}
 ): Promise<MountedGoCanvas> {
   const sandboxId = `go-${crypto.randomUUID().slice(0, 8)}`;
+  const storageScope = options.catalogId?.trim()
+    ? `catalog:${options.catalogId.trim()}`
+    : `ephemeral:${sandboxId}`;
   // Score/localStorage persistence is unified by the canvas `localStorage`→KV
   // shim (PG-LOCALSTORAGE-SHIM-SPEC §7); go no longer injects its own shim.
   const prepared = files;
@@ -85,7 +88,7 @@ export async function mountGoCanvas(
       unlisten = installGoCanvasApiListener(
         apiCtx(sandboxId, prepared, options.catalogId, options.getHostRuntime)
       );
-      await syncGoCanvasSnapshot(sandboxId, generation, prepared);
+      await syncGoCanvasSnapshot(sandboxId, generation, prepared, storageScope);
       return {
         sandboxId,
         canvasMode: "sw",
@@ -103,7 +106,7 @@ export async function mountGoCanvas(
   unlisten = installGoMemoryApiListener(
     apiCtx(sandboxId, prepared, options.catalogId, options.getHostRuntime)
   );
-  const built = buildGoMemoryCanvas(prepared, generation);
+  const built = buildGoMemoryCanvas(prepared, generation, storageScope);
   memoryBlobUrls = built.blobUrls;
   return {
     sandboxId,

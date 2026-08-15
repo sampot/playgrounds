@@ -763,18 +763,184 @@ const BRIDGE = `<script data-playgrounds-bridge>
 })();
 </script>`;
 
+function localStorageShim(storageScope) {
+  const scope = JSON.stringify(`sandbox:${String(storageScope || "default")}`);
+  return `<script data-playgrounds-ls-shim>
+(function () {
+  /* ls-shim-rev:3 */
+  try {
+    if (window.__pgLsShimInstalled) return;
+    window.__pgLsShimInstalled = true;
+    var STORAGE_SCOPE = ${scope};
+    var MIRROR_PREFIX = "__pg_kv_mirror__:" + encodeURIComponent(STORAGE_SCOPE) + ":";
+    var cache = Object.create(null);
+    var touched = Object.create(null);
+    var currentWrite = null;
+    var nativeLS = (function () {
+      try { return window.localStorage; } catch (_) { return null; }
+    })();
+    function nativeKey(k) { return MIRROR_PREFIX + k; }
+    function nativeGet(k) {
+      if (!nativeLS) return null;
+      try { return nativeLS.getItem(nativeKey(k)); } catch (_) { return null; }
+    }
+    function nativeSet(k, v) {
+      if (!nativeLS) return;
+      try { nativeLS.setItem(nativeKey(k), v); } catch (_) { /* quota/private */ }
+    }
+    function nativeDel(k) {
+      if (!nativeLS) return;
+      try { nativeLS.removeItem(nativeKey(k)); } catch (_) { /* ignore */ }
+    }
+    function apiPath(k) { return "/api/kv/" + encodeURIComponent(k); }
+    function persist(k, v) {
+      var init = v == null ? { method: "DELETE" } : { method: "PUT", body: String(v) };
+      return window.fetch(apiPath(k), init).then(function (res) {
+        if (!res.ok) throw new Error("KV " + init.method + " returned " + res.status);
+      }).catch(function (e) {
+        console.warn("[localStorage-shim] sync failed:", e);
+      });
+    }
+    function enqueueTask(task) {
+      var previous = currentWrite;
+      var operation = previous
+        ? previous.then(task, task)
+        : task();
+      var tracked = operation.then(function () {
+        if (currentWrite === tracked) currentWrite = null;
+      }, function () {
+        if (currentWrite === tracked) currentWrite = null;
+      });
+      currentWrite = tracked;
+      return tracked;
+    }
+    function enqueue(k, v) {
+      return enqueueTask(function () { return persist(k, v); });
+    }
+    function clearRemote() {
+      return window.fetch("/api/kv/list", {
+        method: "POST", body: JSON.stringify({ prefix: "" })
+      }).then(function (res) {
+        if (!res.ok) throw new Error("KV list returned " + res.status);
+        return res.json();
+      }).then(function (body) {
+        return (body && body.keys ? body.keys : []).reduce(function (chain, entry) {
+          return chain.then(function () { return persist(entry.name, null); });
+        }, Promise.resolve());
+      }).catch(function (e) {
+        console.warn("[localStorage-shim] clear failed:", e);
+      });
+    }
+    if (nativeLS) {
+      try {
+        for (var i = 0; i < nativeLS.length; i++) {
+          var storedKey = nativeLS.key(i);
+          if (storedKey && storedKey.indexOf(MIRROR_PREFIX) === 0) {
+            var appKey = storedKey.slice(MIRROR_PREFIX.length);
+            var storedValue = nativeLS.getItem(storedKey);
+            if (storedValue != null) cache[appKey] = storedValue;
+          }
+        }
+      } catch (_) { /* private/blocked */ }
+    }
+    var shim = {
+      getItem: function (k) {
+        k = String(k);
+        if (k in cache) return cache[k];
+        var native = nativeGet(k);
+        if (native != null) { cache[k] = native; return native; }
+        return null;
+      },
+      setItem: function (k, v) {
+        k = String(k); v = String(v);
+        cache[k] = v; touched[k] = true; nativeSet(k, v); enqueue(k, v);
+      },
+      removeItem: function (k) {
+        k = String(k);
+        delete cache[k]; touched[k] = true; nativeDel(k); enqueue(k, null);
+      },
+      clear: function () {
+        Object.keys(cache).forEach(function (k) {
+          touched[k] = true; nativeDel(k);
+        });
+        Object.keys(cache).forEach(function (k) { delete cache[k]; });
+        if (nativeLS) {
+          try {
+            var mirrorKeys = [];
+            for (var i = 0; i < nativeLS.length; i++) {
+              var mirrorKey = nativeLS.key(i);
+              if (mirrorKey && mirrorKey.indexOf(MIRROR_PREFIX) === 0) mirrorKeys.push(mirrorKey);
+            }
+            mirrorKeys.forEach(function (k) { nativeLS.removeItem(k); });
+          } catch (_) { /* ignore */ }
+        }
+        enqueueTask(clearRemote);
+      },
+      key: function (i) {
+        var keys = Object.keys(cache);
+        return i >= 0 && i < keys.length ? keys[i] : null;
+      },
+      get length() { return Object.keys(cache).length; },
+      _hydrate: function () {
+        return window.fetch("/api/kv/list", {
+          method: "POST", body: JSON.stringify({ prefix: "" })
+        }).then(function (res) {
+          if (res.status !== 200) return;
+          return res.json();
+        }).then(function (body) {
+          if (!body || !body.keys) return;
+          return body.keys.reduce(function (chain, entry) {
+            var name = entry.name;
+            return chain.then(function () {
+              return window.fetch("/api/kv/" + encodeURIComponent(name)).then(function (res) {
+                if (res.status !== 200) return;
+                return res.text().then(function (value) {
+                  if (!touched[name] && !(name in cache)) cache[name] = value;
+                });
+              });
+            });
+          }, Promise.resolve());
+        }).catch(function (e) {
+          console.warn("[localStorage-shim] hydrate failed:", e);
+        });
+      },
+      _flush: function () { return currentWrite || Promise.resolve(); }
+    };
+    Object.defineProperty(window, "localStorage", {
+      value: shim, configurable: true, writable: false
+    });
+    setTimeout(function () { shim._hydrate(); }, 0);
+    function onHide() { shim._flush(); }
+    document.addEventListener("visibilitychange", function () {
+      if (document.visibilityState === "hidden") onHide();
+    });
+    window.addEventListener("pagehide", onHide);
+  } catch (e) {
+    console.warn("[localStorage-shim] install failed:", e);
+  }
+})();
+</script>`;
+}
+
 /**
  * @param {string} html
+ * @param {string} storageScope
  */
-function injectBridge(html) {
-  if (html.includes("data-playgrounds-bridge")) return html;
+function injectBridge(html, storageScope) {
+  if (
+    html.includes("data-playgrounds-ls-shim") &&
+    html.includes("data-playgrounds-bridge")
+  ) return html;
+  const injection =
+    (html.includes("data-playgrounds-ls-shim") ? "" : localStorageShim(storageScope)) +
+    (html.includes("data-playgrounds-bridge") ? "" : BRIDGE);
   if (/<head[\s>]/i.test(html)) {
-    return html.replace(/<head([^>]*)>/i, `<head$1>${BRIDGE}`);
+    return html.replace(/<head([^>]*)>/i, `<head$1>${injection}`);
   }
   if (/<html[\s>]/i.test(html)) {
-    return html.replace(/<html([^>]*)>/i, `<html$1><head>${BRIDGE}</head>`);
+    return html.replace(/<html([^>]*)>/i, `<html$1><head>${injection}</head>`);
   }
-  return `${BRIDGE}${html}`;
+  return `${injection}${html}`;
 }
 
 /**
@@ -999,7 +1165,7 @@ async function handleCanvasRequest(url) {
     let body = String(entry.body);
     const headers = { ...noStore, "Content-Type": mime };
     if (mime.startsWith("text/html")) {
-      body = injectBridge(body);
+      body = injectBridge(body, parsed.sandboxId);
       headers["Content-Security-Policy"] =
         "base-uri 'self'; object-src 'none'; frame-ancestors 'self'";
     }

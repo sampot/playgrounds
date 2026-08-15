@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   clearAllGoScores,
+  clearGoProgressForCatalog,
   clearGoScoresForCatalog,
+  goLocalStorageMirrorPrefix,
   goScorePrefixFor,
   injectGoScoreStorage,
 } from "./goScoreStorage";
+import { createGoWebKv, goStorageKeyForCatalog } from "./goWebKv";
 
 describe("injectGoScoreStorage", () => {
   it("injects catalog-scoped localStorage shim once", () => {
@@ -59,5 +62,56 @@ describe("clearGoScores", () => {
 
     expect(clearAllGoScores()).toBe(1);
     expect(localStorage.getItem("pg_go_theme")).toBe("dark");
+  });
+
+  it("clears only pg-breakout KV and its synchronous localStorage mirror", async () => {
+    const store = new Map<string, string>();
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      value: {
+        get length() {
+          return store.size;
+        },
+        key(i: number) {
+          return [...store.keys()][i] ?? null;
+        },
+        getItem(k: string) {
+          return store.get(k) ?? null;
+        },
+        setItem(k: string, v: string) {
+          store.set(k, String(v));
+        },
+        removeItem(k: string) {
+          store.delete(k);
+        },
+        clear() {
+          store.clear();
+        },
+      },
+    });
+
+    const breakout = createGoWebKv(goStorageKeyForCatalog("pg-breakout"));
+    const gomoku = createGoWebKv(goStorageKeyForCatalog("pg-gomoku"));
+    await breakout.put("high-score", "1200");
+    await gomoku.put("high-score", "30");
+    localStorage.setItem(
+      goLocalStorageMirrorPrefix("pg-breakout") + "high-score",
+      "1200"
+    );
+    localStorage.setItem(
+      goLocalStorageMirrorPrefix("pg-gomoku") + "high-score",
+      "30"
+    );
+
+    await clearGoProgressForCatalog("pg-breakout");
+
+    expect(await breakout.get("high-score")).toBeNull();
+    expect(await gomoku.get("high-score")).toBe("30");
+    expect(
+      localStorage.getItem(goLocalStorageMirrorPrefix("pg-breakout") + "high-score")
+    ).toBeNull();
+    expect(
+      localStorage.getItem(goLocalStorageMirrorPrefix("pg-gomoku") + "high-score")
+    ).toBe("30");
   });
 });

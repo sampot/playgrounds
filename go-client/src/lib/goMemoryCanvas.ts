@@ -7,11 +7,14 @@ import {
   composePreview,
   revokePreviewBlobs,
 } from "@pg/composePreview";
+import { injectCanvasBridge } from "@pg/canvasSwProtocol";
 import type { FileMap } from "@pg/projectTypes";
 import {
+  goKvNamespaceFor,
   handleGoSessionApi,
   type GoCanvasApiListenerOptions,
 } from "./goCanvas";
+import { handleGoBuiltInKv } from "./goBuiltInKv";
 import { handleGoFunctionsApi } from "./goFunctionsRuntime";
 import { handleGoShellPlatformApi } from "./goShellPlatform";
 import { handleGoShellSessionApi } from "./goShellSession";
@@ -157,10 +160,11 @@ export type MemoryCanvasBuild = {
 
 export function buildGoMemoryCanvas(
   files: FileMap,
-  generation: number
+  generation: number,
+  storageScope?: string
 ): MemoryCanvasBuild {
   const { srcdoc: base, blobUrls } = composePreview(files, "index.html");
-  let srcdoc = base;
+  let srcdoc = injectCanvasBridge(base, storageScope);
   if (/<head[\s>]/iu.test(srcdoc)) {
     srcdoc = srcdoc.replace(/<head([^>]*)>/iu, `<head$1>${API_BRIDGE}`);
   } else {
@@ -191,6 +195,15 @@ async function dispatchMemoryApi(
   }
   if (path.includes("/api/session")) {
     return handleGoSessionApi(sandboxId, request);
+  }
+  if (path.startsWith("/api/kv")) {
+    const builtIn = await handleGoBuiltInKv(goKvNamespaceFor(ctx), {
+      method: request.method,
+      url: request.url,
+      headers: [],
+      body: request.body,
+    });
+    if (builtIn) return builtIn;
   }
   return handleGoFunctionsApi(ctx, {
     method: request.method,

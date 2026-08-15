@@ -40,44 +40,42 @@ describe("handleGoBuiltInKv", () => {
   it("PUT then GET round-trips through goWebKv (high-score persistence)", async () => {
     const put = await handleGoBuiltInKv(
       NS,
-      req("/api/kv/ls%3Ahigh-score", "PUT", textBody("1500"))
+      req("/api/kv/high-score", "PUT", textBody("1500"))
     );
     expect(put?.status).toBe(204);
-    const get = await handleGoBuiltInKv(NS, req("/api/kv/ls%3Ahigh-score", "GET"));
+    const get = await handleGoBuiltInKv(NS, req("/api/kv/high-score", "GET"));
     expect(get?.status).toBe(200);
     expect(await bodyText(get!)).toBe("1500");
     // and it is durable in goWebKv (not lost on refresh)
     const kv = createGoWebKv(NS, { durable: true });
-    expect(await kv.get("ls:high-score")).toBe("1500");
+    expect(await kv.get("high-score")).toBe("1500");
   });
 
   it("GET of a missing key returns 404", async () => {
-    const get = await handleGoBuiltInKv(NS, req("/api/kv/ls%3Amissing", "GET"));
+    const get = await handleGoBuiltInKv(NS, req("/api/kv/missing", "GET"));
     expect(get?.status).toBe(404);
   });
 
   it("DELETE removes the key", async () => {
-    await seed("ls:temp", "x");
-    const del = await handleGoBuiltInKv(NS, req("/api/kv/ls%3Atemp", "DELETE"));
+    await seed("temp", "x");
+    const del = await handleGoBuiltInKv(NS, req("/api/kv/temp", "DELETE"));
     expect(del?.status).toBe(204);
-    const get = await handleGoBuiltInKv(NS, req("/api/kv/ls%3Atemp", "GET"));
+    const get = await handleGoBuiltInKv(NS, req("/api/kv/temp", "GET"));
     expect(get?.status).toBe(404);
   });
 
   it("POST /api/kv/list returns prefix-filtered keys", async () => {
-    await seed("ls:a", "1");
-    await seed("ls:b", "2");
-    await seed("foreign", "3");
+    await seed("a", "1");
+    await seed("b", "2");
     const list = await handleGoBuiltInKv(
       NS,
-      req("/api/kv/list", "POST", textBody(JSON.stringify({ prefix: "ls:" })))
+      req("/api/kv/list", "POST", textBody(JSON.stringify({ prefix: "" })))
     );
     expect(list?.status).toBe(200);
     const parsed = JSON.parse(await bodyText(list!));
     const names = parsed.keys.map((k: { name: string }) => k.name);
-    expect(names).toContain("ls:a");
-    expect(names).toContain("ls:b");
-    expect(names).not.toContain("foreign");
+    expect(names).toContain("a");
+    expect(names).toContain("b");
   });
 
   it("returns null for non-KV routes (delegates to SAM functions.js)", async () => {

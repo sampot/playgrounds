@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createLocalStorageShim,
   type ShimFetch,
-  type ShimNow,
 } from "./localStorageShim";
 
 /** Build an in-memory KV-backed fetch that mimics the host /api/kv contract. */
@@ -54,14 +53,17 @@ describe("createLocalStorageShim", () => {
     expect(shim.length).toBe(0);
   });
 
-  it("namespaces keys under ls: prefix on the wire", async () => {
+  it("maps application keys 1:1 to env.KV and starts the write immediately", async () => {
     const { fetchMock, store } = makeKvFetch();
     const shim = createLocalStorageShim({ fetch: fetchMock, now: () => 0 });
     shim.setItem("save", "x");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/kv/save",
+      expect.objectContaining({ method: "PUT", body: "x" })
+    );
     await shim.flush();
-    const putCall = fetchMock.mock.calls.find((c) => c[1]?.method === "PUT");
-    expect(putCall?.[0]).toContain("/api/kv/ls%3Asave");
-    expect(store.has("ls:save")).toBe(true);
+    expect(store.get("save")).toBe("x");
+    expect(store.has("ls:save")).toBe(false);
   });
 
   it("coerces non-string values like native Storage", () => {
@@ -72,50 +74,52 @@ describe("createLocalStorageShim", () => {
     expect(shim.getItem("n")).toBe("42");
   });
 
-  it("clears cache and schedules KV deletes for ls: keys", async () => {
-    const { fetchMock, store } = makeKvFetch({ "ls:a": "1", "ls:b": "2", "other": "3" });
+  it("clear removes every application KV key even before hydration", async () => {
+    const { fetchMock, store } = makeKvFetch({ a: "1", b: "2" });
     const shim = createLocalStorageShim({ fetch: fetchMock, now: () => 0 });
-    // hydrate so length reflects KV
-    await shim.hydrate();
     shim.clear();
     expect(shim.length).toBe(0);
     await shim.flush();
     expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining("/api/kv/ls%3Aa"),
+      "/api/kv/a",
       expect.objectContaining({ method: "DELETE" })
     );
-    expect(store.get("other")).toBe("3");
+    expect(store.size).toBe(0);
   });
 
-  it("hydrates in-memory cache from /api/kv/list (ls: prefix)", async () => {
-    const { fetchMock } = makeKvFetch({ "ls:best": "900", "foreign": "x" });
+  it("hydrates the whole application KV namespace without rewriting keys", async () => {
+    const { fetchMock } = makeKvFetch({ best: "900", settings: "x" });
     const shim = createLocalStorageShim({ fetch: fetchMock, now: () => 0 });
     await shim.hydrate();
     expect(shim.getItem("best")).toBe("900");
-    expect(shim.getItem("foreign")).toBeNull();
-    expect(shim.length).toBe(1);
+    expect(shim.getItem("settings")).toBe("x");
+    expect(shim.length).toBe(2);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/kv/list",
+      expect.objectContaining({ body: JSON.stringify({ prefix: "" }) })
+    );
   });
 
-  it("debounces background PUTs within the flush window", async () => {
+  it("preserves operation order while synchronizing every mutation promptly", async () => {
     const { fetchMock } = makeKvFetch();
-    let t = 0;
-    const now: ShimNow = () => t;
     const shim = createLocalStorageShim({
       fetch: fetchMock,
-      now,
-      flushMs: 100,
+      now: () => 0,
     });
     shim.setItem("k", "1");
     shim.setItem("k", "2");
-    shim.setItem("k", "3");
-    // before window: no PUT yet
-    expect(fetchMock).not.toHaveBeenCalled();
-    t = 150;
-    shim.flush();
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    const put = fetchMock.mock.calls[0];
-    expect(put[0]).toContain("/api/kv/ls%3Ak");
-    expect(put[1]?.body).toBe("3");
+    shim.removeItem("k");
+    await shim.flush();
+    expect(fetchMock.mock.calls.map((call) => call[1]?.method)).toEqual([
+      "PUT",
+      "PUT",
+      "DELETE",
+    ]);
+    expect(fetchMock.mock.calls.map((call) => call[1]?.body)).toEqual([
+      "1",
+      "2",
+      undefined,
+    ]);
   });
 
   it("does not throw on fetch failure; warns instead", async () => {
@@ -131,33 +135,34 @@ describe("createLocalStorageShim", () => {
     warn.mockRestore();
   });
 
-  it("honors a pre-existing native value for the same key before hydrate", () => {
-    const native = new Map<string, string>([["ls:legacy", "old"]]);
+  it("honors a scoped native mirror before async hydration", () => {
+    const native = new Map<string, string>([
+      ["__pg_kv_mirror__:catalog%3Apg-breakout:legacy", "old"],
+    ]);
     const { fetchMock } = makeKvFetch();
     const shim = createLocalStorageShim({
       fetch: fetchMock,
       now: () => 0,
+      mirrorScope: "catalog:pg-breakout",
       readNative: (k) => native.get(k) ?? null,
     });
-    // before hydrate, getItem falls back to native ls: keys
     expect(shim.getItem("legacy")).toBe("old");
   });
 
-  it("mirrors writes to native localStorage so a fresh shim reads them synchronously (no reset to 0 on refresh)", () => {
+  it("keeps synchronous mirrors isolated between applications", () => {
     const native = new Map<string, string>();
-    const putNative = (k: string, v: string) => {
-      // empty string signals deletion (mirrors removeItem/clear)
-      if (v === "") native.delete(k);
-      else native.set(k, v);
-    };
+    const putNative = (k: string, v: string) => native.set(k, v);
+    const deleteNative = (k: string) => native.delete(k);
     const getNative = (k: string) => native.get(k) ?? null;
     const { fetchMock } = makeKvFetch();
     // First load: write a high score, mirror to native.
     const a = createLocalStorageShim({
       fetch: fetchMock,
       now: () => 0,
+      mirrorScope: "catalog:pg-breakout",
       readNative: getNative,
       writeNative: putNative,
+      deleteNative,
     });
     a.setItem("high-score", "1500");
     a.flush();
@@ -165,10 +170,23 @@ describe("createLocalStorageShim", () => {
     const b = createLocalStorageShim({
       fetch: fetchMock,
       now: () => 0,
+      mirrorScope: "catalog:pg-breakout",
       readNative: getNative,
       writeNative: putNative,
+      deleteNative,
     });
     // Synchronous startup read must return the persisted value, not 0/null.
     expect(b.getItem("high-score")).toBe("1500");
+
+    const other = createLocalStorageShim({
+      fetch: fetchMock,
+      now: () => 0,
+      mirrorScope: "catalog:pg-gomoku",
+      readNative: getNative,
+      writeNative: putNative,
+      deleteNative,
+    });
+    // Same application key is isolated by host scope, not by game-chosen prefixes.
+    expect(other.getItem("high-score")).toBeNull();
   });
 });

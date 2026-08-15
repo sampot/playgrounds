@@ -40,13 +40,13 @@ function isGoCanvasSwUsableSync(): boolean {
 /** Bump with go-client/static/sw.js GO_SW_REV so phones pick up bridge fixes. */
 const SW_URL = "/sw.js?v=5";
 
-function withCanvasBridge(files: FileMap): FileMap {
+function withCanvasBridge(files: FileMap, storageScope?: string): FileMap {
   const out: FileMap = { ...files };
   for (const [path, content] of Object.entries(files)) {
     const lower = path.toLowerCase();
     if (!lower.endsWith(".html") && !lower.endsWith(".htm")) continue;
     if (!isTextContent(content)) continue;
-    out[path] = injectCanvasBridge(content);
+    out[path] = injectCanvasBridge(content, storageScope);
   }
   return out;
 }
@@ -84,7 +84,8 @@ export async function ensureGoCanvasSw(): Promise<ServiceWorkerRegistration> {
 export async function syncGoCanvasSnapshot(
   sandboxId: string,
   generation: number,
-  files: FileMap
+  files: FileMap,
+  storageScope?: string
 ): Promise<void> {
   const reg = await ensureGoCanvasSw();
   const worker = reg.active;
@@ -92,7 +93,7 @@ export async function syncGoCanvasSnapshot(
   const message = buildCanvasSyncMessage(
     sandboxId,
     generation,
-    withCanvasBridge(files)
+    withCanvasBridge(files, storageScope)
   );
   await new Promise<void>((resolve, reject) => {
     const channel = new MessageChannel();
@@ -210,7 +211,7 @@ export async function handleGoSessionApi(
 export type GoCanvasApiListenerOptions = GoFunctionsApiContext;
 
 /** Durable goWebKv namespace for a sandbox — mirrors `storageFor` in goFunctionsRuntime. */
-function kvNamespaceFor(ctx: GoFunctionsApiContext): string {
+export function goKvNamespaceFor(ctx: GoFunctionsApiContext): string {
   const catalogId = ctx.getCatalogId?.()?.trim() || null;
   if (catalogId) return `catalog:${catalogId}`;
   const sandboxId = ctx.getSandboxId()?.trim() || "anonymous";
@@ -239,7 +240,7 @@ async function dispatchGoCanvasApi(
   // before delegating to the SAM's functions.js (games must not re-implement
   // KV plumbing; this also backs the localStorage→KV high-score shim).
   if (path.startsWith("/api/kv")) {
-    const ns = kvNamespaceFor(ctx);
+    const ns = goKvNamespaceFor(ctx);
     const kv = await handleGoBuiltInKv(ns, request);
     if (kv) return kv;
   }

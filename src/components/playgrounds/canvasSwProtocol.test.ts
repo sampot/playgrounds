@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   buildCanvasEntryUrl,
@@ -187,23 +188,28 @@ describe("api stub + HTML bridge", () => {
 
   it("injects localStorage→KV shim before user code (idempotent)", () => {
     const out = injectCanvasBridge(
-      "<!doctype html><html><head><title>t</title></head><body></body></html>"
+      "<!doctype html><html><head><title>t</title></head><body></body></html>",
+      "catalog:pg-breakout"
     );
     expect(out).toContain("data-playgrounds-ls-shim");
-    expect(out).toContain("ls-shim-rev:2");
+    expect(out).toContain("ls-shim-rev:3");
     // shim installs before the bridge so first paint sees the proxy
     const shimIdx = out.indexOf("data-playgrounds-ls-shim");
     const bridgeIdx = out.indexOf("data-playgrounds-bridge");
     expect(shimIdx).toBeGreaterThanOrEqual(0);
     expect(shimIdx).toBeLessThan(bridgeIdx);
-    // namespace + best-effort flush markers present
-    expect(out).toContain('PREFIX = "ls:"');
+    // Application keys map directly to env.KV; only the native synchronous
+    // mirror receives an internal, app-scoped prefix.
+    expect(out).toContain('STORAGE_SCOPE = "catalog:pg-breakout"');
+    expect(out).toContain('"/api/kv/" + encodeURIComponent(k)');
+    expect(out).not.toContain('PREFIX = "ls:"');
+    expect(out).toContain("__pg_kv_mirror__:");
     expect(out).toContain("localStorage-shim");
     // _hydrate is deferred via setTimeout so the canvas bridge's fetch override
     // is installed before the POST /api/kv/list goes out (fixes 405 on go-client).
     expect(out).toContain("setTimeout(function () { shim._hydrate(); }, 0);");
     // Idempotent: re-injecting does not duplicate the shim marker.
-    expect(injectCanvasBridge(out)).toBe(out);
+    expect(injectCanvasBridge(out, "catalog:pg-breakout")).toBe(out);
   });
 
   it("does not inject shim into go's legacy score-shim-only HTML again", () => {
@@ -215,5 +221,16 @@ describe("api stub + HTML bridge", () => {
     const again = injectCanvasBridge(go);
     const count = (again.match(/data-playgrounds-ls-shim/g) || []).length;
     expect(count).toBe(1);
+  });
+});
+
+describe("field canvas service worker bridge", () => {
+  it("ships the same unprefixed localStorage→KV contract", () => {
+    const source = readFileSync("public/sw.js", "utf8");
+    expect(source).toContain("data-playgrounds-ls-shim");
+    expect(source).toContain("ls-shim-rev:3");
+    expect(source).toContain('"/api/kv/" + encodeURIComponent(k)');
+    expect(source).toContain("__pg_kv_mirror__:");
+    expect(source).not.toContain('PREFIX = "ls:"');
   });
 });

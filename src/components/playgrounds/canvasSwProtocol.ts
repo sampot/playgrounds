@@ -336,19 +336,19 @@ export function serializedResponseTransferables(
  * mirrors `localStorageShim.ts`; runs in the canvas realm (no module access).
  * Idempotent via the `data-playgrounds-ls-shim` marker.
  */
+const LOCALSTORAGE_SCOPE_PLACEHOLDER = "__PG_STORAGE_SCOPE__";
+
 export const LOCALSTORAGE_SHIM_SCRIPT = `<script data-playgrounds-ls-shim>
 (function () {
-  /* ls-shim-rev:2 */
+  /* ls-shim-rev:3 */
   try {
     if (window.__pgLsShimInstalled) return;
     window.__pgLsShimInstalled = true;
-    var PREFIX = "ls:";
-    var FLUSH_MS = 250;
+    var STORAGE_SCOPE = "${LOCALSTORAGE_SCOPE_PLACEHOLDER}";
+    var MIRROR_PREFIX = "__pg_kv_mirror__:" + encodeURIComponent(STORAGE_SCOPE) + ":";
     var cache = Object.create(null);
-    var pending = Object.create(null);
-    var lastFlush = Date.now();
-    var flushing = false;
-    var currentFlush = null;
+    var touched = Object.create(null);
+    var currentWrite = null;
     // Capture the real localStorage so we can mirror writes synchronously.
     // The shell's async /api/kv round-trip (hydrate/flush) is slower than a
     // SAM's synchronous startup read, so without the native mirror the first
@@ -358,7 +358,7 @@ export const LOCALSTORAGE_SHIM_SCRIPT = `<script data-playgrounds-ls-shim>
     var nativeLS = (function () {
       try { return window.localStorage; } catch (_) { return null; }
     })();
-    function nativeKey(k) { return PREFIX + k; }
+    function nativeKey(k) { return MIRROR_PREFIX + k; }
     function nativeGet(k) {
       if (!nativeLS) return null;
       try { return nativeLS.getItem(nativeKey(k)); } catch (_) { return null; }
@@ -371,30 +371,44 @@ export const LOCALSTORAGE_SHIM_SCRIPT = `<script data-playgrounds-ls-shim>
       if (!nativeLS) return;
       try { nativeLS.removeItem(nativeKey(k)); } catch (_) { /* ignore */ }
     }
-    function apiPath(k) { return "/api/kv/" + encodeURIComponent(PREFIX + k); }
-    function doFlush() {
-      if (flushing) return currentFlush || Promise.resolve();
-      flushing = true;
-      lastFlush = Date.now();
-      currentFlush = (function () {
-        var batch = Object.keys(pending).map(function (k) { return [k, pending[k]]; });
-        Object.keys(pending).forEach(function (k) { delete pending[k]; });
-        return batch.reduce(function (chain, kv) {
-          var k = kv[0], v = kv[1];
-          return chain.then(function () {
-            var method = v == null ? "DELETE" : "PUT";
-            var init = v == null ? { method: "DELETE" } : { method: "PUT", body: String(v) };
-            return window.fetch(apiPath(k), init).catch(function (e) {
-              console.warn("[localStorage-shim] flush failed:", e);
-            });
-          });
-        }, Promise.resolve());
-      })();
-      currentFlush.then(function () { flushing = false; currentFlush = null; }, function () { flushing = false; currentFlush = null; });
-      return currentFlush;
+    function apiPath(k) { return "/api/kv/" + encodeURIComponent(k); }
+    function persist(k, v) {
+      var init = v == null ? { method: "DELETE" } : { method: "PUT", body: String(v) };
+      return window.fetch(apiPath(k), init).then(function (res) {
+        if (!res.ok) throw new Error("KV " + init.method + " returned " + res.status);
+      }).catch(function (e) {
+        console.warn("[localStorage-shim] sync failed:", e);
+      });
     }
-    function scheduleFlush() {
-      if (Date.now() - lastFlush >= FLUSH_MS && !flushing) doFlush();
+    function enqueueTask(task) {
+      var previous = currentWrite;
+      var operation = previous
+        ? previous.then(task, task)
+        : task();
+      var tracked = operation.then(function () {
+        if (currentWrite === tracked) currentWrite = null;
+      }, function () {
+        if (currentWrite === tracked) currentWrite = null;
+      });
+      currentWrite = tracked;
+      return tracked;
+    }
+    function enqueue(k, v) {
+      return enqueueTask(function () { return persist(k, v); });
+    }
+    function clearRemote() {
+      return window.fetch("/api/kv/list", {
+        method: "POST", body: JSON.stringify({ prefix: "" })
+      }).then(function (res) {
+        if (!res.ok) throw new Error("KV list returned " + res.status);
+        return res.json();
+      }).then(function (body) {
+        return (body && body.keys ? body.keys : []).reduce(function (chain, entry) {
+          return chain.then(function () { return persist(entry.name, null); });
+        }, Promise.resolve());
+      }).catch(function (e) {
+        console.warn("[localStorage-shim] clear failed:", e);
+      });
     }
     function makeStorage() {
       return {
@@ -410,23 +424,33 @@ export const LOCALSTORAGE_SHIM_SCRIPT = `<script data-playgrounds-ls-shim>
         setItem: function (k, v) {
           v = String(v);
           cache[k] = v;
-          pending[k] = v;
+          touched[k] = true;
           nativeSet(k, v);
-          scheduleFlush();
+          enqueue(k, v);
         },
         removeItem: function (k) {
           delete cache[k];
-          pending[k] = null;
+          touched[k] = true;
           nativeDel(k);
-          scheduleFlush();
+          enqueue(k, null);
         },
         clear: function () {
           Object.keys(cache).forEach(function (k) {
-            pending[k] = null;
+            touched[k] = true;
             nativeDel(k);
           });
           Object.keys(cache).forEach(function (k) { delete cache[k]; });
-          doFlush();
+          if (nativeLS) {
+            try {
+              var mirrorKeys = [];
+              for (var i = 0; i < nativeLS.length; i++) {
+                var mirrorKey = nativeLS.key(i);
+                if (mirrorKey && mirrorKey.indexOf(MIRROR_PREFIX) === 0) mirrorKeys.push(mirrorKey);
+              }
+              mirrorKeys.forEach(function (k) { nativeLS.removeItem(k); });
+            } catch (_) { /* ignore */ }
+          }
+          enqueueTask(clearRemote);
         },
         key: function (i) {
           var ks = Object.keys(cache);
@@ -436,7 +460,7 @@ export const LOCALSTORAGE_SHIM_SCRIPT = `<script data-playgrounds-ls-shim>
         _hydrate: function () {
           return window.fetch("/api/kv/list", {
             method: "POST",
-            body: JSON.stringify({ prefix: PREFIX }),
+            body: JSON.stringify({ prefix: "" }),
           }).then(function (res) {
             if (res.status !== 200) return;
             return res.json();
@@ -444,21 +468,31 @@ export const LOCALSTORAGE_SHIM_SCRIPT = `<script data-playgrounds-ls-shim>
             if (!body || !body.keys) return;
             return body.keys.reduce(function (chain, entry) {
               var name = entry.name;
-              if (name.indexOf(PREFIX) !== 0) return chain;
               return chain.then(function () {
                 return window.fetch("/api/kv/" + encodeURIComponent(name)).then(function (r) {
                   if (r.status !== 200) return;
                   return r.text().then(function (val) {
-                    var plain = name.slice(PREFIX.length);
-                    if (!(plain in cache)) cache[plain] = val;
+                    if (!touched[name] && !(name in cache)) cache[name] = val;
                   });
                 });
               });
             }, Promise.resolve());
           }).catch(function (e) { console.warn("[localStorage-shim] hydrate failed:", e); });
         },
-        _flush: function () { return doFlush(); },
+        _flush: function () { return currentWrite || Promise.resolve(); },
       };
+    }
+    if (nativeLS) {
+      try {
+        for (var i = 0; i < nativeLS.length; i++) {
+          var storedKey = nativeLS.key(i);
+          if (storedKey && storedKey.indexOf(MIRROR_PREFIX) === 0) {
+            var appKey = storedKey.slice(MIRROR_PREFIX.length);
+            var storedValue = nativeLS.getItem(storedKey);
+            if (storedValue != null) cache[appKey] = storedValue;
+          }
+        }
+      } catch (_) { /* private/blocked */ }
     }
     var shim = makeStorage();
     // install before user code reads localStorage
@@ -485,6 +519,14 @@ export const LOCALSTORAGE_SHIM_SCRIPT = `<script data-playgrounds-ls-shim>
   }
 })();
 </script>`;
+
+function renderLocalStorageShimScript(storageScope?: string): string {
+  const scope = storageScope?.trim() || "default";
+  return LOCALSTORAGE_SHIM_SCRIPT.replace(
+    JSON.stringify(LOCALSTORAGE_SCOPE_PLACEHOLDER),
+    JSON.stringify(scope)
+  );
+}
 
 /** Injected into HTML so the shell console panel still receives logs/errors,
  * `fetch("/api/…")` resolves under the canvas project path, same-origin fetch
@@ -739,7 +781,7 @@ export const CANVAS_BRIDGE_SCRIPT = `<script data-playgrounds-bridge>
 export const PLAYGROUNDS_SDK_SCRIPT_TAG =
   '<script src="/playgrounds/sdk.js" defer data-playgrounds-sdk></script>';
 
-export function injectCanvasBridge(html: string): string {
+export function injectCanvasBridge(html: string, storageScope?: string): string {
   // Idempotent guards: each marker is unique, so re-injection is a no-op.
   if (html.includes("data-playgrounds-ls-shim") &&
       html.includes("data-playgrounds-bridge") &&
@@ -749,7 +791,10 @@ export function injectCanvasBridge(html: string): string {
   // Headers we want injected before user code: shim first (installs
   // localStorage before the SAM reads it), then bridge, then SDK.
   const headInjections: Array<{ marker: string; script: string }> = [
-    { marker: "data-playgrounds-ls-shim", script: LOCALSTORAGE_SHIM_SCRIPT },
+    {
+      marker: "data-playgrounds-ls-shim",
+      script: renderLocalStorageShimScript(storageScope),
+    },
     { marker: "data-playgrounds-bridge", script: CANVAS_BRIDGE_SCRIPT },
     { marker: "data-playgrounds-sdk", script: PLAYGROUNDS_SDK_SCRIPT_TAG },
   ];
