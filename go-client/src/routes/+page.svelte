@@ -11,9 +11,12 @@
 
   let input = $state("");
   // 穩定推薦池：只在「再次推薦」時重新產生，捲動不改變內容。
-  let pool = $state<GoCatalogEntry[]>(recommendHome(4));
-  let recCount = $state(homeRecCount());
-  let recs = $state<GoCatalogEntry[]>(pool.slice(0, recCount));
+  // 初值用區域常數，避免 $state 初始化時互相引用（state_referenced_locally）。
+  const initialPool = recommendHome(4);
+  const initialRecCount = homeRecCount();
+  let pool = $state<GoCatalogEntry[]>(initialPool);
+  let recCount = $state(initialRecCount);
+  let recs = $state<GoCatalogEntry[]>(initialPool.slice(0, initialRecCount));
   let isSearching = $state(false);
   const og = goOgMeta({
     title: GO_HOME_DOCUMENT_TITLE,

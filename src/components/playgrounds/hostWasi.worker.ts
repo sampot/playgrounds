@@ -1,7 +1,11 @@
+/// <reference lib="webworker" />
+
 /**
  * WASI preview1 runner Worker — `@bjorn3/browser_wasi_shim` + pinned .wasm CLIs.
  * DEC-039: prefer OPFS SyncAccessHandle preopen; memory entries remain for tests／fallback.
  */
+
+declare const self: DedicatedWorkerGlobalScope;
 
 import {
   ConsoleStdout,
@@ -270,7 +274,7 @@ self.addEventListener("unhandledrejection", ev => {
       : typeof reason === "string"
         ? reason
         : "WASI Worker unhandledrejection";
-  (self as DedicatedWorkerGlobalScope).postMessage({
+  self.postMessage({
     type: "result",
     id: "unhandled",
     ok: false,
@@ -284,7 +288,7 @@ self.onmessage = (ev: MessageEvent<HostWasiWorkerIn>) => {
   if (!msg || msg.type !== "run") return;
   void runCmd(msg)
     .then(out => {
-      (self as DedicatedWorkerGlobalScope).postMessage(out);
+      self.postMessage(out);
     })
     .catch((e: unknown) => {
       const out: HostWasiWorkerOut = {
@@ -294,6 +298,9 @@ self.onmessage = (ev: MessageEvent<HostWasiWorkerIn>) => {
         error: e instanceof Error ? e.message : String(e),
         code: "wasi_unavailable",
       };
-      (self as DedicatedWorkerGlobalScope).postMessage(out);
+      self.postMessage(out);
     });
 };
+
+// Keep this file a module (avoids DOM/`self` redeclaration under check).
+export {};

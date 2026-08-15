@@ -58,6 +58,26 @@ describe("goSamOfflineCache list／delete", () => {
 
     vi.unstubAllGlobals();
   });
+
+  it("reports when an offline download cannot be stored", async () => {
+    vi.stubGlobal("caches", {
+      open: async () => ({
+        put: async () => {
+          throw new Error("quota exceeded");
+        },
+      }),
+    });
+
+    const { putGoSamOfflineCache } = await import("./goSamOfflineCache");
+
+    await expect(
+      putGoSamOfflineCache("pg-breakout", "sampot/pg-breakout", {
+        "index.html": "<html></html>",
+      })
+    ).resolves.toBe(false);
+
+    vi.unstubAllGlobals();
+  });
 });
 
 describe("fileMapsEqual", () => {

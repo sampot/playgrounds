@@ -60,12 +60,24 @@ export async function runUpdate(
   }
   const cached = await getGoSamOfflineCache(id);
   if (!cached) {
-    await putGoSamOfflineCache(id, entry.source, freshFiles);
+    const stored = await putGoSamOfflineCache(id, entry.source, freshFiles);
+    if (!stored) {
+      return {
+        ok: false,
+        flash: `無法儲存「${title}」的離線下載，請確認瀏覽器儲存空間`,
+      };
+    }
     return { ok: true, flash: `已為「${title}」建立離線下載` };
   }
   if (fileMapsEqual(freshFiles, cached.files)) {
     return { ok: true, flash: `「${title}」已是最新版本` };
   }
-  await putGoSamOfflineCache(id, entry.source, freshFiles);
+  const stored = await putGoSamOfflineCache(id, entry.source, freshFiles);
+  if (!stored) {
+    return {
+      ok: false,
+      flash: `無法儲存「${title}」的更新，請確認瀏覽器儲存空間`,
+    };
+  }
   return { ok: true, flash: `已更新「${title}」至最新版本` };
 }

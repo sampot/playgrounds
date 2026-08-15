@@ -65,27 +65,34 @@ describe("pg-rubik functions.js + goWebKv", () => {
  */
 type CapturedEnv = Record<string, unknown> | null;
 let capturedEnv: CapturedEnv = null;
-const hostSessionFetchMock = vi.fn(async () => ({ state: { turn: "host" } }));
+const hostSessionFetchMock = vi.fn(
+  async (_path: string, _init?: { method?: string }) => ({
+    state: { turn: "host" },
+  })
+);
 
 const hostableSamModule = {
   fetch: async (request: Request, env: Record<string, unknown>) => {
     capturedEnv = env;
     const url = new URL(request.url);
-    if (url.pathname === "/api/host/state" && env.HOST) {
-      const out = await (
-        env.HOST as { hostSessionFetch: typeof hostSessionFetchMock }
-      ).hostSessionFetch("/api/session/state", { method: "GET" });
+    const host = env["HOST"] as
+      | {
+          hostSessionFetch: typeof hostSessionFetchMock;
+          capabilities: () => Promise<string[]>;
+        }
+      | undefined;
+    if (url.pathname === "/api/host/state" && host) {
+      const out = await host.hostSessionFetch("/api/session/state", {
+        method: "GET",
+      });
       return new Response(JSON.stringify(out), {
         headers: { "content-type": "application/json" },
       });
     }
     return new Response(
       JSON.stringify({
-        hasHost: Boolean(env && env.HOST),
-        hostCapabilities:
-          env && env.HOST
-            ? await (env.HOST as { capabilities: () => Promise<string[]> }).capabilities()
-            : null,
+        hasHost: Boolean(host),
+        hostCapabilities: host ? await host.capabilities() : null,
       }),
       { headers: { "content-type": "application/json" } }
     );
@@ -131,7 +138,7 @@ describe("goFunctionsRuntime — env.HOST injection (DEC-053)", () => {
     const data = readJson(response) as { hasHost: boolean };
     expect(response.status).toBe(200);
     expect(data.hasHost).toBe(false);
-    expect(capturedEnv && Boolean(capturedEnv.HOST)).toBe(false);
+    expect(Boolean(capturedEnv?.["HOST"])).toBe(false);
   });
 
   it("injects env.HOST and exposes canonical capabilities when host runtime is present", async () => {

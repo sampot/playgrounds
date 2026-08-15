@@ -109,18 +109,15 @@ export async function handleGoBuiltInKv(
       const v = await kv.get(key);
       if (v == null) return notFound();
       if (typeof v === "string") return textResponse(v, 200);
-      const ab =
-        v instanceof ArrayBuffer
-          ? v
-          : (v as Uint8Array).buffer.slice(
-              (v as Uint8Array).byteOffset,
-              (v as Uint8Array).byteOffset + (v as Uint8Array).byteLength
-            );
+      const src =
+        v instanceof ArrayBuffer ? new Uint8Array(v) : (v as Uint8Array);
+      const copy = new Uint8Array(src.byteLength);
+      copy.set(src);
       return {
         status: 200,
         statusText: "",
         headers: [["Content-Type", "application/octet-stream"]],
-        body: ab,
+        body: copy.buffer,
       };
     }
     if (method === "PUT") {

@@ -88,10 +88,10 @@ export async function putGoSamOfflineCache(
   catalogId: string,
   source: string,
   files: FileMap
-): Promise<void> {
-  if (typeof caches === "undefined") return;
+): Promise<boolean> {
+  if (typeof caches === "undefined") return false;
   const id = catalogId.trim();
-  if (!id) return;
+  if (!id) return false;
   try {
     const cache = await caches.open(CACHE_NAME);
     const body = JSON.stringify(serialize(id, source, files));
@@ -105,8 +105,10 @@ export async function putGoSamOfflineCache(
         },
       })
     );
+    return true;
   } catch {
-    /* private mode／quota — ignore */
+    /* private mode／quota */
+    return false;
   }
 }
 

@@ -323,8 +323,9 @@ export async function resolvePlaygroundsProjectDir(
 }
 
 export function supportsSyncAccessHandle(): boolean {
-  return (
-    typeof FileSystemFileHandle !== "undefined" &&
-    typeof FileSystemFileHandle.prototype.createSyncAccessHandle === "function"
-  );
+  if (typeof FileSystemFileHandle === "undefined") return false;
+  const proto = FileSystemFileHandle.prototype as FileSystemFileHandle & {
+    createSyncAccessHandle?: unknown;
+  };
+  return typeof proto.createSyncAccessHandle === "function";
 }

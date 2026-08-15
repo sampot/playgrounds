@@ -291,10 +291,10 @@
 
         <section class="go-more-section" aria-labelledby="go-more-apps-title">
           <h3 id="go-more-apps-title" class="go-more-section-title">
-            已安裝遊戲
+            離線遊戲
           </h3>
           <a class="go-more-btn go-more-link" href="/apps" onclick={onClose}>
-            管理已安裝遊戲
+            管理可離線玩的遊戲
           </a>
         </section>
 
