@@ -322,38 +322,45 @@ import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
 </svelte:head>
 
 {#if !catalogId}
-  <h1>無法開啟</h1>
-  <p class="err" role="alert">連結不完整</p>
+  <h1 class="pixel-text">無法開啟</h1>
+  <div class="pixel-status" role="alert">
+    <p class="pixel-status-body err">連結不完整</p>
+  </div>
 {:else if !entry && (!status || status.phase === "idle" || status.phase === "loading")}
-  <h1>無法開啟</h1>
-  <p class="err" role="alert">型錄沒有這項小品（可能已下架）</p>
-  <p class="lead">
-    可回
-    <a href={`${PLAYGROUNDS_GO_ORIGIN}/sam/`} target="_blank" rel="noopener noreferrer"
-      >型錄</a
-    >
-    挑選其他小品。
-  </p>
-{:else if !status || status.phase === "idle" || status.phase === "loading"}
-  <h1>{entry?.title || status?.entry?.title || "開啟小品"}</h1>
-  <p class="status" role="status">{status?.message || "正在載入…"}</p>
-  <GoSamLoadBar
-    progress={status?.loadProgress ?? { ratio: null, detail: "準備中…" }}
-    label="小品下載進度"
-  />
-{:else if status.phase === "error"}
-  <h1>打不開</h1>
-  <p class="err" role="alert">{status.error}</p>
-  <p class="actions">
-    <button type="button" class="btn primary" onclick={retryLoad}>再試一次</button>
-  </p>
-  {#if showOfflineHint}
-    <p class="lead">連上網路後再試；成功開過一次的小品，之後就能離線玩。</p>
-  {:else}
-    <p class="lead">
-      可回 <a href={`${PLAYGROUNDS_GO_ORIGIN}/`}>山姆鍋遊樂場</a> 挑選其他小品。
+  <h1 class="pixel-text">無法開啟</h1>
+  <div class="pixel-status" role="alert">
+    <p class="pixel-status-title">型錄沒有這項小品</p>
+    <p class="pixel-status-body">可能已下架。可回
+      <a href={`${PLAYGROUNDS_GO_ORIGIN}/sam/`} target="_blank" rel="noopener noreferrer"
+        >型錄</a
+      >
+      挑選其他小品。
     </p>
-  {/if}
+  </div>
+{:else if !status || status.phase === "idle" || status.phase === "loading"}
+  <h1 class="pixel-text">{entry?.title || status?.entry?.title || "開啟小品"}</h1>
+  <div class="pixel-status" role="status">
+    <p class="pixel-status-title">{status?.message || "正在載入…"}</p>
+    <GoSamLoadBar
+      progress={status?.loadProgress ?? { ratio: null, detail: "準備中…" }}
+      label="小品下載進度"
+    />
+  </div>
+{:else if status.phase === "error"}
+  <h1 class="pixel-text">打不開</h1>
+  <div class="pixel-status" role="alert">
+    <p class="pixel-status-title err">{status.error}</p>
+    <p class="actions">
+      <button type="button" class="pixel-btn pixel-btn--primary" onclick={retryLoad}>再試一次</button>
+    </p>
+    {#if showOfflineHint}
+      <p class="pixel-status-body">連上網路後再試；成功開過一次的小品，之後就能離線玩。</p>
+    {:else}
+      <p class="pixel-status-body">
+        可回 <a href={`${PLAYGROUNDS_GO_ORIGIN}/`}>山姆鍋遊樂場</a> 挑選其他小品。
+      </p>
+    {/if}
+  </div>
 {:else}
   <h1 class="sr-only">{status.entry?.title || entry?.title || "小品"}</h1>
   {#if hostable}
@@ -409,33 +416,11 @@ import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
 {/if}
 
 <style>
-  .lead {
-    margin-top: 1rem;
-  }
   .actions {
     display: flex;
     flex-wrap: wrap;
     gap: 0.65rem;
-    margin-top: 1rem;
-  }
-  .btn {
-    min-height: 2.75rem;
-    min-width: 2.75rem;
-    padding: 0.55rem 1rem;
-    border-radius: var(--radius);
-    border: var(--pixel-edge) solid rgb(var(--ink));
-    background: rgb(var(--card));
-    color: rgb(var(--ink));
-    font-family: var(--pixel);
-    font: inherit;
-    font-weight: 700;
-    cursor: pointer;
-    box-shadow: var(--pixel-shadow);
-  }
-  .btn.primary {
-    background: rgb(var(--accent));
-    border-color: rgb(var(--ink));
-    color: #fff;
+    margin: 0.75rem 0 0;
   }
   .stage {
     flex: 1;
@@ -444,12 +429,14 @@ import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
     border-radius: var(--radius);
     overflow: hidden;
     background: #0a1210;
+    box-shadow: var(--pixel-shadow);
   }
   .stage--fill {
     min-height: 0;
     height: 100%;
     border: none;
     border-radius: 0;
+    box-shadow: none;
   }
   .play {
     display: block;

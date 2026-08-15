@@ -88,9 +88,12 @@
   <meta name="twitter:image" content={og.image} />
 </svelte:head>
 
-<h1>純玩</h1>
+<h1 class="pixel-text">純玩</h1>
 <p class="lead">{GO_HOME_LEAD}</p>
-<p class="status">選一個遊戲直接玩。造訪過的離線也能再開。</p>
+<p class="status home-tagline">
+  <span class="pixel-tag">多款小品</span>
+  <span>選一個遊戲直接玩。造訪過的離線也能再開。</span>
+</p>
 
 <section class="home-rec" aria-label="推薦試試">
   <h2 class="home-rec-title">推薦試試</h2>
@@ -98,7 +101,7 @@
   <div class="search-box">
     <input
       type="text"
-      class="search-input"
+      class="search-input pixel-input"
       placeholder="輸入部分遊戲 ID 搜尋（例如：break）"
       value={input}
       oninput={handleSearch}
@@ -130,11 +133,18 @@
   {/if}
 </section>
 
-<button type="button" class="home-reshuffle" onclick={reshuffle}>
+<button type="button" class="home-reshuffle pixel-btn pixel-btn--primary" onclick={reshuffle}>
   再次推薦
 </button>
 
 <style>
+  .home-tagline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.65rem;
+    margin: 0 0 1.1rem;
+  }
   .home-rec {
     margin: 0 0 1rem;
   }
@@ -142,34 +152,6 @@
     display: block;
     width: fit-content;
     margin: 0 auto;
-    min-height: 2.75rem;
-    padding: 0.55rem 1rem;
-    border: var(--pixel-edge) solid rgb(var(--ink));
-    border-radius: var(--radius);
-    background: rgb(var(--accent));
-    color: #fff;
-    font-family: var(--pixel);
-    font: inherit;
-    font-size: 0.9rem;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-    cursor: pointer;
-    box-shadow: var(--pixel-shadow);
-    transition:
-      transform 0.06s steps(2),
-      box-shadow 0.06s steps(2);
-  }
-  html[data-theme="dark"] .home-reshuffle {
-    color: #042f2e;
-  }
-  .home-reshuffle:hover,
-  .home-reshuffle:focus-visible {
-    outline: none;
-    animation: pixel-blink 0.9s steps(2) infinite;
-  }
-  .home-reshuffle:active {
-    transform: translateY(3px);
-    box-shadow: 0 0 0 0 rgb(var(--ink));
   }
   .home-rec-title {
     margin: 0 0 0.65rem;
@@ -181,31 +163,15 @@
   .search-box {
     margin-bottom: 0.65rem;
   }
-  .search-input {
-    width: 100%;
-    padding: 0.65rem 0.9rem;
-    border: var(--pixel-edge) solid rgb(var(--ink));
-    border-radius: var(--radius);
-    background: rgb(var(--fill));
-    color: rgb(var(--ink));
-    font: inherit;
-    font-size: 0.95rem;
-    box-sizing: border-box;
-    box-shadow: inset 0 2px 0 0 color-mix(in oklab, rgb(var(--ink)) 10%, transparent);
-  }
-  .search-input:hover,
-  .search-input:focus-visible {
-    border-color: rgb(var(--accent));
-    outline: none;
-  }
-  .search-input::placeholder {
-    color: rgb(var(--muted));
-  }
   .search-no-results,
   .search-placeholder-text {
     font-size: 0.9rem;
     color: rgb(var(--muted));
     text-align: center;
     padding: 1rem;
+    border: var(--pixel-edge) solid rgb(var(--ink));
+    border-radius: var(--radius);
+    background: rgb(var(--card));
+    box-shadow: var(--pixel-shadow);
   }
 </style>

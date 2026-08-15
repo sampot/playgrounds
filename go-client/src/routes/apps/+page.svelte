@@ -126,20 +126,20 @@
   <a href="/">← 回純玩首頁</a>
 </p>
 
-<h1>已安裝遊戲</h1>
+<h1 class="pixel-text">已安裝遊戲</h1>
 
 {#if flash}
-  <p class="flash" role="status">{flash}</p>
+  <p class="flash pixel-status" role="status">{flash}</p>
 {/if}
 
 {#if confirm}
-  <div class="confirm" role="alertdialog" aria-labelledby="apps-confirm-title">
+  <div class="confirm pixel-frame" role="alertdialog" aria-labelledby="apps-confirm-title">
     <h2 id="apps-confirm-title" class="confirm-title">{confirmCopy.title}</h2>
     <p class="confirm-body">{confirmCopy.body}</p>
     <div class="confirm-actions">
       <button
         type="button"
-        class="btn"
+        class="pixel-btn"
         disabled={busy}
         onclick={() => (confirm = null)}
       >
@@ -147,7 +147,7 @@
       </button>
       <button
         type="button"
-        class="btn btn-danger"
+        class="pixel-btn pixel-btn--danger"
         disabled={busy}
         onclick={() => void runConfirm()}
       >
@@ -158,7 +158,7 @@
 {/if}
 
 {#if apps.length === 0}
-  <div class="empty-pixel">
+  <div class="empty-pixel pixel-frame">
     <svg width="72" height="72" viewBox="0 0 12 12" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true">
       <rect x="2" y="4" width="8" height="5" />
       <rect x="3" y="3" width="6" height="1" />
@@ -172,7 +172,7 @@
 {:else}
   <ul class="app-list">
     {#each apps as app (app.id)}
-       <li class="app-row">
+       <li class="app-row pixel-box">
           <span class="app-icon" aria-hidden="true">
             <GoSeriesIcon series={app.series} size={20} />
           </span>
@@ -185,7 +185,7 @@
         <div class="app-acts">
           <button
             type="button"
-            class="act-btn"
+            class="act-btn pixel-btn"
             title={`清除「${app.title}」進度／分數`}
             aria-label={`清除「${app.title}」進度／分數`}
             onclick={() => askClearScores(app.id, app.title)}
@@ -194,7 +194,7 @@
           </button>
           <button
             type="button"
-            class="act-btn act-btn--danger"
+            class="act-btn act-btn--danger pixel-btn pixel-btn--danger-outline"
             title={`移除「${app.title}」離線下載`}
             aria-label={`移除「${app.title}」離線下載`}
             onclick={() => askRemoveOffline(app.id, app.title)}
@@ -209,7 +209,7 @@
   <section class="apps-advanced">
     <button
       type="button"
-      class="btn btn-danger-outline"
+      class="pixel-btn pixel-btn--danger-outline"
       onclick={askClearAll}
     >
       清除全部本機遊戲資料…
@@ -233,8 +233,6 @@
   }
   h1 {
     margin: 0 0 1rem;
-    font-size: 1.25rem;
-    font-weight: 700;
   }
   .flash {
     margin: 0 0 0.75rem;
@@ -250,11 +248,6 @@
   }
   .confirm {
     margin: 0 0 1rem;
-    padding: 1rem;
-    border: var(--pixel-edge) solid rgb(var(--ink));
-    border-radius: var(--radius);
-    background: rgb(var(--card));
-    box-shadow: var(--pixel-shadow);
   }
   .confirm-title {
     margin: 0 0 0.35rem;
@@ -286,10 +279,6 @@
     align-items: center;
     gap: 0.5rem;
     padding: 0.6rem 0.75rem;
-    border: var(--pixel-edge) solid rgb(var(--ink));
-    border-radius: var(--radius);
-    background: rgb(var(--card));
-    box-shadow: var(--pixel-shadow);
     min-width: 0;
   }
   .app-icon {
@@ -323,73 +312,11 @@
     gap: 0.35rem;
   }
   .act-btn {
-    min-height: 2.5rem;
     min-width: 2.5rem;
     padding: 0.35rem 0.55rem;
-    border: var(--pixel-edge) solid rgb(var(--ink));
-    border-radius: var(--radius);
-    background: rgb(var(--fill));
-    color: rgb(var(--ink));
-    font-family: var(--pixel);
-    font: inherit;
     font-size: 0.75rem;
-    font-weight: 700;
-    cursor: pointer;
-    box-shadow: var(--pixel-shadow);
-    transition:
-      transform 0.06s steps(2),
-      box-shadow 0.06s steps(2);
-  }
-  .act-btn:hover:not(:disabled),
-  .act-btn:focus-visible:not(:disabled) {
-    border-color: rgb(var(--accent));
-    color: rgb(var(--accent));
-    outline: none;
-    animation: pixel-blink 0.9s steps(2) infinite;
-  }
-  .act-btn:active:not(:disabled) {
-    transform: translateY(3px);
-    box-shadow: 0 0 0 0 rgb(var(--ink));
-  }
-  .act-btn--danger {
-    color: rgb(var(--danger));
-    border-color: rgb(var(--danger));
-  }
-  .act-btn--danger:hover:not(:disabled),
-  .act-btn--danger:focus-visible:not(:disabled) {
-    color: rgb(var(--danger));
-    border-color: rgb(var(--danger));
   }
   .apps-advanced {
     margin-top: 1.25rem;
-  }
-  .btn {
-    min-height: 2.75rem;
-    min-width: 2.75rem;
-    padding: 0.55rem 1rem;
-    border-radius: var(--radius);
-    border: var(--pixel-edge) solid rgb(var(--ink));
-    background: rgb(var(--card));
-    color: rgb(var(--ink));
-    font-family: var(--pixel);
-    font: inherit;
-    font-weight: 700;
-    cursor: pointer;
-    box-shadow: var(--pixel-shadow);
-  }
-  .btn-danger {
-    background: rgb(var(--danger));
-    border-color: rgb(var(--ink));
-    color: #fff;
-    text-align: center;
-  }
-  .btn-danger:hover:not(:disabled),
-  .btn-danger:focus-visible:not(:disabled) {
-    filter: brightness(1.08);
-    color: #fff;
-  }
-  .btn-danger-outline {
-    border-color: rgb(var(--danger));
-    color: rgb(var(--danger));
   }
 </style>

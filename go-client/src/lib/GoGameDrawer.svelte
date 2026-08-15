@@ -257,7 +257,13 @@
     padding: 0.75rem;
     border: var(--pixel-edge) solid rgb(var(--ink));
     border-radius: var(--radius);
-    background: rgb(var(--fill));
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in oklab, rgb(var(--gold-soft)) 14%, transparent) 0,
+        transparent 40%
+      ),
+      rgb(var(--fill));
     box-shadow: var(--pixel-shadow);
     pointer-events: auto;
   }
@@ -291,11 +297,15 @@
     font-family: var(--pixel);
     font-size: 0.8rem;
     font-weight: 700;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.04em;
     color: rgb(var(--muted));
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  .game-drawer-title::before {
+    content: "▸ ";
+    color: rgb(var(--gold));
   }
   .game-drawer-btn {
     min-height: 2.75rem;

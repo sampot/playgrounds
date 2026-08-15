@@ -137,69 +137,77 @@
 </svelte:head>
 
 {#if !shortId}
-  <h1>無法開始</h1>
-  <p class="err" role="alert">邀請連結不完整</p>
-{:else if !status || status.phase === "resolving" || status.phase === "idle"}
-  <h1>邀請</h1>
-  <p class="status" role="status">{status?.message || "正在讀取邀請…"}</p>
-{:else if status.phase === "error"}
-  <h1>無法開始</h1>
-  <p class="err" role="alert">{status.error}</p>
-  <div class="actions" style="margin-top: 1rem">
-    <button type="button" class="btn primary" onclick={() => void copyInviteLink()}>
-      複製邀請連結
-    </button>
+  <h1 class="pixel-text">無法開始</h1>
+  <div class="pixel-status" role="alert">
+    <p class="pixel-status-body err">邀請連結不完整</p>
   </div>
-  {#if copyFlash}
-    <p class="status" role="status">{copyFlash}</p>
-  {/if}
-  <p class="status" style="margin-top: 1rem">
-    若在 LINE 等 App 內開啟失敗，請用系統瀏覽器開啟連結（iPhone：⋯ → 在 Safari 開啟）。也可請主持重新邀請，或開啟
-    <a
-      href={`${PLAYGROUNDS_GO_ORIGIN}/`}
-      target="_blank"
-      rel="noopener noreferrer"
-      >山姆鍋遊樂場主頁</a
-    >
-  </p>
-{:else if status.phase === "consent"}
-  <h1>接受邀請</h1>
-  {#if inAppHint}
-    <p class="hint" role="note">
-      偵測到 App 內建瀏覽器。若加入後無法顯示遊戲畫面，請改用 Safari／Chrome 開啟本連結。
+{:else if !status || status.phase === "resolving" || status.phase === "idle"}
+  <h1 class="pixel-text">邀請</h1>
+  <div class="pixel-status" role="status">
+    <p class="pixel-status-title">{status?.message || "正在讀取邀請…"}</p>
+  </div>
+{:else if status.phase === "error"}
+  <h1 class="pixel-text">無法開始</h1>
+  <div class="pixel-status" role="alert">
+    <p class="pixel-status-title err">{status.error}</p>
+    <div class="actions">
+      <button type="button" class="pixel-btn pixel-btn--primary" onclick={() => void copyInviteLink()}>
+        複製邀請連結
+      </button>
+    </div>
+    {#if copyFlash}
+      <p class="pixel-status-body" role="status">{copyFlash}</p>
+    {/if}
+    <p class="pixel-status-body">
+      若在 LINE 等 App 內開啟失敗，請用系統瀏覽器開啟連結（iPhone：⋯ → 在 Safari 開啟）。也可請主持重新邀請，或開啟
+      <a
+        href={`${PLAYGROUNDS_GO_ORIGIN}/`}
+        target="_blank"
+        rel="noopener noreferrer"
+        >山姆鍋遊樂場主頁</a
+      >
     </p>
-  {/if}
-  <p class="lead">
-    {#if protocolLabel}
-      協定 <span class="mono">{protocolLabel}</span>
+  </div>
+{:else if status.phase === "consent"}
+  <h1 class="pixel-text">接受邀請</h1>
+  <div class="pixel-frame invite-panel">
+    {#if inAppHint}
+      <p class="hint" role="note">
+        偵測到 App 內建瀏覽器。若加入後無法顯示遊戲畫面，請改用 Safari／Chrome 開啟本連結。
+      </p>
     {/if}
-    {#if samSource}
-      · 來源 <span class="mono">{samSource}</span>
-    {/if}
-  </p>
-  <label class="field">
-    <span>顯示名稱</span>
-    <input
-      class="input"
-      type="text"
-      maxlength="32"
-      bind:value={nameInput}
-      disabled={busy}
-      autocomplete="nickname"
-    />
-  </label>
-  <div class="actions">
-    <button
-      type="button"
-      class="btn primary"
-      disabled={busy}
-      onclick={() => void onAccept()}
-    >
-      {busy ? "處理中…" : "同意加入"}
-    </button>
-    <button type="button" class="btn" disabled={busy} onclick={onDecline}>
-      取消
-    </button>
+    <p class="lead">
+      {#if protocolLabel}
+        協定 <span class="mono">{protocolLabel}</span>
+      {/if}
+      {#if samSource}
+        · 來源 <span class="mono">{samSource}</span>
+      {/if}
+    </p>
+    <label class="field">
+      <span>顯示名稱</span>
+      <input
+        class="pixel-input"
+        type="text"
+        maxlength="32"
+        bind:value={nameInput}
+        disabled={busy}
+        autocomplete="nickname"
+      />
+    </label>
+    <div class="actions">
+      <button
+        type="button"
+        class="pixel-btn pixel-btn--primary"
+        disabled={busy}
+        onclick={() => void onAccept()}
+      >
+        {busy ? "處理中…" : "同意加入"}
+      </button>
+      <button type="button" class="pixel-btn" disabled={busy} onclick={onDecline}>
+        取消
+      </button>
+    </div>
   </div>
 {:else if showCanvas}
   <h1 class="sr-only">邀請</h1>
@@ -227,13 +235,7 @@
   </div>
 {:else}
   <h1 class="sr-only">邀請</h1>
-  <p class="status bar" role="status">
-    {status.message || "進行中…"}
-  </p>
-  {#if status.error}
-    <p class="err" role="alert">{status.error}</p>
-  {/if}
-  <div class="wait" role="status" aria-live="polite">
+  <div class="wait pixel-frame" role="status" aria-live="polite">
     <p class="wait-title">
       {#if status.phase === "loading_sam"}
         正在下載小品
@@ -247,6 +249,12 @@
         請稍候
       {/if}
     </p>
+    {#if status.message}
+      <p class="wait-hint">{status.message}</p>
+    {/if}
+    {#if status.error}
+      <p class="err" role="alert">{status.error}</p>
+    {/if}
     {#if status.phase === "loading_sam"}
       <GoSamLoadBar
         progress={status.loadProgress ?? { ratio: null, detail: "準備中…" }}
@@ -258,6 +266,9 @@
 {/if}
 
 <style>
+  .invite-panel {
+    margin: 0 0 1rem;
+  }
   .field {
     display: flex;
     flex-direction: column;
@@ -265,48 +276,11 @@
     margin: 0.75rem 0 1rem;
     font-size: 0.85rem;
   }
-  .input {
-    min-height: 2.75rem;
-    padding: 0.5rem 0.75rem;
-    border: var(--pixel-edge) solid rgb(var(--ink));
-    border-radius: var(--radius);
-    background: rgb(var(--fill));
-    color: rgb(var(--ink));
-    font: inherit;
-    box-shadow: inset 0 2px 0 0 color-mix(in oklab, rgb(var(--ink)) 10%, transparent);
-  }
   .actions {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-  }
-  .btn {
-    min-height: 2.75rem;
-    padding: 0.5rem 1rem;
-    border-radius: var(--radius);
-    border: var(--pixel-edge) solid rgb(var(--ink));
-    background: rgb(var(--card));
-    color: rgb(var(--ink));
-    font-family: var(--pixel);
-    font: inherit;
-    font-weight: 700;
-    cursor: pointer;
-    box-shadow: var(--pixel-shadow);
-  }
-  .btn.primary {
-    border-color: rgb(var(--ink));
-    background: rgb(var(--accent));
-    color: #fff;
-  }
-  :global(html[data-theme="dark"]) .btn.primary {
-    color: #042f2e;
-  }
-  .btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-  .bar {
-    margin: 0 0 0.5rem;
+    margin: 0.75rem 0 0;
   }
   .wait {
     display: flex;
@@ -314,11 +288,6 @@
     justify-content: center;
     gap: 0.5rem;
     min-height: min(50vh, 20rem);
-    padding: 1.25rem 1rem;
-    border: var(--pixel-edge) solid rgb(var(--ink));
-    border-radius: var(--radius);
-    background: rgb(var(--card));
-    box-shadow: var(--pixel-shadow);
     text-align: center;
   }
   .wait-title {
@@ -336,11 +305,14 @@
     margin: 0 0 0.75rem;
     padding: 0.65rem 0.75rem;
     border-radius: var(--radius);
-    border: var(--pixel-edge) solid rgb(var(--ink));
+    border: 2px solid rgb(var(--ink));
     background: rgb(var(--fill));
     color: rgb(var(--muted));
     font-size: 0.85rem;
     line-height: 1.4;
+  }
+  .lead {
+    margin: 0 0 0.5rem;
   }
   .stage {
     flex: 1;
@@ -349,12 +321,14 @@
     border-radius: var(--radius);
     overflow: hidden;
     background: #0a1210;
+    box-shadow: var(--pixel-shadow);
   }
   .stage--fill {
     min-height: 0;
     height: 100%;
     border: none;
     border-radius: 0;
+    box-shadow: none;
   }
   .play {
     display: block;
@@ -381,7 +355,7 @@
     .actions {
       flex-direction: row;
     }
-    .btn {
+    .actions .pixel-btn {
       flex: 1;
     }
   }

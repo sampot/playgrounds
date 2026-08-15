@@ -13,6 +13,8 @@ import {
 } from "./goMemoryCanvas";
 import type { HostRuntime } from "./hostRuntime";
 
+export type GoCanvasMode = "sw" | "memory";
+
 export type MountGoCanvasOptions = {
   /** Solo `/s/<id>` — durable KV／DB namespace for intrinsics (env.KV／env.DB). */
   catalogId?: string | null;

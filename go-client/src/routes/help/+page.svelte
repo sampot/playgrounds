@@ -73,10 +73,10 @@
   <a href={backHref}>{backLabel}</a>
 </p>
 
-<h1>使用說明</h1>
+<h1 class="pixel-text">使用說明</h1>
 <p class="lead">加入主畫面、離線再玩，以及掃碼落在 App 內建瀏覽器時怎麼辦。</p>
 
-<section class="help-section" aria-labelledby="help-install">
+<section class="help-section pixel-frame" aria-labelledby="help-install">
   <h2 id="help-install">加入主畫面</h2>
   <p>
     用 <strong>iPhone Safari</strong>（不是頁頂「分享」）：
@@ -95,7 +95,7 @@
   </p>
 </section>
 
-<section class="help-section" aria-labelledby="help-offline">
+<section class="help-section pixel-frame" aria-labelledby="help-offline">
   <h2 id="help-offline">離線再玩</h2>
   <p>
     連線成功開過一次的遊戲，之後可在「更多 → 已安裝遊戲」再開。邀請短連結（<span
@@ -104,7 +104,7 @@
   </p>
 </section>
 
-<section class="help-section" aria-labelledby="help-webview">
+<section class="help-section pixel-frame" aria-labelledby="help-webview">
   <h2 id="help-webview">App 內建瀏覽器（例如 LINE）</h2>
   <p>
     用相機或 LINE 掃 QR／點連結時，常會開在 <strong>App 內建瀏覽器</strong>，功能可能不完整（無法加入主畫面、部分遊戲異常）。
@@ -135,11 +135,6 @@
   }
   .help-section {
     margin: 0 0 1.5rem;
-    padding: 0.85rem 0.95rem;
-    border: var(--pixel-edge) solid rgb(var(--ink));
-    border-radius: var(--radius);
-    background: rgb(var(--card));
-    box-shadow: var(--pixel-shadow);
   }
   .help-section h2 {
     margin: 0 0 0.5rem;

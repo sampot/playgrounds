@@ -23,7 +23,7 @@ function applyTheme(theme: GoTheme): void {
     'meta[name="theme-color"]'
   );
   if (meta) {
-    meta.setAttribute("content", theme === "dark" ? "#121c1a" : "#f6f0e0");
+    meta.setAttribute("content", theme === "dark" ? "#161826" : "#f6f0e0");
   }
 }
 

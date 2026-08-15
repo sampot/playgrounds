@@ -406,7 +406,7 @@
     {#if showMore}
       <button
         type="button"
-        class="hdr-more-btn"
+        class="hdr-more-btn pixel-btn"
         aria-expanded={moreOpen}
         aria-haspopup="dialog"
         onclick={openMore}
@@ -416,7 +416,7 @@
     {/if}
     <button
       type="button"
-      class="share-btn"
+      class="share-btn pixel-btn"
       disabled={!shareEnabled}
       title={shareEnabled
         ? catalogId
@@ -430,7 +430,7 @@
     {#if goAuth.loggedIn}
       <button
         type="button"
-        class={["profile-btn", "profile-btn--logged"]
+        class={["profile-btn", "profile-btn--logged", "pixel-btn"]
           .filter(Boolean)
           .join(" ")}
         aria-expanded={profileOpen}
@@ -476,7 +476,7 @@
     {:else}
       <button
         type="button"
-        class="profile-btn profile-btn--login"
+        class="profile-btn profile-btn--login pixel-btn pixel-btn--primary"
         aria-label="登入"
         onclick={onProfileClick}
       >

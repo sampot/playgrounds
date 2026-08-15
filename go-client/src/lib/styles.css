@@ -7,13 +7,18 @@
   --line: 142 124 98;
   --muted: 110 96 78;
   --danger: 186 52 42;
+  /* 低調金色高光（選單標籤／星芒），不是第二主色。 */
+  --gold: 198 148 48;
+  --gold-soft: 246 196 83;
   --sans: ui-sans-serif, system-ui, "PingFang TC", "Helvetica Neue",
     "Microsoft JhengHei", "Noto Sans TC", sans-serif;
-  --pixel: "DotGothic16", "Zpix", "Courier New", ui-monospace,
-    "SFMono-Regular", Menlo, Consolas, monospace;
-  --radius: 8px;
+  /* 未打包像素字型：以系統等寬為準，勿假名未載入的 web font。 */
+  --pixel: ui-monospace, "SFMono-Regular", "Menlo", "Consolas", "Courier New",
+    monospace;
+  --radius: 4px;
   --pixel-shadow: 0 3px 0 0 rgb(var(--ink));
   --pixel-edge: 3px;
+  --pixel-inset: inset 0 2px 0 0 color-mix(in oklab, rgb(var(--ink)) 10%, transparent);
   /* 像素描邊：單向輕描邊，保留 8-bit 感但不壓字（CJK 不宜多向硬描邊）。 */
   --pixel-text-shadow: 1px 1px 0 rgb(var(--ink));
 }
@@ -26,6 +31,8 @@ html[data-theme="dark"] {
   --line: 86 96 130;
   --muted: 150 160 186;
   --danger: 232 90 78;
+  --gold: 232 188 72;
+  --gold-soft: 246 210 110;
   --pixel-shadow: 0 3px 0 0 rgb(var(--ink));
 }
 *,
@@ -74,7 +81,79 @@ img {
   background: rgb(var(--card));
   box-shadow: var(--pixel-shadow);
 }
+/* 雙層選單框：外墨邊 + 內淺邊，像系統選單／狀態窗。 */
+.pixel-frame {
+  position: relative;
+  border: var(--pixel-edge) solid rgb(var(--ink));
+  border-radius: var(--radius);
+  background: rgb(var(--card));
+  box-shadow: var(--pixel-shadow);
+  padding: 0.85rem 0.95rem;
+}
+.pixel-frame::before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border: 2px solid color-mix(in oklab, rgb(var(--line)) 70%, rgb(var(--ink)));
+  border-radius: 2px;
+  pointer-events: none;
+}
+.pixel-frame > * {
+  position: relative;
+  z-index: 1;
+}
+/* 狀態窗：載入／錯誤／等待訊息。 */
+.pixel-status {
+  margin: 0 0 1rem;
+  padding: 0.85rem 0.95rem;
+  border: var(--pixel-edge) solid rgb(var(--ink));
+  border-radius: var(--radius);
+  background: rgb(var(--card));
+  box-shadow: var(--pixel-shadow);
+}
+.pixel-status-title {
+  margin: 0 0 0.35rem;
+  font-family: var(--pixel);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-shadow: var(--pixel-text-shadow);
+}
+.pixel-status-body {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: color-mix(in oklab, rgb(var(--ink)) 88%, transparent);
+}
+/* 小標籤列（如「推薦試試」旁的裝飾標）。 */
+.pixel-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.55rem;
+  border: 2px solid rgb(var(--ink));
+  border-radius: var(--radius);
+  background: color-mix(in oklab, rgb(var(--gold-soft)) 55%, rgb(var(--card)));
+  color: rgb(var(--ink));
+  font-family: var(--pixel);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  box-shadow: 0 2px 0 0 rgb(var(--ink));
+}
+.pixel-tag::before {
+  content: "";
+  width: 0.45rem;
+  height: 0.45rem;
+  background: rgb(var(--gold));
+  box-shadow: 0.35rem 0 0 rgb(var(--accent));
+  flex-shrink: 0;
+}
 .pixel-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
   min-height: 2.75rem;
   padding: 0.45rem 0.85rem;
   border: var(--pixel-edge) solid rgb(var(--ink));
@@ -82,12 +161,14 @@ img {
   background: rgb(var(--card));
   color: rgb(var(--ink));
   font-family: var(--pixel);
-  font: inherit;
+  font-size: inherit;
   font-weight: 700;
   letter-spacing: 0.02em;
   text-transform: none;
+  text-decoration: none;
   cursor: pointer;
   box-shadow: var(--pixel-shadow);
+  box-sizing: border-box;
   transition:
     transform 0.06s steps(2),
     box-shadow 0.06s steps(2),
@@ -122,6 +203,7 @@ html[data-theme="dark"] .pixel-btn--primary {
 .pixel-btn--primary:focus-visible:not(:disabled) {
   color: #fff;
   filter: brightness(1.08);
+  animation: none;
 }
 html[data-theme="dark"] .pixel-btn--primary:hover:not(:disabled),
 html[data-theme="dark"] .pixel-btn--primary:focus-visible:not(:disabled) {
@@ -136,9 +218,26 @@ html[data-theme="dark"] .pixel-btn--primary:focus-visible:not(:disabled) {
 .pixel-btn--danger:focus-visible:not(:disabled) {
   color: #fff;
   filter: brightness(1.08);
+  animation: none;
+}
+.pixel-btn--danger-outline {
+  border-color: rgb(var(--danger));
+  color: rgb(var(--danger));
+  background: rgb(var(--fill));
+}
+.pixel-btn--danger-outline:hover:not(:disabled),
+.pixel-btn--danger-outline:focus-visible:not(:disabled) {
+  border-color: rgb(var(--danger));
+  color: rgb(var(--danger));
+}
+.pixel-btn--block {
+  width: 100%;
+  text-align: start;
+  justify-content: flex-start;
 }
 .pixel-input {
   width: 100%;
+  min-height: 2.75rem;
   padding: 0.6rem 0.8rem;
   border: var(--pixel-edge) solid rgb(var(--ink));
   border-radius: var(--radius);
@@ -147,7 +246,7 @@ html[data-theme="dark"] .pixel-btn--primary:focus-visible:not(:disabled) {
   font: inherit;
   font-size: 0.95rem;
   box-sizing: border-box;
-  box-shadow: inset 0 2px 0 0 color-mix(in oklab, rgb(var(--ink)) 10%, transparent);
+  box-shadow: var(--pixel-inset);
 }
 .pixel-input:hover,
 .pixel-input:focus-visible {
@@ -156,6 +255,55 @@ html[data-theme="dark"] .pixel-btn--primary:focus-visible:not(:disabled) {
 }
 .pixel-input::placeholder {
   color: rgb(var(--muted));
+}
+
+/* —— Go 專用：覆寫共用 ShareSheet（硬邊／pixel），不改元件預設 —— */
+.share-sheet-panel {
+  border: var(--pixel-edge) solid rgb(var(--ink)) !important;
+  border-bottom: none !important;
+  border-radius: calc(var(--radius) + 0.35rem) calc(var(--radius) + 0.35rem) 0 0 !important;
+  background: rgb(var(--fill)) !important;
+  box-shadow:
+    0 -6px 0 0 rgb(var(--ink)),
+    0 -12px 24px color-mix(in oklab, rgb(var(--ink)) 22%, transparent) !important;
+}
+.share-sheet-title {
+  font-family: var(--pixel) !important;
+  letter-spacing: 0.02em !important;
+  text-shadow: var(--pixel-text-shadow);
+}
+.share-sheet-close,
+.share-sheet-btn {
+  border: var(--pixel-edge) solid rgb(var(--ink)) !important;
+  border-radius: var(--radius) !important;
+  font-family: var(--pixel) !important;
+  font-weight: 700 !important;
+  box-shadow: var(--pixel-shadow) !important;
+}
+.share-sheet-btn--primary {
+  background: rgb(var(--accent)) !important;
+  border-color: rgb(var(--ink)) !important;
+  color: #fff !important;
+}
+html[data-theme="dark"] .share-sheet-btn--primary {
+  color: #042f2e !important;
+}
+.share-sheet-qr-wrap {
+  border: var(--pixel-edge) solid rgb(var(--ink)) !important;
+  border-radius: var(--radius) !important;
+  background: #fff !important;
+  box-shadow: var(--pixel-inset) !important;
+}
+.share-sheet-spoken,
+.share-sheet-url {
+  border: 2px solid rgb(var(--ink)) !important;
+  border-radius: var(--radius) !important;
+}
+@media (min-width: 40rem) {
+  .share-sheet-panel {
+    border-bottom: var(--pixel-edge) solid rgb(var(--ink)) !important;
+    border-radius: calc(var(--radius) + 0.35rem) !important;
+  }
 }
 
 @keyframes pixel-blink {
@@ -229,8 +377,16 @@ a {
   row-gap: 0.4rem;
   padding: 0.5rem max(0.75rem, calc((100% - 40rem) / 2 + 0.75rem));
   border-bottom: var(--pixel-edge) solid rgb(var(--ink));
-  background: color-mix(in oklab, rgb(var(--fill)) 92%, transparent);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, rgb(var(--gold-soft)) 12%, transparent) 0,
+      transparent 40%
+    ),
+    color-mix(in oklab, rgb(var(--fill)) 92%, transparent);
   backdrop-filter: blur(6px);
+  box-shadow: inset 0 calc(-1 * var(--pixel-edge)) 0 0
+    color-mix(in oklab, rgb(var(--line)) 55%, transparent);
   transition:
     transform 0.22s steps(4),
     opacity 0.22s steps(4);
@@ -671,8 +827,8 @@ a {
       90deg,
       rgb(var(--accent)) 0,
       rgb(var(--accent)) calc(10px - 2px),
-      color-mix(in oklab, rgb(var(--accent)) 68%, rgb(var(--ink))) calc(10px - 2px),
-      color-mix(in oklab, rgb(var(--accent)) 68%, rgb(var(--ink))) 10px
+      color-mix(in oklab, rgb(var(--accent)) 68%, rgb(var(--gold))) calc(10px - 2px),
+      color-mix(in oklab, rgb(var(--accent)) 68%, rgb(var(--gold))) 10px
     );
   transition: width 0.18s steps(10);
 }
@@ -841,6 +997,11 @@ html[data-theme="dark"] .err {
   border-radius: var(--radius);
   overflow: hidden;
   background:
+    radial-gradient(
+      80% 70% at 50% 40%,
+      color-mix(in oklab, rgb(var(--gold-soft)) 28%, transparent),
+      transparent 70%
+    ),
     repeating-linear-gradient(
       45deg,
       color-mix(in oklab, rgb(var(--accent)) 22%, rgb(var(--fill))) 0,
@@ -848,6 +1009,14 @@ html[data-theme="dark"] .err {
       color-mix(in oklab, rgb(var(--accent)) 38%, rgb(var(--fill))) 8px,
       color-mix(in oklab, rgb(var(--accent)) 38%, rgb(var(--fill))) 16px
     );
+}
+.home-grid-cover::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border: 1px solid color-mix(in oklab, rgb(var(--ink)) 35%, transparent);
+  border-radius: 2px;
+  pointer-events: none;
 }
 .home-grid-cover-icon {
   position: absolute;

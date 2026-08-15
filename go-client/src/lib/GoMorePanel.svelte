@@ -411,7 +411,13 @@
     border-bottom: none;
     border-radius: calc(var(--gm-radius) + 0.35rem)
       calc(var(--gm-radius) + 0.35rem) 0 0;
-    background: rgb(var(--gm-fill));
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in oklab, rgb(var(--gold-soft)) 14%, transparent) 0,
+        transparent 28%
+      ),
+      rgb(var(--gm-fill));
     box-shadow: 0 -6px 0 0 rgb(var(--gm-ink)),
       0 -12px 24px color-mix(in oklab, rgb(var(--gm-ink)) 22%, transparent);
     overflow: hidden;
@@ -423,6 +429,7 @@
     flex-shrink: 0;
     min-width: 0;
     padding: 1rem 1rem 0.5rem;
+    border-bottom: 2px solid color-mix(in oklab, rgb(var(--gm-ink)) 18%, transparent);
   }
   .go-more-body {
     flex: 1 1 auto;
@@ -440,9 +447,12 @@
   .go-more-title {
     margin: 0;
     flex: 1;
+    font-family: var(--pixel);
     font-size: 1.05rem;
     font-weight: 700;
+    letter-spacing: 0.02em;
     line-height: 1.3;
+    text-shadow: var(--pixel-text-shadow);
   }
   .go-more-close {
     flex-shrink: 0;
@@ -470,14 +480,22 @@
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+    padding: 0.65rem 0.7rem;
+    border: 2px solid color-mix(in oklab, rgb(var(--gm-ink)) 55%, transparent);
+    border-radius: var(--gm-radius);
+    background: color-mix(in oklab, rgb(var(--card)) 55%, rgb(var(--gm-fill)));
   }
   .go-more-section-title {
     margin: 0;
     font-family: var(--pixel);
     font-size: 0.8rem;
     font-weight: 700;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.04em;
     color: rgb(var(--gm-muted));
+  }
+  .go-more-section-title::before {
+    content: "▸ ";
+    color: rgb(var(--gold));
   }
   .go-more-hint,
   .go-more-confirm-body {

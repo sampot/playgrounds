@@ -136,16 +136,29 @@
     gap: 0.45rem;
     width: 100%;
     max-width: 40rem;
-    margin: 0 auto;
-    padding: 0.9rem 1rem 0.5rem;
+    margin: 0 auto 0.5rem;
+    padding: 0.85rem 1rem;
+    border: var(--pixel-edge) solid rgb(var(--ink));
+    border-radius: var(--radius);
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in oklab, rgb(var(--gold-soft)) 16%, transparent) 0,
+        transparent 55%
+      ),
+      rgb(var(--card));
+    box-shadow: var(--pixel-shadow);
   }
   .hostbar--live {
     gap: 0.65rem;
+    border-color: rgb(var(--accent));
   }
   .hostbar-msg {
     margin: 0;
-    font-size: 0.9rem;
-    font-weight: 600;
+    font-family: var(--pixel);
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
     color: rgb(var(--ink));
     text-align: center;
   }
@@ -198,16 +211,17 @@
     border-color: rgb(var(--ink));
     color: #fff;
   }
-  html[data-theme="dark"] .hostbtn--primary {
+  :global(html[data-theme="dark"]) .hostbtn--primary {
     color: #042f2e;
   }
   .hostbtn--primary:hover:not(:disabled),
   .hostbtn--primary:focus-visible:not(:disabled) {
     color: #fff;
     background: color-mix(in oklab, rgb(var(--accent)) 86%, #000);
+    animation: none;
   }
-  html[data-theme="dark"] .hostbtn--primary:hover:not(:disabled),
-  html[data-theme="dark"] .hostbtn--primary:focus-visible:not(:disabled) {
+  :global(html[data-theme="dark"]) .hostbtn--primary:hover:not(:disabled),
+  :global(html[data-theme="dark"]) .hostbtn--primary:focus-visible:not(:disabled) {
     color: #042f2e;
   }
 </style>
