@@ -16,7 +16,10 @@
   import { goAuth } from "$lib/goAuth.svelte";
   import { recommendHome, searchGoCatalog, type GoCatalogEntry } from "$lib/goCatalog";
   import GoSeriesIcon from "$lib/GoSeriesIcon.svelte";
+  import { formatGoBuildStamp, GO_BUILD_ISO } from "$lib/goBuildStamp";
   import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
+
+  const buildStamp = formatGoBuildStamp(GO_BUILD_ISO);
 
   let input = $state("");
   // 穩定推薦池：只在「再次推薦」時重新產生，捲動不改變內容。
@@ -188,6 +191,13 @@
   再次推薦
 </button>
 
+<footer class="home-footer">
+  <p>
+    建置
+    <time datetime={GO_BUILD_ISO}>{buildStamp}</time>
+  </p>
+</footer>
+
 <style>
   .home-tagline {
     display: flex;
@@ -218,6 +228,22 @@
     display: block;
     width: fit-content;
     margin: 0 auto;
+  }
+  .home-footer {
+    margin: 1.75rem 0 0;
+    padding-top: 0.85rem;
+    border-top: var(--pixel-edge) solid
+      color-mix(in oklab, rgb(var(--ink)) 18%, transparent);
+    text-align: center;
+  }
+  .home-footer p {
+    margin: 0;
+    font-size: 0.75rem;
+    letter-spacing: 0.02em;
+    color: color-mix(in oklab, rgb(var(--muted)) 92%, transparent);
+  }
+  .home-footer time {
+    font-variant-numeric: tabular-nums;
   }
   .home-rec-title {
     margin: 0 0 0.65rem;

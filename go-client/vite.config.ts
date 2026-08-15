@@ -7,6 +7,11 @@ const root = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   plugins: [sveltekit()],
+  define: {
+    // Prefer import.meta.env over a bare `__…__` global — Vite define truncates
+    // trailing underscores in identifiers like `__GO_BUILD_ISO__`.
+    "import.meta.env.GO_BUILD_ISO": JSON.stringify(new Date().toISOString()),
+  },
   resolve: {
     alias: {
       // Shared field-shell modules (DEC-050) — pure TS, no IDE shell.
