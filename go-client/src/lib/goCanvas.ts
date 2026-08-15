@@ -38,7 +38,7 @@ function isGoCanvasSwUsableSync(): boolean {
 }
 
 /** Bump with go-client/static/sw.js GO_SW_REV so phones pick up bridge fixes. */
-const SW_URL = "/sw.js?v=5";
+const SW_URL = "/sw.js?v=7";
 
 function withCanvasBridge(files: FileMap, storageScope?: string): FileMap {
   const out: FileMap = { ...files };
@@ -269,31 +269,41 @@ export function installGoCanvasApiListener(
     const data = ev.data as CanvasApiMessage | undefined;
     if (!data || data.type !== CANVAS_API_TYPE) return;
     const port = ev.ports?.[0];
-    if (!port) return;
     const sandboxId = data.sandboxId;
     const active = ctx.getSandboxId();
+    const reply = (payload: {
+      type: typeof CANVAS_API_RESULT_TYPE;
+      requestId: string;
+      response?: SerializedResponse;
+      error?: string;
+    }) => {
+      try {
+        port?.postMessage(payload);
+      } catch {
+        /* port may be absent when SW fans out without MessageChannel */
+      }
+      try {
+        navigator.serviceWorker.controller?.postMessage(payload);
+      } catch {
+        /* no controller */
+      }
+    };
     void (async () => {
       try {
-        if (active && sandboxId !== active) {
-          port.postMessage({
-            type: CANVAS_API_RESULT_TYPE,
-            requestId: data.requestId,
-            response: jsonResponse({ error: "wrong_sandbox" }, 403),
-          });
-          return;
-        }
+        // Fan-out from SW may hit every /s/ tab; only the owner replies.
+        if (active && sandboxId !== active) return;
         const response = await dispatchGoCanvasApi(
           ctx,
           sandboxId,
           data.request
         );
-        port.postMessage({
+        reply({
           type: CANVAS_API_RESULT_TYPE,
           requestId: data.requestId,
           response,
         });
       } catch (e) {
-        port.postMessage({
+        reply({
           type: CANVAS_API_RESULT_TYPE,
           requestId: data.requestId,
           error: e instanceof Error ? e.message : String(e),

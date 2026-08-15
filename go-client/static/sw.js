@@ -5,7 +5,7 @@
  *
  * Must stay aligned with field public/sw.js for canvas-bridge + API forward.
  */
-const GO_SW_REV = 6;
+const GO_SW_REV = 7;
 const CANVAS_PREFIX = "/canvas/";
 const SYNC_TYPE = "playgrounds-canvas-sync";
 const SYNC_ACK = "playgrounds-canvas-sync-ack";
@@ -37,6 +37,30 @@ self.addEventListener("activate", event => {
 self.addEventListener("message", event => {
   const data = event.data;
   if (!data || typeof data !== "object") return;
+  if (data.type === API_RESULT && typeof data.requestId === "string") {
+    if (data.error) {
+      settleApi(
+        data.requestId,
+        new Response(JSON.stringify({ error: data.error }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        })
+      );
+      return;
+    }
+    const r = data.response || {};
+    settleApi(
+      data.requestId,
+      new Response(r.body ?? null, {
+        status: r.status || 200,
+        statusText: r.statusText || "",
+        headers: r.headers || [
+          ["Content-Type", "application/json; charset=utf-8"],
+        ],
+      })
+    );
+    return;
+  }
   if (data.type === SYNC_TYPE && typeof data.sandboxId === "string") {
     snapshots.set(data.sandboxId, {
       generation: Number(data.generation) || 0,
@@ -104,20 +128,56 @@ function isGoShellClientPath(pathname) {
   return !pathname.startsWith(CANVAS_PREFIX);
 }
 
-async function findShellClient() {
+/** Pages that install installGoCanvasApiListener (solo／invite). */
+function isGoCanvasHostPath(pathname) {
+  return (
+    pathname.startsWith("/s/") ||
+    pathname === "/i" ||
+    pathname.startsWith("/i/")
+  );
+}
+
+/**
+ * Prefer focused／visible /s/／/i/ hosts. Posting only to `/` leaves /api hanging
+ * until api_timeout because home never installs the canvas API listener.
+ * @returns {Promise<Client[]>}
+ */
+async function findShellApiClients() {
   const all = await self.clients.matchAll({
     type: "window",
     includeUncontrolled: true,
   });
+  const hosts = [];
+  const otherShell = [];
   for (const client of all) {
     try {
-      const u = new URL(client.url);
-      if (isGoShellClientPath(u.pathname)) return client;
+      const pathname = new URL(client.url).pathname;
+      if (!isGoShellClientPath(pathname)) continue;
+      if (isGoCanvasHostPath(pathname)) hosts.push(client);
+      else otherShell.push(client);
     } catch {
       /* ignore */
     }
   }
-  return null;
+  const rank = c => {
+    if (c.focused) return 0;
+    if (c.visibilityState === "visible") return 1;
+    return 2;
+  };
+  hosts.sort((a, b) => rank(a) - rank(b));
+  otherShell.sort((a, b) => rank(a) - rank(b));
+  return hosts.concat(otherShell);
+}
+
+/** @type {Map<string, { resolve: (r: Response) => void, timer: number }>} */
+const pendingApi = new Map();
+
+function settleApi(requestId, response) {
+  const pending = pendingApi.get(requestId);
+  if (!pending) return;
+  pendingApi.delete(requestId);
+  clearTimeout(pending.timer);
+  pending.resolve(response);
 }
 
 /** fetch("/api/…") → /canvas/<id>/api/… (same as field canvas bridge). */
@@ -164,8 +224,8 @@ function injectBridge(html) {
 }
 
 async function forwardApi(sandboxId, request) {
-  const client = await findShellClient();
-  if (!client) {
+  const clients = await findShellApiClients();
+  if (!clients.length) {
     return new Response(
       JSON.stringify({
         ready: false,
@@ -188,64 +248,39 @@ async function forwardApi(sandboxId, request) {
   const headers = [];
   request.headers.forEach((v, k) => headers.push([k, v]));
   const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const payload = {
+    type: API_TYPE,
+    requestId,
+    sandboxId,
+    request: {
+      method: request.method,
+      url: request.url,
+      headers,
+      body: bodyBuf,
+    },
+  };
   return new Promise(resolve => {
-    const channel = new MessageChannel();
     const timer = setTimeout(() => {
-      channel.port1.close();
-      resolve(
+      settleApi(
+        requestId,
         new Response(JSON.stringify({ error: "api_timeout" }), {
           status: 504,
           headers: { "Content-Type": "application/json" },
         })
       );
     }, 30000);
-    channel.port1.onmessage = ev => {
-      clearTimeout(timer);
-      channel.port1.close();
-      const msg = ev.data;
-      if (!msg || msg.type !== API_RESULT || msg.requestId !== requestId) {
-        resolve(
-          new Response(JSON.stringify({ error: "bad_api_result" }), {
-            status: 502,
-            headers: { "Content-Type": "application/json" },
-          })
-        );
-        return;
+    pendingApi.set(requestId, { resolve, timer });
+    // Fan-out without MessageChannel transfer: pages reply via
+    // controller.postMessage({ type: API_RESULT, requestId, ... }).
+    // First matching host wins; avoids silent drops when ports are stripped
+    // or the first matchAll client is `/` (no API listener).
+    for (const client of clients) {
+      try {
+        client.postMessage(payload);
+      } catch {
+        /* ignore */
       }
-      if (msg.error) {
-        resolve(
-          new Response(JSON.stringify({ error: msg.error }), {
-            status: 500,
-            headers: { "Content-Type": "application/json" },
-          })
-        );
-        return;
-      }
-      const r = msg.response;
-      resolve(
-        new Response(r.body, {
-          status: r.status,
-          statusText: r.statusText || "",
-          headers: r.headers || [
-            ["Content-Type", "application/json; charset=utf-8"],
-          ],
-        })
-      );
-    };
-    client.postMessage(
-      {
-        type: API_TYPE,
-        requestId,
-        sandboxId,
-        request: {
-          method: request.method,
-          url: request.url,
-          headers,
-          body: bodyBuf,
-        },
-      },
-      [channel.port2]
-    );
+    }
   });
 }
 
