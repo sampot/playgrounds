@@ -1,7 +1,7 @@
 title: 迷你地城
 kind: game
 series: 精緻可玩
-blurb: 5 樓逐層往下的回合制隨機地城；每局重生，探索、戰鬥、寶箱、藥水；行動裝置優先、無依賴。
+blurb: 三層短局隨機迷宮；找符石開出口、碰撞戰鬥、追擊怪物、寶箱與成長；行動裝置優先、無依賴。
 source: sampot/pg-microdungeon
 license: MIT
 status: unlisted
