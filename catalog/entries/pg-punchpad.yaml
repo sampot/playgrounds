@@ -1,0 +1,7 @@
+title: 測力拳
+kind: game
+series: 機台
+blurb: 出拳打袋看力道分數；致敬測力拳玩法類型。
+source: sampot/pg-punchpad
+license: MIT
+status: listed

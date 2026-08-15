@@ -1,0 +1,7 @@
+title: 疊疊機
+kind: game
+series: 機台
+blurb: 停燈對位堆方塊換獎；時機節奏；致敬疊疊機玩法類型。
+source: sampot/pg-stacker
+license: MIT
+status: listed

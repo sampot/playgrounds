@@ -1,0 +1,7 @@
+title: 滾球台
+kind: game
+series: 機台
+blurb: 滾球上坡進分環；致敬 Skee-Ball 玩法類型。
+source: sampot/pg-skeeball
+license: MIT
+status: listed

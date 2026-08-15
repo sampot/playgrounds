@@ -1,0 +1,7 @@
+title: 投籃機
+kind: game
+series: 機台
+blurb: 限時投籃進框、連投計分換票感；致敬投籃機玩法類型。
+source: sampot/pg-hoopshot
+license: MIT
+status: listed

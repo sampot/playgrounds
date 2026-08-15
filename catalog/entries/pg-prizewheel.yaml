@@ -1,0 +1,7 @@
+title: 轉轉樂
+kind: game
+series: 機台
+blurb: 轉盤停格兌虛擬獎券；純娛樂非博弈。
+source: sampot/pg-prizewheel
+license: MIT
+status: listed

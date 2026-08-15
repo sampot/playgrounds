@@ -1,0 +1,7 @@
+title: 射門機
+kind: game
+series: 機台
+blurb: 定點射門進框、限時連射；致敬射門機玩法類型。
+source: sampot/pg-goalshot
+license: MIT
+status: listed
