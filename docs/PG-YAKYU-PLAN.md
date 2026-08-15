@@ -49,7 +49,7 @@
 | **單場節奏** | **9 局快轉＋關鍵手動**（見 §6） |
 | **敘事** | **抽象校隊＋台味包（硬）**——見 §4.1；虛構校名，禁止真實校／聯盟／球星 |
 | **規則** | **簡化棒球**（見 §7）；文件與遊戲內「關於」註明 |
-| **資源就緒度** | **低**（缺成套棒球 sprite；`sports-pack` 可借場地／球感；須自繪或另找 pack） |
+| **資源就緒度** | **中**（已採 looneybits「2D Baseball Pack」CC0：球／棒／手套／本壘線；球員仍為幾何剪影） |
 | **交付形** | 純 HTML＋CSS＋JS；無 build；測試用 `npx vitest run` |
 
 與「熱血系列不適合 SAM」不衝突：本作為**縮體量關鍵操作＋快轉**，不是完整作。
@@ -336,9 +336,9 @@ pg-yakyu/
 
 ### 11.3 美術／音效
 
-- 開發可自 `game-assets/art/sports-pack/` 等拷貝；定稿進 repo `assets/`。
+- `assets/baseball-pack/` 已收錄 looneybits「2D Baseball Pack」的精選 CC0 PNG（球／棒／手套／本壘線）；來源：https://opengameart.org/content/2d-baseball-pack。
 - **署名硬規則：** 授權要求署名 → 依要求；不要求也要在 `ATTRIBUTION.md`／遊戲內關於列出。
-- 無棒球專用 pack 時：幾何剪影＋場地色塊可先上架 unlisted。
+- 球員與其餘球場仍採幾何剪影＋場地色塊；後續加入素材仍須複製進 repo 並補署名。
 
 ---
 
@@ -406,3 +406,5 @@ status: unlisted # 先 unlisted，打磨後 listed
 | 2026-08-15 | 鎖 §4.1 台味包：虛構校隊池、命名邊界、賽季場地敘事、快轉詞庫 |
 | 2026-08-15 | 開始實作：本機獨立 repo 完成 Phase 0–2 baseline；12 tests 與瀏覽器單場流程通過 |
 | 2026-08-15 | 型錄 `pg-yakyu` 以 `status: unlisted` 入庫；`PG-GAMES` 移入已實作 |
+| 2026-08-15 | 加入 looneybits「2D Baseball Pack」CC0 精選素材；來源與檔案對照寫入遊戲 repo |
+| 2026-08-15 | 美術／音效打磨：球場 FX、揮棒動畫、Kenney CC0 SFX＋靜音鈕 |
