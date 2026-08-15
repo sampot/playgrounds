@@ -37,6 +37,21 @@ async function seed(key: string, value: string) {
 }
 
 describe("handleGoBuiltInKv", () => {
+  it("handles the canvas-prefixed URL forwarded by the service worker", async () => {
+    const put = await handleGoBuiltInKv(
+      NS,
+      req(
+        "https://go.samkuo.me/canvas/go-abcd1234/api/kv/high-score",
+        "PUT",
+        textBody("2400")
+      )
+    );
+    expect(put?.status).toBe(204);
+
+    const kv = createGoWebKv(NS, { durable: true });
+    expect(await kv.get("high-score")).toBe("2400");
+  });
+
   it("PUT then GET round-trips through goWebKv (high-score persistence)", async () => {
     const put = await handleGoBuiltInKv(
       NS,

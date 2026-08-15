@@ -22,11 +22,17 @@ const KV_LIST_PATH = "/api/kv/list";
 const KEY_RE = /^[A-Za-z0-9._\-~%:/+@]{1,512}$/u;
 
 function apiPath(pathname: string): string {
+  let path: string;
   try {
-    return new URL(pathname, "https://go.local").pathname;
+    path = new URL(pathname, "https://go.local").pathname;
   } catch {
-    return pathname;
+    path = pathname;
   }
+  // The go service worker forwards the original canvas URL, e.g.
+  // `/canvas/<sandboxId>/api/kv/high-score`. Normalize it to the same
+  // built-in route shape used by memory canvases and direct unit calls.
+  const canvasKv = path.match(/^\/canvas\/[^/]+(\/api\/kv(?:\/.*)?$)/u);
+  return canvasKv?.[1] ?? path;
 }
 
 function textResponse(body: string, status: number): SerializedResponse {

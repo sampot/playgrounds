@@ -196,15 +196,15 @@ async function dispatchMemoryApi(
   if (path.includes("/api/session")) {
     return handleGoSessionApi(sandboxId, request);
   }
-  if (path.startsWith("/api/kv")) {
-    const builtIn = await handleGoBuiltInKv(goKvNamespaceFor(ctx), {
-      method: request.method,
-      url: request.url,
-      headers: [],
-      body: request.body,
-    });
-    if (builtIn) return builtIn;
-  }
+  // Same as SW dispatch: handler normalizes canvas-prefixed URLs and
+  // returns null for unrelated routes (do not gate on startsWith).
+  const builtIn = await handleGoBuiltInKv(goKvNamespaceFor(ctx), {
+    method: request.method,
+    url: request.url,
+    headers: [],
+    body: request.body,
+  });
+  if (builtIn) return builtIn;
   return handleGoFunctionsApi(ctx, {
     method: request.method,
     url: request.url,

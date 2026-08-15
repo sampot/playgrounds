@@ -239,11 +239,12 @@ async function dispatchGoCanvasApi(
   // Shell-built-in /api/kv/*: serve from the durable goWebKv namespace
   // before delegating to the SAM's functions.js (games must not re-implement
   // KV plumbing; this also backs the localStorage→KV high-score shim).
-  if (path.startsWith("/api/kv")) {
-    const ns = goKvNamespaceFor(ctx);
-    const kv = await handleGoBuiltInKv(ns, request);
-    if (kv) return kv;
-  }
+  // Let the handler normalize both direct `/api/kv/*` URLs and the
+  // `/canvas/<sandboxId>/api/kv/*` URL shape forwarded by the service worker.
+  // It returns null for unrelated routes.
+  const ns = goKvNamespaceFor(ctx);
+  const kv = await handleGoBuiltInKv(ns, request);
+  if (kv) return kv;
   return handleGoFunctionsApi(ctx, request);
 }
 
