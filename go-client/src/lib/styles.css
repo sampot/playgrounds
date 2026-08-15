@@ -205,6 +205,7 @@ a {
   position: sticky;
   top: 0;
   z-index: 20;
+  /* 僅定位層；背景/底線/毛玻璃由 .chrome 自帶（整條可隨 hidden 滑走）。 */
 }
 .chrome-root--overlay {
   position: absolute;
@@ -216,13 +217,17 @@ a {
   pointer-events: auto;
 }
 
+/* 全寬 bar（背景＋底線＋毛玻璃）；內容用 padding-inline 收斂到與 .main
+   同寬的 40rem 居中欄，故 bar 全寬、內容貼齊主內容左右緣。
+   hidden 時整條（含毛玻璃）隨 .chrome 上滑消失，不殘留透明模糊層。 */
 .chrome {
+  width: 100%;
   display: flex;
   align-items: center;
   gap: 0.5rem;
   flex-wrap: wrap;
   row-gap: 0.4rem;
-  padding: 0.5rem 0.75rem;
+  padding: 0.5rem max(0.75rem, calc((100% - 40rem) / 2 + 0.75rem));
   border-bottom: var(--pixel-edge) solid rgb(var(--ink));
   background: color-mix(in oklab, rgb(var(--fill)) 92%, transparent);
   backdrop-filter: blur(6px);
@@ -232,8 +237,8 @@ a {
   will-change: transform, opacity;
 }
 .chrome--compact {
-  padding: 0.35rem 0.5rem;
-  border-bottom: var(--pixel-edge) solid rgb(var(--ink));
+  /* canvas play：同為全寬 bar；內容亦收斂到 40rem 居中欄。 */
+  padding: 0.35rem max(0.5rem, calc((100% - 40rem) / 2 + 0.5rem));
   background: rgb(var(--fill));
   backdrop-filter: none;
   gap: 0.35rem;
@@ -404,6 +409,9 @@ a {
    並縮小 logo／按鈕／間距，避免換行同時消除 logo 與按鈕間的空隙。 */
 @media (max-width: 30rem) {
   .chrome {
+    /* 手機不收斂：全寬貼邊，維持現狀。 */
+    max-width: none;
+    margin: 0;
     gap: 0.3rem;
     row-gap: 0.2rem;
     padding: 0.4rem 0.5rem;
@@ -531,9 +539,11 @@ a {
 }
 .chrome-flash--toast {
   position: absolute;
-  left: 0.75rem;
-  right: 0.75rem;
-  max-width: 412px;
+  left: 50%;
+  transform: translateX(-50%);
+  right: auto;
+  width: calc(100% - 1.5rem);
+  max-width: 38.5rem;
   top: 3.1rem;
   border: var(--pixel-edge) solid rgb(var(--ink));
   border-radius: var(--radius);

@@ -1,21 +1,19 @@
 <script lang="ts">
   import type { GoCatalogEntry } from "$lib/goCatalog";
-  import type { FileMap } from "@pg/projectTypes";
   import { getGoCatalogEntry } from "$lib/goCatalog";
   import { goTheme } from "$lib/goTheme.svelte";
   import GoSeriesIcon from "$lib/GoSeriesIcon.svelte";
   import {
     clearAllGoSamOfflineCache,
-    deleteGoSamOfflineCache,
-    getGoSamOfflineCache,
-    putGoSamOfflineCache,
-    fileMapsEqual,
   } from "$lib/goSamOfflineCache";
-  import { loadSamFiles } from "$lib/samLoad";
   import {
     clearAllGoProgress,
-    clearGoProgressForCatalog,
   } from "$lib/goScoreStorage";
+  import {
+    runClearScores,
+    runRemoveOffline,
+    runUpdate,
+  } from "$lib/goGameActions";
 
   type Props = {
     open: boolean;
@@ -124,21 +122,14 @@
     const c = confirm;
     try {
       if (c.kind === "scores" && c.id) {
-        const n = await clearGoProgressForCatalog(c.id);
-        onFlash(
-          n > 0
-            ? `已清除「${c.title}」的進度／分數`
-            : `「${c.title}」沒有可清除的進度／分數`
-        );
+        const r = await runClearScores(c.id, c.title);
+        onFlash(r.flash);
       } else if (c.kind === "offline" && c.id) {
-        const ok = await deleteGoSamOfflineCache(c.id);
-        const flash = ok
-          ? `已移除「${c.title}」的離線下載`
-          : `找不到「${c.title}」的離線下載`;
+        const r = await runRemoveOffline(c.id, c.title);
         confirm = null;
         onClose();
-        if (onRemovedOffline) onRemovedOffline(flash);
-        else onFlash(flash);
+        if (onRemovedOffline) onRemovedOffline(r.flash);
+        else onFlash(r.flash);
         return;
       } else if (c.kind === "all") {
         const scores = await clearAllGoProgress();
@@ -156,34 +147,17 @@
     }
   }
 
-  async function runUpdate() {
+  async function onUpdate() {
     if (!currentCatalogId || actionBusy) return;
     actionBusy = true;
-    const id = currentCatalogId;
-    const title = currentTitle || currentCatalogId;
     try {
-      const entry = getGoCatalogEntry(id);
+      const entry = getGoCatalogEntry(currentCatalogId);
       if (!entry) {
-        onFlash(`找不到「${title}」的型錄資料`);
+        onFlash(`找不到「${currentTitle || currentCatalogId}」的型錄資料`);
         return;
       }
-      let freshFiles: FileMap;
-      try {
-        freshFiles = await loadSamFiles(entry.source);
-      } catch {
-        onFlash(`檢查更新失敗：無法讀取「${title}」的來源`);
-        return;
-      }
-      const cached = await getGoSamOfflineCache(id);
-      if (!cached) {
-        await putGoSamOfflineCache(id, entry.source, freshFiles);
-        onFlash(`已為「${title}」建立離線下載`);
-      } else if (fileMapsEqual(freshFiles, cached.files)) {
-        onFlash(`「${title}」已是最新版本`);
-      } else {
-        await putGoSamOfflineCache(id, entry.source, freshFiles);
-        onFlash(`已更新「${title}」至最新版本`);
-      }
+      const r = await runUpdate(entry);
+      onFlash(r.flash);
     } finally {
       actionBusy = false;
     }
@@ -359,7 +333,7 @@
                 type="button"
                 class="go-more-btn"
                 disabled={actionBusy}
-                onclick={() => void runUpdate()}
+                onclick={() => void onUpdate()}
               >
                 檢查更新
               </button>

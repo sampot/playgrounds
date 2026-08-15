@@ -4,6 +4,7 @@
   import GoMorePanel from "$lib/GoMorePanel.svelte";
   import GoProfilePanel from "$lib/GoProfilePanel.svelte";
   import GoWordmark from "$lib/GoWordmark.svelte";
+  import GoGameDrawer from "$lib/GoGameDrawer.svelte";
   import GoShareSheet from "$lib/GoShareSheet.svelte";
   import { goAuth } from "$lib/goAuth.svelte";
   import { recommendSameKind } from "$lib/goCatalog";
@@ -30,6 +31,8 @@
   let recommends = $state<ReturnType<typeof recommendSameKind>>([]);
   let moreOpen = $state(false);
   let profileOpen = $state(false);
+  /** Canvas play 專屬遊戲操作 drawer（左側收合把手）。 */
+  let drawerOpen = $state(false);
   /** Canvas play: hide chrome on scroll-down, show on scroll-up. */
   let chromeHidden = $state(false);
   let chromeAutoHideTimer: ReturnType<typeof setTimeout> | null = null;
@@ -47,7 +50,8 @@
     // effect that re-runs frequently (e.g. canvas scroll binding) must not
     // keep resetting the 3s timer, or it would never elapse.
     if (chromeAutoHideTimer != null) return;
-    if (!chromeHideable || chromeHidden || shareOpen || moreOpen || profileOpen) return;
+    if (!chromeHideable || chromeHidden || shareOpen || moreOpen || profileOpen || drawerOpen)
+      return;
     chromeAutoHideTimer = setTimeout(() => {
       chromeAutoHideTimer = null;
       if (shareOpen || moreOpen || profileOpen) return;
@@ -116,6 +120,7 @@
     if (mode === "invite") {
       shareOpen = false;
       moreOpen = false;
+      drawerOpen = false;
     }
   });
 
@@ -126,7 +131,7 @@
    * cleared only when leaving a hideable context or when a panel opens.
    */
   $effect(() => {
-    const panelOpen = shareOpen || moreOpen || profileOpen;
+    const panelOpen = shareOpen || moreOpen || profileOpen || drawerOpen;
     if (!chromeHideable || chromeHidden || panelOpen) {
       clearChromeAutoHide();
       if (!chromeHideable) chromeHidden = false;
@@ -512,3 +517,12 @@
 {/if}
 
 <GoProfilePanel open={profileOpen} onClose={() => (profileOpen = false)} />
+
+{#if canvasActive && catalogId}
+  <GoGameDrawer
+    catalogId={catalogId}
+    onFlash={(msg) => chromeSession.setFlash(msg)}
+    onRemovedOffline={(flash) => chromeSession.setFlash(flash)}
+    bind:open={drawerOpen}
+  />
+{/if}
