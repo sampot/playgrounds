@@ -1,6 +1,6 @@
 /**
- * Visit-then-offline FileMap cache for `/s/<id>` (DEC-050 §6.5).
- * Network-first loaders call {@link putGoSamOfflineCache} after a successful fetch.
+ * Visit-then-offline FileMap cache for go `/s/<id>` and Invite `/i/` (DEC-050 §6.5).
+ * `/s/` is local-first (明示「檢查更新」才 tip-sync)；Invite join checks tipRev first.
  */
 
 import type { FileMap } from "@pg/projectTypes";
@@ -17,7 +17,15 @@ type WireBundle = {
   v: 1;
   id: string;
   source: string;
+  /** GitHub tree SHA when known (Invite freshness／「檢查更新」). */
+  tipRev?: string;
   files: Record<string, WireFile>;
+};
+
+export type GoSamOfflinePack = {
+  source: string;
+  files: FileMap;
+  tipRev: string | null;
 };
 
 function cacheUrl(catalogId: string): string {
@@ -40,7 +48,12 @@ function base64ToBytes(b64: string): Uint8Array {
   return out;
 }
 
-function serialize(id: string, source: string, files: FileMap): WireBundle {
+function serialize(
+  id: string,
+  source: string,
+  files: FileMap,
+  tipRev?: string | null
+): WireBundle {
   const wire: Record<string, WireFile> = {};
   for (const [path, content] of Object.entries(files)) {
     if (isTextContent(content)) {
@@ -49,7 +62,10 @@ function serialize(id: string, source: string, files: FileMap): WireBundle {
       wire[path] = { t: "b", b: bytesToBase64(content) };
     }
   }
-  return { v: 1, id, source, files: wire };
+  const bundle: WireBundle = { v: 1, id, source, files: wire };
+  const rev = tipRev?.trim();
+  if (rev) bundle.tipRev = rev;
+  return bundle;
 }
 
 function deserialize(bundle: WireBundle): FileMap {
@@ -87,14 +103,15 @@ export function fileMapsEqual(a: FileMap, b: FileMap): boolean {
 export async function putGoSamOfflineCache(
   catalogId: string,
   source: string,
-  files: FileMap
+  files: FileMap,
+  tipRev?: string | null
 ): Promise<boolean> {
   if (typeof caches === "undefined") return false;
   const id = catalogId.trim();
   if (!id) return false;
   try {
     const cache = await caches.open(CACHE_NAME);
-    const body = JSON.stringify(serialize(id, source, files));
+    const body = JSON.stringify(serialize(id, source, files, tipRev));
     await cache.put(
       cacheUrl(id),
       new Response(body, {
@@ -114,7 +131,7 @@ export async function putGoSamOfflineCache(
 
 export async function getGoSamOfflineCache(
   catalogId: string
-): Promise<{ source: string; files: FileMap } | null> {
+): Promise<GoSamOfflinePack | null> {
   if (typeof caches === "undefined") return null;
   const id = catalogId.trim();
   if (!id) return null;
@@ -124,7 +141,12 @@ export async function getGoSamOfflineCache(
     if (!res || !res.ok) return null;
     const bundle = (await res.json()) as WireBundle;
     if (!bundle || bundle.v !== 1 || !bundle.files) return null;
-    return { source: bundle.source, files: deserialize(bundle) };
+    const tip = typeof bundle.tipRev === "string" ? bundle.tipRev.trim() : "";
+    return {
+      source: bundle.source,
+      files: deserialize(bundle),
+      tipRev: tip || null,
+    };
   } catch {
     return null;
   }

@@ -15,6 +15,7 @@ vi.mock("./goSamOfflineCache", () => ({
 
 vi.mock("./samLoad", () => ({
   loadSamFiles: vi.fn(async () => ({ "index.html": "<main>new</main>" })),
+  fetchSamTipRev: vi.fn(async () => "tip-sha"),
 }));
 
 vi.mock("./goScoreStorage", () => ({

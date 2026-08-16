@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { formatGithubSource, parseGithubUrl } from "./githubProject";
 
 describe("parseGithubUrl", () => {
@@ -35,15 +35,22 @@ describe("parseGithubUrl", () => {
   });
 });
 
-describe("formatGithubSource", () => {
-  it("formats with ref and path", () => {
-    expect(
-      formatGithubSource({
-        owner: "a",
-        repo: "b",
-        ref: "main",
-        path: "pkg",
-      })
-    ).toBe("https://github.com/a/b/tree/main/pkg");
+describe("fetchGithubTipRev", () => {
+  it("returns the tree sha from the GitHub trees API", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo) => {
+      const url = String(input);
+      expect(url).toContain("/git/trees/main");
+      return Response.json({
+        sha: "deadbeefcafebabe",
+        tree: [{ path: "index.html", type: "blob", sha: "blob1", size: 10 }],
+        truncated: false,
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { fetchGithubTipRev } = await import("./githubProject");
+    await expect(
+      fetchGithubTipRev({ owner: "sampot", repo: "pg-gomoku" })
+    ).resolves.toBe("deadbeefcafebabe");
+    vi.unstubAllGlobals();
   });
 });

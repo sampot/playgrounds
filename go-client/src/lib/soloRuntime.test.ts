@@ -12,9 +12,7 @@ const fixtures = vi.hoisted(() => ({
   },
   cachedFiles: { "index.html": "<main>cached</main>" },
   freshFiles: { "index.html": "<main>fresh</main>" },
-  getCache: vi.fn(),
-  putCache: vi.fn(),
-  loadFiles: vi.fn(),
+  resolve: vi.fn(),
   mount: vi.fn(),
 }));
 
@@ -22,14 +20,8 @@ vi.mock("./goCatalog", () => ({
   getGoCatalogEntry: vi.fn(() => fixtures.entry),
 }));
 
-vi.mock("./goSamOfflineCache", () => ({
-  getGoSamOfflineCache: fixtures.getCache,
-  putGoSamOfflineCache: fixtures.putCache,
-}));
-
-vi.mock("./samLoad", () => ({
-  assertSamHasIndex: vi.fn(),
-  loadSamFiles: fixtures.loadFiles,
+vi.mock("./goSamResolve", () => ({
+  resolveGoSamFiles: fixtures.resolve,
 }));
 
 vi.mock("./mountGoCanvas", () => ({
@@ -43,12 +35,11 @@ vi.mock("./goFriendlyError", () => ({
 describe("createSoloRuntime cache policy", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    fixtures.getCache.mockResolvedValue({
-      source: fixtures.entry.source,
+    fixtures.resolve.mockResolvedValue({
       files: fixtures.cachedFiles,
+      origin: "cache",
+      catalogId: fixtures.entry.id,
     });
-    fixtures.loadFiles.mockResolvedValue(fixtures.freshFiles);
-    fixtures.putCache.mockResolvedValue(true);
     fixtures.mount.mockResolvedValue({
       sandboxId: "go-test",
       canvasMode: "memory",
@@ -65,8 +56,12 @@ describe("createSoloRuntime cache policy", () => {
 
     await runtime.bootFromCatalogId(fixtures.entry.id);
 
-    expect(fixtures.loadFiles).not.toHaveBeenCalled();
-    expect(fixtures.putCache).not.toHaveBeenCalled();
+    expect(fixtures.resolve).toHaveBeenCalledWith(
+      expect.objectContaining({
+        catalogId: fixtures.entry.id,
+        source: fixtures.entry.source,
+      })
+    );
     expect(fixtures.mount).toHaveBeenCalledWith(
       fixtures.cachedFiles,
       1,
@@ -75,25 +70,17 @@ describe("createSoloRuntime cache policy", () => {
     expect(runtime.getStatus().phase).toBe("ready");
   });
 
-  it("downloads again when the catalog source changed", async () => {
-    fixtures.getCache.mockResolvedValue({
-      source: "sampot/old-breakout",
-      files: fixtures.cachedFiles,
+  it("mounts freshly downloaded files when resolve returns download", async () => {
+    fixtures.resolve.mockResolvedValue({
+      files: fixtures.freshFiles,
+      origin: "download",
+      catalogId: fixtures.entry.id,
     });
     const { createSoloRuntime } = await import("./soloRuntime");
     const runtime = createSoloRuntime();
 
     await runtime.bootFromCatalogId(fixtures.entry.id);
 
-    expect(fixtures.loadFiles).toHaveBeenCalledWith(
-      fixtures.entry.source,
-      expect.any(Object)
-    );
-    expect(fixtures.putCache).toHaveBeenCalledWith(
-      fixtures.entry.id,
-      fixtures.entry.source,
-      fixtures.freshFiles
-    );
     expect(fixtures.mount).toHaveBeenCalledWith(
       fixtures.freshFiles,
       1,

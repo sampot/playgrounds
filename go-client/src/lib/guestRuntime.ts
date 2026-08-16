@@ -25,7 +25,7 @@ import {
   goLoadProgressFromFiles,
   type GoLoadProgress,
 } from "./goLoadProgress";
-import { assertSamHasIndex, loadSamFiles } from "./samLoad";
+import { resolveGoSamFiles } from "./goSamResolve";
 import {
   applyRosterAnswer,
   createRosterOffer,
@@ -162,17 +162,16 @@ export function createGuestRuntime() {
   let tunnelChannelBySession = new Map<string, string>();
 
   function clearMemoryBlobs() {
-    if (memoryBlobUrls.length) {
-      revokeGoMemoryBlobs(memoryBlobUrls);
-      memoryBlobUrls = [];
-    }
+    if (!memoryBlobUrls?.length) return;
+    revokeGoMemoryBlobs(memoryBlobUrls);
+    memoryBlobUrls = [];
   }
 
   function buildMemorySrcdoc(): string {
     if (!samFiles) throw new Error("小品尚未載入");
     clearMemoryBlobs();
     const built = buildGoMemoryCanvas(samFiles, generation);
-    memoryBlobUrls = built.blobUrls;
+    memoryBlobUrls = Array.isArray(built.blobUrls) ? built.blobUrls : [];
     return built.srcdoc;
   }
 
@@ -478,11 +477,14 @@ export function createGuestRuntime() {
 
     set({
       phase: "loading_sam",
-      message: "正在下載小品…",
-      loadProgress: { ratio: null, detail: "準備中…" },
+      message: "正在檢查小品版本…",
+      loadProgress: { ratio: null, detail: "檢查更新…" },
     });
     try {
-      const files = await loadSamFiles(source, {
+      // Invite：入座前檢查 tip；沒包或 tipRev 過期才全量下載。
+      const resolved = await resolveGoSamFiles({
+        source,
+        updatePolicy: "check-tip",
         onProgress: p => {
           const loadProgress = goLoadProgressFromFiles(p);
           set({
@@ -491,10 +493,21 @@ export function createGuestRuntime() {
           });
         },
       });
-      assertSamHasIndex(files);
+      const files = resolved.files;
       set({
-        loadProgress: { ratio: 1, detail: "下載完成" },
-        message: "小品已下載，正在準備…",
+        loadProgress: {
+          ratio: 1,
+          detail:
+            resolved.origin === "cache"
+              ? "已下載"
+              : resolved.origin === "stale-cache"
+                ? "離線快取"
+                : "下載完成",
+        },
+        message:
+          resolved.origin === "cache" || resolved.origin === "stale-cache"
+            ? "小品已就緒，正在準備…"
+            : "小品已下載，正在準備…",
       });
       sandboxId = `go-guest-${crypto.randomUUID().slice(0, 8)}`;
       samFiles = files;
@@ -502,10 +515,11 @@ export function createGuestRuntime() {
       unlistenApi?.();
       clearMemoryBlobs();
 
+      const catalogId = resolved.catalogId;
       const apiCtx = {
         getSandboxId: () => sandboxId,
         getFiles: () => samFiles,
-        getCatalogId: () => null as string | null,
+        getCatalogId: () => catalogId,
       };
       const preferSw = isGoCanvasSwUsable();
       if (preferSw) {

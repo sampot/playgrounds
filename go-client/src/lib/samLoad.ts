@@ -1,4 +1,8 @@
-import { fetchGithubProject, parseGithubUrl } from "@pg/githubProject";
+import {
+  fetchGithubProject,
+  fetchGithubTipRev,
+  parseGithubUrl,
+} from "@pg/githubProject";
 import type { FileMap } from "@pg/projectTypes";
 import type { FileListProgress } from "@pg/transferProgress";
 
@@ -20,6 +24,18 @@ export async function loadSamFiles(
     signal: options?.signal,
     onProgress: options?.onProgress,
   });
+}
+
+/** Light GitHub tree SHA for tip／offline freshness checks. */
+export async function fetchSamTipRev(
+  source: string,
+  options?: { signal?: AbortSignal }
+): Promise<string> {
+  const ref = parseGithubUrl(source);
+  if (!ref) {
+    throw new Error(`無法解析小品來源：${source}`);
+  }
+  return fetchGithubTipRev(ref, { signal: options?.signal });
 }
 
 export function assertSamHasIndex(files: FileMap): void {

@@ -308,9 +308,9 @@ GET go.samkuo.me/i/<short_id>
 | --- | --- |
 | **範圍** | **僅**模式 B（`/s/<id>`）與為其服務的殼（首頁 `/` 可作安裝／回訪入口）。**模式 A（`/i/`）排除。** |
 | **加到主畫面** | go origin 提供 Web App Manifest＋圖示（含 iOS `apple-touch-icon`／必要 meta），使標準 Safari／Chrome 可「加入主畫面」／安裝。start_url 宜為 **`/`** 或穩定 `/s/<id>`（實作可定預設 `/`；深鏈開啟仍尊重 path）。**勿**引導使用者把 **`/i/<short_id>`** 釘成主畫面圖示當永久遊戲（短鏈會過期）。 |
-| **離線可玩** | **造訪過才離線**（對齊場殼 DEC-009 精神；非全型錄預先下載）：曾成功載入之 `/s/<id>` 的殼資產＋該 SAM FileMap（或等價 Cache）在網路失敗時仍可再開同 id。嵌入 catalog 已可離線 resolve；差在小品本體與殼 bundle 的 Cache。策略傾向 **network-first**（線上更新優先；失敗才 Cache）——細節可對齊場 `swOfflineStrategy`，但 go SW 須與畫布 snapshot 職責共存、勿 cache-first 釘死舊包。 |
+| **離線可玩** | **造訪過才離線**（對齊場殼 DEC-009 精神；非全型錄預先下載）：曾成功載入之 `/s/<id>`（及 Invite 曾下載之同 source）的殼資產＋該 SAM FileMap（或等價 Cache）在網路失敗時仍可再開同 id。嵌入 catalog 已可離線 resolve；差在小品本體與殼 bundle 的 Cache。**`/s/`＝local-first**（本機有同 source 離線包即重用；明示「檢查更新」才 tip-sync）。**Invite `/i/`＝入座前 check-tip**（比 GitHub tree SHA；沒包或 tipRev 過期才全量下載；相符則重用離線包）。 |
 | **分數／實例狀態** | **本機、本 origin**。權威＝SAM 應用模型：`UI → /api → functions.js → env.KV／env.DB`。go 注入同形 bindings，後端為 **IndexedDB（主）＋ localStorage（後備）**，命名空間穩定綁 **`catalog_id`**（`catalog:<id>`），**不**綁每次隨機 `sandboxId`、**不**用 OPFS。Invite 畫布用 ephemeral／非 durable 記憶體 ns。舊 UI 直寫 `localStorage` 的 shim（`injectGoScoreStorage`）僅相容尚未遷移的小品。**無**雲端、**無**跨 `play`↔`go` 自動搬。§6.6 分層清除含 KV／DB＋舊 shim。 |
-| **Invite 排除（硬）** | `/i/`：**不能**離線入座／對弈；不承諾該局分數長期保留；短鏈失效後重開＝頁內錯誤（請 Host 重新邀請）。可保留非局偏好（例：Roster 顯示名）。 |
+| **Invite 排除（硬）** | `/i/`：**不能**離線入座／對弈；不承諾該局分數長期保留；短鏈失效後重開＝頁內錯誤（請 Host 重新邀請）。可保留非局偏好（例：Roster 顯示名）。載入小品：入座前 **check-tip**（與 `/s/` 同離線庫；tip 相符才跳過全量下載）。 |
 | **敘事** | 對讀者：「傳閱連結可留在手機、沒網路也能玩過的那幾顆」——**不是**「邀請 QR 離線也能加入」。 |
 | **否決** | Invite 離線；預先打包全型錄離線；雲排行榜／帳號存檔；把 go 做成第二個 OPFS 沙盒庫；UI 直寫 IndexedDB／OPFS 當權威狀態（runtime 無法匯出／清除）。 |
 
@@ -429,7 +429,7 @@ Session／`act`／棋盤權威在 **Host 場**；go 只渲染與經 Roster 隧�
 | 職責 | 說明 |
 | --- | --- |
 | **畫布** | 既有：`/canvas/<sandboxId>/*` 記憶體 snapshot＋`/api` 轉發（與場對齊；Invite／`/s/` 共用） |
-| **離線（§6.5）** | 另：殼 document／hashed assets＋曾載入之 `/s/` SAM 產物——**network-first**；**不**對 `/i/*` 承諾離線 document |
+| **離線（§6.5）** | 另：殼 document／hashed assets＋曾載入之 `/s/`（與 Invite 同 source）SAM 產物——`/s/` **local-first**；`/i/` 入座 **check-tip**；**不**對 `/i/*` 承諾離線 document／入座 |
 | **安裝** | Manifest／icon 靜態資產可進 Cache；SW 須滿足瀏覽器 installability 常見條件（實作細節另測 Safari／Chrome） |
 
 畫布 snapshot **仍是記憶體／頁生命週期**；離線再開 `/s/<id>`＝重新 materialize（自 Cache 取 FileMap），不是還原當下 Invite session。
@@ -658,3 +658,4 @@ dash provision → 場殼記憶體 API key
 | 2026-08-10 | §5.5.1：站級 `og:image`＝`/og.png`（避免 FB 回退 favicon）；仍不做每小品專圖 |
 | 2026-08-10 | SEO：`robots.txt`（Allow `/`／`/help`／`/s/`；Disallow `/i/`）＋`sitemap.xml`（listed `/s/`）；`/i/` `noindex` |
 | 2026-08-16 | TURN：啟用備援的邀請＝**relay-only**（go Guest 不試直連）；對齊點數計劃 §7.2 |
+| 2026-08-16 | §6.5：**`/s/` local-first**；**Invite Guest check-tip**（入座前比 tipRev；過期才重抓）；明示「檢查更新」寫 tipRev |

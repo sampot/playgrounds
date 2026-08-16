@@ -5,15 +5,11 @@
 import { getGoCatalogEntry, type GoCatalogEntry } from "./goCatalog";
 import { friendlySoloLoadError } from "./goFriendlyError";
 import {
-  getGoSamOfflineCache,
-  putGoSamOfflineCache,
-} from "./goSamOfflineCache";
-import {
   goLoadProgressFromFiles,
   type GoLoadProgress,
 } from "./goLoadProgress";
+import { resolveGoSamFiles } from "./goSamResolve";
 import { mountGoCanvas, type GoCanvasMode } from "./mountGoCanvas";
-import { assertSamHasIndex, loadSamFiles } from "./samLoad";
 import type { FileMap } from "@pg/projectTypes";
 import type { HostRuntime } from "./hostRuntime";
 
@@ -111,57 +107,31 @@ export function createSoloRuntime(opts?: {
     });
 
     try {
-      let files: FileMap;
-      let fromCache = false;
-      const cached = await getGoSamOfflineCache(entry.id);
-      // A downloaded catalog game is the playable local copy. Reuse it across
-      // page sessions; explicit「檢查更新」refreshes branch-tip content.
-      if (cached?.source === entry.source) {
-        files = cached.files;
-        assertSamHasIndex(files);
-        if (seq !== bootSeq) return;
-        set({
-          loadProgress: { ratio: 1, detail: "已下載" },
-          message: `正在開啟「${entry.title}」…`,
-        });
-      } else {
-        try {
-          files = await loadSamFiles(entry.source, {
-            onProgress: p => {
-              if (seq !== bootSeq) return;
-              const loadProgress = goLoadProgressFromFiles(p);
-              set({
-                loadProgress,
-                message: `正在下載「${entry.title}」… ${loadProgress.detail}`,
-              });
-            },
-          });
+      const resolved = await resolveGoSamFiles({
+        catalogId: entry.id,
+        source: entry.source,
+        updatePolicy: "local-first",
+        onProgress: p => {
           if (seq !== bootSeq) return;
-          assertSamHasIndex(files);
-          await putGoSamOfflineCache(entry.id, entry.source, files);
-        } catch (e) {
-          if (!cached) throw e;
-          // A catalog source change could not be fetched — keep the previous
-          // downloaded copy playable until the network is available.
-          files = cached.files;
-          fromCache = true;
-          assertSamHasIndex(files);
-          if (seq !== bootSeq) return;
+          const loadProgress = goLoadProgressFromFiles(p);
           set({
-            loadProgress: { ratio: 1, detail: "離線快取" },
-            message: `正在開啟「${entry.title}」…`,
+            loadProgress,
+            message: `正在下載「${entry.title}」… ${loadProgress.detail}`,
           });
-        }
-      }
+        },
+      });
       if (seq !== bootSeq) return;
+      const files = resolved.files;
+      const fromCache = resolved.origin === "stale-cache";
       set({
         loadProgress: {
           ratio: 1,
-          detail: fromCache
-            ? "離線快取"
-            : cached?.source === entry.source
+          detail:
+            resolved.origin === "cache"
               ? "已下載"
-              : "下載完成",
+              : resolved.origin === "stale-cache"
+                ? "離線快取"
+                : "下載完成",
         },
         message: `正在開啟「${entry.title}」…`,
       });

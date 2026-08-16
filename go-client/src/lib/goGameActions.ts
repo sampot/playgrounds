@@ -10,7 +10,7 @@ import {
   putGoSamOfflineCache,
   fileMapsEqual,
 } from "./goSamOfflineCache";
-import { loadSamFiles } from "./samLoad";
+import { fetchSamTipRev, loadSamFiles } from "./samLoad";
 import { clearGoProgressForCatalog } from "./goScoreStorage";
 
 export type GameActionResult =
@@ -52,15 +52,29 @@ export async function runUpdate(
 ): Promise<GameActionResult> {
   const id = entry.id;
   const title = entry.title ?? id;
+  let tipRev: string | null = null;
+  try {
+    tipRev = await fetchSamTipRev(entry.source);
+  } catch {
+    tipRev = null;
+  }
+  const cached = await getGoSamOfflineCache(id);
+  if (cached?.tipRev && tipRev && cached.tipRev === tipRev) {
+    return { ok: true, flash: `「${title}」已是最新版本` };
+  }
   let freshFiles;
   try {
     freshFiles = await loadSamFiles(entry.source);
   } catch {
     return { ok: false, flash: `檢查更新失敗：無法讀取「${title}」的來源` };
   }
-  const cached = await getGoSamOfflineCache(id);
   if (!cached) {
-    const stored = await putGoSamOfflineCache(id, entry.source, freshFiles);
+    const stored = await putGoSamOfflineCache(
+      id,
+      entry.source,
+      freshFiles,
+      tipRev
+    );
     if (!stored) {
       return {
         ok: false,
@@ -70,9 +84,15 @@ export async function runUpdate(
     return { ok: true, flash: `已為「${title}」建立離線下載` };
   }
   if (fileMapsEqual(freshFiles, cached.files)) {
+    await putGoSamOfflineCache(id, entry.source, cached.files, tipRev);
     return { ok: true, flash: `「${title}」已是最新版本` };
   }
-  const stored = await putGoSamOfflineCache(id, entry.source, freshFiles);
+  const stored = await putGoSamOfflineCache(
+    id,
+    entry.source,
+    freshFiles,
+    tipRev
+  );
   if (!stored) {
     return {
       ok: false,

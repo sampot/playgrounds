@@ -99,7 +99,10 @@ async function fetchRepoTree(
   repo: string,
   treeRef: string,
   signal?: AbortSignal
-): Promise<{ ok: true; tree: GhTreeItem[] } | { ok: false; status: number }> {
+): Promise<
+  | { ok: true; sha: string; tree: GhTreeItem[] }
+  | { ok: false; status: number }
+> {
   // Branch tips are mutable, so the tree API response is HTTP-cached by the
   // browser／SW and would otherwise serve a stale tree (with old blob SHAs)
   // indefinitely — keeping go pinned to a pre-push SAM version. Append a
@@ -113,13 +116,56 @@ async function fetchRepoTree(
   });
   if (!treeRes.ok) return { ok: false, status: treeRes.status };
   const tree = (await treeRes.json()) as {
+    sha?: string;
     truncated?: boolean;
     tree?: GhTreeItem[];
   };
   if (tree.truncated) {
     throw new Error("儲存庫檔案樹過大（API truncated），請指定較淺的子目錄");
   }
-  return { ok: true, tree: tree.tree || [] };
+  const sha = typeof tree.sha === "string" ? tree.sha.trim() : "";
+  if (!sha) {
+    throw new Error("無法讀取儲存庫 tip revision");
+  }
+  return { ok: true, sha, tree: tree.tree || [] };
+}
+
+/**
+ * Resolve the Git tree SHA for a public GitHub source (branch tip／ref).
+ * Light check used by Invite join to skip a full re-download when local
+ * offline pack already matches tip.
+ */
+export async function fetchGithubTipRev(
+  ref: GithubRef,
+  options?: { signal?: AbortSignal }
+): Promise<string> {
+  const { sha } = await resolveGithubTree(ref, options?.signal);
+  return sha;
+}
+
+async function resolveGithubTree(
+  ref: GithubRef,
+  signal?: AbortSignal
+): Promise<{ sha: string; rawRef: string; tree: GhTreeItem[] }> {
+  let rawRef = ref.ref || "main";
+  let treeResult = await fetchRepoTree(ref.owner, ref.repo, rawRef, signal);
+
+  if (!treeResult.ok && !ref.ref && treeResult.status === 404) {
+    rawRef = "master";
+    treeResult = await fetchRepoTree(ref.owner, ref.repo, rawRef, signal);
+  }
+
+  if (!treeResult.ok && !ref.ref && treeResult.status === 404) {
+    rawRef = await resolveDefaultBranch(ref.owner, ref.repo, signal);
+    if (rawRef !== "main" && rawRef !== "master") {
+      treeResult = await fetchRepoTree(ref.owner, ref.repo, rawRef, signal);
+    }
+  }
+
+  if (!treeResult.ok) {
+    throw new Error(`無法列出檔案樹（HTTP ${treeResult.status}）`);
+  }
+  return { sha: treeResult.sha, rawRef, tree: treeResult.tree };
 }
 
 /**
@@ -140,46 +186,9 @@ export async function fetchGithubProject(
   const maxFiles = options?.maxFiles ?? 200;
   const rootPrefix = ref.path ? normalizeProjectPath(ref.path) : "";
 
-  /** Branch／tag／SHA used in raw.githubusercontent.com paths. */
-  let rawRef = ref.ref || "main";
-  let treeResult = await fetchRepoTree(
-    ref.owner,
-    ref.repo,
-    rawRef,
-    options?.signal
-  );
+  const { rawRef, tree } = await resolveGithubTree(ref, options?.signal);
 
-  if (!treeResult.ok && !ref.ref && treeResult.status === 404) {
-    rawRef = "master";
-    treeResult = await fetchRepoTree(
-      ref.owner,
-      ref.repo,
-      rawRef,
-      options?.signal
-    );
-  }
-
-  if (!treeResult.ok && !ref.ref && treeResult.status === 404) {
-    rawRef = await resolveDefaultBranch(
-      ref.owner,
-      ref.repo,
-      options?.signal
-    );
-    if (rawRef !== "main" && rawRef !== "master") {
-      treeResult = await fetchRepoTree(
-        ref.owner,
-        ref.repo,
-        rawRef,
-        options?.signal
-      );
-    }
-  }
-
-  if (!treeResult.ok) {
-    throw new Error(`無法列出檔案樹（HTTP ${treeResult.status}）`);
-  }
-
-  const candidates = treeResult.tree.filter(
+  const candidates = tree.filter(
     item =>
       item.type === "blob" &&
       typeof item.path === "string" &&
