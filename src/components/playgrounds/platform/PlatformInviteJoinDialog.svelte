@@ -192,7 +192,7 @@
     {:else if payload}
       <p class="text-skin-base/55 m-0 text-[12px] leading-relaxed">
         {#if isHandshakeOnly}
-          對方邀請你建立連線。同意後只會出現在線上名冊，不會自動加入任何局。
+          對方邀請你建立連線。同意後會與主持握手，不會自動加入任何局。
         {:else if protocolId}
           主持邀請你以對手身分加入
           <span class="text-skin-base font-medium">{protocolId}</span>。

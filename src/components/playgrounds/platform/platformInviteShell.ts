@@ -1,6 +1,6 @@
 /**
  * Bridge work-canvas Host SAM ↔ Platform invite mint + answer loop (DEC-047).
- * AvatarsPanel registers the implementation (peer handlers live there).
+ * Hidden roster transport registers the implementation (peer handlers).
  */
 
 export type PlatformInviteMintResult = {

@@ -1,5 +1,5 @@
 /**
- * Coordinates PlaygroundsApp ↔ AvatarsPanel for roster session invites／act (DEC-045).
+ * Coordinates PlaygroundsApp ↔ roster transport for session invites／act (DEC-045).
  */
 
 import type { MultiAgentSession } from "../sessionTypes";

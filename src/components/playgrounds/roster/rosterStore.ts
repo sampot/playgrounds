@@ -1,5 +1,6 @@
 /**
- * In-memory Avatar presence + projection sandbox links for the 線上 tab (DEC-045).
+ * In-memory Avatar presence + projection sandbox links for roster peer seating.
+ * (Avatars／線上 tab UI cancelled — stubs still back session bridge.)
  */
 
 import { identiconDataUrl } from "./rosterIdenticon";

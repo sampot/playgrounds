@@ -1,6 +1,6 @@
 /**
- * Bridge: shell-owned guest consent → AvatarsPanel WebRTC／session_invite plumbing.
- * AvatarsPanel remains connection transport; product consent UI stays out of it.
+ * Bridge: shell-owned guest consent → roster WebRTC／session_invite plumbing.
+ * Transport lives in the hidden AvatarsPanel mount; product consent UI is Shell.
  */
 
 import type { InviteMeta } from "./platformClient";

@@ -19,7 +19,6 @@
     SESSION_EVENT_KIND,
     SESSION_SEAT_BOUND_KIND,
     buildSessionActResultPayload,
-    hasRosterInviteInLocation,
     type SessionActPayload,
   } from "./roster";
   import { consumePgProvisionFromLocation } from "./platform/consumePgProvision";
@@ -629,7 +628,7 @@
   let addBottomPanelDialogEl = $state<HTMLDialogElement | null>(null);
   let addBottomSamPickId = $state("");
   /** Left sidebar: file tree vs agent chat vs Avatars. Default Files; restore from layout. */
-  let sidebarTab = $state<"files" | "agent" | "avatars">("files");
+  let sidebarTab = $state<"files" | "agent">("files");
   /** `#pg=`／`view=canvas`: first paint already play-first (no IDE flash). */
   const bootConsumerPlay =
     typeof window !== "undefined" && isConsumerPlayLanding();
@@ -957,15 +956,14 @@
         bottomPanelMaximized = parsed.bottomPanelMaximized;
         if (bottomPanelMaximized) bottomPanelOpen = true;
       }
-      if (
-        parsed.sidebarTab === "files" ||
-        parsed.sidebarTab === "agent" ||
-        parsed.sidebarTab === "avatars"
-      ) {
+      if (parsed.sidebarTab === "files" || parsed.sidebarTab === "agent") {
         sidebarTab = parsed.sidebarTab;
-      } else if ((parsed as { sidebarTab?: string }).sidebarTab === "roster") {
-        // Transient mis-key during rename; Avatars tab remains `avatars`
-        sidebarTab = "avatars";
+      } else if (
+        parsed.sidebarTab === "avatars" ||
+        (parsed as { sidebarTab?: string }).sidebarTab === "roster"
+      ) {
+        // Cancelled Avatars／線上 tab — fall back to files.
+        sidebarTab = "files";
       }
       if (parsed.bottomTab === "agent") {
         // Migrate: Agent moved from bottom panel to left sidebar.
@@ -1342,7 +1340,7 @@
   }
 
   function selectSidebarTab(
-    tab: "files" | "agent" | "avatars",
+    tab: "files" | "agent",
     opts?: { ensureAgent?: boolean }
   ) {
     sidebarTab = tab;
@@ -5760,17 +5758,8 @@
       pathname: window.location.pathname,
       hostname: window.location.hostname,
     });
-    // Roster OOB wire still uses 線上 tab. Platform `#pg=` guest join is shell
-    // modal + maximized SAM — do not force AvatarsPanel / IDE chrome.
-    if (
-      hasRosterInviteInLocation({
-        hash: window.location.hash,
-        search: window.location.search,
-      })
-    ) {
-      filesSidebarOpen = true;
-      selectSidebarTab("avatars");
-    }
+    // Platform `#pg=` guest join is shell modal + maximized SAM.
+    // OOB `#roster=` Avatars tab UX is cancelled (session invite＝SAM＋Shell).
     const landingPgInvite = hasPgInviteInLocation({
       hash: window.location.hash,
       search: window.location.search,
@@ -5823,9 +5812,6 @@
       },
       exitTryPlayToWorkspace: () => {
         exitTryPlayToWorkspace();
-      },
-      focusAvatarsTab: () => {
-        selectSidebarTab("avatars");
       },
       getActiveSandboxId: () => activeId || null,
     });
@@ -6095,7 +6081,7 @@
           if (!inviteShell) {
             throw new HostBridgeError(
               "not_found",
-              "線上邀請服務尚未就緒 — 請打開側欄「線上」後再試"
+              "邀請連線服務尚未就緒，請稍候再試"
             );
           }
           return inviteShell.mintAndAnswer(opts);
@@ -6449,10 +6435,9 @@
       const handshakeOnly = payload.meta.kind === "signal.handshake";
       if (handshakeOnly) {
         exitTryPlayToWorkspace();
-        selectSidebarTab("avatars");
         inviteJoinStatus = "連線完成";
         inviteJoinOpen = false;
-        status = "連線完成 — 可在「線上」看到對方";
+        status = "連線完成";
       } else {
         inviteJoinStatus = "已連線，等待入座…";
         inviteJoinOpen = false;
@@ -7155,7 +7140,7 @@
         <div
           class="border-skin-line flex h-8 shrink-0 items-center gap-0.5 border-b px-1 text-[10px] font-semibold tracking-wider uppercase"
           role="tablist"
-          aria-label="沙盒、總管與線上"
+          aria-label="沙盒與總管"
         >
           <button
             type="button"
@@ -7190,22 +7175,6 @@
           >
             <PgIcon name="bot" size={12} />
             總管
-          </button>
-          <button
-            type="button"
-            role="tab"
-            id="playgrounds-sidebar-tab-avatars"
-            aria-selected={sidebarTab === "avatars"}
-            aria-controls="playgrounds-sidebar-avatars"
-            class="inline-flex items-center gap-1 rounded px-2 py-1 {sidebarTab ===
-            'avatars'
-              ? 'bg-skin-card text-skin-base'
-              : 'text-skin-base/45 hover:text-skin-base/75'}"
-            onclick={() => selectSidebarTab("avatars")}
-            title="線上（連線中的人）"
-          >
-            <PgIcon name="layers" size={12} />
-            線上
           </button>
           <button
             type="button"
@@ -7472,17 +7441,6 @@
             ></iframe>
           {/if}
         </div>
-        <div
-          id="playgrounds-sidebar-avatars"
-          role="tabpanel"
-          aria-labelledby="playgrounds-sidebar-tab-avatars"
-          class="bg-skin-card flex min-h-0 flex-1 flex-col {sidebarTab ===
-          'avatars'
-            ? ''
-            : 'hidden'}"
-        >
-          <AvatarsPanel />
-        </div>
       {:else}
         <div class="playgrounds-files-rail">
           <button
@@ -7510,23 +7468,13 @@
             title="展開並顯示總管"
             onclick={() => selectSidebarTab("agent")}>總管</button
           >
-          <button
-            type="button"
-            class="text-skin-base/55 hover:text-skin-base/80 px-0.5 text-[10px] font-semibold tracking-wider uppercase"
-            title="展開並顯示線上"
-            onclick={() => {
-              filesSidebarOpen = true;
-              selectSidebarTab("avatars");
-            }}>線上</button
-          >
           <span class="text-skin-base/40 text-[10px]">{fileList.length}</span>
         </div>
-        <!-- Keep Roster／Platform join transport mounted while rail is collapsed
-             (Guest `#pg=` collapses sidebar so play surface shows first). -->
-        <div hidden aria-hidden="true">
-          <AvatarsPanel />
-        </div>
       {/if}
+      <!-- Platform Invite／session peer transport (no Avatars／線上 tab UI). -->
+      <div hidden aria-hidden="true">
+        <AvatarsPanel />
+      </div>
     </aside>
 
     <div

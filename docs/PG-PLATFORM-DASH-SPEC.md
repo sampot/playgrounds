@@ -505,7 +505,7 @@ SAM（現行 Agent／會議小品等）
 
 ### 7.3 過渡實作
 
-若場殼仍讀 SecretStore `PLAYGROUNDS_API_KEY`：視為 **債務**，須改為記憶體＋provision；文件與錯誤文案不得再教「寫入密鑰庫」。若「線上」tab 暫有鑄鏈按鈕：視為 dogfood／過渡，目標仍為 HOST 代理＋SAM UI。後台若曾有「邀請」tab 鑄場 Invite，須移除。
+若場殼仍讀 SecretStore `PLAYGROUNDS_API_KEY`：視為 **債務**，須改為記憶體＋provision；文件與錯誤文案不得再教「寫入密鑰庫」。側欄「線上」tab 已取消；鑄邀請權威路徑＝HOST 代理＋SAM／Shell UI。後台若曾有「邀請」tab 鑄場 Invite，須移除。
 
 ---
 

@@ -84,14 +84,14 @@
 | 殼層不假設 OPFS（遊樂場） | 殼／儲存邊界 | 遊樂場 UI **不得**假設「殼所在瀏覽器」OPFS 為沙盒權威；編輯／Files 經 Runtime 通道。見 DEC-038。 |
 | 訊息通道（Backend Runtime） | 訊息通道 | 殼↔Runtime 可替換傳輸：MVP＝`postMessage`；跨主機目標＝**WebRTC**。見 DEC-038、SPEC §1.4。 |
 | 跨主機叢集（遊樂場路線） | WebRTC 叢集 | 多主機瀏覽器經 WebRTC 成執行叢集；Runtime／workers 可在非殼所在主機。契約保留遷移；細節另規。見 DEC-038。 |
-| Roster（遊樂場） | Roster／連線名冊 | 跟**當前這場**連上的使用者列表＋建立 peer（WebRTC）的連線機制；**可同時多 peer**。≠ 開啟另一場子域空 origin。舊稱 Visit。見 DEC-045、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)。 |
-| Avatar Agent（遊樂場 Roster） | Avatar／化身／投影 User agent | 每位連線使用者在**本場**自動建立的薄 SAM／proxy（User agent 投影）；可 agent 模式執行；**線上** tab 卡片＝其 UI。權威與執行在對方 **`homePeer`**；經 Roster DataChannel 轉。**非**本機 clone。Session 入座**不特規**——走 DEC-023 邀請（附完整 protocol 規格）＋型錄 lazy install。頭像預設 **identicon**。Phase 2.5：本機 ephemeral `roster_avatar` 投影＋`avatar_relay`。見 DEC-045、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)。 |
-| Avatars tab（遊樂場） | 線上 tab | 左側側欄第三 tab（Files／總管／線上）；UI label＝`線上`（連線中的人；概念上仍是 Roster Avatar／化身列表）；layout 鍵＝`avatars`。見 DEC-045、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)。 |
-| identicon（遊樂場 Avatar） | identicon | 依穩定 id 本機衍生的預設頭像；不預設外站圖。見 DEC-045。 |
-| Roster 邀請連結（遊樂場） | 邀請連結／`#roster=` | 把 Roster **壓縮交換字串**（與 QR／文字同一 wire）放進 URL hash，方便分享開場並進入「加入連線」。**不是** session 入座邀請、**不是** `?open=` 開 SAM、**不是** Platform Invite。回覆亦可做成連結供貼回發起方。見 DEC-045 Phase 4.1、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)。 |
-| 薄 signaling（遊樂場 Roster） | signaling | **每握手槽**只完成一次 WebRTC offer／answer（非 trickle；1× offer＋1× answer；用完銷槽）。≠ 全場只能一 peer。載荷經**剪裁＋固定樣板**；QR／文字／可選 Platform rendezvous。不中繼資料／心跳／重談。見 DEC-045／047。 |
-| Roster 樣板 SDP（遊樂場） | 樣板壓縮／交換 payload | 自完整 SDP 抽取必要欄位，依固定樣板編解碼還原；**QR 與文字**（及可選 Platform rendezvous）共用同一字串。可選**同區網**旗標以進一步剪裁 candidates。見 DEC-045、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)。 |
-| 同區網 Roster（遊樂場） | LAN／同區網模式 | 使用者宣告 peers 同一區網時，offer／answer 可更小；誤選須新邀請改模式，不經同房補 candidates。見 DEC-045。 |
+| Roster（遊樂場） | Roster／peer transport | 本場 WebRTC peer／DataChannel 連線機制（可同時多 peer）。≠ 側欄名冊 UI；≠ 開另一場子域。見 DEC-045（[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md) **已取消**產品面）。 |
+| Avatar／投影座位（遊樂場） | 投影／proxy seat | 遠端入座時本場可建薄 proxy sandbox 掛 seat；權威在對方 **`homePeer`**；經 Roster DataChannel 轉。Session 不特規——DEC-023＋型錄 lazy install。**不是**「線上」tab 產品卡片。見 DEC-045。 |
+| Avatars tab（遊樂場） | ~~線上 tab~~（已取消） | 曾為左側側欄第三 tab（Files／總管／線上）。**2026-08-16 取消**；session 邀請／加入改由 **SAM＋Shell**。 |
+| identicon（遊樂場） | identicon | 依穩定 id 本機衍生的預設圖；曾用於 Avatars tab。Tab 取消後非產品必要。 |
+| Roster 邀請連結（遊樂場） | `#roster=`（歷史） | 曾把壓縮 wire 放進 URL hash 做 OOB 連線。**非**主路徑（改 Platform `#pg=`／短鏈）。見 DEC-045／047。 |
+| 薄 signaling（遊樂場 Roster） | signaling | **每握手槽**只完成一次 WebRTC offer／answer（非 trickle）。見 DEC-045／047。 |
+| Roster 樣板 SDP（遊樂場） | 樣板壓縮／交換 payload | 自完整 SDP 抽取必要欄位，依固定樣板編解碼還原；QR／文字／Platform 可共用。見 DEC-045。 |
+| 同區網 Roster（遊樂場） | LAN／同區網模式 | 使用者宣告 peers 同一區網時，offer／answer 可更小。見 DEC-045。 |
 | Playgrounds Platform API | Platform API | 獨立於場殼的 Cloudflare Workers 服務：**`api.samkuo.me`**（API；舊 `/i/` 可 302 至 go）、**`dash.samkuo.me`**（後台 UI，同 Worker）：Invite、薄 signal、帳號。後台持 **access token**；場殼持 **API key**（記憶體，經 provision）。不中繼 session／DataChannel。後台 UI 規格見 [PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md)。見 DEC-047、[PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)。 |
 | 純玩版客戶端（Playgrounds） | 純玩版／`go.samkuo.me` | 獨立 Worker＠**`https://go.samkuo.me`**：**無編輯環境**、不依賴持久 OPFS 沙盒庫；**同時只跑一個 SAM**。啟動含（1）Invite 短鏈入座（**臨時**；**不能離線**）（2）型錄 **`/s/<catalog_id>`** 單機傳閱（3）首頁 `/` 至多 3 則**game**推薦（picks 優先）。`/s/` 當前為 **`kind: game`** 時可換片（下一個／試試這些≤3）；可**加主畫面／造訪後離線／本機分數**；Header「**更多**」＝**本機溢流**（已下載／分層清除；≠ 只有推薦；`/i/` 不露）。`/i/` 不換片、不離線。UI **須**露出山姆鍋 logo（→ **`play.samkuo.me/`**）、「山姆鍋遊樂場」（→ **`/sam/?kind=game`**；副標網址＝`play.samkuo.me`），以及條件允許時的 Header「分享」（→`/s/<id>`）。**不是**場。見 [PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md) §5.5／§5.6／§6.4／§6.5／§6.6、DEC-050。 |
 | 型錄 SAM 傳閱連（go） | `/s/<catalog_id>`／go 分享網址 | 只認型錄穩定 **`id`** 的純玩深鏈：**`https://go.samkuo.me/s/<id>`**。go **建置內嵌** catalog 解析；無 Invite／join／TTL。型錄列「分享」與 go Header「分享」只出此形；皆開**頁內分享面**（系統分享／**QR**／複製）；**分享 title／`og:title`＝`entry.title`**。當前為 **game** 時可換片；可安裝、造訪後離線、本機分數；可從「更多→已下載」再開。**不是** `/i/`、**不是**場 `?open=`、**不是**「一鍵開」、**不是** go 上完整型錄／我的遊戲庫。見 DEC-050、[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md) §5.5／§5.6／§6.6、[PG-CATALOG-UX-PLAN.md](./PG-CATALOG-UX-PLAN.md)。 |
@@ -135,7 +135,7 @@
 | agent.ui（遊樂場艦隊） | agent.ui 標註 | 顯示用註記（roleLabel／health／successorOf 等）；存 runtime `ui-annotations.json`；HOST `setAgentUi`；遊樂場介面只渲染。見 DEC-032。 |
 | SAM 實例（遊樂場） | 實例 | 一沙盒對應一 SAM 實例（Code＋Data＋Configuration；即使未執行）。`clone` 產另一實例，之後程式碼分叉。數量爆炸主因常是實例增殖，而非僅「新建」。見 DEC-028。 |
 | clonedFrom／cloneIntent（沙盒 meta） | 血統／clone 意圖 | `clonedFrom`＝直接來源 `sandboxId`；`cloneIntent` 區分人手保留、總管代建、自迭代、session 分身等，供管理面分區與 GC。見 DEC-028。 |
-| Agent 區（遊樂場） | Agent 區 | 左側側欄與 Files／**線上** 以 Tab 切換的 iframe；內容為**總管**（現行 Agent 席）的 UI。遊樂場介面 Tab 標籤顯示「總管」；程式／layout 鍵仍可為 `agent`。見 DEC-017。Roster Avatar 列表見 DEC-045（**線上** tab，非此 iframe）。下方 dock 預設 Console；REPL／Shell／自選 SAM 為 opt-in（DEC-044）。 |
+| Agent 區（遊樂場） | Agent 區 | 左側側欄與 Files 以 Tab 切換的 iframe；內容為**總管**（現行 Agent 席）的 UI。遊樂場介面 Tab 標籤顯示「總管」；程式／layout 鍵仍可為 `agent`。見 DEC-017。下方 dock 預設 Console；REPL／Shell／自選 SAM 為 opt-in（DEC-044）。 |
 | host binding（遊樂場） | host binding／`env.HOST` | **對口席**＝目錄全部 scopes **自動準入**→動態全量；**已準入 SAM**＝同形子集。卸任收回對口快捷。不另立 `env.SANDBOX`／`env.OBSERVE`。見 DEC-017／036／**051**、[PG-API-SCOPES-SPEC.md](./PG-API-SCOPES-SPEC.md)。 |
 | sandbox-intrinsic（遊樂場） | 沙盒內建／intrinsic | 該沙盒自己的檔案樹、`env.vars`、自己的 KV／DB、自己的畫布↔functions 等；**預設可開、不必** `sam:capabilities` 宣告。見 DEC-036、[PG-API-SCOPES-SPEC.md](./PG-API-SCOPES-SPEC.md)。 |
 | environment capability（遊樂場） | 環境能力／capability／scope | 共用或跨邊界 API 的授權標籤（OAuth-style scope，如 `compute:python`、`sandbox:create`）；須 `sam:capabilities` 宣告＋使用者同意才準入。MVP 別名仍認 `runPython`／`runCmd`。見 DEC-036／**051**、[PG-API-SCOPES-SPEC.md](./PG-API-SCOPES-SPEC.md)。 |

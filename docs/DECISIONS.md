@@ -84,7 +84,7 @@
 | [DEC-042](#dec-042-playgrounds-workers與-wildcard-場網) | Playgrounds：Workers 部署與 `*.samkuo.me` 場網 | Accepted |
 | [DEC-043](#dec-043-playgrounds-文件站-starlight與-docssamkuome) | Playgrounds 文件站：Starlight＠`docs.samkuo.me` | Accepted |
 | [DEC-044](#dec-044-playgrounds-下方面板-dockopt-in與自選-sam) | Playgrounds 下方面板 dock（opt-in＋自選 SAM） | Accepted |
-| [DEC-045](#dec-045-playgrounds-跨場-rosteravatar與薄-signaling) | Playgrounds 跨場 Roster／Avatar 與薄 signaling | Accepted |
+| [DEC-045](#dec-045-playgrounds-跨場-rosteravatar與薄-signaling) | Playgrounds 跨場 Roster／薄 signaling（Avatars tab **已取消**；邀請＝SAM＋Shell） | Accepted |
 | [DEC-046](#dec-046-playgrounds-型錄結構化資料與查詢面) | Playgrounds 型錄結構化資料與查詢面 | Draft |
 | [DEC-047](#dec-047-playgrounds-platform-api) | Playgrounds Platform API（Invite／薄 signaling／後台） | Draft |
 | [DEC-048](#dec-048-playgrounds-宿主-sveltekit-靜態-pwa) | Playgrounds 宿主：SvelteKit 靜態 PWA（卸根 Astro） | Accepted |
@@ -870,34 +870,34 @@
 
 ### DEC-045: Playgrounds 跨場 Roster／Avatar 與薄 signaling
 
-- **Status:** Accepted（2026-08-05；契約；實作依計劃分階段）
-- **Context:** 希望不同使用者的場可經網路相遇：連線後本場 **Roster** 出現對方，並為每位連線者建立 **Avatar**（代替該使用者在本場現身的 User agent），以便後續邀請參與 session。須對齊 DEC-031 `homePeer`、DEC-038 WebRTC 路線、DEC-042 無伺服器租戶；場主**不**負擔資料面雲費。若 signaling 變成常駐中繼（trickle／心跳／重談／轉發資料），會變成隱性雲端房間，違背場網哲學。（機制舊稱 **Visit**；2026-08-05 起改名 **Roster**。）
+- **Status:** Accepted（2026-08-05；契約）；**Revision 2026-08-16：** 撤銷 Avatars／「線上」tab 產品面——session 邀請／加入改由 **SAM＋Shell**（Platform Invite）；薄 signaling／peer／session bridge **硬約束不變**
+- **Context:** 希望不同使用者的場可經網路相遇：連線後可遠端入座 session。須對齊 DEC-031 `homePeer`、DEC-038 WebRTC 路線、DEC-042 無伺服器租戶；場主**不**負擔資料面雲費。若 signaling 變成常駐中繼（trickle／心跳／重談／轉發資料），會變成隱性雲端房間，違背場網哲學。（機制舊稱 **Visit**；2026-08-05 起改名 **Roster**。曾規劃側欄「線上」名冊＋投影 Avatar UI——**2026-08-16 取消**該產品面。）
 - **Decision:**
-  1. **Roster：** 跟**當前這場**連上的使用者**名冊**＋建立瀏覽器 peer（WebRTC）的連線機制。開別人的場子域 ≠ Roster（那只是另一 origin 空場）。**需求：可同時維持多個 peer**（多名冊列、多 Avatar）；握手可串行（尤其經 Platform 排隊），連上後不得因「新連線」強制拆掉既有 peer（除非使用者明確結束）。
-  2. **Avatar／化身：** 每位連線使用者在**本場自動建立**的 **User agent 投影**——薄 SAM／proxy；可 agent 模式執行；有 UI。**線上** tab 卡片＝該投影 SAM 的呈現面。權威與執行仍在對方 **`homePeer`**；本場經 **Roster DataChannel** 轉訊息／（後段）事件與 `act`。**不**把對方沙盒權威搬進本機 OPFS；**不是**對方本機 clone。斷線 → 撕掉本場投影。Phase 1–2 可以 presence stub（identicon／名／連線態）占位；目標＝spawn 真投影 SAM。
-  3. **場主 UX：** 左側側欄 **線上** tab（UI label＝`線上`；layout 鍵仍為 `avatars`），與 **Files／總管** 並列（三 tab）。內容＝目前 Roster 上的 Avatar／化身投影（非總管 iframe、非檔案樹）。無連線時為空態。連線流程僅分 **發起**（建邀請、等回覆）與 **加入**（貼邀請、建回覆）——對應 WebRTC initiator／responder；**不**用場主／訪客產品角色。UI 用語＝邀請／回覆／QR／同一區網；**不**暴露 offer／answer／SDP 等術語。兩區塊預設收起。Platform Invite 路徑之 O／A 角色見 [DEC-047](#dec-047-playgrounds-platform-api)（加入者 offer）。
-  4. **頭像：** 每個 Avatar **預設 identicon**（本機依穩定 id 如 `agentId`／peer 公鑰衍生繪製；**不**預設拉外站圖）。日後可選自訂圖，不擋 MVP。
-  5. **Signaling（硬約束）：** 伺服器（或 OOB 貼上）**只**用來完成**一次** WebRTC **offer／answer**（每握手槽恰好 **1× offer**＋**1× answer**）。採 **非 trickle**（ICE 收進後再發布；**無** candidate 訊息）。該槽用完／失敗／TTL → **銷槽**；拒再寫。需重連該 peer → **新握手**。**已有可用 PeerConnection 的對端 → 重用，不再經 signaling**（Platform Invite 同此；見 [DEC-047](#dec-047-playgrounds-platform-api)）。**禁止**經 signaling：DataChannel 流量、presence 心跳、session／mailbox／FS、Avatar 投影流量、renegotiation、同一槽第二輪 offer／answer。多人加入時可有多個握手槽（可串行）；**不得**把「一次一握手」解釋成「全場只能一 peer」。
-  6. **壓縮載荷（硬約束）：** 交換的不是完整原始 SDP 字串。雙方依**固定樣板**重建 SDP：先剪裁／抽取必要欄位（如 fingerprint、ICE ufrag／pwd、精簡 candidates），再編碼進樣板 payload。**交換方式＝QR 或文字**（複製／貼上）二選一，**同等一等**；同一壓縮字串可顯示為 QR 或純文字。載荷須小到**單張 QR 仍易掃**（過大則失敗提示，勿默認多碼拼圖）。薄 rendezvous（[DEC-047](#dec-047-playgrounds-platform-api)）若存在，亦用同一格式；Platform 路徑時序／誰出 offer 見該決策。
-  7. **同區網選項：** 使用者可宣告 **peers 位於同一區網（LAN）**。此模式下 offer／answer **可進一步剪裁**（例如只帶 host／link-local candidates、略過需公網 STUN／relay 的候選；細節以樣板版號為準）。載荷須標明此模式，雙方一致解碼。誤選則連線可能失敗——應提示可改「一般／跨網」重發，勿默默升格加 candidates 走第二輪 signaling。
-  8. **資料面：** 連上後只走 WebRTC（一般模式可用 STUN）。**不支援使用者自備 TURN**（產品不提供填 TURN URI／credential／SecretStore 接 TURN 的路徑——UX 過差）。**預設不做**營運 TURN；若日後需要跨網備援，**僅**經 Platform **官方 TURN**（admin 開通＋點數制；見 [PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)）。有權時殼**自動**附 TURN credentials；**Host／Guest 人機不分辨**直連 vs relay（對齊五子棋 E2E）。同區網模式可不依賴公網 STUN。Avatar 投影與對端通訊走同一 DataChannel（或同 peer 上約定之 channel），**不**經 signaling 伺服器。
-  9. **Session（不特規 Avatar）：** 遠端入座沿用 **DEC-023** 同一套邀請／協定閘／`joinPolicy`——**不**為 Avatar 另建協定系統。邀請附**完整 protocol 規格**；接收場以型錄為虛擬可用集合、**lazy install** 兌現相容 SAM（類比 virtual actor／dehibernate）。Avatar 只負責本場投影呈現（化身卡片可顯示邀請）與 Roster DataChannel 橋；本場看到的參與者是 Avatar 投影，執行／權威仍在對方 homePeer。落地前 DEC-023 本地範圍不變；遠端橋見計劃 Phase 3。
-  10. **Rate limit：** signaling 必須可限流（IP／碼／TTL）；可疊 CF zone path 規則。
+  1. **Roster（transport）：** 跟**當前這場**建立瀏覽器 peer（WebRTC）的連線機制與 DataChannel 管線。開別人的場子域 ≠ Roster。**需求：可同時維持多個 peer**；握手可串行（尤其經 Platform 排隊），連上後不得因「新連線」強制拆掉既有 peer（除非使用者明確結束）。**不是**側欄名冊產品 UI。
+  2. **投影座位（實作細節）：** 遠端入座仍可在本場為對端建立薄 proxy／投影 sandbox 以掛 seat（權威在對方 `homePeer`；經 DataChannel 轉）。**不**再以「線上」tab 卡片作為人機呈現面；Host／Guest 人機＝**SAM 應用＋場 Shell**（邀請、consent、放大畫布）。
+  3. **場主 UX（2026-08-16）：** **無**左側「線上」／Avatars tab。Session **邀請與加入**由當前 SAM（例：遊戲）與 Shell 模態／分享面提供。側欄僅 **沙盒／總管**。Platform Invite 路徑之 O／A 角色見 [DEC-047](#dec-047-playgrounds-platform-api)。
+  4. ~~頭像／identicon 名冊 UI~~ — **已撤銷**（transport 可仍用穩定 id；不做人機名冊）。
+  5. **Signaling（硬約束）：** 伺服器（或 OOB 貼上）**只**用來完成**一次** WebRTC **offer／answer**（每握手槽恰好 **1× offer**＋**1× answer**）。採 **非 trickle**（ICE 收進後再發布；**無** candidate 訊息）。該槽用完／失敗／TTL → **銷槽**；拒再寫。需重連該 peer → **新握手**。**已有可用 PeerConnection 的對端 → 重用，不再經 signaling**（Platform Invite 同此；見 [DEC-047](#dec-047-playgrounds-platform-api)）。**禁止**經 signaling：DataChannel 流量、presence 心跳、session／mailbox／FS、投影流量、renegotiation、同一槽第二輪 offer／answer。多人加入時可有多個握手槽（可串行）；**不得**把「一次一握手」解釋成「全場只能一 peer」。
+  6. **壓縮載荷（硬約束）：** 交換的不是完整原始 SDP 字串。雙方依**固定樣板**重建 SDP。產品主路徑＝Platform Invite（短連結）；樣板 wire 仍可供 QR／文字／go 等編碼共用。載荷須小到**單張 QR 仍易掃**（過大則失敗提示）。薄 rendezvous（[DEC-047](#dec-047-playgrounds-platform-api)）用同一格式。
+  7. **同區網選項：** 可宣告 peers 同一區網以進一步剪裁 offer／answer；誤選則提示改模式重發，勿經同房補 candidates。
+  8. **資料面：** 連上後只走 WebRTC。**不支援使用者自備 TURN**。**預設不做**營運 TURN；跨網備援僅經 Platform **官方 TURN**（見 [PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)）。有權時殼**自動**附 TURN credentials；**Host／Guest 人機不分辨**直連 vs relay。
+  9. **Session（不特規投影）：** 遠端入座沿用 **DEC-023**——**不**另建協定系統。邀請附**完整 protocol 規格**；型錄 lazy install。人機邀請／同意走 SAM＋Shell；DataChannel 僅傳輸橋。
+  10. **Rate limit：** signaling 必須可限流（IP／碼／TTL）。
   11. **敘事：** DEC-004——場與人串連，非多租戶協作 SaaS。
-  - 階段見 [PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)。
+  - 歷史計劃（已取消產品面）：[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)。
 - **Consequences:**
   - 勿把 signaling 做成聊天室、房間中繼或 ICE trickle 匯流排。
   - 勿假設 Roster＝開 `*.samkuo.me` 子域；勿跨 origin 自動搬資料。
-  - 勿把 Avatar 當本機 clone 或擁有對方 FS 的實體沙盒權威；勿給遠端座位完整 HOST。
-  - 勿為 Avatar 另開 session／protocol 引擎；協定兌現走 DEC-023＋型錄 lazy install。
-  - 勿把 Avatar 塞進總管 tab 或 Files 樹；勿預設外站頭像 CDN。
-  - 勿把完整 SDP 原文塞進 QR／文字交換；勿以多張 QR 拼圖當預設 UX；勿只做 QR 不做文字（或相反）。
+  - 勿把遠端投影當本機 clone 或擁有對方 FS 的實體沙盒權威；勿給遠端座位完整 HOST。
+  - 勿為遠端另開 session／protocol 引擎；協定兌現走 DEC-023＋型錄 lazy install。
+  - **勿**再做側欄「線上」／Avatars tab 或以其為邀請主路徑；勿預設外站頭像 CDN。
+  - 勿把完整 SDP 原文塞進 QR／文字交換；勿以多張 QR 拼圖當預設 UX。
   - 勿在同區網失敗後經同一房補 candidates／重談；改新邀請或改模式。
-  - 勿預設免費無限營運 TURN；勿把 session／Avatar 真相放上 Workers／DO／R2。
-  - **勿**做自備 TURN（殼設定貼 URI／帳密、SecretStore 長期存 TURN、教使用者自架 coturn 當產品路徑）。
-  - 官方 TURN／點數見 [PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)；未落地前跨網可能連不上＝已知限制。
-  - 勿把「每槽一次握手」寫成全場只能一個 peer；多 peer 為需求，單 peer 僅過渡實作缺口。
-  - 同步 [GLOSSARY.md](./GLOSSARY.md)、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)；遠端座位落地時修訂 DEC-023。
+  - 勿預設免費無限營運 TURN；勿把 session 真相放上 Workers／DO／R2。
+  - **勿**做自備 TURN。
+  - 官方 TURN／點數見 [PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)。
+  - 勿把「每槽一次握手」寫成全場只能一個 peer。
+  - 同步 [GLOSSARY.md](./GLOSSARY.md)；遠端座位對齊 DEC-023／047。
 - **Revision（2026-08-05）：** 場主 UX＝左側 **Avatars** tab（並列 Files／總管）；頭像預設 identicon。
 - **Revision（2026-08-05）：** 側欄 UI label 改為「**化身**」（鍵名仍 `avatars`）。
 - **Revision（2026-08-05）：** 側欄 UI label 改為「**線上**」（鍵名仍 `avatars`；「化身」保留為 Avatar 投影概念用語）。
@@ -917,6 +917,7 @@
 - **Revision（2026-08-06）：** 明確 **多 peer** 為需求；「一次一握手」≠「只能一 peer」。Platform Ticket 路徑 O／A 角色見 DEC-047。
 - **Revision（2026-08-07）：** **否決自備 TURN**（非產品路徑）；預設仍無營運 TURN；跨網備援僅未來官方 TURN＋點數（[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)）。
 - **Revision（2026-08-07）：** 官方 TURN 對人透明（自動納入 ICE；Host／Guest 不分辨直連／relay）；有權 Host 之場邀請 E2E（五子棋）在無法直連時仍須能連。
+- **Revision（2026-08-16）：** **取消**側欄 Avatars／「線上」tab 與 [PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md) 產品計劃；session 邀請／加入＝**SAM＋Shell**（Platform Invite）；Roster 程式庫改為隱藏 transport。OOB `#roster=` 不再為主路徑。
 
 
 ### DEC-046: Playgrounds 型錄結構化資料與查詢面
@@ -1156,7 +1157,7 @@
 | [PG-BACKEND-RUNTIME-PLAN.md](./PG-BACKEND-RUNTIME-PLAN.md) | Backend Runtime 實作階段（DEC-038） |
 | [PG-MAIN-CONTENT-PLAN.md](./PG-MAIN-CONTENT-PLAN.md) | Main content Editor↔SAM tabs／plain 掛載（DEC-030） |
 | [PG-BOTTOM-DOCK-PLAN.md](./PG-BOTTOM-DOCK-PLAN.md) | 下方面板 dock／opt-in／自選 SAM（DEC-044） |
-| [PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md) | 跨場 Roster／Avatar／薄 signaling（DEC-045） |
+| [PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md) | ~~跨場 Roster／Avatar 產品計劃~~（**已取消**；transport 仍見 DEC-045；邀請＝SAM＋Shell） |
 | [PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md) | Platform API／Ticket／signal／後台（DEC-047 Draft） |
 | [PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md) | Platform 後台 UI 規格（`dash.samkuo.me`；DEC-047） |
 | [PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md) | Platform 點數制與官方 TURN（Draft；非訂閱；**否決**自備 TURN） |

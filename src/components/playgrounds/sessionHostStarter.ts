@@ -286,7 +286,7 @@ async function onInviteRoster() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ role: "participant" }),
     });
-    setStatus("已送出邀請（" + invited.protocolId + "）— 對方請在線上 tab 接受");
+    setStatus("已送出邀請（" + invited.protocolId + "）— 等待對方接受");
   } catch (e) {
     setStatus(String(e.message || e));
   }

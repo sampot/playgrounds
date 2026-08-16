@@ -1,6 +1,6 @@
 /**
  * Guest `#pg=` boot: open compose SAM maximized, then shell consent modal.
- * Does not open AvatarsPanel / restore IDE chrome.
+ * Does not restore IDE chrome for product consent.
  */
 
 import {
