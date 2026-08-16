@@ -262,4 +262,4 @@ dash SSO（已註冊）
 | 2026-08-07 | Guest `#pg=`：開 SAM＋maximize 後以**殼同意 modal**入座；不再把同意流程放進 AvatarsPanel／先露開發殼 |
 | 2026-08-07 | 再來一局：同 session `act:reset`（`ended`→`active`，不必再按開始）；一局≠一 Session；禁強制重邀 |
 | 2026-08-07 | §3.1／§9：有權 Host＋官方 TURN 時無法直連仍須能對玩；Host／Guest 不分辨傳輸路徑（對齊點數計劃） |
-| 2026-08-07 | Guest 主路徑指向純玩版 `go.samkuo.me`（[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)）；場殼 `#pg=` 降為過渡／相容 |
+| 2026-08-16 | DEC-053：UI→`/api/online/*`→`env.HOST`；play／go 雙殼皆可鑄邀請；短網址 canonical＝`go…/i/…`；Phase 1–3 標完成 |
