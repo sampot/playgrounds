@@ -182,11 +182,16 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
   ): Promise<unknown> {
     if (!deps.getFiles()) throw new Error("Host 小品尚未載入");
     if (!deps.getSandboxId()) throw new Error("Host 沙盒尚未就緒");
-    return deps.invokeHostSession(path, {
+    const result = (await deps.invokeHostSession(path, {
       method: init?.method || "GET",
       headers: init?.headers,
       body: init?.body,
-    });
+    })) as { ok?: boolean; events?: unknown[]; state?: unknown };
+    // Mirror play hostSessionDomainFetch: fan out domain events to Guests.
+    const events = Array.isArray(result?.events) ? result.events : [];
+    if (events.length > 0) publishEvents(events);
+    trackPhaseFromState(result?.state);
+    return result;
   }
 
   function publishEvents(events: unknown[]): void {

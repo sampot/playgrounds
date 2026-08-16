@@ -67,6 +67,7 @@ import {
   hostCreatePlatformInvite,
   hostRevokePlatformInvite,
 } from "./platform/platformHostProxy";
+import { getPlatformInviteShell } from "./platform/platformInviteShell";
 import { readSandboxIdField, readToolSandboxId } from "./sandboxIdCompat";
 import { copyProjectState } from "./projectState";
 import { normalizeProjectPath, sortProjectPaths } from "./pathUtils";
@@ -1067,18 +1068,29 @@ export function createShellHostBridge(ctx: ShellHostContext): HostBridge {
       try {
         const agentId = ctx.getActiveAgentId();
         const workId = ctx.getActiveId();
-        if (!agentId) {
+        const caller = getHostCallerSandboxId();
+        const chatSessionId = options?.chatSessionId?.trim() || undefined;
+        // Steward coding-orch: caller is the active agent → agent hosts, work is target.
+        // Domain Host SAM (e.g. pg-gomoku): caller is the work canvas → that sandbox hosts.
+        const isStewardCaller = Boolean(agentId && caller && caller === agentId);
+        if (isStewardCaller) {
+          return await ctx.openMultiAgentSession({
+            ...(chatSessionId ? { chatSessionId } : {}),
+            hostSandboxId: agentId!,
+            targetSandboxId: workId,
+          });
+        }
+        const hostSandboxId = (caller || workId || "").trim();
+        if (!hostSandboxId) {
           throw new HostBridgeError(
-            "no_agent",
-            "請先設總管（總管自任 coding-orchestration Host）"
+            "no_target",
+            "請先開啟工作沙盒（Host SAM）"
           );
         }
         return await ctx.openMultiAgentSession({
-          ...(options?.chatSessionId?.trim()
-            ? { chatSessionId: options.chatSessionId.trim() }
-            : {}),
-          hostSandboxId: agentId,
-          targetSandboxId: workId,
+          ...(chatSessionId ? { chatSessionId } : {}),
+          hostSandboxId,
+          targetSandboxId: hostSandboxId,
         });
       } catch (e) {
         if (e instanceof HostBridgeError) throw e;
@@ -1257,6 +1269,16 @@ export function createShellHostBridge(ctx: ShellHostContext): HostBridge {
     },
 
     async createPlatformInvite(options?: HostCreatePlatformInviteOptions) {
+      // Prefer the registered invite shell so mint also starts the Host answer
+      // loop and presents the share modal (same path as /api/shell/platform/invite).
+      const inviteShell = getPlatformInviteShell();
+      if (inviteShell) {
+        return inviteShell.mintAndAnswer({
+          kind: options?.kind,
+          intent: options?.intent,
+          ttlMs: options?.ttlMs,
+        });
+      }
       return hostCreatePlatformInvite(options);
     },
 

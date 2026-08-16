@@ -46,6 +46,7 @@ Search indexing: `robots.txt` allows `/`、`/help`、`/s/` and disallows `/i/`�
 
 ## Flow
 
-1. Host (play) mints `invite.compose` → `short_url` = `go…/i/…`
+1. Host mints `invite.compose` from **play**（作者場）or **go**（玩家主場／已登入）→ `short_url` = `go…/i/…`
 2. Guest opens short link → resolve secret → consent → memory-load SAM → WebRTC → play
 3. Catalog share → `go…/s/<id>` with that SAM’s title；go Header share sheet = system share / QR / copy + link preview
+4. On `/s/<id>` for hostable protocols（e.g. `pg-gomoku`）， logged-in Host can invite from the SAM UI（`env.HOST.createPlatformInvite`）→ same Guest `/i/` path

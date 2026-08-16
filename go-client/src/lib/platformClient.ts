@@ -20,8 +20,9 @@ export type InvitePreview = {
 };
 
 /**
- * Resolve short id → invite secret via Platform (stub until dedicated short API).
- * Phase 1: callers may pass secret in hash; short path shows pending UI.
+ * Resolve short id → invite secret via Platform `GET /v1/shorts/:id`.
+ * Prefer shared `@pg/platform/platformClient.resolveShortInvite` when importing
+ * from field modules; this helper remains for go-local callers.
  */
 export async function previewInviteBySecret(
   secret: string

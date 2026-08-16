@@ -273,6 +273,19 @@ export function createGoHostBinding(deps: GoHostBindingDeps): GoHostBinding {
           intent: options?.intent,
           ttlMs: options?.ttlMs,
         });
+        // Start answer loop immediately on the shared HostRuntime (do not wait
+        // for the page event listener) so Guest offers are not dropped.
+        const rt = deps.getHostRuntime();
+        if (rt) {
+          const st = rt.getStatus();
+          if (!st.sessionId || st.phase === "idle") {
+            await rt.open();
+          }
+          await rt.adoptSamInvite({
+            inviteId: created.invite_id,
+            shortUrl: created.short_url,
+          });
+        }
         // Mirror the field bridge's behaviour: surface the minted invite to the
         // existing `subscribeGoShellPlatformEvents` listeners so the go page's
         // share sheet flow keeps working alongside the new env.HOST call.

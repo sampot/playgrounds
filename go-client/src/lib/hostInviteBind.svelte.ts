@@ -315,7 +315,13 @@ export function createHostInviteBind(opts: {
     ev: GoShellPlatformInviteEvent
   ): Promise<HostInviteShare | null> {
     const r = ensureRuntime();
-    if (!r.getStatus().sessionId) {
+    const current = r.getStatus();
+    // env.HOST.createPlatformInvite may already have started the answer loop;
+    // only re-adopt when this is a new invite id.
+    if (current.inviteId === ev.inviteId && current.shortUrl) {
+      return buildShare({ inviteId: ev.inviteId, shortUrl: ev.shortUrl });
+    }
+    if (!current.sessionId) {
       await r.open();
     }
     await r.adoptSamInvite({

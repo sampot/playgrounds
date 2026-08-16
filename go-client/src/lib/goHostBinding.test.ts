@@ -277,8 +277,9 @@ describe("createGoHostBinding — platform invite", () => {
       )
     );
     vi.stubGlobal("fetch", fetchSpy);
+    const rt = makeRuntime();
     const binding = createGoHostBinding({
-      getHostRuntime: () => makeRuntime(),
+      getHostRuntime: () => rt,
     });
     const out = await binding.createPlatformInvite({
       kind: "invite.compose",
@@ -286,6 +287,11 @@ describe("createGoHostBinding — platform invite", () => {
     });
     expect(out.invite_id).toBe("inv_x");
     expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(rt.open).toHaveBeenCalled();
+    expect(rt.adoptSamInvite).toHaveBeenCalledWith({
+      inviteId: "inv_x",
+      shortUrl: "https://go.samkuo.me/i/x",
+    });
   });
 
   it("emits invite.compose event on successful mint", async () => {

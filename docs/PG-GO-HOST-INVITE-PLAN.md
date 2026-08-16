@@ -1,11 +1,11 @@
 # Playgrounds 玩家主場鑄邀請（GO-INVITE）— 從遊戲中邀請對手對玩
 
-> **狀態：** Draft（2026-08-11）— 契約／階段草案  
+> **狀態：** Draft（2026-08-16）— GO-INVITE 實作落地（DEC-053 `env.HOST`）；Phase 5 手測進行中  
 > **權威決策：** 建議 [DECISIONS.md](./DECISIONS.md) **DEC-052**（§5.3 玩家主場互邀＝GO-INVITE；本文件實作之）  
 > **相關：** [PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md)（登入＋記憶體 field API key）、[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)（純玩版；玩家主場）、[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)（五子棋 `gomoku.v1`；**作者面** Host 鑄邀請）、[PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)、[GLOSSARY.md](./GLOSSARY.md)  
 > **載體 SAM：** 型錄 [`pg-gomoku`](../catalog/entries/pg-gomoku.yaml)（source [`sampot/pg-gomoku`](https://github.com/sampot/pg-gomoku)；`gomoku.v1`）
 
-一句話：**登入 go 的玩家（玩家主場，DEC-050）在遊戲中開一局、對另一位玩家發出邀請；對手開 `https://go.samkuo.me/i/<short_id>` 入座對弈。** go 以**玩家 A 的記憶體 field API key**（DEC-052 pipeline 取得，**關頁即失**）走 **`invite.compose`** 鑄邀請（Platform `POST /v1/invites`），並在本頁開啟 **Host 導向的 `gomoku.v1` session**（`/api/session/open`→`/status`→入座→`/act`→作答循環）。完成依據＝**go 玩家 A（Host）持記憶體 key 完成「開局→對玩家 A 發邀請→玩家 B 開 `/i/` 入座→雙方輪流落子至終局」**。
+一句話：**登入 go 的玩家（玩家主場，DEC-050）在遊戲中開一局、對另一位玩家發出邀請；對手開 `https://go.samkuo.me/i/<short_id>` 入座對弈。** play 與 go **都可**鑄邀請；go 以玩家記憶體 field API key 走 `invite.compose`，並以 `env.HOST`（`createGoHostBinding`）主持 session。
 
 > **與作者面（場殼）的關係（不變）：** 場殼 play 仍是**作者 Host**；本刀把「Host 能力」**複製到 go 的玩家主場**——同一套 `invite.compose`＋`gomoku.v1`，但 Host＝已登入玩家、座落在 **go origin**。go **不**新增我的場／密鑰庫／後台／TURN 管理（見 §4 非目標）。
 
@@ -200,12 +200,12 @@ go 目前只有 Guest runtime（`guestRuntime.ts`）。玩家 A 開局須在 go 
 
 | Phase | 內容 | 完成定義 | 狀態 |
 | --- | --- | --- | --- |
-| **0. 契約** | 本文件；DEC-052 §5.3 化實 | 流程／憑證／切界清楚 | **本刀**（進行中） |
-| **1. goAuth mint** | `mintPlatformInvite`（key 內部用；`targetField=go`；`not_provisioned`）；測試 | 有 key mint 成功回 `short_url=/i/…`；無 key `not_provisioned`；不持久化 | — |
-| **2. 畫布橋** | goCanvas＋goMemoryCanvas 攔 `/api/shell/platform/invite`→goAuth；回應形狀同作者面 | gomoku 在 go iframe 內 `fetch /api/shell/platform/invite` 成功取得 `short_url` | — |
-| **3. Host runtime** | `hostRuntime`（open／channel／answer loop／act start·place·reset·close）；goWebKv 當 Host 權威 | 玩家 A Host 序：open→入座 ready→start active→place→ended→reset | — |
-| **4. 頁內分享面** | `GoShareSheet` 「邀請對弈」模式（QR／複製／系統分享；`/i/<short>`；title）；登入閘 | B 可掃 QR／複製入座；未登入導向登入 | — |
-| **5. 端到端手測** | §8 腳本；失敗態；窄屏 | A↔B 對弈完成；key 關頁即失；無 `alert` | — |
+| **0. 契約** | 本文件；DEC-052 §5.3 化實 | 流程／憑證／切界清楚 | **完成** |
+| **1. goAuth mint** | `mintPlatformInvite`（key 內部用；`targetField=go`；`not_provisioned`）；測試 | 有 key mint 成功回 `short_url=/i/…`；無 key `not_provisioned`；不持久化 | **完成** |
+| **2. 畫布橋／env.HOST** | `createGoHostBinding`＋`/api/online/*`（DEC-053）；過渡 `/api/shell/platform` 仍保留 | gomoku 經 `env.HOST.createPlatformInvite` 取得 `short_url` | **完成** |
+| **3. Host runtime** | `hostRuntime`（open／channel／answer loop／act／event fanout／close）；goWebKv 當 Host 權威 | 玩家 A Host 序：open→入座 ready→start active→place→ended→reset | **完成** |
+| **4. 頁內分享面** | `GoShareSheet` 「邀請對弈」模式（QR／複製／系統分享；`/i/<short>`；title）；登入閘 | B 可掃 QR／複製入座；未登入導向登入 | **完成** |
+| **5. 端到端手測** | §8 腳本；失敗態；窄屏 | A↔B 對弈完成；key 關頁即失；無 `alert` | **進行中** |
 
 ---
 

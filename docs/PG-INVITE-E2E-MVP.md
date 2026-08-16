@@ -1,11 +1,11 @@
 # Playgrounds 場邀請 E2E MVP（五子棋）
 
-> **狀態：** Draft（2026-08-07）— Phase 0 完成；Phase 1–3 **進行中**（SAM `gomoku.v1`＋場殼 invite／入座銜接已開工）；Phase 4 手測未完  
-> **權威決策：** [DECISIONS.md](./DECISIONS.md) **DEC-047**（Invite／provision）、**DEC-045**（Roster／signal）、**DEC-023**（session／protocol）  
-> **相關：** [PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)、[PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md)、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)、[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（點數／官方 TURN；有權 Host 跨網對玩／路徑透明）、[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)（純玩版 Guest＠`go.samkuo.me`；短網址 canonical）、DEC-025（`?open=`／放大畫布）、DEC-046（型錄／lazy install）、[GLOSSARY.md](./GLOSSARY.md)  
+> **狀態：** Draft（2026-08-16）— Phase 0–3 完成；Phase 4 手測進行中（DEC-053 `env.HOST`）  
+> **權威決策：** [DECISIONS.md](./DECISIONS.md) **DEC-047**（Invite／provision）、**DEC-045**（Roster／signal）、**DEC-023**（session／protocol）、**DEC-053**（UI→`/api`→`env.HOST`）  
+> **相關：** [PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)、[PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md)、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)、[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（點數／官方 TURN；有權 Host 跨網對玩／路徑透明）、[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)（純玩版 Guest＠`go.samkuo.me`；短網址 canonical）、[PG-GO-HOST-INVITE-PLAN.md](./PG-GO-HOST-INVITE-PLAN.md)（go 玩家主場亦可鑄邀請）、DEC-025（`?open=`／放大畫布）、DEC-046（型錄／lazy install）、[GLOSSARY.md](./GLOSSARY.md)  
 > **載體 SAM：** 型錄 [`pg-gomoku`](../catalog/entries/pg-gomoku.yaml)（source [`sampot/pg-gomoku`](https://github.com/sampot/pg-gomoku)）— **不是**殼內 brainstorm／coding-orch 狗糧
 
-一句話：**用型錄五子棋跑通「註冊 Host 開 session → 鑄場 Invite → 未註冊 Guest 短連結入座 → Host 按「開始」開局 → 對弈」的完整端到端路徑；證明 Platform／場殼／Roster／session 對真人可玩小品成立，而非僅 dogfood protocol。**
+一句話：**用型錄五子棋跑通「註冊 Host 開 session → 鑄場 Invite → 未註冊 Guest 短連結入座 → Host 按「開始」開局 → 對弈」的完整端到端路徑；Host 可在 `play`（作者場）或 `go`（玩家主場）鑄邀請，Guest 一律走 `go…/i/…`。**
 
 ---
 
@@ -133,7 +133,7 @@ intent:
 | TTL | 預設 **5m**（開局後拉人，非預約） |
 | Consent | 連結 ≠ 自動入座 |
 | 放大 | `maximize_preview`＝場殼 `maximizePreview()`，非瀏覽器 Fullscreen |
-| 鑄造 | `HOST.createPlatformInvite` 或工作畫布 `/api/shell/platform/invite`（殼代理；無記憶體 key → `not_provisioned`＋導向 dash） |
+| 鑄造 | `env.HOST.createPlatformInvite`（UI→`/api/online/invite`→functions.js；殼代理 mint＋answer＋share modal）。無記憶體 key → `not_provisioned`＋導向 dash／go 登入 |
 | 呈現 | **殼頁共用分享 modal**（短網址＋QR；可蓋在最大化畫布之上）。五子棋 UI 鑄邀請後由殼彈出；「線上」tab 不作唯一入口 |
 | Wire 上限 | Platform offer／answer 經 API，**不**套用 OOB／直掃 wire QR 的 ≈1200 上限（短網址才進 QR） |
 
@@ -215,10 +215,10 @@ dash SSO（已註冊）
 | Phase | 內容 | 完成定義 | 狀態 |
 | --- | --- | --- | --- |
 | **0. 契約** | 本文件；GLOSSARY／相關計劃交叉引用 | 載體／protocol／角色／非目標清楚 | **完成** |
-| **1. Protocol＋SAM Host** | `gomoku.v1` meta；本機雙席或 stub player；`ready`→「開始」→`active` | Host 沙盒可 openSession＋start＋place＋終局（可暫不經 Platform） | **進行中**（`sampot/pg-gomoku`） |
-| **2. 鑄邀請** | Host UI → `createPlatformInvite`；短鏈／QR；未 provision 錯誤 | 已 provision Host 取得 `api.samkuo.me/i/…` | **進行中**（`/api/shell/platform/invite`） |
-| **3. Guest compose** | `#pg=` → 開五子棋 → consent → signal → 入座 | 無帳號 Guest 成 `player` 席 | **進行中**（compose 同意＋reuse 工作畫布＋自動 session_invite） |
-| **4. 對弈 E2E** | 雙方落子至終局；手測清單通過 | 兩瀏覽器完成 §9 | 未開始 |
+| **1. Protocol＋SAM Host** | `gomoku.v1` meta；本機雙席或 stub player；`ready`→「開始」→`active` | Host 沙盒可 openSession＋start＋place＋終局（可暫不經 Platform） | **完成** |
+| **2. 鑄邀請** | Host UI → `env.HOST.createPlatformInvite`；短鏈／QR；未 provision 錯誤 | 已 provision Host 取得 `go.samkuo.me/i/…` | **完成**（DEC-053） |
+| **3. Guest compose** | `#pg=`／go `/i/` → 開五子棋 → consent → signal → 入座 | 無帳號 Guest 成 `player` 席 | **完成** |
+| **4. 對弈 E2E** | 雙方落子至終局；手測清單通過 | 兩瀏覽器完成 §9（play Host＋go Host） | **進行中** |
 | **5.（可選）** | 型錄 protocols 欄、docs 導讀、picks | 另議 | **部分**（型錄 `protocols` 已加） |
 
 ---
