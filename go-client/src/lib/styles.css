@@ -562,6 +562,9 @@ a {
 .chrome .hdr-more-btn {
   anchor-name: --go-more-trigger;
 }
+.chrome .profile-btn--logged {
+  anchor-name: --go-profile-trigger;
+}
 .chrome .profile-btn {
   margin-left: auto;
 }

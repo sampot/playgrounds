@@ -382,4 +382,31 @@
     line-height: 1.45;
     color: rgb(var(--gp-muted));
   }
+
+  @media (min-width: 48rem) {
+    .go-profile[open] {
+      align-items: flex-end;
+      justify-content: flex-start;
+      padding: 4.75rem 1rem 1rem;
+    }
+    .go-profile-panel {
+      width: min(28rem, calc(100vw - 2rem));
+      margin: 0;
+      max-height: min(calc(100svh - 5.75rem), 30rem);
+      border-bottom: var(--pixel-edge) solid rgb(var(--gp-ink));
+      border-radius: calc(var(--gp-radius) + 0.35rem);
+      box-shadow: 0 6px 0 0 rgb(var(--gp-ink)),
+        0 12px 24px color-mix(in oklab, rgb(var(--gp-ink)) 22%, transparent);
+    }
+
+    @supports (position-anchor: --go-profile-trigger) {
+      .go-profile-panel {
+        position: fixed;
+        position-anchor: --go-profile-trigger;
+        top: calc(anchor(bottom) + 0.6rem);
+        left: anchor(right);
+        translate: -100% 0;
+      }
+    }
+  }
 </style>
