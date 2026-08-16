@@ -544,6 +544,13 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
     await startAnswerLoopForInvite(opts);
   }
 
+  function stopAnsweringInvite(inviteId: string): void {
+    if (!inviteId || status.inviteId !== inviteId) return;
+    loop?.stop();
+    loop = null;
+    set({ message: "已停止接受新對手" });
+  }
+
   /**
    * Host act — forward an opaque protocol payload to the Host SAM and fan out
    * returned events. The framework never interprets `payload`.
@@ -630,6 +637,7 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
     open,
     mintInviteAndAnswer,
     adoptSamInvite,
+    stopAnsweringInvite,
     /** Generic opaque host act (framework never inspects payload). */
     act: hostAct,
     hostSessionFetch,

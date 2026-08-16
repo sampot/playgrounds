@@ -250,6 +250,13 @@
     consumeRosterInviteHash();
     unregInviteShell = registerPlatformInviteShell({
       mintAndAnswer: opts => mintPlatformInviteAndAnswer(opts),
+      stopAnswering: inviteId => {
+        if (platformHostLoop?.inviteId !== inviteId) return;
+        platformHostLoop.stop();
+        platformHostLoop = null;
+        platformConnInvite = null;
+        status = "已停止等待對方連線";
+      },
       getPreferSeatSandboxId: () =>
         getPlatformComposeShell()?.getActiveSandboxId?.() ?? null,
     });

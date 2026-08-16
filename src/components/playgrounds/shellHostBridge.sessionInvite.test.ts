@@ -184,6 +184,30 @@ describe("shellHostBridge createPlatformInvite → mintAndAnswer", () => {
     expect(out.short_url).toContain("go.samkuo.me/i/");
   });
 
+  it("stops the matching shell answer loop when revoking an invite", async () => {
+    setPlatformFieldApiKey("pg_sk_test");
+    const stopAnswering = vi.fn();
+    registerPlatformInviteShell({
+      mintAndAnswer: vi.fn(),
+      stopAnswering,
+    });
+    const fetchSpy = vi.fn(async () =>
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      })
+    );
+    vi.stubGlobal("fetch", fetchSpy);
+    try {
+      const host = createShellHostBridge(mockCtx());
+      await host.revokePlatformInvite({ inviteId: "inv-shell" });
+      expect(stopAnswering).toHaveBeenCalledWith("inv-shell");
+      expect(fetchSpy).toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("falls back to mint-only proxy when invite shell is not registered", async () => {
     setPlatformFieldApiKey("pg_sk_test");
     registerPlatformInviteShell(null);

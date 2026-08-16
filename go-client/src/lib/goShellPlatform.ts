@@ -30,8 +30,13 @@ export type GoShellPlatformLoginNeededEvent = {
   kind: "login_needed";
   message: string;
 };
+export type GoShellPlatformInviteRevokedEvent = {
+  kind: "invite_revoked";
+  inviteId: string;
+};
 export type GoShellPlatformEvent =
   | GoShellPlatformInviteEvent
+  | GoShellPlatformInviteRevokedEvent
   | GoShellPlatformLoginNeededEvent;
 
 type PlatformListener = (ev: GoShellPlatformEvent) => void;

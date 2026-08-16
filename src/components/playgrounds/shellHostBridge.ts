@@ -68,6 +68,7 @@ import {
   hostRevokePlatformInvite,
 } from "./platform/platformHostProxy";
 import { getPlatformInviteShell } from "./platform/platformInviteShell";
+import { getPlatformInviteShareShell } from "./platform/platformInviteShareShell";
 import { readSandboxIdField, readToolSandboxId } from "./sandboxIdCompat";
 import { copyProjectState } from "./projectState";
 import { normalizeProjectPath, sortProjectPaths } from "./pathUtils";
@@ -1283,6 +1284,8 @@ export function createShellHostBridge(ctx: ShellHostContext): HostBridge {
     },
 
     async revokePlatformInvite(options: HostRevokePlatformInviteOptions) {
+      getPlatformInviteShell()?.stopAnswering?.(options.inviteId);
+      getPlatformInviteShareShell()?.dismiss?.();
       return hostRevokePlatformInvite(options);
     },
 

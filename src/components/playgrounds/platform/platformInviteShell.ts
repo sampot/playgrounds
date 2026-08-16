@@ -20,6 +20,8 @@ export type PlatformInviteShell = {
     intent?: unknown;
     ttlMs?: number;
   }) => Promise<PlatformInviteMintResult>;
+  /** Stop the Host answer loop for a revoked invite, if it is still current. */
+  stopAnswering?: (inviteId: string) => void;
   /** Prefer seating this sandbox on session invite accept (human-visible canvas). */
   getPreferSeatSandboxId?: () => string | null;
 };

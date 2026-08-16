@@ -55,6 +55,7 @@ type RuntimeMock = HostRuntime & {
   hostSessionFetch: ReturnType<typeof vi.fn>;
   mintInviteAndAnswer: ReturnType<typeof vi.fn>;
   adoptSamInvite: ReturnType<typeof vi.fn>;
+  stopAnsweringInvite: ReturnType<typeof vi.fn>;
 };
 
 function makeRuntime(overrides: Partial<HostStatus> = {}): RuntimeMock {
@@ -75,6 +76,7 @@ function makeRuntime(overrides: Partial<HostStatus> = {}): RuntimeMock {
     shortUrl: "https://go.samkuo.me/i/test",
   }));
   const adoptSamInvite = vi.fn(async () => undefined);
+  const stopAnsweringInvite = vi.fn();
   const runtime = {
     open,
     close,
@@ -85,6 +87,7 @@ function makeRuntime(overrides: Partial<HostStatus> = {}): RuntimeMock {
     hostSessionFetch,
     mintInviteAndAnswer,
     adoptSamInvite,
+    stopAnsweringInvite,
   };
   return runtime as unknown as RuntimeMock;
 }
@@ -350,15 +353,25 @@ describe("createGoHostBinding — platform invite", () => {
     }
   });
 
-  it("revokePlatformInvite delegates to goAuth.revokePlatformInvite", async () => {
+  it("revokePlatformInvite stops polling and delegates to goAuth", async () => {
     goAuth.__setApiKeyForTests("pg_sk_test");
+    const events: GoShellPlatformEvent[] = [];
+    const unsub = subscribeGoShellPlatformEvents(ev => events.push(ev));
     const spy = vi
       .spyOn(goAuth, "revokePlatformInvite")
       .mockResolvedValue(undefined);
-    const binding = createGoHostBinding({
-      getHostRuntime: () => makeRuntime(),
-    });
-    await binding.revokePlatformInvite({ inviteId: "inv_z" });
-    expect(spy).toHaveBeenCalledWith("inv_z");
+    const rt = makeRuntime();
+    const binding = createGoHostBinding({ getHostRuntime: () => rt });
+    try {
+      await binding.revokePlatformInvite({ inviteId: "inv_z" });
+      expect(rt.stopAnsweringInvite).toHaveBeenCalledWith("inv_z");
+      expect(spy).toHaveBeenCalledWith("inv_z");
+      expect(events).toContainEqual({
+        kind: "invite_revoked",
+        inviteId: "inv_z",
+      });
+    } finally {
+      unsub();
+    }
   });
 });

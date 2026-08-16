@@ -245,6 +245,11 @@
         void b.adoptSamInvite(ev).then(share => {
           if (share) openHostShare(share);
         });
+      } else if (ev.kind === "invite_revoked") {
+        if (hostShare?.inviteId === ev.inviteId) {
+          hostShareOpen = false;
+          hostShare = null;
+        }
       } else {
         routeLoginNeeded(ev);
       }

@@ -322,7 +322,12 @@ export function createGoHostBinding(deps: GoHostBindingDeps): GoHostBinding {
       }
     },
     async revokePlatformInvite(options) {
+      deps.getHostRuntime()?.stopAnsweringInvite(options.inviteId);
       await goAuth.revokePlatformInvite(options.inviteId);
+      emitGoShellPlatformEvent({
+        kind: "invite_revoked",
+        inviteId: options.inviteId,
+      });
       return { ok: true };
     },
   };
