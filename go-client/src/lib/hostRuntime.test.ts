@@ -134,6 +134,60 @@ describe("hostRuntime.createPlatformInvite adoption path", () => {
     );
   });
 
+  it("keeps the Guest display name from presence on the bound seat", async () => {
+    goAuth.__setApiKeyForTests("pg_sk_test");
+    let loopOptions:
+      | Parameters<typeof platformHostLoop.startPlatformHostAnswerLoop>[0]
+      | null = null;
+    vi.spyOn(platformHostLoop, "startPlatformHostAnswerLoop").mockImplementation(
+      options => {
+        loopOptions = options;
+        return { stop: vi.fn(), inviteId: options.inviteId };
+      }
+    );
+    const rt = createHostRuntime({
+      getFiles: () => ({ "index.html": "<html></html>" }) as FileMap,
+      getSandboxId: () => "go-sb-name",
+      protocol,
+      invokeHostSession: async () => ({ ok: true }),
+    });
+    await rt.open();
+    await rt.adoptSamInvite({
+      inviteId: "platform-inv-name",
+      shortUrl: "https://go.samkuo.me/i/name",
+    });
+    const sessionId = rt.getStatus().sessionId!;
+    const prepared = loopOptions!.prepareHandlers();
+    prepared.attachSession({
+      send: vi.fn(),
+      close: vi.fn(),
+      getChannel: () => null,
+      pc: {} as RTCPeerConnection,
+      role: "guest",
+    });
+    prepared.handlers.onMessage?.({
+      type: "presence",
+      agentId: "go-guest-name",
+      name: "小明",
+    });
+    prepared.handlers.onMessage?.({
+      type: "avatar_relay",
+      from: "go-guest-name",
+      payload: {
+        kind: "session_invite_accept",
+        inviteId: "platform-inv-name",
+        sessionId,
+        role: "player",
+      },
+    });
+    await vi.waitFor(() => expect(rt.getStatus().seats).toHaveLength(1));
+    expect(rt.getStatus().seats[0]).toMatchObject({
+      peerId: "go-guest-name",
+      displayName: "小明",
+    });
+    expect(rt.getStatus().message).toMatch(/小明/);
+  });
+
   it("forwards Guest acts with the role from its bound seat", async () => {
     goAuth.__setApiKeyForTests("pg_sk_test");
     let loopOptions:

@@ -199,7 +199,13 @@ describe("createGoHostBinding — listSeats", () => {
   it("appends guest seats with their peerId as sandboxId", async () => {
     const rt = makeRuntime({
       seats: [
-        { seatId: "seat-1", role: "player", peerId: "peer-1", inviteId: "inv-1" },
+        {
+          seatId: "seat-1",
+          role: "player",
+          peerId: "peer-1",
+          inviteId: "inv-1",
+          displayName: "小明",
+        },
       ],
     });
     const binding = createGoHostBinding({ getHostRuntime: () => rt });
@@ -211,6 +217,7 @@ describe("createGoHostBinding — listSeats", () => {
       role: "player",
       kind: "human",
       sandboxId: "peer-1",
+      name: "小明",
     });
   });
 

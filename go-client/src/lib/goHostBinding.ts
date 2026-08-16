@@ -92,6 +92,8 @@ export interface GoHostBinding {
       kind: "human" | "agent";
       sandboxId: string | null;
       paused: boolean;
+      /** Guest display name from presence, when known. */
+      name?: string;
     }>
   >;
   /** Forward to Host SAM `/api/session/*` (act / state / presence / ...). */
@@ -249,6 +251,7 @@ export function createGoHostBinding(deps: GoHostBindingDeps): GoHostBinding {
         kind: "human" as const,
         sandboxId: s.peerId,
         paused: false,
+        ...(s.displayName ? { name: s.displayName } : {}),
       }));
       return [hostSeat, ...guestSeats];
     },

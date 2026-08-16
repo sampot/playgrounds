@@ -221,6 +221,7 @@ export function createHostInviteBind(opts: {
             kind: seat.kind,
             sandboxId: seat.sandboxId ?? "",
             paused: seat.paused,
+            ...(seat.name ? { name: seat.name } : {}),
           })),
         };
       },

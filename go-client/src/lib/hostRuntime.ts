@@ -59,6 +59,8 @@ export type HostGuestSeat = {
   role: string;
   peerId: string;
   inviteId: string;
+  /** From Guest `presence.name` when provided. */
+  displayName?: string;
 };
 
 export type HostStatus = {
@@ -144,7 +146,12 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
   let seq = 0;
 
   /** Per-answer slot; peerId is resolved from the first presence message. */
-  type RelaySlot = { peerId: string | null; session: RosterPeerSession | null };
+  type RelaySlot = {
+    peerId: string | null;
+    session: RosterPeerSession | null;
+    /** From Guest `presence.name`. */
+    displayName: string | null;
+  };
   const slots: RelaySlot[] = [];
 
   function emit() {
@@ -326,11 +333,14 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
     seatBoundSent.add(payload.inviteId);
     const role = payload.role?.trim() || guestRoles[0] || "player";
     const seatId = `seat-${crypto.randomUUID().slice(0, 8)}`;
+    const displayName =
+      slots.find(s => s.peerId === fromPeerId)?.displayName || undefined;
     const seat: HostGuestSeat = {
       seatId,
       role,
       peerId: fromPeerId,
       inviteId: payload.inviteId,
+      ...(displayName ? { displayName } : {}),
     };
     set({ seats: [...status.seats, seat] });
     sendRelay(
@@ -345,15 +355,16 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
       fromPeerId
     );
     const filled = status.seats.length;
+    const who = displayName || "對手";
     if (guestTarget > 0 && filled >= guestTarget) {
       set({
         phase: "ready",
-        message: "所有對手已入座",
+        message: displayName ? `${displayName} 已入座` : "所有對手已入座",
         error: null,
       });
     } else {
       set({
-        message: `已入座（${filled}/${guestTarget} 位對手）`,
+        message: `${who}已入座（${filled}/${guestTarget} 位對手）`,
         error: null,
       });
     }
@@ -390,11 +401,18 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
       onMessage: (data: unknown) => {
         if (isPresenceMessage(data)) {
           if (!slot.peerId) slot.peerId = data.agentId;
+          if (typeof data.name === "string" && data.name.trim()) {
+            slot.displayName = data.name.trim();
+          }
           if (slot.peerId && slot.session) {
             peerSessions.set(slot.peerId, slot.session);
           }
           if (slot.peerId && !status.seats.some(s => s.peerId === slot.peerId)) {
-            set({ message: "有人連上了，等待入座…" });
+            set({
+              message: slot.displayName
+                ? `${slot.displayName} 已連線，等待入座…`
+                : "有人連上了，等待入座…",
+            });
           }
           if (
             slot.peerId &&
@@ -484,7 +502,11 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
       useRelay: opts.useRelay === true,
       localPresence: { agentId: localAgentId, name: "玩家 A" },
       prepareHandlers: () => {
-        const slot: RelaySlot = { peerId: null, session: null };
+        const slot: RelaySlot = {
+          peerId: null,
+          session: null,
+          displayName: null,
+        };
         slots.push(slot);
         return {
           handlers: relayHandlers(slot),
