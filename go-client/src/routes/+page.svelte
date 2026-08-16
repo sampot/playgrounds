@@ -152,6 +152,8 @@
   <span>選一個遊戲直接玩。造訪過的離線也能再開。</span>
 </p>
 <p class="home-help">
+  <a href="/apps">可離線玩的遊戲</a>
+  <span class="home-help-sep" aria-hidden="true">·</span>
   <a href="/help">使用說明 · 加入主畫面</a>
 </p>
 
@@ -213,8 +215,15 @@
     margin: 0 0 0.55rem;
   }
   .home-help {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 0.5rem;
     margin: 0 0 1.1rem;
     font-size: 0.85rem;
+  }
+  .home-help-sep {
+    color: color-mix(in oklab, rgb(var(--ink)) 42%, transparent);
   }
   .home-help a {
     font-weight: 600;
