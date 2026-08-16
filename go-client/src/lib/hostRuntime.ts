@@ -27,6 +27,11 @@ import {
   type RosterPeerSession,
 } from "@pg/roster/rosterPeer";
 import {
+  broadcastSessionChat,
+  isSessionChatMessage,
+  SESSION_CHAT_HOST_DISPLAY_NAME,
+} from "@pg/roster/rosterSessionChat";
+import {
   SESSION_EVENT_KIND,
   SESSION_INVITE_CANCEL_KIND,
   SESSION_INVITE_REJECT_KIND,
@@ -41,6 +46,8 @@ import { publishRosterRelayedSessionEvent } from "@pg/roster/rosterHomeSessionTu
 import { startPlatformHostAnswerLoop } from "@pg/platform/platformHostLoop";
 import { composeWantsRelay } from "@pg/platform/platformCompose";
 import { goAuth } from "./goAuth.svelte";
+import { chromeSession } from "./chromeSession.svelte";
+import { goSessionChat } from "./goSessionChat.svelte";
 import { publishGoMemoryBroadcast } from "./goMemoryCanvas";
 import type { FileMap } from "@pg/projectTypes";
 import type { HostableProtocol } from "./goCatalog";
@@ -159,7 +166,55 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
   }
   function set(partial: Partial<HostStatus>) {
     status = { ...status, ...partial };
+    if (partial.phase && goSessionChat.connected) {
+      const p = partial.phase;
+      goSessionChat.setUiPhase(
+        p === "active" ? "active" : p === "idle" ? "ended" : "waiting"
+      );
+    }
     emit();
+  }
+
+  function collectChatPeers(): RosterPeerSession[] {
+    const seen = new Set<RosterPeerSession>();
+    const peers: RosterPeerSession[] = [];
+    for (const s of slots) {
+      if (s.session && !seen.has(s.session)) {
+        seen.add(s.session);
+        peers.push(s.session);
+      }
+    }
+    for (const sess of peerSessions.values()) {
+      if (!seen.has(sess)) {
+        seen.add(sess);
+        peers.push(sess);
+      }
+    }
+    return peers;
+  }
+
+  function refreshSessionChatPeers(): void {
+    const peers = collectChatPeers();
+    if (peers.length === 0) {
+      if (goSessionChat.connected) goSessionChat.setPeers([]);
+      return;
+    }
+    const broadcast = (msg: Parameters<typeof broadcastSessionChat>[1]) =>
+      broadcastSessionChat(peers, msg);
+    if (!goSessionChat.connected) {
+      goSessionChat.attach({
+        localAgentId,
+        localName: SESSION_CHAT_HOST_DISPLAY_NAME,
+        localRole: "host",
+        peers,
+        broadcast,
+      });
+      goSessionChat.setUiPhase(
+        status.phase === "active" ? "active" : "waiting"
+      );
+    } else {
+      goSessionChat.setBroadcast(broadcast);
+    }
   }
 
   function sendRelay(payload: Record<string, unknown>, to?: string): void {
@@ -406,6 +461,7 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
           }
           if (slot.peerId && slot.session) {
             peerSessions.set(slot.peerId, slot.session);
+            refreshSessionChatPeers();
           }
           if (slot.peerId && !status.seats.some(s => s.peerId === slot.peerId)) {
             set({
@@ -441,9 +497,13 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
           }
         } else if (isAvatarRelayMessage(data)) {
           onRelay(data, slot);
+        } else if (isSessionChatMessage(data)) {
+          const toast = goSessionChat.onIncoming(data);
+          if (toast) chromeSession.setFlash(toast, 2800);
         }
       },
       onChannelOpen: () => {
+        refreshSessionChatPeers();
         set({ message: "已連線，等待對手入座…" });
       },
       onError: (err: Error) => {
@@ -500,7 +560,10 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
       inviteId: opts.inviteId,
       apiKey,
       useRelay: opts.useRelay === true,
-      localPresence: { agentId: localAgentId, name: "玩家 A" },
+      localPresence: {
+        agentId: localAgentId,
+        name: SESSION_CHAT_HOST_DISPLAY_NAME,
+      },
       prepareHandlers: () => {
         const slot: RelaySlot = {
           peerId: null,
@@ -513,6 +576,7 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
           attachSession: (sess: RosterPeerSession) => {
             slot.session = sess;
             if (slot.peerId) peerSessions.set(slot.peerId, sess);
+            refreshSessionChatPeers();
           },
         };
       },
@@ -659,6 +723,7 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
       shortUrl: null,
       seats: [],
     });
+    goSessionChat.detach();
   }
 
   function subscribe(listener: Listener): () => void {
@@ -681,6 +746,7 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
     dispose() {
       loop?.stop();
       loop = null;
+      goSessionChat.detach();
       for (const sess of peerSessions.values()) {
         try {
           sess.close();

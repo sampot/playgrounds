@@ -154,4 +154,23 @@ declare global {
   }
 }
 
+/**
+ * Optional SAM → shell (iframe `parent.postMessage`) for session chat hints.
+ * Same contract on play and go. See `rosterSessionChat` / PG-GO-SESSION-CHAT-PLAN.
+ *
+ * @example
+ * parent.postMessage({
+ *   type: "playgrounds-session-chat-hints",
+ *   freeText: false,
+ *   quickReplies: ["加油", "等一下"],
+ * }, "*");
+ */
+type PlaygroundsSessionChatHintsMessage = {
+  type: "playgrounds-session-chat-hints";
+  freeText?: boolean;
+  quickReplies?: string[];
+  /** Nested form also accepted by the shell parser. */
+  hints?: { freeText?: boolean; quickReplies?: string[] };
+};
+
 export {};

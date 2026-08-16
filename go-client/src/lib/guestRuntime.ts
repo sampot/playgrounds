@@ -35,6 +35,13 @@ import {
   type RosterPresenceMsg,
 } from "@pg/roster/rosterPeer";
 import {
+  broadcastSessionChat,
+  isSessionChatMessage,
+  sessionChatPhaseFromEvent,
+} from "@pg/roster/rosterSessionChat";
+import { goSessionChat } from "./goSessionChat.svelte";
+import { chromeSession } from "./chromeSession.svelte";
+import {
   SESSION_INVITE_ACCEPT_KIND,
   SESSION_INVITE_REJECT_KIND,
   isSessionActResultPayload,
@@ -216,6 +223,7 @@ export function createGuestRuntime() {
     pendingInvite = null;
     composeProtocolId = null;
     accepted = false;
+    goSessionChat.detach();
     try {
       peerSession?.close();
     } catch {
@@ -348,6 +356,7 @@ export function createGuestRuntime() {
             error: null,
             ...(partial || {}),
           });
+          goSessionChat.setUiPhase("ready");
         })
         .catch(e => {
           set({
@@ -373,6 +382,8 @@ export function createGuestRuntime() {
           event: payload.event,
         });
       }
+      const phaseFromEv = sessionChatPhaseFromEvent(payload.event);
+      if (phaseFromEv) goSessionChat.setUiPhase(phaseFromEv);
       const event =
         payload.event && typeof payload.event === "object"
           ? (payload.event as { type?: unknown; reason?: unknown })
@@ -593,15 +604,30 @@ export function createGuestRuntime() {
               tryAutoAccept(data.agentId);
             } else if (isAvatarRelayMessage(data)) {
               onRelay(data);
+            } else if (isSessionChatMessage(data)) {
+              const toast = goSessionChat.onIncoming(data);
+              if (toast) chromeSession.setFlash(toast, 2800);
             }
           },
           onChannelOpen: () => {
+            goSessionChat.attach({
+              localAgentId,
+              localName: status.displayName,
+              localRole: "guest",
+              peers: [],
+              broadcast: (msg) => {
+                if (!slot.s) return 0;
+                return broadcastSessionChat([slot.s], msg);
+              },
+            });
+            goSessionChat.setUiPhase("waiting");
             set({
               phase: "waiting_invite",
               message: "已連線，等待主持邀請入座…",
             });
           },
           onChannelClose: () => {
+            goSessionChat.detach();
             markHostEnded("主持已結束連線");
           },
           onConnectionState: (state: RTCPeerConnectionState) => {
@@ -646,6 +672,7 @@ export function createGuestRuntime() {
   }
 
   function decline(): void {
+    goSessionChat.detach();
     peerSession?.close();
     peerSession = null;
     samFiles = null;
@@ -683,6 +710,7 @@ export function createGuestRuntime() {
     decline,
     setDisplayName(name: string) {
       set({ displayName: name });
+      goSessionChat.setLocalName(name);
     },
     /** @internal Vitest only — drive relay／channel-close paths without WebRTC. */
     __testOnRelay(raw: unknown) {

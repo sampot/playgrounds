@@ -1,13 +1,17 @@
 <script lang="ts">
   import { page } from "$app/state";
   import { goto } from "$app/navigation";
+  import { onMount } from "svelte";
   import { chromeSession } from "$lib/chromeSession.svelte";
   import GoMorePanel from "$lib/GoMorePanel.svelte";
   import GoProfilePanel from "$lib/GoProfilePanel.svelte";
   import GoWordmark from "$lib/GoWordmark.svelte";
   import GoGameDrawer from "$lib/GoGameDrawer.svelte";
+  import GoSessionChatPanel from "$lib/GoSessionChatPanel.svelte";
   import GoShareSheet from "$lib/GoShareSheet.svelte";
   import { goAuth } from "$lib/goAuth.svelte";
+  import { goSessionChat } from "$lib/goSessionChat.svelte";
+  import { installGoSessionChatHintsListener } from "$lib/goSessionChatHintsListener";
   import { recommendSameKind, nextSameKind } from "$lib/goCatalog";
   import {
     pickBossWelcome,
@@ -39,6 +43,7 @@
   let profileOpen = $state(false);
   /** Canvas play 專屬遊戲操作 drawer（左側收合把手）。 */
   let drawerOpen = $state(false);
+  const chatOpen = $derived(goSessionChat.panelOpen);
   /** Canvas play: hide chrome on scroll-down, show on scroll-up. */
   let chromeHidden = $state(false);
   let chromeAutoHideTimer: ReturnType<typeof setTimeout> | null = null;
@@ -50,17 +55,25 @@
     }
   }
 
-  /** After reveal: hide again if header idle for 3s (paused while share／more／profile open). */
+  /** After reveal: hide again if header idle for 3s (paused while share／more／profile／chat open). */
   function scheduleChromeAutoHide() {
     // Idempotent: if a countdown is already pending, don't restart it — an
     // effect that re-runs frequently (e.g. canvas scroll binding) must not
     // keep resetting the 3s timer, or it would never elapse.
     if (chromeAutoHideTimer != null) return;
-    if (!chromeHideable || chromeHidden || shareOpen || moreOpen || profileOpen || drawerOpen)
+    if (
+      !chromeHideable ||
+      chromeHidden ||
+      shareOpen ||
+      moreOpen ||
+      profileOpen ||
+      drawerOpen ||
+      chatOpen
+    )
       return;
     chromeAutoHideTimer = setTimeout(() => {
       chromeAutoHideTimer = null;
-      if (shareOpen || moreOpen || profileOpen) return;
+      if (shareOpen || moreOpen || profileOpen || chatOpen) return;
       chromeHidden = true;
     }, CHROME_AUTO_HIDE_MS);
   }
@@ -118,6 +131,8 @@
     }
   });
 
+  onMount(() => installGoSessionChatHintsListener());
+
   $effect(() => {
     if (mode === "solo" && catalogId && chromeSession.kind === "game") {
       recommends = recommendSameKind(catalogId, 3);
@@ -134,9 +149,9 @@
     }
   });
 
-  /** Drawer 展開時強制顯示 header（即便之前因 auto-hide 已隱藏）。 */
+  /** Drawer／對話面板展開時強制顯示 header（即便之前因 auto-hide 已隱藏）。 */
   $effect(() => {
-    if (drawerOpen && chromeHidden) {
+    if ((drawerOpen || chatOpen) && chromeHidden) {
       chromeHidden = false;
       scheduleChromeAutoHide();
     }
@@ -149,7 +164,8 @@
    * cleared only when leaving a hideable context or when a panel opens.
    */
   $effect(() => {
-    const panelOpen = shareOpen || moreOpen || profileOpen || drawerOpen;
+    const panelOpen =
+      shareOpen || moreOpen || profileOpen || drawerOpen || chatOpen;
     if (!chromeHideable || chromeHidden || panelOpen) {
       clearChromeAutoHide();
       if (!chromeHideable) chromeHidden = false;
@@ -158,7 +174,8 @@
     if (chromeAutoHideTimer == null) {
       chromeAutoHideTimer = setTimeout(() => {
         chromeAutoHideTimer = null;
-        if (!(shareOpen || moreOpen || profileOpen)) chromeHidden = true;
+        if (!(shareOpen || moreOpen || profileOpen || chatOpen))
+          chromeHidden = true;
       }, CHROME_AUTO_HIDE_MS);
     }
   });
@@ -581,3 +598,5 @@
     bind:open={drawerOpen}
   />
 {/if}
+
+<GoSessionChatPanel />

@@ -191,3 +191,33 @@ export type {
   RosterCameraScanStop,
   RosterCameraDetectDeps,
 } from "./rosterQrCamera";
+
+export {
+  SESSION_CHAT_TYPE,
+  SESSION_CHAT_VERSION,
+  SESSION_CHAT_MAX_TEXT_CHARS,
+  SESSION_CHAT_MAX_TIMELINE,
+  SESSION_CHAT_TOAST_FULL_CHARS,
+  SESSION_CHAT_DEFAULT_QUICK_REPLIES,
+  SESSION_CHAT_HINTS_TYPE,
+  SESSION_CHAT_HOST_DISPLAY_NAME,
+  isSessionChatMessage,
+  isSessionChatHostMessage,
+  normalizeSessionChatText,
+  buildSessionChatMessage,
+  broadcastSessionChat,
+  formatSessionChatToast,
+  resolveSessionChatFreeText,
+  resolveSessionChatQuickReplies,
+  normalizeSessionChatHints,
+  parseSessionChatHintsMessage,
+  sessionChatPhaseFromEvent,
+  trimSessionChatTimeline,
+} from "./rosterSessionChat";
+export type {
+  SessionChatMsg,
+  SessionChatHints,
+  SessionChatSendTarget,
+  SessionChatUiPhase,
+  SessionChatRole,
+} from "./rosterSessionChat";
