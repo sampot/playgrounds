@@ -132,6 +132,89 @@ describe("hostRuntime.createPlatformInvite adoption path", () => {
     );
   });
 
+  it("forwards Guest acts with the role from its bound seat", async () => {
+    goAuth.__setApiKeyForTests("pg_sk_test");
+    let loopOptions:
+      | Parameters<typeof platformHostLoop.startPlatformHostAnswerLoop>[0]
+      | null = null;
+    vi.spyOn(platformHostLoop, "startPlatformHostAnswerLoop").mockImplementation(
+      options => {
+        loopOptions = options;
+        return { stop: vi.fn(), inviteId: options.inviteId };
+      }
+    );
+    const invokeHostSession = vi.fn(async () => ({
+      ok: true,
+      events: [],
+      state: { status: "active" },
+    }));
+    const rt = createHostRuntime({
+      getFiles: () => ({ "index.html": "<html></html>" }) as FileMap,
+      getSandboxId: () => "go-sb-role",
+      protocol,
+      invokeHostSession,
+    });
+    await rt.open();
+    await rt.adoptSamInvite({
+      inviteId: "platform-inv-role",
+      shortUrl: "https://go.samkuo.me/i/role",
+    });
+    const sessionId = rt.getStatus().sessionId!;
+    const prepared = loopOptions!.prepareHandlers();
+    const send = vi.fn();
+    prepared.attachSession({
+      send,
+      close: vi.fn(),
+      getChannel: () => null,
+      pc: {} as RTCPeerConnection,
+      role: "guest",
+    });
+    prepared.handlers.onMessage?.({
+      type: "presence",
+      agentId: "go-guest-role",
+      name: "對手",
+    });
+    prepared.handlers.onMessage?.({
+      type: "avatar_relay",
+      from: "go-guest-role",
+      payload: {
+        kind: "session_invite_accept",
+        inviteId: "platform-inv-role",
+        sessionId,
+        role: "player",
+      },
+    });
+    await vi.waitFor(() => expect(rt.getStatus().seats).toHaveLength(1));
+    const seatId = rt.getStatus().seats[0]!.seatId;
+    invokeHostSession.mockClear();
+
+    prepared.handlers.onMessage?.({
+      type: "avatar_relay",
+      from: "go-guest-role",
+      payload: {
+        kind: "session_act",
+        inviteId: "platform-inv-role",
+        sessionId,
+        seatId,
+        requestId: "act-1",
+        payload: { type: "place", row: 1, col: 2 },
+      },
+    });
+
+    await vi.waitFor(() => {
+      expect(invokeHostSession).toHaveBeenCalledWith(
+        "/api/session/act",
+        expect.objectContaining({
+          body: JSON.stringify({
+            role: "player",
+            seatId,
+            payload: { type: "place", row: 1, col: 2 },
+          }),
+        })
+      );
+    });
+  });
+
   it("close notifies connected guests with session.closed before tearing the channel", async () => {
     goAuth.__setApiKeyForTests("pg_sk_test");
     let loopOptions:

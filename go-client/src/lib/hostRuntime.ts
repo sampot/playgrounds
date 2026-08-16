@@ -213,13 +213,28 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
   }
 
   /** Forward a Guest `session_act` to the Host SAM `/api/session/act`. */
-  async function forwardGuestAct(act: SessionActPayload): Promise<{
+  async function forwardGuestAct(
+    act: SessionActPayload,
+    fromPeerId: string
+  ): Promise<{
     ok: boolean;
     result?: unknown;
     error?: { code: string; message: string };
   }> {
     try {
+      const seat = status.seats.find(
+        candidate =>
+          candidate.seatId === act.seatId &&
+          candidate.peerId === fromPeerId &&
+          candidate.inviteId === act.inviteId
+      );
+      if (!seat || act.sessionId !== status.sessionId) {
+        throw Object.assign(new Error("座位與連線不符"), {
+          code: "seat_forbidden",
+        });
+      }
       const body = {
+        role: seat.role,
         seatId: act.seatId,
         payload: act.payload,
       };
@@ -347,7 +362,7 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
     act: SessionActPayload,
     fromPeerId: string
   ): Promise<void> {
-    const { ok, result, error } = await forwardGuestAct(act);
+    const { ok, result, error } = await forwardGuestAct(act, fromPeerId);
     sendRelay(
       buildSessionActResultPayload({
         requestId: act.requestId,
