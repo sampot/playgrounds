@@ -13,7 +13,7 @@
 
 ---
 
-## 已實作（169）
+## 已實作（174）
 
 ### 街機（32＋25 unlisted）
 
@@ -58,24 +58,24 @@
 | `pg-yakyu` | 野球生涯 | **unlisted**；虛構青棒校隊；打者揮棒或投手兩用、其餘快轉、短賽季決賽 |
 | `pg-shrineclear` | 祠堂試煉 | 俯視清房、鑰匙開門、近戰短關 |
 | `pg-abilitycave` | 能力門洞穴 | 3～5 能力解鎖過障、短圖回溯 |
-| `pg-streetclash` | 騎樓格鬥誌 | 多角色招式表、街機／對戰／修練 |
-| `pg-nightbrawl` | 夜市清街 | 側視一路打、夾擊與投技、關卡頭目 |
-| `pg-islandloop` | 環島賽 | 多賽道盃、車輛改裝、計時榜 |
-| `pg-pitchduel` | 操場對決 | 五人制足球場地規則、人機對戰 |
-| `pg-alleybowl` | 騎樓保齡 | 球道物理＋桿數／關卡挑戰 |
-| `pg-roofglide` | 頂樓滑板 | 路線計分、技名連段 |
-| `pg-straitwing` | 海峽空戰 | 俯視狗鬥任務鏈 |
-| `pg-templecleave` | 廟口斬陣 | 自由移動、技能冷卻、裝備掉落關卡 |
-| `pg-siegepush` | 攻城推波 | 組波次攻打 AI 基地 |
-| `pg-tidefort` | 潮汐要塞 | 能力回流、地圖填圖 |
-| `pg-ghostmark` | 查哨夜行 | 視線錐、警報等級、任務鏈 |
-| `pg-blackward` | 廢校夜勤 | 資源稀缺、聲響、有限視野 |
-| `pg-backdoor` | 後門任務 | 同一關多解（偷／騙／打／駭） |
-| `pg-gatepair` | 對門實驗室 | 傳送門／動量關卡 |
-| `pg-nightsnake` | 燈籠蛇 | 關卡＋無盡雙模式 |
-| `pg-lighttrace` | 光跡對決 | 留跡包圍領地 |
-| `pg-typestorm` | 字幕風暴 | 打字殺敵／搶修台詞 |
-| `pg-stringbeat` | 琴弦節拍 | 軌道對應撥弦 |
+| `pg-streetclash` | 騎樓格鬥誌 | **unlisted（重做中）**；多角色招式表、街機／對戰／修練 |
+| `pg-nightbrawl` | 夜市清街 | **unlisted（重做中）**；側視一路打、夾擊與投技、關卡頭目 |
+| `pg-islandloop` | 環島賽 | **unlisted（重做中）**；多賽道盃、車輛改裝、計時榜 |
+| `pg-pitchduel` | 操場對決 | **unlisted（重做中）**；五人制足球場地規則、人機對戰 |
+| `pg-alleybowl` | 騎樓保齡 | **unlisted（重做中）**；球道物理＋桿數／關卡挑戰 |
+| `pg-roofglide` | 頂樓滑板 | **unlisted（重做中）**；路線計分、技名連段 |
+| `pg-straitwing` | 海峽空戰 | **unlisted（重做中）**；俯視狗鬥任務鏈 |
+| `pg-templecleave` | 廟口斬陣 | **unlisted（重做中）**；自由移動、技能冷卻、裝備掉落關卡 |
+| `pg-siegepush` | 攻城推波 | **unlisted（重做中）**；組波次攻打 AI 基地 |
+| `pg-tidefort` | 潮汐要塞 | **unlisted（重做中）**；能力回流、地圖填圖 |
+| `pg-ghostmark` | 查哨夜行 | **unlisted（重做中）**；視線錐、警報等級、任務鏈 |
+| `pg-blackward` | 廢校夜勤 | **unlisted（重做中）**；資源稀缺、聲響、有限視野 |
+| `pg-backdoor` | 後門任務 | **unlisted（重做中）**；同一關多解（偷／騙／打／駭） |
+| `pg-gatepair` | 對門實驗室 | **unlisted（重做中）**；傳送門／動量關卡 |
+| `pg-nightsnake` | 燈籠蛇 | **unlisted（重做中）**；關卡＋無盡雙模式 |
+| `pg-lighttrace` | 光跡對決 | **unlisted（重做中）**；留跡包圍領地 |
+| `pg-typestorm` | 字幕風暴 | **unlisted（重做中）**；打字殺敵／搶修台詞 |
+| `pg-stringbeat` | 琴弦節拍 | **unlisted（重做中）**；軌道對應撥弦 |
 
 ### 懷舊（27＋16 unlisted）
 
@@ -116,14 +116,14 @@
 | `pg-tinyfarm` | 一季小農園 | 短局翻土澆水收成賣箱；非長期養成 |
 | `pg-caveline` | 洞穴一筆劃 | 廊道拼路／限步探路 |
 | `pg-coopswitch` | 雙人機關 | 同機兩角色踩開關推箱過關；預留 Invite |
-| `pg-casefile` | 陳年卷宗 | 場景熱點、道具組合、推理結案 |
-| `pg-township` | 鎮誌 | 多日曆、好感、多結局 |
-| `pg-campusbond` | 社團心事 | 行程配置＋關係線 |
-| `pg-seacast` | 港邊釣夢 | 魚圖鑑、漁場天氣、裝備 |
-| `pg-lockroom` | 密室一小時 | 多房間線索鏈、一局完整解謎 |
-| `pg-atticfind` | 頂樓尋物 | 場景搜尋＋故事章節 |
-| `pg-festcrowd` | 遶境人潮 | 指定動作疏導／救出走位 |
-| `pg-worddawn` | 晨間一字 | 每日＋無盡 Wordle 系文字謎 |
+| `pg-casefile` | 陳年卷宗 | **unlisted（重做中）**；場景熱點、道具組合、推理結案 |
+| `pg-township` | 鎮誌 | **unlisted（重做中）**；多日曆、好感、多結局 |
+| `pg-campusbond` | 社團心事 | **unlisted（重做中）**；行程配置＋關係線 |
+| `pg-seacast` | 港邊釣夢 | **unlisted（重做中）**；魚圖鑑、漁場天氣、裝備 |
+| `pg-lockroom` | 密室一小時 | **unlisted（重做中）**；多房間線索鏈、一局完整解謎 |
+| `pg-atticfind` | 頂樓尋物 | **unlisted（重做中）**；場景搜尋＋故事章節 |
+| `pg-festcrowd` | 遶境人潮 | **unlisted（重做中）**；指定動作疏導／救出走位 |
+| `pg-worddawn` | 晨間一字 | **unlisted（重做中）**；每日＋無盡 Wordle 系文字謎 |
 
 ### 機台（17＋1 unlisted）
 
@@ -180,10 +180,10 @@
 | `pg-sketchtell` | 你畫我猜 | 一輪一畫家、其餘猜詞；預留 Invite |
 | `pg-chengyu` | 成語接龍 | 末字起頭接龍、挑戰計分與人機；對戰超時出局，預留 `chengyu.v1` |
 | `pg-holdem` | 德州撲克 | 六人桌 NLHE 對 AI；Sit & Go 盲注遞增、虛擬籌碼；純娛樂非博弈 |
-| `pg-cardbazaar` | 卡市爭鋒 | 構築＋排位；≠傳統牌桌 |
-| `pg-whodunit` | 誰是兇手 | 線索卡、指認；多人／人機 |
-| `pg-huntshade` | 追匿 | 1 追捕 vs 多逃亡；Invite |
-| `pg-quizleague` | 搶答聯賽 | 賽季題庫＋段位 |
+| `pg-cardbazaar` | 卡市爭鋒 | **unlisted（重做中）**；構築＋排位；≠傳統牌桌 |
+| `pg-whodunit` | 誰是兇手 | **unlisted（重做中）**；線索卡、指認；多人／人機 |
+| `pg-huntshade` | 追匿 | **unlisted（重做中）**；1 追捕 vs 多逃亡；Invite |
+| `pg-quizleague` | 搶答聯賽 | **unlisted（重做中）**；賽季題庫＋段位 |
 
 ### 策略（24 unlisted）
 
@@ -201,26 +201,35 @@
 | `pg-pierbox` | 港口貨櫃 | **unlisted**；管堆場、橋機與船期，以最少翻櫃完成合約 |
 | `pg-islesupply` | 島鏈補給 | **unlisted**；排船期與庫存，迎風避颱維持七島十回合供應 |
 | `pg-clubbudg` | 校園社團爭預算 | **unlisted**；八週分配幹部工時、爭場地、辦活動拚期末評鑑 |
-| `pg-bannerwar` | 旌旗戰棋 | 戰役章、兵種相剋、陣亡後果 |
-| `pg-islandage` | 島鏈紀元 | 探索／擴張／開發／征服 |
-| `pg-autolegion` | 自走軍團 | 羈絆、經濟、站位、賽季排位 |
-| `pg-ascenddeck` | 牌途登峰 | 路線地圖、遺物、可重複通關 |
-| `pg-deepcatacomb` | 深窟探險 | 程序地城、飢餓／光照、死即重來 |
-| `pg-villagewrath` | 里民與天 | 佈置災異與恩賜、引導聚落 |
-| `pg-outpost` | 離島前哨 | 殖民者需求、心情、生產鏈 |
-| `pg-roundtable` | 圓桌協議 | 多勢力同時出價與條約 |
-| `pg-partyquest` | 結社遠征錄 | 世界地圖、職業裝備、主線多章 |
-| `pg-blockcity` | 街區建國 | 分區、交通、民怨長期平衡 |
-| `pg-porttycoon` | 港口大亨 | 航線、倉儲、合約與對手 AI |
-| `pg-empirekitchen` | 總舖師傳奇 | 菜單研發、員工、展店 |
-| `pg-nightmarket` | 夜盤 | 多日價格、資訊差、對手 AI |
-| `pg-templeidle` | 香火放置 | 香火累積、建築升級、離線收益 |
+| `pg-bannerwar` | 旌旗戰棋 | **unlisted（重做中）**；戰役章、兵種相剋、陣亡後果 |
+| `pg-islandage` | 島鏈紀元 | **unlisted（重做中）**；探索／擴張／開發／征服 |
+| `pg-autolegion` | 自走軍團 | **unlisted（重做中）**；羈絆、經濟、站位、賽季排位 |
+| `pg-ascenddeck` | 牌途登峰 | **unlisted（重做中）**；路線地圖、遺物、可重複通關 |
+| `pg-deepcatacomb` | 深窟探險 | **unlisted（重做中）**；程序地城、飢餓／光照、死即重來 |
+| `pg-villagewrath` | 里民與天 | **unlisted（重做中）**；佈置災異與恩賜、引導聚落 |
+| `pg-outpost` | 離島前哨 | **unlisted（重做中）**；殖民者需求、心情、生產鏈 |
+| `pg-roundtable` | 圓桌協議 | **unlisted（重做中）**；多勢力同時出價與條約 |
+| `pg-partyquest` | 結社遠征錄 | **unlisted（重做中）**；世界地圖、職業裝備、主線多章 |
+| `pg-blockcity` | 街區建國 | **unlisted（重做中）**；分區、交通、民怨長期平衡 |
+| `pg-porttycoon` | 港口大亨 | **unlisted（重做中）**；航線、倉儲、合約與對手 AI |
+| `pg-empirekitchen` | 總舖師傳奇 | **unlisted（重做中）**；菜單研發、員工、展店 |
+| `pg-nightmarket` | 夜盤 | **unlisted（重做中）**；多日價格、資訊差、對手 AI |
+| `pg-templeidle` | 香火放置 | **unlisted（重做中）**；香火累積、建築升級、離線收益 |
 
 ---
 
 ## 打算實作（backlog）
 
-（空）類型覆蓋 44 款本機已實作並推送 public remotes（`sampot/pg-*`；Kenney／Blippy Bits 等美術音效在 `assets/`；`npx vitest run` 綠）。型錄已改 `listed`；待場／go deploy 後可於 `/sam/?kind=game` 與 go `/s/<id>` 遊玩。再生產／補推：`node scripts/scaffold-genre-backlog.mjs`、`node scripts/publish-genre-games.mjs`。
+類型覆蓋 44 款（上表標 **unlisted（重做中）**）目前只有 scaffold 等級的內容：多數 `app.js` 只把 `getLegalActions()` 畫成 3～4 顆按鈕，缺實際操作介面與遊戲深度，**不符可玩要求**。已全數改回 `status: unlisted`，逐款重寫至可玩後才重新上架。
+
+驗收標準（每款都要滿足才可改 `listed`）：
+
+1. **操作是遊戲本身**——棋盤點格／拖曳／即時控制／輸入，而非「動作字串按鈕列」。
+2. **狀態空間有意義**——盤面、單位、牌庫、地圖等結構化狀態，不是幾個純量計數器。
+3. **對手／挑戰有決策**——AI 或關卡設計會因玩家選擇改變，不是固定遞增數值。
+4. **輸贏路徑清楚**——可勝可敗，且來自玩家操作。
+5. **測試驗玩法規則**——不是只斷言欄位有變。
+6. **美術／音效實際用在畫面上**，且署名齊備。
 
 ## 維護備註
 

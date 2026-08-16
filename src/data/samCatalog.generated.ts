@@ -104,7 +104,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "街機",
     blurb: "球道物理＋桿數／關卡挑戰。",
     source: "sampot/pg-alleybowl",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -124,7 +124,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "策略",
     blurb: "路線地圖、遺物、可重複通關。",
     source: "sampot/pg-ascenddeck",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -134,7 +134,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "懷舊",
     blurb: "場景搜尋＋故事章節。",
     source: "sampot/pg-atticfind",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -144,7 +144,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "策略",
     blurb: "羈絆、經濟、站位、賽季排位。",
     source: "sampot/pg-autolegion",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -154,7 +154,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "街機",
     blurb: "同一關多解（偷／騙／打／駭）。",
     source: "sampot/pg-backdoor",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -164,7 +164,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "策略",
     blurb: "戰役章、兵種相剋、陣亡後果。",
     source: "sampot/pg-bannerwar",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -244,7 +244,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "街機",
     blurb: "資源稀缺、聲響、有限視野。",
     source: "sampot/pg-blackward",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -254,7 +254,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "策略",
     blurb: "分區、交通、民怨長期平衡。",
     source: "sampot/pg-blockcity",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -314,7 +314,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "懷舊",
     blurb: "行程配置＋關係線。",
     source: "sampot/pg-campusbond",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -334,7 +334,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "桌遊",
     blurb: "構築＋排位；≠傳統牌桌。",
     source: "sampot/pg-cardbazaar",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -364,7 +364,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "懷舊",
     blurb: "場景熱點、道具組合、推理結案。",
     source: "sampot/pg-casefile",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -544,7 +544,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "策略",
     blurb: "程序地城、飢餓／光照、死即重來。",
     source: "sampot/pg-deepcatacomb",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -604,7 +604,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "策略",
     blurb: "菜單研發、員工、展店。",
     source: "sampot/pg-empirekitchen",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -624,7 +624,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "懷舊",
     blurb: "指定動作疏導／救出走位。",
     source: "sampot/pg-festcrowd",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -734,7 +734,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "街機",
     blurb: "傳送門／動量關卡。",
     source: "sampot/pg-gatepair",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -744,7 +744,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "街機",
     blurb: "視線錐、警報等級、任務鏈。",
     source: "sampot/pg-ghostmark",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -885,7 +885,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "桌遊",
     blurb: "1 追捕 vs 多逃亡；Invite。",
     source: "sampot/pg-huntshade",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -945,7 +945,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "策略",
     blurb: "探索／擴張／開發／征服；多小時一局。",
     source: "sampot/pg-islandage",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -955,7 +955,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "街機",
     blurb: "多賽道盃、車輛改裝、計時榜。",
     source: "sampot/pg-islandloop",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -1075,7 +1075,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "街機",
     blurb: "留跡包圍領地。",
     source: "sampot/pg-lighttrace",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -1106,7 +1106,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "懷舊",
     blurb: "多房間線索鏈、一局完整解謎。",
     source: "sampot/pg-lockroom",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -1266,7 +1266,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "街機",
     blurb: "側視一路打、夾擊與投技、關卡頭目。",
     source: "sampot/pg-nightbrawl",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -1276,7 +1276,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "策略",
     blurb: "多日價格、資訊差、對手 AI。",
     source: "sampot/pg-nightmarket",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -1286,7 +1286,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "街機",
     blurb: "關卡＋無盡雙模式。",
     source: "sampot/pg-nightsnake",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -1326,7 +1326,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "策略",
     blurb: "殖民者需求、心情、生產鏈。",
     source: "sampot/pg-outpost",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -1346,7 +1346,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "策略",
     blurb: "世界地圖、職業裝備、主線多章。",
     source: "sampot/pg-partyquest",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -1406,7 +1406,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "街機",
     blurb: "五人制足球場地規則、人機對戰。",
     source: "sampot/pg-pitchduel",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -1446,7 +1446,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "策略",
     blurb: "航線、倉儲、合約與對手 AI。",
     source: "sampot/pg-porttycoon",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -1506,7 +1506,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "桌遊",
     blurb: "賽季題庫＋段位。",
     source: "sampot/pg-quizleague",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -1576,7 +1576,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "街機",
     blurb: "路線計分、技名連段。",
     source: "sampot/pg-roofglide",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -1596,7 +1596,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "策略",
     blurb: "多勢力同時出價與條約；人機可。",
     source: "sampot/pg-roundtable",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -1646,7 +1646,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "懷舊",
     blurb: "魚圖鑑、漁場天氣、裝備。",
     source: "sampot/pg-seacast",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -1706,7 +1706,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "街機",
     blurb: "組波次攻打 AI 基地。",
     source: "sampot/pg-siegepush",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -1856,7 +1856,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "街機",
     blurb: "俯視狗鬥任務鏈；≠戰車對決。",
     source: "sampot/pg-straitwing",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -1866,7 +1866,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "街機",
     blurb: "多角色招式表、街機／對戰／修練。",
     source: "sampot/pg-streetclash",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -1876,7 +1876,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "街機",
     blurb: "軌道對應撥弦；≠踏墊四方向。",
     source: "sampot/pg-stringbeat",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -1926,7 +1926,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "街機",
     blurb: "自由移動、技能冷卻、裝備掉落關卡。",
     source: "sampot/pg-templecleave",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -1936,7 +1936,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "策略",
     blurb: "香火累積、建築升級、離線收益。",
     source: "sampot/pg-templeidle",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -2006,7 +2006,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "街機",
     blurb: "能力回流、地圖填圖。",
     source: "sampot/pg-tidefort",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -2066,7 +2066,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "懷舊",
     blurb: "多日曆、好感、多結局。",
     source: "sampot/pg-township",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -2106,7 +2106,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "街機",
     blurb: "打字殺敵／搶修台詞。",
     source: "sampot/pg-typestorm",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -2156,7 +2156,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "策略",
     blurb: "佈置災異與恩賜、引導聚落。",
     source: "sampot/pg-villagewrath",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -2226,7 +2226,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "桌遊",
     blurb: "線索卡、指認；多人／人機。",
     source: "sampot/pg-whodunit",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
@@ -2246,7 +2246,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "懷舊",
     blurb: "每日＋無盡；≠成語接龍。",
     source: "sampot/pg-worddawn",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
   },
   {
