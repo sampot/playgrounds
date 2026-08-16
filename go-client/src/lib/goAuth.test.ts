@@ -109,6 +109,7 @@ describe("goAuth.mintPlatformInvite (GO-INVITE)", () => {
 
   afterEach(() => {
     goAuth.__setApiKeyForTests(null);
+    goAuth.__setTurnPreferForTests(false);
     if (originalFetch) globalThis.fetch = originalFetch;
     vi.unstubAllGlobals();
   });
@@ -150,6 +151,42 @@ describe("goAuth.mintPlatformInvite (GO-INVITE)", () => {
     expect(body.kind).toBe("invite.compose");
     expect(body.targetField).toContain("go");
     expect(body.intent).toEqual({ version: 1 });
+  });
+
+  it("stamps transport.roster.relay when Host prefers TURN", async () => {
+    goAuth.__setApiKeyForTests("pg_sk_test");
+    goAuth.__setTurnPreferForTests(true);
+    let body: Record<string, unknown> = {};
+    vi.stubGlobal(
+      "fetch",
+      async (_input: RequestInfo | URL, init?: RequestInit) => {
+        body = JSON.parse(String(init?.body) || "{}");
+        return new Response(
+          JSON.stringify({
+            invite_id: "inv_relay",
+            kind: "invite.compose",
+            expires_at: 1780000000000,
+            short_url: "https://go.samkuo.me/i/relay",
+            deep_link: "https://go.samkuo.me/i/relay",
+            secret: "sec",
+          }),
+          { status: 200, headers: { "content-type": "application/json" } }
+        );
+      }
+    );
+
+    await goAuth.mintPlatformInvite({
+      kind: "invite.compose",
+      intent: {
+        version: 1,
+        transport: { roster: { signal: true } },
+      },
+    });
+
+    expect(body.intent).toEqual({
+      version: 1,
+      transport: { roster: { signal: true, relay: true } },
+    });
   });
 
   it("gives not_provisioned without a key", async () => {

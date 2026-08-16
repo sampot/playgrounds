@@ -615,7 +615,8 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
       await startAnswerLoopForInvite({
         inviteId: created.invite_id,
         shortUrl: created.short_url,
-        useRelay: composeWantsRelay(opts.intent),
+        useRelay:
+          composeWantsRelay(opts.intent) || goAuth.wantsTurnRelay(),
       });
       return { inviteId: created.invite_id, shortUrl: created.short_url };
     } catch (e) {

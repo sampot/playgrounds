@@ -242,7 +242,7 @@ GET go.samkuo.me/i/<short_id>
 - 開啟當下 Invite 指定的 SAM（`invite.compose` → `sam.source`／resolve）。
 - 頁內同意入座（protocol 摘要；可改臨時顯示名）。
 - Platform ticket／Roster：Guest offer → Host answer；DataChannel；`gomoku.v1` **player** 席。
-- 官方 TURN：既有 Guest `join_cap` → `/v1/invites/…/turn/credentials`（記 **Host** 點數）；路徑對人透明。
+- 官方 TURN：既有 Guest `join_cap` → `/v1/invites/…/turn/credentials`（記 **Host** 點數）；Host 已啟用備援時邀請握手 **relay-only**；路徑對人透明。
 - 連線態／入座態／Host「開始」後落子至終局；**再來一局**（同 session）由 SAM 決定（五子棋＝Host `reset`）；Host 結束場時可讀提示。
 - **不**提供「下一個」／試試這些換片；**不**露「已下載／清除」本機選單（臨時局與本機離線庫無關）。
 - **臨時生命週期（硬）：** 短鏈隨 Invite TTL／撤銷失效；入座依賴 Platform＋Host＋WebRTC——**先天不能離線**。不承諾以 `/i/` 加主畫面後離線重玩；不承諾該局分數／棋譜長期本機或雲端保留（顯示名等非局狀態可本機記住，見 §6.5 排除項）。
@@ -520,7 +520,7 @@ dash provision → 場殼記憶體 API key
 
 - E2E 驗收之 Guest「開短連結」改以 **go `/i/`** 為準；場殼 `#pg=` 降為次要。
 - Consent、`ready`→Host「開始」、再來一局 `reset`、結束場 fanout——協議不變。
-- 有權 Host＋官方 TURN：go Guest 在無法直連時仍須能連（[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)；E2E §3.1）——**不**因純玩版省略 TURN。
+- 有權 Host＋已啟用備援＋官方 TURN：go Guest 經 **relay-only** 連線（不試直連）（[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)；E2E §3.1）——**不**因純玩版省略 TURN。
 - 型錄「分享」契約見 [PG-CATALOG-UX-PLAN.md](./PG-CATALOG-UX-PLAN.md)；與本文件 §5.4／§5.5／§5.6 一致。
 - `pg-gomoku` 等型錄項：Invite 用 `/i/`；傳閱用 `/s/pg-gomoku`；換片僅同 `kind: game`（或該項實際 kind）。
 
@@ -553,7 +553,7 @@ dash provision → 場殼記憶體 API key
 - [ ] Guest 無 Platform 登入、無 OPFS 寫入即可載入五子棋 UI 並 consent
 - [ ] 掃碼／常見 in-app 瀏覽可完成加入（不主依賴「用 Safari 開啟」）
 - [ ] 入座後 `ready`；僅 Host「開始」後可交替落子至終局
-- [ ] 有權 Host＋官方 TURN：無法直連時 go Guest 仍可連；UI 不揭露 relay
+- [ ] 有權 Host＋已啟用備援＋官方 TURN：go Guest **relay-only** 可連（不試直連）；UI 不揭露 relay
 - [ ] 連線後 session／棋步不經 Platform 中繼
 - [ ] **臨時／線上：** 斷網或 short 失效 → 頁內錯誤；**不**宣稱 `/i/` 離線可玩或主畫面永久入口
 
@@ -657,3 +657,4 @@ dash provision → 場殼記憶體 API key
 | 2026-08-08 | **sql.js：** 動態 import；WASM 同源 `/vendor/sql.js`＋SW network-first 離線 cache（非 CDN、非進 `/s/` 預載） |
 | 2026-08-10 | §5.5.1：站級 `og:image`＝`/og.png`（避免 FB 回退 favicon）；仍不做每小品專圖 |
 | 2026-08-10 | SEO：`robots.txt`（Allow `/`／`/help`／`/s/`；Disallow `/i/`）＋`sitemap.xml`（listed `/s/`）；`/i/` `noindex` |
+| 2026-08-16 | TURN：啟用備援的邀請＝**relay-only**（go Guest 不試直連）；對齊點數計劃 §7.2 |

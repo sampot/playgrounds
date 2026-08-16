@@ -135,6 +135,10 @@ export type FieldMeProfile = {
   google: { email: string; avatar_url: string | null } | null;
   line: { display_name: string; avatar_url: string | null } | null;
   default_field_url: string;
+  /** Admin opened official TURN entitlement. */
+  turn_hosted?: boolean;
+  /** User opted in to use connection relay when entitled. */
+  turn_prefer?: boolean;
 };
 
 /** Resolve self profile by field API key (DEC-052). */

@@ -31,6 +31,8 @@ export {
   applyRosterAnswer,
   isPresenceMessage,
   isAvatarRelayMessage,
+  iceServersIncludeTurn,
+  buildRosterRtcConfiguration,
 } from "./rosterPeer";
 export type {
   RosterPeerSession,

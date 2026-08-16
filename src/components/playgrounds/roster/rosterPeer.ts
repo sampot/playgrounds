@@ -175,24 +175,45 @@ function attachChannel(
   });
 }
 
-function createPc(
-  lan: boolean,
+/** True when iceServers include at least one `turn:`／`turns:` URL. */
+export function iceServersIncludeTurn(
   iceServers?: RTCIceServer[]
-): RTCPeerConnection {
-  if (lan) {
-    return new RTCPeerConnection({ iceServers: [] });
-  }
-  const servers =
-    iceServers && iceServers.length > 0 ? iceServers : DEFAULT_STUN;
-  return new RTCPeerConnection({ iceServers: servers });
-}
-
-function shouldKeepRelay(iceServers?: RTCIceServer[]): boolean {
+): boolean {
   if (!iceServers || iceServers.length === 0) return false;
   return iceServers.some(s => {
     const urls = Array.isArray(s.urls) ? s.urls : [s.urls];
     return urls.some(u => typeof u === "string" && /^turns?:/i.test(u));
   });
+}
+
+/**
+ * RTCConfiguration for Roster peers.
+ * Official TURN present → **relay-only**（PG-PLATFORM-CREDITS §7.2：不嘗試直連）.
+ */
+export function buildRosterRtcConfiguration(
+  lan: boolean,
+  iceServers?: RTCIceServer[]
+): RTCConfiguration {
+  if (lan) {
+    return { iceServers: [] };
+  }
+  const servers =
+    iceServers && iceServers.length > 0 ? iceServers : DEFAULT_STUN;
+  if (iceServersIncludeTurn(servers)) {
+    return { iceServers: servers, iceTransportPolicy: "relay" };
+  }
+  return { iceServers: servers };
+}
+
+function createPc(
+  lan: boolean,
+  iceServers?: RTCIceServer[]
+): RTCPeerConnection {
+  return new RTCPeerConnection(buildRosterRtcConfiguration(lan, iceServers));
+}
+
+function shouldKeepRelay(iceServers?: RTCIceServer[]): boolean {
+  return iceServersIncludeTurn(iceServers);
 }
 
 function iceWaitOpts(iceServers?: RTCIceServer[]): {
@@ -259,7 +280,8 @@ export async function createRosterOffer(opts: {
   handlers?: RosterPeerHandlers;
   /** Sent when DataChannel opens (mutual presence). */
   localPresence?: { agentId: string; name: string };
-  /** Optional ICE servers (STUN＋official TURN). Omitted → default STUN. */
+  /** Optional ICE servers (STUN＋official TURN). Omitted → default STUN.
+   *  When TURN urls are present, PeerConnection is **relay-only**. */
   iceServers?: RTCIceServer[];
 }): Promise<{ session: RosterPeerSession; wire: string }> {
   const lan = Boolean(opts.lan);

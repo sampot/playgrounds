@@ -319,6 +319,24 @@ export type TurnIceServersResult = {
   balance?: number;
 };
 
+export type FieldMeProfile = {
+  user_id: string;
+  role: "admin" | "user";
+  turn_hosted?: boolean;
+  turn_prefer?: boolean;
+};
+
+/** Resolve self profile by field API key (credits／TURN prefs). */
+export async function fetchFieldMe(
+  apiKey: string,
+  origin = platformApiOrigin()
+): Promise<FieldMeProfile> {
+  const res = await fetch(`${origin}/v1/field/me`, {
+    headers: { Authorization: `Bearer ${apiKey}` },
+  });
+  return parseJson<FieldMeProfile>(res);
+}
+
 /**
  * Host: official TURN credentials (API key). Returns null if unavailable
  * (not entitled, no credits, TURN not configured) — caller falls back to STUN.

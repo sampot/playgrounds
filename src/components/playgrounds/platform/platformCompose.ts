@@ -50,6 +50,38 @@ export function composeWantsRelay(intent: unknown): boolean {
   );
 }
 
+/**
+ * When Host has `turn_prefer` on, stamp `transport.roster.relay: true` so
+ * Guest／Host answer loop both take official TURN＋relay-only ICE.
+ * No-op when `prefer` is false.
+ */
+export function stampComposeRelayPrefer(
+  intent: unknown,
+  prefer: boolean
+): unknown {
+  if (!prefer) return intent;
+  if (intent == null || typeof intent !== "object") {
+    return {
+      version: 1,
+      transport: { roster: { signal: true, relay: true } },
+    } satisfies InviteComposeIntentV1;
+  }
+  const base = intent as InviteComposeIntentV1;
+  const roster = base.transport?.roster ?? {};
+  return {
+    ...base,
+    version: base.version ?? 1,
+    transport: {
+      ...base.transport,
+      roster: {
+        signal: roster.signal !== false,
+        ...roster,
+        relay: true,
+      },
+    },
+  } satisfies InviteComposeIntentV1;
+}
+
 export function composeNeedsMaximize(intent: unknown): boolean {
   if (!isInviteComposeIntent(intent)) return false;
   return intent.sam?.presentation === "maximize_preview";

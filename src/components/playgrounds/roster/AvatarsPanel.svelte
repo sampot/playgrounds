@@ -65,6 +65,7 @@
   import { registerSessionBridge } from "../sessionBridge";
   import {
     createJoin,
+    fetchFieldMe,
     fetchGuestTurnIceServers,
     platformFieldLoginUrl,
     postOfferAndWaitAnswer,
@@ -79,6 +80,7 @@
   } from "../platform/platformFieldCredential";
   import {
     composeWantsRelay,
+    stampComposeRelayPrefer,
     wantsRosterSignal,
   } from "../platform/platformCompose";
   import { getPlatformComposeShell } from "../platform/platformComposeShell";
@@ -643,19 +645,27 @@
   }) {
     const kind = opts.kind || "invite.compose";
     const handshake = kind === "signal.handshake";
+    const apiKey = await readPlatformApiKey();
+    let turnPrefer = false;
+    try {
+      const me = await fetchFieldMe(apiKey);
+      turnPrefer = Boolean(me.turn_hosted) && Boolean(me.turn_prefer);
+    } catch {
+      turnPrefer = false;
+    }
+    const intent = stampComposeRelayPrefer(opts.intent, turnPrefer);
     const created = await hostCreatePlatformInvite({
       kind,
-      intent: opts.intent,
+      intent,
       ttlMs: opts.ttlMs,
       targetField: window.location.origin,
     });
-    const apiKey = await readPlatformApiKey();
     platformHostLoop?.stop();
     platformHostLoop = startPlatformHostAnswerLoop({
       inviteId: created.invite_id,
       apiKey,
       lan,
-      useRelay: composeWantsRelay(opts.intent),
+      useRelay: composeWantsRelay(intent),
       localPresence: localPresence(),
       // Connection invite: one guest only (API replaces host reply paste).
       maxAnswers: handshake ? 1 : undefined,
@@ -1032,12 +1042,13 @@
     // Without stable host peer id we always signal for new joiners.
     const join = await createJoin(secret);
     const slot: { s: RosterPeerSession | null } = { s: null };
-    const iceServers = lan
-      ? undefined
-      : ((await fetchGuestTurnIceServers({
-          inviteId: meta.inviteId,
-          joinCap: join.join_cap,
-        })) ?? undefined);
+    const iceServers =
+      lan || !composeWantsRelay(meta.intent)
+        ? undefined
+        : ((await fetchGuestTurnIceServers({
+            inviteId: meta.inviteId,
+            joinCap: join.join_cap,
+          })) ?? undefined);
     const result = await createRosterOffer({
       lan,
       transport: "signal",

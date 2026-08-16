@@ -28,6 +28,7 @@ import {
   type HostStatus,
 } from "./hostRuntime";
 import { createGoHostBinding, type GoHostBinding } from "./goHostBinding";
+import { goAuth } from "./goAuth.svelte";
 import { handleGoFunctionsApi } from "./goFunctionsRuntime";
 import { hostableProtocolFor, type GoCatalogEntry, type HostableProtocol } from "./goCatalog";
 import type { FileMap } from "@pg/projectTypes";
@@ -328,6 +329,7 @@ export function createHostInviteBind(opts: {
     await r.adoptSamInvite({
       inviteId: ev.inviteId,
       shortUrl: ev.shortUrl,
+      useRelay: goAuth.wantsTurnRelay(),
     });
     return buildShare({ inviteId: ev.inviteId, shortUrl: ev.shortUrl });
   }

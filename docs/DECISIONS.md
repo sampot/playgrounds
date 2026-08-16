@@ -880,7 +880,7 @@
   5. **Signaling（硬約束）：** 伺服器（或 OOB 貼上）**只**用來完成**一次** WebRTC **offer／answer**（每握手槽恰好 **1× offer**＋**1× answer**）。採 **非 trickle**（ICE 收進後再發布；**無** candidate 訊息）。該槽用完／失敗／TTL → **銷槽**；拒再寫。需重連該 peer → **新握手**。**已有可用 PeerConnection 的對端 → 重用，不再經 signaling**（Platform Invite 同此；見 [DEC-047](#dec-047-playgrounds-platform-api)）。**禁止**經 signaling：DataChannel 流量、presence 心跳、session／mailbox／FS、投影流量、renegotiation、同一槽第二輪 offer／answer。多人加入時可有多個握手槽（可串行）；**不得**把「一次一握手」解釋成「全場只能一 peer」。
   6. **壓縮載荷（硬約束）：** 交換的不是完整原始 SDP 字串。雙方依**固定樣板**重建 SDP。產品主路徑＝Platform Invite（短連結）；樣板 wire 仍可供 QR／文字／go 等編碼共用。載荷須小到**單張 QR 仍易掃**（過大則失敗提示）。薄 rendezvous（[DEC-047](#dec-047-playgrounds-platform-api)）用同一格式。
   7. **同區網選項：** 可宣告 peers 同一區網以進一步剪裁 offer／answer；誤選則提示改模式重發，勿經同房補 candidates。
-  8. **資料面：** 連上後只走 WebRTC。**不支援使用者自備 TURN**。**預設不做**營運 TURN；跨網備援僅經 Platform **官方 TURN**（見 [PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)）。有權時殼**自動**附 TURN credentials；**Host／Guest 人機不分辨**直連 vs relay。
+  8. **資料面：** 連上後只走 WebRTC。**不支援使用者自備 TURN**。**預設不做**營運 TURN；跨網備援僅經 Platform **官方 TURN**（見 [PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)）。Host 已開通＋已啟用備援（`turn_prefer`）且有點時：該次 session 邀請雙方建 peer **自動**附 TURN credentials，並採 **relay-only ICE**（**不**嘗試 host／srflx 直連）；**Host／Guest 人機不分辨**直連 vs relay。
   9. **Session（不特規投影）：** 遠端入座沿用 **DEC-023**——**不**另建協定系統。邀請附**完整 protocol 規格**；型錄 lazy install。人機邀請／同意走 SAM＋Shell；DataChannel 僅傳輸橋。
   10. **Rate limit：** signaling 必須可限流（IP／碼／TTL）。
   11. **敘事：** DEC-004——場與人串連，非多租戶協作 SaaS。
@@ -918,6 +918,7 @@
 - **Revision（2026-08-07）：** **否決自備 TURN**（非產品路徑）；預設仍無營運 TURN；跨網備援僅未來官方 TURN＋點數（[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)）。
 - **Revision（2026-08-07）：** 官方 TURN 對人透明（自動納入 ICE；Host／Guest 不分辨直連／relay）；有權 Host 之場邀請 E2E（五子棋）在無法直連時仍須能連。
 - **Revision（2026-08-16）：** **取消**側欄 Avatars／「線上」tab 與 [PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md) 產品計劃；session 邀請／加入＝**SAM＋Shell**（Platform Invite）；Roster 程式庫改為隱藏 transport。OOB `#roster=` 不再為主路徑。
+- **Revision（2026-08-16）：** 官方 TURN：**啟用備援的 session 邀請＝relay-only**（被邀請端與 Host 不嘗試 WebRTC 直連）；詳 [PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md) §7.2。
 
 
 ### DEC-046: Playgrounds 型錄結構化資料與查詢面
@@ -1021,7 +1022,7 @@
   7. **Header「更多」＝本機溢流：** 「更多」**不是**「只有推薦」。本機段＝「已下載的遊戲」＋**分層**清除（進度／分數 vs 離線包 vs 可選全部）；試試這些可作第二段。頁內面板＋確認（禁止原生 dialog）。首頁 `/` 與 `/s/` 可開；**Invite `/i/` 不露**本機選單。見計劃 §6.6。
   8. **範圍：** Invite 首刀＝`invite.compose`／五子棋 E2E（[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)）；`/s/`＝型錄傳閱＋game 換片（Phase 5）＋可安裝／離線／本機分數（Phase 6）＋「更多」本機溢流（Phase 6b）。Host 與「一鍵開」仍走場殼＋OPFS。
   9. **保留名：** `go` ∈ 場網保留表（與 `api`／`docs`／`dash` 同級）。
-  10. **TURN／點數：** Invite Guest 仍經 `join_cap` 取官方 TURN（記 Host）；對人透明。`/s/` 不經 Platform／TURN。
+  10. **TURN／點數：** Invite Guest 仍經 `join_cap` 取官方 TURN（記 Host）；Host 已啟用備援時邀請握手 **relay-only**（不試直連）；對人透明。`/s/` 不經 Platform／TURN。
   - 細節／階段見 [PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)。
 - **Consequences:**
   - 勿把 go 做成無主匿名對戰頁；須可辨識山姆鍋／遊樂場並鏈到 `play.samkuo.me`。

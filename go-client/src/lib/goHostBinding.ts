@@ -288,7 +288,8 @@ export function createGoHostBinding(deps: GoHostBindingDeps): GoHostBinding {
           await rt.adoptSamInvite({
             inviteId: created.invite_id,
             shortUrl: created.short_url,
-            useRelay: composeWantsRelay(options?.intent),
+            useRelay:
+              composeWantsRelay(options?.intent) || goAuth.wantsTurnRelay(),
           });
         }
         // Mirror the field bridge's behaviour: surface the minted invite to the

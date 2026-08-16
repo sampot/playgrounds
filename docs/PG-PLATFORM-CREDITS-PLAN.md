@@ -1,10 +1,10 @@
 # Playgrounds Platform 點數制與有成本備援（官方 TURN）
 
-> **狀態：** Draft（2026-08-07）— 契約／階段草案；DEC-045／047 已否決自備 TURN；官方 TURN／點數實作未開始  
+> **狀態：** Draft（2026-08-07；**2026-08-16** 修訂：啟用備援＝relay-only）— 契約／階段草案；DEC-045／047 已否決自備 TURN；官方 TURN／點數實作進行中  
 > **權威決策：** [DECISIONS.md](./DECISIONS.md) **DEC-045**（否決自備 TURN；官方 TURN 另段）、**DEC-047**（非目標含自備 TURN）；點數帳本可另立 DEC（建議 **DEC-049** Draft）  
 > **相關：** [PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)、[PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md)、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)、[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)、[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)（Guest 純玩／短鏈＠go）、DEC-004（非協作 SaaS）、DEC-029（SecretStore＝LLM 等 BYOK；**不含** TURN）、[GLOSSARY.md](./GLOSSARY.md)
 
-一句話：**Platform 註冊帳號採點數制（非訂閱）；跨網備援僅官方 TURN（按消耗扣點）；不支援自備 TURN；路徑對 Host／Guest 透明；有權 Host 的五子棋 E2E 在無法直連時仍須能連；扣點掛 Host。**
+一句話：**Platform 註冊帳號採點數制（非訂閱）；跨網備援僅官方 TURN（按消耗扣點）；不支援自備 TURN；Host 啟用備援時該次 session 邀請以 relay 為傳輸路徑（不嘗試 WebRTC 直連）；路徑對人透明；扣點掛 Host。**
 
 ---
 
@@ -27,8 +27,9 @@
 - 扣點與配額掛在 **Host**（鑄 Invite／開該次連線的註冊使用者）。
 - Dash／場殼用語避開「方案、訂閱、Pro、Billing」產品腔；對讀者用「點數」；營運可說「連線備援」。
 | **後台（必做契約）：** 使用者可看**剩餘點數**與**每個 session 扣點**；可自設是否**使用連線備援**（`turn_prefer`；需 admin 已開通 `turn.hosted`）；admin 可為使用者**加點（儲值）**，並可**開通／關閉**該使用者的官方連線備援資格（詳 §7.1）。
-- **連線路徑對人透明（硬）：** Host 與 Guest／參與者**無需、也不得被要求**分辨「直連或 relay」。Host 已開通＋已啟用偏好＋有點時，殼在建 peer 時自動納入官方 TURN；UI 只呈現連上／失敗等連線態。
-- **五子棋 E2E 對齊：** 被授權使用 relay 的 Host，對玩路徑在雙方無法直連時仍應能完成連線與對弈（見 [PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md) §3.1／驗收）。
+- **連線路徑對人透明（硬）：** Host 與 Guest／參與者**無需、也不得被要求**分辨「直連或 relay」。UI 只呈現連上／失敗等連線態（不標「經轉發」）。
+- **啟用備援＝relay 優先、不試直連（硬）：** Host 已開通 `turn.hosted`＋已啟用 `turn_prefer`＋餘額足夠時，該次 **session 邀請**（`invite.compose`／GO-INVITE 等同路徑）雙方建 peer **以官方 relay 為傳輸路徑**——殼自動附 TURN credentials，並採 **relay-only ICE**（等價 `iceTransportPolicy: "relay"`）：**不**蒐集／嘗試 host／srflx 直連候選。關閉備援＝僅 STUN／直連。
+- **五子棋 E2E 對齊：** 被授權且已啟用備援的 Host，邀請對玩須能經官方 relay 完成連線與對弈（見 [PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md) §3.1／驗收）。
 
 ## 3. 非目標
 
@@ -37,8 +38,9 @@
 - 公開自助註冊（仍邀請制；DEC-047）。
 - 經 Platform **中繼** session／DataChannel／presence／mailbox／檔案真相（TURN 只解傳輸路徑，權威仍在 peer／本機 session）。
 - Trickle ICE、renegotiation 經 Platform、把 TURN 做成「預設一定連得上」的對外無限承諾。
-- 對 Host／Guest **揭露**直連 vs relay，或要求其選擇傳輸模式（除錯除外）。
-- 在 **Invite E2E MVP（五子棋）** 的**無備援**快樂路徑上強制依賴官方 TURN（無 entitlement 時仍以直連／STUN 為準；有 entitlement 時見 §2／E2E §3.1）。
+- 對 Host／Guest **揭露**直連 vs relay，或要求其選擇傳輸模式（除錯除外；`turn_prefer` 開關只說「連線備援」，不教 ICE）。
+- 在 **Invite E2E MVP（五子棋）** 的**無備援**快樂路徑上強制依賴官方 TURN（未開通／未啟用／無點時仍以直連／STUN 為準；已啟用備援時見 §2／§7.2／E2E §3.1）。
+- 已啟用備援時仍先試直連、等失敗再 fallback 到 TURN（浪費握手時間且與「已付費備援」預期不符）——**否決**；啟用＝relay-only。
 - 初版完整金流（信用卡／發票／退款流程）——可後段；本計劃先帳本＋admin 儲值／贈點。
 - 以點數支付 LLM／其他 BYOK 模型費用（非本計劃範圍；若日後有，另規）。
 
@@ -92,16 +94,16 @@
 
 | 事件 | 扣點？ |
 | --- | --- |
-| 鑄 Invite、signal O／A、純 STUN 直連成功 | 否 |
+| 鑄 Invite、signal O／A、純 STUN 直連成功（備援關閉） | 否 |
 | 簽發官方 TURN credentials | 可選**預留**（小額 hold），結算時多退少補 |
-| ICE 實際選用 relay／持續走 TURN | **是**（按主單位累計） |
+| 備援已啟用之邀請：relay-only 連上／持續走 TURN | **是**（按主單位累計；啟用後成功連線即預期走 relay） |
 | Guest 加入本身 | 否（無帳號）；其 relay 計入 Host |
 
 ### 5.3 餘額不足
 
 1. **簽發前：** 拒絕 hosted TURN cred；回可讀錯誤（例：`credits_insufficient`／`turn_not_entitled`）。
 2. **連線中耗盡：** 停止續簽／撤銷 cred（細節依供應商）；UI 提示「轉發額度用尽」；**不**經 Platform 改送 session 資料。
-3. **降級：** 可回退僅直連／同區網嘗試——**勿**靜默改走第二輪 Platform signaling 補 candidates（仍守 DEC-045）；**勿**提示「請自備 TURN」。
+3. **降級：** 若該次邀請已標備援（`transport.roster.relay`）但簽發失敗／耗盡：頁內中性失敗即可；**可**提示 Host 關閉備援後重邀（僅直連）。**勿**在同一次握手內靜默改試直連或第二輪 Platform signaling 補 candidates（仍守 DEC-045）；**勿**提示「請自備 TURN」。
 
 ### 5.4 濫用與限流
 
@@ -153,7 +155,7 @@
 | 排序 | 新→舊 |
 | 空態 | 「尚無 session 扣點」——說明僅在使用官方連線轉發等有成本備援時才會出現 |
 | 加點列 | **不**混入使用者列表；admin 加點另見 §7.1.2（本人若被加點，餘額更新即可，可不單獨列「儲值收據」於初版） |
-| 使用連線備援 | **開關**（`turn_prefer`）：本人可開／關；**僅**在 admin 已開通 `turn.hosted` 時可啟用。關閉＝僅直連、不扣備援點 |
+| 使用連線備援 | **開關**（`turn_prefer`）：本人可開／關；**僅**在 admin 已開通 `turn.hosted` 時可啟用。**開啟**＝之後鑄的 session 邀請以官方 relay 為傳輸路徑（被邀請端與 Host **不嘗試** WebRTC 直連）；**關閉**＝僅直連／STUN、不扣備援點 |
 | 錯誤 | API 失敗 → flash／`role="status"`；**不**原生 dialog |
 | 非目標（初版） | 匯出 CSV、圖表、跨帳號對帳、自助買點 |
 
@@ -192,26 +194,28 @@
 
 | 項 | 規格 |
 | --- | --- |
-| 預設 ICE | STUN＋（若 Host 已 `turn.hosted`＋已啟用 `turn_prefer`＋餘額足夠）自動附官方 TURN credentials |
+| 備援關閉 | 僅 STUN／直連（既有快樂路徑） |
+| 備援開啟（`turn.hosted`＋`turn_prefer`＋餘額足夠） | 鑄 Invite 時 intent 帶 `transport.roster.relay: true`；Host 作答與 Guest 出 offer **皆**取官方 TURN `iceServers`；**ICE＝relay-only**（不嘗試 host／srflx 直連） |
 | 自備 TURN | **無**（DEC-045） |
-| **路徑不透明（硬）** | Host／Guest／SAM UI **不**顯示「直連／轉發／TURN／relay」；不要求使用者選擇傳輸模式；除錯／devtools 除外 |
+| **路徑不透明（硬）** | Host／Guest／SAM UI **不**顯示「直連／轉發／TURN／relay」；不要求使用者在連線當下選擇傳輸模式；除錯／devtools 除外 |
 | 連線態 | 只呈現連線中／已連線／失敗等；失敗用中性網路文案 |
 | 點數提示 | **不**在連線當下彈「正在消耗轉發點數」；餘額／扣點在 **dash** 事後可查（§7.1.1） |
-| 失敗（無權／無點／供應商） | 若因而無法連上：頁內可讀錯誤（可導向 dash）；**不**教自備 TURN；**不** `alert` |
+| 失敗（無權／無點／供應商） | 若因而無法連上：頁內可讀錯誤（可導向 dash）；**不**教自備 TURN；**不** `alert`；**不**同握手內暗降級直連 |
 
-### 7.3 Guest
+### 7.3 Guest（被邀請者）
 
 - 不顯示 Host 餘額、entitlement、是否走 relay。
 - 連線失敗用中性文案（無法連線／請稍後再試）；**不**要求 Guest 註冊或購點。
-- Guest **無需**知道 Host 是否開通備援。
+- Guest **無需**知道 Host 是否開通備援；實作上依 Invite intent／`join_cap` 取 TURN 並採與 Host **相同**的 relay-only 政策（見 §7.2）。
+- **硬：** 當該 Invite 啟用備援時，被邀請端**不**嘗試 WebRTC 直連。
 
 ### 7.4 與五子棋 E2E 的對齊
 
-當 Host 已開通 `turn.hosted` 且餘額足夠（admin 已加點）：
+當 Host 已開通 `turn.hosted`、已啟用 `turn_prefer`、且餘額足夠（admin 已加點）：
 
-1. Guest 經 Invite 入座的 WebRTC 握手在**無法直連**時仍應能建立 PeerConnection（經官方 TURN）。
+1. Guest 經 Invite 入座的 WebRTC 握手**以官方 relay 建立** PeerConnection（relay-only；不依賴「先直連失敗再 fallback」）。
 2. 雙方走完「同意 → 連線 → ready → 開始 → 對弈」時，**任何人機面都不揭露**直連 vs relay。
-3. Session／棋步仍**不**經 Platform 中繼（僅 ICE／媒體或 DataChannel **傳輸**可走 TURN）。
+3. Session／棋步仍**不**經 Platform 中繼（僅 ICE／DataChannel **傳輸**走 TURN）。
 
 詳驗收：[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md) §3.1／§9。
 
@@ -226,7 +230,7 @@
 | **DEC-004** | 敘事仍是個人場串連；點數是備援成本回收，不是多租戶協作套餐。 |
 | **DEC-029** | SecretStore 繼續服務 LLM 等 BYOK；**不**承載 TURN。官方 TURN cred **短命、∉ SecretStore**。 |
 | **Roster Phase 5** | 自備 TURN **刪除**；mailbox／自訂頭像等可另留；官方 TURN 依本計劃。 |
-| **Invite E2E MVP** | 無備援時以直連為準；**有** `turn.hosted`＋點數的 Host → 無法直連仍須能完成五子棋對玩連線；路徑對人透明（§7.4）。 |
+| **Invite E2E MVP** | 無備援時以直連為準；**有** `turn.hosted`＋`turn_prefer`＋點數的 Host → 邀請握手 relay-only，須能完成五子棋對玩連線；路徑對人透明（§7.4）。 |
 
 ---
 
@@ -236,7 +240,7 @@
 | --- | --- | --- | --- |
 | **0. 契約** | 本計劃；GLOSSARY；DEC-045／047 否決自備 TURN | 點數≠訂閱、Host 扣點、**無自備 TURN**、官方 TURN opt-in 寫死 | **進行中**（本文件＋DEC 修訂） |
 | **1. 帳本** | Platform：餘額＋ledger（含 `session_id`）＋`turn.hosted` entitlement；`GET /me/credits`＋`/me/credits/sessions`；admin 加點＋開通／關閉備援；dash：餘額＋session 扣點＋營運加點／備援開關 | 使用者可見餘額與每 session 扣點；admin 可加點、可決定誰可用官方 TURN；無 TURN 供應商也可上線帳本 | **進行中**（API＋dash UI 已落地；用量結算仍粗） |
-| **2. 官方 TURN 簽發** | entitlement `turn.hosted`；`/field/turn/credentials`＋Guest `…/turn/credentials`；短 TTL；餘額預檢；殼**自動**接入 `iceServers`（有權＋有點時）；signal 路徑 `keepRelay` | 有點＋有權才拿到 cred；五子棋跨網無法直連仍可連；人機不揭露路徑 | **進行中**（需設 `TURN_KEY_ID`／`TURN_API_TOKEN`） |
+| **2. 官方 TURN 簽發** | entitlement `turn.hosted`；`/field/turn/credentials`＋Guest `…/turn/credentials`；短 TTL；餘額預檢；備援開啟時殼接入 `iceServers`＋**relay-only ICE**（`iceTransportPolicy: "relay"`）；signal 路徑 `keepRelay`；Host `turn_prefer` → stamp intent `relay` | 有點＋有權＋`turn_prefer` 才走備援邀請；五子棋經 relay 可連；不試直連；人機不揭露路徑 | **進行中**（殼 relay-only＋intent stamp 已落地；需設 `TURN_KEY_ID`／`TURN_API_TOKEN`） |
 | **3. 用量結算** | 分鐘或 MB 累計入帳；耗盡行為；同時連線硬頂 | 帳本與供應商成本可對上數量級；無靜默無限 relay | 未開始 |
 | **4. UX 拋光** | 連線態僅連上／失敗；dash 餘額／扣點；失敗中性文案 | 窄螢幕可完成；**不**教 TURN／relay 術語 | 未開始 |
 | **5.（可選）自助儲值** | 金流買點；收據／歷史 | 另規金流與合規；**仍非訂閱** | 未開始 |
@@ -275,3 +279,5 @@
 | 2026-08-07 | 後台 admin：**開通／關閉連線備援**（§7.1.3／DASH §6.5.3）；與加點正交 |
 | 2026-08-07 | **路徑對人透明：** Host／Guest 不分辨直連 vs relay；有權 Host 的五子棋 E2E 在無法直連時仍須能連（§7.4） |
 | 2026-08-07 | 實作開工：credits／entitlement API、CF TURN 簽發、dash 加點／開通、殼 auto iceServers、signal `keepRelay` |
+| 2026-08-16 | **啟用備援＝relay-only：** session 邀請時 Host 已開 `turn_prefer` → 雙方不嘗試 WebRTC 直連；被邀請者以 relay 為傳輸路徑（§2／§7.2／§7.3） |
+| 2026-08-16 | **實作：** `buildRosterRtcConfiguration`（`iceTransportPolicy: "relay"`）；`stampComposeRelayPrefer`；go／play mint 依 `turn_prefer` stamp intent |

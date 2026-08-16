@@ -39,15 +39,16 @@
 
 ### 3.1 官方 relay 與跨網連線（對齊點數計劃）
 
-**產品期望（官方 TURN 落地後）：** admin 已為 Host **開通連線備援**（`turn.hosted`）且已**加點**時，五子棋邀請對玩在**雙方無法直連**的網路下仍應能完成 WebRTC 連線並進入對弈。
+**產品期望（官方 TURN 落地後）：** admin 已為 Host **開通連線備援**（`turn.hosted`）、Host 已**啟用** `turn_prefer`、且已**加點**時，五子棋邀請對玩經 **官方 relay** 完成 WebRTC 連線並進入對弈（**不**先試直連再 fallback）。
 
 | 規則 | 說明 |
 | --- | --- |
-| 自動 | 殼在有權＋有點時自動納入官方 TURN；**無**「請選擇轉發」步驟 |
-| 對人透明 | Host 與 Guest **無需知道**當次是直連還是 relay；UI 只呈現連上／失敗 |
-| 資料面 | session／棋步仍不經 Platform 中繼（僅傳輸路徑可走 TURN） |
-| 本刀 Phase 1–4 | 仍以直連／STUN 可連為手測主路徑；跨網無備援失敗＝已知限制 |
-| 完整跨網驗收 | 依賴 [PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md) Phase 2+；見 §9「relay」項 |
+| 自動 | 殼在有權＋已啟用偏好＋有點時自動納入官方 TURN，並採 **relay-only ICE**；**無**「請選擇轉發」步驟 |
+| 不試直連 | 該次 Invite 雙方（Host 作答／Guest 出 offer）**不**嘗試 host／srflx 直連 |
+| 對人透明 | Host 與 Guest **無需知道**當次傳輸路徑；UI 只呈現連上／失敗 |
+| 資料面 | session／棋步仍不經 Platform 中繼（僅傳輸路徑走 TURN） |
+| 本刀 Phase 1–4 | 仍以直連／STUN 可連為手測主路徑（備援關閉）；跨網無備援失敗＝已知限制 |
+| 完整跨網驗收 | 依賴 [PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md) Phase 2+（含 relay-only）；見 §9「relay」項 |
 
 ---
 
@@ -234,7 +235,7 @@ dash SSO（已註冊）
 - [ ] Invite 預設約 5m；過期後新 Guest 無法加入（已連線對局可粗暴處理）
 - [ ] 窄螢幕可完成：複製／分享短鏈、同意入座、落子（主操作不靠 hover-only）
 - [ ] 無原生 `alert`／`confirm`／`prompt`
-- [ ] （官方 TURN 落地後）Host 已開通連線備援＋有點：在**無法直連**環境下仍完成連線→入座→開始→對弈；Host／Guest UI **不**顯示直連／轉發／TURN
+- [ ] （官方 TURN 落地後）Host 已開通連線備援＋已啟用 `turn_prefer`＋有點：邀請握手 **relay-only**（不試直連）完成連線→入座→開始→對弈；Host／Guest UI **不**顯示直連／轉發／TURN
 - [ ] （同上）連線成功過程**無**「選擇備援／轉發」步驟；Guest 仍無 Platform 帳號
 
 ---
@@ -263,3 +264,4 @@ dash SSO（已註冊）
 | 2026-08-07 | 再來一局：同 session `act:reset`（`ended`→`active`，不必再按開始）；一局≠一 Session；禁強制重邀 |
 | 2026-08-07 | §3.1／§9：有權 Host＋官方 TURN 時無法直連仍須能對玩；Host／Guest 不分辨傳輸路徑（對齊點數計劃） |
 | 2026-08-16 | DEC-053：UI→`/api/online/*`→`env.HOST`；play／go 雙殼皆可鑄邀請；短網址 canonical＝`go…/i/…`；Phase 1–3 標完成 |
+| 2026-08-16 | §3.1：啟用備援的邀請＝**relay-only**（不試直連）；對齊 [PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md) |

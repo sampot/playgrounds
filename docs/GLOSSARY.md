@@ -105,7 +105,7 @@
 | Platform field API key | 場用 API key／通行證（`pg_sk_…`） | 每帳號至多 1 把；**僅遊樂場殼頁記憶體**；經後台「登入我的遊樂場」→ 短命 **provision** redeem 取得。每次入場輪替（單席）。用於殼代理鑄 Invite／signal。**∉ SecretStore**、**不**掛 `env.secrets.*`、**不**進 URL／`.sam`。**不是**後台登入憑證。對讀者可稱「通行證」。見 DEC-047、DASH-SPEC §5／§6.2。 |
 | Platform provision | provision／`#pg_provision=` | 短命、單次 token：後台→場殼交接場用 API key。Deep link **只**帶 provision，**永不**帶 `pg_sk_`。Redeem 後作廢。**≠** `#pg=` 場 Invite。見 DEC-047、DASH-SPEC §7.0。 |
 | Platform 點數 | 點數／credits | 註冊帳號餘額；有營運成本的備援（首項＝官方 TURN）按實際消耗扣點。**非**訂閱制。扣點掛 **Host**；Guest 無帳號不持點。見 [PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)。 |
-| 官方 TURN（Platform） | hosted TURN／連線轉發 | Platform 簽發短命 TURN credentials；admin 開通＋點數。建 peer 時殼**自動**納入；**Host／Guest 人機不分辨**直連 vs relay。資料面權威仍在 peer；**不**經 signaling 中繼 session。見 DEC-045／[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)／[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md) §3.1。 |
+| 官方 TURN（Platform） | hosted TURN／連線轉發 | Platform 簽發短命 TURN credentials；admin 開通＋點數＋使用者 `turn_prefer`。啟用備援的 **session 邀請**：殼附 TURN＋**relay-only ICE**（不嘗試直連）；**Host／Guest 人機不分辨**路徑。資料面權威仍在 peer；**不**經 signaling 中繼 session。見 DEC-045／[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)／[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md) §3.1。 |
 | 自備 TURN（否決） | — | 使用者自填 TURN URI／credential。**非產品路徑**（UX 過差）；DEC-045／047 否決。跨網備援僅官方 TURN。 |
 | PLAYGROUNDS_API_KEY（廢止主路徑） | （舊）SecretStore 保留名 | **曾**為場內持 Platform API key 的 SecretStore binding。契約改為記憶體＋provision 後**不得**再作為主路徑；實作債務須汰除。BYOK 仍走 SecretStore（DEC-029），名稱自選、非此保留名語意。 |
 | Host 本地面／殼面（遊樂場後端） | HOST local｜shell | 本地面＝Runtime 內儲存／純資料；殼面＝終端 UI 指令（執行期不得再打 Runtime 權威儲存完成該指令）。見 DEC-038、SPEC §6。 |

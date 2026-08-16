@@ -23,6 +23,7 @@ import {
   type FieldMeProfile,
   type MintInviteResult,
 } from "./platformClient";
+import { stampComposeRelayPrefer } from "@pg/platform/platformCompose";
 import { chromeSession } from "./chromeSession.svelte";
 import { BOSS_FLASH } from "./goBossWelcome";
 
@@ -129,6 +130,11 @@ class GoAuth {
 
   /** Redeemed this-session field API key — memory only, never persisted. */
   #apiKey: string | null = null;
+  /**
+   * Host opted into official TURN (`turn_hosted`＋`turn_prefer` from field/me).
+   * Memory only — refreshed with profile; not written to localStorage.
+   */
+  #turnPrefer = false;
 
   constructor() {
     this.profile = readStoredProfile();
@@ -145,7 +151,20 @@ class GoAuth {
   #clearApiKey(): void {
     this.#apiKey = null;
     this.loggedIn = false;
+    this.#turnPrefer = false;
     writeSessionApiKey(null);
+  }
+
+  #applyFieldMe(me: FieldMeProfile): GoProfile {
+    this.#turnPrefer = Boolean(me.turn_hosted) && Boolean(me.turn_prefer);
+    this.profile = profileFromFieldMe(me);
+    writeStoredProfile(this.profile);
+    return this.profile;
+  }
+
+  /** Host may use official TURN on session invites (dash「使用連線備援」). */
+  wantsTurnRelay(): boolean {
+    return this.#turnPrefer;
   }
 
   clear(): void {
@@ -209,8 +228,7 @@ class GoAuth {
 
         // Re-validate against `/v1/field/me`; on failure drop to stored profile.
         const me = await fetchFieldMe(api_key);
-        this.profile = profileFromFieldMe(me);
-        writeStoredProfile(this.profile);
+        this.#applyFieldMe(me);
 
         chromeSession.setFlash(BOSS_FLASH.loggedIn);
       } catch (err) {
@@ -228,8 +246,7 @@ class GoAuth {
       this.busy = true;
       try {
         const me = await fetchFieldMe(this.#apiKey);
-        this.profile = profileFromFieldMe(me);
-        writeStoredProfile(this.profile);
+        this.#applyFieldMe(me);
       } catch {
         this.#clearApiKey();
       } finally {
@@ -242,6 +259,7 @@ class GoAuth {
    * Mint a Platform invite as the logged-in player (GO-INVITE). Uses the page
    * memory field API key; throws an error with `code === "not_provisioned"` when
    * missing / invalid so the UI can route to login. `targetField` = go origin.
+   * When Host has turn_prefer, stamps `transport.roster.relay` for Guest.
    */
   async mintPlatformInvite(opts: {
     kind?: string;
@@ -259,7 +277,7 @@ class GoAuth {
     return mintPlatformInvite({
       apiKey: key,
       kind: opts.kind,
-      intent: opts.intent,
+      intent: stampComposeRelayPrefer(opts.intent, this.#turnPrefer),
       targetField: goOrigin(),
       ttlMs: opts.ttlMs,
     });
@@ -292,9 +310,7 @@ class GoAuth {
     if (!key) return null;
     try {
       const me = await fetchFieldMe(key);
-      this.profile = profileFromFieldMe(me);
-      writeStoredProfile(this.profile);
-      return this.profile;
+      return this.#applyFieldMe(me);
     } catch {
       this.#clearApiKey();
       return null;
@@ -305,6 +321,12 @@ class GoAuth {
   __setApiKeyForTests(key: string | null): void {
     this.#apiKey = key;
     this.loggedIn = Boolean(key);
+    if (!key) this.#turnPrefer = false;
+  }
+
+  /** Test seam: set Host turn_prefer without field/me. */
+  __setTurnPreferForTests(prefer: boolean): void {
+    this.#turnPrefer = prefer;
   }
 }
 
