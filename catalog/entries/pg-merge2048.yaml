@@ -1,0 +1,7 @@
+title: 數字合併
+kind: game
+series: 懷舊
+blurb: 滑格同數合併挑戰 2048；本機最高分。
+source: sampot/pg-merge2048
+license: MIT
+status: listed

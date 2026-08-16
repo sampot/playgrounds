@@ -1,0 +1,7 @@
+title: 骨牌接龍
+kind: game
+series: 桌遊
+blurb: 雙六骨牌接點出牌、人機對戰；可換主題皮。
+source: sampot/pg-domino
+license: MIT
+status: listed

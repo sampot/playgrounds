@@ -1,0 +1,7 @@
+title: 你畫我猜
+kind: game
+series: 桌遊
+blurb: 一輪一畫家、其餘猜詞；先單機提示後多人，預留 Invite。
+source: sampot/pg-sketchtell
+license: MIT
+status: listed

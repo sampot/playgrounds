@@ -1,0 +1,7 @@
+title: 湊十消數
+kind: game
+series: 懷舊
+blurb: 框選相鄰數字加總＝10 消除；電腦課益智感。
+source: sampot/pg-tensum
+license: MIT
+status: listed
