@@ -13,7 +13,7 @@
 
 ---
 
-## 已實作（115）
+## 已實作（125）
 
 ### 街機（32＋7 unlisted）
 
@@ -155,26 +155,28 @@
 | `pg-chengyu` | 成語接龍 | 末字起頭接龍、挑戰計分與人機；對戰超時出局，預留 `chengyu.v1` |
 | `pg-holdem` | 德州撲克 | 六人桌 NLHE 對 AI；Sit & Go 盲注遞增、虛擬籌碼；純娛樂非博弈 |
 
+### 策略（10 unlisted）
+
+規格見 [`PG-SLG-GAMES-PLAN.md`](./PG-SLG-GAMES-PLAN.md)。
+
+| id | 標題 | 一句話 |
+| --- | --- | --- |
+| `pg-nightstall` | 夜市攤位爭霸 | **unlisted**；十二夜看天氣進貨、定價、宣傳，與兩名 AI 搶客比淨資產 |
+| `pg-junzheng` | 三國一郡 | **unlisted**；三政令經營糧兵城防，攻城或守滿十二回合 |
+| `pg-alleyclaim` | 巷弄地盤 | **unlisted**；同時下令佔街廓、搶地標、連線得分 |
+| `pg-pondfarm` | 塭仔養魚 | **unlisted**；一造管理密度、水質與颱風風險，抓時機收成 |
+| `pg-pilgrim` | 廟會遶境路線 | **unlisted**；時限內規劃必訪宮壇與回廟路線，兼顧香火與擾民 |
+| `pg-lixuan` | 里長選舉 | **unlisted**；四週配置拜訪、政見與志工，依議題爭取各鄰支持 |
+| `pg-railslot` | 高鐵時刻表戰 | **unlisted**；排發車、停靠與待避，化解延誤並守住準點率 |
+| `pg-pierbox` | 港口貨櫃 | **unlisted**；管堆場、橋機與船期，以最少翻櫃完成合約 |
+| `pg-islesupply` | 島鏈補給 | **unlisted**；排船期與庫存，迎風避颱維持七島十回合供應 |
+| `pg-clubbudg` | 校園社團爭預算 | **unlisted**；八週分配幹部工時、爭場地、辦活動拚期末評鑑 |
+
 ---
 
 ## 打算實作（backlog）
 
-短局 SLG 遊戲群規格見 [`PG-SLG-GAMES-PLAN.md`](./PG-SLG-GAMES-PLAN.md)。批次內仍逐款完成；第一款通過上架驗收後才開始下一款。
-
-| 批次 | id | 標題 | 一句話 | 資源就緒度 |
-| --- | --- | --- | --- | --- |
-| A1 | `pg-nightstall` | 夜市攤位爭霸 | 十二夜進貨、定價、宣傳，與 AI 搶客比淨資產 | 中 |
-| A2 | `pg-junzheng` | 三國一郡 | 三政令經營糧兵城防，攻城或守滿十二回合 | 高 |
-| A3 | `pg-alleyclaim` | 巷弄地盤 | 同時下令佔街廓、搶地標、連線得分 | 高 |
-| B1 | `pg-pondfarm` | 塭仔養魚 | 一造管理密度、水質與颱風風險，抓時機收成 | 中 |
-| B2 | `pg-pilgrim` | 廟會遶境路線 | 時限內規劃必訪宮壇與回廟路線，兼顧香火與擾民 | 中低 |
-| B3 | `pg-lixuan` | 里長選舉 | 四週配置拜訪、政見與志工，依議題爭取各鄰支持 | 中 |
-| C1 | `pg-railslot` | 高鐵時刻表戰 | 排發車、停靠與待避，化解延誤並守住準點率 | 中低 |
-| C2 | `pg-pierbox` | 港口貨櫃 | 管堆場、橋機與船期，以最少翻櫃完成合約 | 中低 |
-| C3 | `pg-islesupply` | 島鏈補給 | 排船期與庫存，迎風避颱維持七島十回合供應 | 中 |
-| D1 | `pg-clubbudg` | 校園社團爭預算 | 八週分配幹部工時、爭場地、辦活動拚期末評鑑 | 中 |
-
-首款進型錄時新增遊戲系列 **`策略`**。**GitHub remote／`gh repo create` 尚未建立**——上架 go／`?open=` 前需逐款建立並推送對應 `sampot/pg-*` public repo。
+（空）短局 SLG 十款本機 Phase 0–3 已完成；見「已實作／策略」。GitHub public remotes 已建立（`sampot/pg-nightstall` 等十款）；上架 go／`?open=` 仍待場／go deploy。
 
 ## 維護備註
 

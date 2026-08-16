@@ -1,0 +1,7 @@
+title: 巷弄地盤
+kind: game
+series: 策略
+blurb: 同時下令佔街廓、搶地標、連線得分。
+source: sampot/pg-alleyclaim
+license: MIT
+status: unlisted

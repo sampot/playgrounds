@@ -1,6 +1,6 @@
 # Playgrounds 短局 SLG 遊戲群計劃
 
-> **狀態：** Proposed（2026-08-16）
+> **狀態：** Accepted；十款本機 Phase 0–3（2026-08-16）
 > **權威約束：** 從屬 [PG-GAMES.md](./PG-GAMES.md)；純 HTML＋CSS＋JavaScript、無 build、mobile-first、可執行邏輯採 TDD
 > **相關：** [playgrounds-host-api.md](./playgrounds-host-api.md)（`/api/kv`）、[`game-assets/ATTRIBUTION.md`](../game-assets/ATTRIBUTION.md)、既有 `pg-sandrts`／`pg-tinyfarm`／`pg-inkskirmish`／`pg-twland`
 > **程式庫：** 每款各自建立 `sampot/pg-*` public repo；本地 `~/dev/sampot/pg-*`
@@ -13,16 +13,16 @@
 
 | 批次 | id | 標題 | SLG 切片 | 目標局長 | MVP 勝利條件 |
 | --- | --- | --- | --- | --- | --- |
-| A1 | `pg-nightstall` | 夜市攤位爭霸 | 短局經營 | 8～12 分 | 12 夜後淨資產最高 |
-| A2 | `pg-junzheng` | 三國一郡 | 回合領土 | 12～20 分 | 攻下敵城或守滿 12 回合 |
-| A3 | `pg-alleyclaim` | 巷弄地盤 | 區域控制 | 8～12 分 | 8 回合後控制分最高 |
-| B1 | `pg-pondfarm` | 塭仔養魚 | 風險經營 | 8～12 分 | 一造結束達成淨利目標 |
-| B2 | `pg-pilgrim` | 廟會遶境路線 | 路線規劃 | 6～10 分 | 時限內回廟且香火達標 |
-| B3 | `pg-lixuan` | 里長選舉 | 影響力配置 | 10～15 分 | 開票得票率最高 |
-| C1 | `pg-railslot` | 高鐵時刻表戰 | 交通調度 | 6～10 分 | 尖峰結束達成準點與載客門檻 |
-| C2 | `pg-pierbox` | 港口貨櫃 | 產能調度 | 8～12 分 | 班次結束合約分達標 |
-| C3 | `pg-islesupply` | 島鏈補給 | 網路／後勤 | 10～15 分 | 連續 10 回合維持各島供應 |
-| D1 | `pg-clubbudg` | 校園社團爭預算 | 資源配置 | 8～12 分 | 期末評鑑排名第一 |
+| A1 ✅ | `pg-nightstall` | 夜市攤位爭霸 | 短局經營 | 8～12 分 | 12 夜後淨資產最高 |
+| A2 ✅ | `pg-junzheng` | 三國一郡 | 回合領土 | 12～20 分 | 攻下敵城或守滿 12 回合 |
+| A3 ✅ | `pg-alleyclaim` | 巷弄地盤 | 區域控制 | 8～12 分 | 8 回合後控制分最高 |
+| B1 ✅ | `pg-pondfarm` | 塭仔養魚 | 風險經營 | 8～12 分 | 一造結束達成淨利目標 |
+| B2 ✅ | `pg-pilgrim` | 廟會遶境路線 | 路線規劃 | 6～10 分 | 時限內回廟且香火達標 |
+| B3 ✅ | `pg-lixuan` | 里長選舉 | 影響力配置 | 10～15 分 | 開票得票率最高 |
+| C1 ✅ | `pg-railslot` | 高鐵時刻表戰 | 交通調度 | 6～10 分 | 尖峰結束達成準點與載客門檻 |
+| C2 ✅ | `pg-pierbox` | 港口貨櫃 | 產能調度 | 8～12 分 | 班次結束合約分達標 |
+| C3 ✅ | `pg-islesupply` | 島鏈補給 | 網路／後勤 | 10～15 分 | 連續 10 回合維持各島供應 |
+| D1 ✅ | `pg-clubbudg` | 校園社團爭預算 | 資源配置 | 8～12 分 | 期末評鑑排名第一 |
 
 ### 1.1 系列
 
@@ -349,3 +349,5 @@ pg-<id>/
 | 日期 | 變更 |
 | --- | --- |
 | 2026-08-16 | 規格初版：十款全數納入；新系列「策略」；A 批先做夜市攤位、三國一郡、巷弄地盤 |
+| 2026-08-16 | `pg-nightstall` 本機 Phase 0–3：規則／AI／KV、9 tests、mobile-first 夜市 UI、Kenney 美術音效＋Blippy Bits 音樂＋俐方體署名；型錄 `unlisted` |
+| 2026-08-16 | 其餘九款本機 Phase 0–3 完成（皆 `unlisted`）；宿主型錄／PG-GAMES 同步；十款 GitHub public remote 已建立 |

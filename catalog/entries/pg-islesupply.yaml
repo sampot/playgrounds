@@ -1,0 +1,7 @@
+title: 島鏈補給
+kind: game
+series: 策略
+blurb: 排船期與庫存，迎風避颱維持七島十回合供應。
+source: sampot/pg-islesupply
+license: MIT
+status: unlisted

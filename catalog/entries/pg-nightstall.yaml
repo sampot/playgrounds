@@ -1,0 +1,7 @@
+title: 夜市攤位爭霸
+kind: game
+series: 策略
+blurb: 十二夜看天氣進貨、定價、宣傳，與兩名 AI 搶客比淨資產。
+source: sampot/pg-nightstall
+license: MIT
+status: unlisted

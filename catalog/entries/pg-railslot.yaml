@@ -1,0 +1,7 @@
+title: 高鐵時刻表戰
+kind: game
+series: 策略
+blurb: 排發車、停靠與待避，化解延誤並守住準點率。
+source: sampot/pg-railslot
+license: MIT
+status: unlisted
