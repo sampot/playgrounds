@@ -134,7 +134,7 @@ describe("catalog query API", () => {
       repo: "pg-secret-egg",
       title: "隱藏彩蛋",
       kind: "game",
-      series: "精緻可玩",
+      series: "街機",
       blurb: "測試用",
       source: "sampot/pg-secret-egg",
       status: "unlisted",

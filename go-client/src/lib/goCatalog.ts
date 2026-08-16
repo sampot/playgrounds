@@ -31,7 +31,6 @@ export type GoCatalogEntry = Pick<
  * 標記，輕量且符合小品原創風格。未知分類退回預設遊戲 icon。
  */
 const GO_SERIES_ICON: Record<string, string> = {
-  精緻可玩: "🎯",
   街機: "🕹️",
   懷舊: "📺",
   機台: "🎰",

@@ -1,6 +1,6 @@
 title: 扯鈴
 kind: game
-series: 精緻可玩
+series: 街機
 blurb: 扯鈴節奏連招：在節拍點按下對應鍵觸發抖鈴／拋鈴／接鈴，連招累加 combo、miss 斷 combo、難度遞增。
 source: sampot/pg-diabolo
 license: MIT

@@ -19,17 +19,6 @@
   // 12x12 網格上的實心方塊：[x, y, w, h]
   type Rect = [number, number, number, number];
 
-  // 精緻可玩 → 星章（精選標記）
-  const STAR: Rect[] = [
-    [5, 1, 2, 1],
-    [4, 2, 4, 1],
-    [2, 3, 8, 1],
-    [3, 4, 6, 1],
-    [4, 5, 4, 1],
-    [3, 6, 2, 2],
-    [7, 6, 2, 2],
-    [5, 6, 2, 3],
-  ];
   // 街機 → 搖桿（動作小品）
   const GAMEPAD: Rect[] = [
     [2, 4, 8, 4],
@@ -197,7 +186,6 @@
   ];
 
   const SHAPES: Record<string, Rect[]> = {
-    精緻可玩: STAR,
     街機: GAMEPAD,
     懷舊: SCREEN,
     機台: DICE,

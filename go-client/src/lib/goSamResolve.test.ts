@@ -6,7 +6,7 @@ const fixtures = vi.hoisted(() => ({
     title: "五子棋",
     source: "sampot/pg-gomoku",
     kind: "game",
-    series: "精緻可玩",
+    series: "街機",
     blurb: "test",
     status: "listed",
   },

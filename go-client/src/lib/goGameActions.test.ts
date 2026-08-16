@@ -39,7 +39,7 @@ describe("runUpdate", () => {
       title: "打磚塊",
       source: "sampot/pg-breakout",
       kind: "game",
-      series: "精緻可玩",
+      series: "街機",
       blurb: "測試小品",
       status: "listed",
     });
