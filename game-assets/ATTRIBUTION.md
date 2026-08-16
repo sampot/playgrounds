@@ -153,15 +153,54 @@
 
 ---
 
+## 2026-08-16 新入庫（Kenney CC0）
+
+皆 **CC0**；進 `pg-*` 仍須署名（專案硬規則）。原始 zip 在 `_staging/`。  
+**HTML 小品取用提示：** 純 2D pack（骨牌／農場／準星／國旗／圖樣／光罩）可直接拷 PNG／SVG；3D kit（寵物／車／森林／洞穴／地城）優先用 `Previews/` 作 2D 精靈，或經 CDN 載 GLB（勿為素材裝 npm）。
+
+| 本地路徑 | Pack | URL | 備註 |
+| --- | --- | --- | --- |
+| `art/domino-pack/` | Domino Pack | https://kenney.nl/assets/domino-pack | 雙六骨牌；5 皮（Light／Dark／Gingerbread／Hearts／Stars）＋ SVG |
+| `art/tiny-farm/` | Tiny Farm | https://kenney.nl/assets/tiny-farm | 16×16 農作物生長階、農具、畜舍、角色；tilemap |
+| `art/cube-pets/` | Cube Pets（License 標 2.0） | https://kenney.nl/assets/cube-pets | 方塊動物 GLB＋`Previews/`；staging zip 檔名 `_1.0` |
+| `art/car-kit/` | Car Kit 3.1 | https://kenney.nl/assets/car-kit | 轎車／服務車／kart／零件碎片；`Previews/` |
+| `art/crosshair-pack/` | Crosshair Pack 1.1 | https://kenney.nl/assets/crosshair-pack | 準星多風格；本機 `*-2x` 資料夾＝原 zip「2×」改名（解壓編碼） |
+| `art/flag-pack/` | Flag Pack | https://kenney.nl/assets/flag-pack | 國旗 PNG／SVG（含 `TW`／`HK`／`MO` 等） |
+| `art/mini-forest/` | Mini Forest | https://kenney.nl/assets/mini-forest | 樹／岩／帳篷／弓箭靶；3D＋Previews |
+| `art/modular-cave-kit/` | Modular Cave Kit | https://kenney.nl/assets/modular-cave-kit | 洞穴廊道模組；3D＋Previews |
+| `art/mini-dungeon/` | Mini Dungeon 2.0 | https://kenney.nl/assets/mini-dungeon | 地城牆／寶箱／人／獸人／陷阱；3D＋Previews |
+| `art/light-masks/` | Light Masks | https://kenney.nl/assets/light-masks | 燈光／手電筒遮罩（Default／Inverted／Transparent） |
+| `art/pattern-pack-extra/` | Pattern Pack Extra | https://kenney.nl/assets/pattern-pack-extra | 額外無縫圖樣；可作桌布／關卡底 |
+
+可併用庫內既有：`sfx/ui-audio/`、`sfx/impact-sounds/`、`art/particle-pack/`、`art/shooting-gallery/`（靶場）、`music/blippy-bits/` 等。
+
+---
+
+## 字型 `fonts/`（2026-08-16 入庫）
+
+**硬規則不變：** OFL／CC0 進 `pg-*` **皆須署名**；拷字型時一併附 `OFL.txt`／`License.txt`。  
+網頁優先 **woff2**；像素字請用整數倍字級（例：12／24／36）。
+
+| 本地路徑 | 名稱 | 授權 | URL | 備註 |
+| --- | --- | --- | --- | --- |
+| `fonts/kenney-fonts/` | Kenney Fonts | CC0 | https://kenney.nl/assets/kenney-fonts | 西文／數字像素與標題體（Pixel／Mini／Rocket／Future…）；**無中文** |
+| `fonts/cubic-11/` | 俐方體11號 Cubic 11 v1.500 | OFL 1.1 | https://github.com/ACh-K/Cubic-11 | 繁中 11×11 點陣；`Cubic_11.woff2`／`.ttf`；保留名 Cubic／俐方體 |
+| `fonts/fusion-pixel-12px/` | 縫合像素 Fusion Pixel 12px proportional | OFL 1.1 | https://github.com/TakWolf/fusion-pixel-font | 2026.08.11；分區 woff2：`zh_hant`／`zh_hans`／`latin`／`ja`／`ko`；台味 UI 優先 `zh_hant` |
+| `fonts/jf-openhuninn/` | jf open 粉圓 v2.1 | OFL 1.1 | https://github.com/justfont/open-huninn-font | 非像素圓體 UI／說明文字；`jf-openhuninn-2.1.ttf`；保留名 open huninn／huninn |
+
+**選用建議：** 像素 HUD／分數 → Kenney（英數）＋ Cubic／Fusion `zh_hant`（中文）；說明／選單長文 → 粉圓。勿單獨販售字型檔（OFL）。
+
+---
+
 ## 仍缺／慎用
 
 | 題材 | 狀態 |
 | --- | --- |
 | 四色牌牌面 | 尚無可靠 CC0 pack；宜自繪或另尋 |
-| 可免署名字型 | 多數開源字型為 OFL／需署名；未收入 `fonts/` |
+| 可免署名字型 | Kenney Fonts＝CC0（仍須本專案署名）；CJK 實用面仍以 **OFL** 為主（Cubic／Fusion／粉圓已入庫） |
 | 真麻將「花牌／十六張台規 UI」 | 已由 `sampot/pg-mahjong` 採 Gemini AI 花牌＋桌面 UI；庫內仍僅基礎牌 |
 | 沙丘戰線採收機／香料工人／統一美術 | `art/rts/` 坦克／空中／塔／沙漠已有；步行兵與「沙蟲風」生物仍薄 |
 | 力氣錘專用槌／鈴柱、機台魚竿／捲線器 | 尚無成套 CC0；`pg-strongman`／`pg-fishcab` 需自繪或拼皮 |
-| 磁碟空間 | itch 包含 wav 全套時體積大；進 `pg-*` 只拷需要的 **ogg**（或 mp3）即可 |
+| 磁碟空間 | itch 包含 wav 全套時體積大；進 `pg-*` 只拷需要的 **ogg**（或 mp3）即可；字型進遊戲只拷用到的 woff2／ttf |
 
 捐助（非義務）：https://kenney.nl/donate
