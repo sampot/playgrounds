@@ -30,6 +30,7 @@ import {
   SESSION_EVENT_KIND,
   SESSION_INVITE_REJECT_KIND,
   SESSION_SEAT_BOUND_KIND,
+  buildSessionInvitePayload,
   isSessionActPayload,
   isSessionInviteAcceptPayload,
   type SessionActPayload,
@@ -133,6 +134,7 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
   let loop: ReturnType<typeof startPlatformHostAnswerLoop> | null = null;
   const localAgentId = `go-host-${crypto.randomUUID().slice(0, 8)}`;
   const seatBoundSent = new Set<string>();
+  const sessionInviteSent = new Set<string>();
   /** peerAgentId → session (one DataChannel per connected Guest). */
   const peerSessions = new Map<string, RosterPeerSession>();
   let seq = 0;
@@ -368,6 +370,31 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
           if (slot.peerId && !status.seats.some(s => s.peerId === slot.peerId)) {
             set({ message: "有人連上了，等待入座…" });
           }
+          if (
+            slot.peerId &&
+            status.sessionId &&
+            status.inviteId &&
+            !sessionInviteSent.has(slot.peerId)
+          ) {
+            sessionInviteSent.add(slot.peerId);
+            sendRelay(
+              buildSessionInvitePayload({
+                sessionId: status.sessionId,
+                inviteId: status.inviteId,
+                role: guestRoles[0] || "player",
+                protocol: {
+                  protocolId: deps.protocol.protocolId,
+                  apiVersion: deps.protocol.apiVersion || "1",
+                  roles: [...deps.protocol.roles],
+                  roleLimits: deps.protocol.roleLimits
+                    ? { ...deps.protocol.roleLimits }
+                    : undefined,
+                  joinPolicy: "invite_only",
+                },
+              }),
+              slot.peerId
+            );
+          }
         } else if (isAvatarRelayMessage(data)) {
           onRelay(data, slot);
         }
@@ -417,6 +444,7 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
     shortUrl: string;
   }): Promise<void> {
     set({ inviteId: opts.inviteId, shortUrl: opts.shortUrl, error: null });
+    sessionInviteSent.clear();
     loop?.stop();
     const apiKey = goAuth.getPlatformApiKeyForHostLoop();
     if (!apiKey) {
@@ -528,6 +556,7 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
       }
     }
     peerSessions.clear();
+    sessionInviteSent.clear();
     if (status.inviteId) {
       try {
         await goAuth.revokePlatformInvite(status.inviteId);
@@ -585,6 +614,7 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
         }
       }
       peerSessions.clear();
+      sessionInviteSent.clear();
     },
   };
 }

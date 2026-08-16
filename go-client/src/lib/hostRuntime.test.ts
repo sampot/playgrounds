@@ -78,4 +78,57 @@ describe("hostRuntime.createPlatformInvite adoption path", () => {
     rt.dispose();
     expect(stop).toHaveBeenCalled();
   });
+
+  it("sends a session invite when the connected Guest announces presence", async () => {
+    goAuth.__setApiKeyForTests("pg_sk_test");
+    let loopOptions:
+      | Parameters<typeof platformHostLoop.startPlatformHostAnswerLoop>[0]
+      | null = null;
+    vi.spyOn(platformHostLoop, "startPlatformHostAnswerLoop").mockImplementation(
+      options => {
+        loopOptions = options;
+        return { stop: vi.fn(), inviteId: options.inviteId };
+      }
+    );
+    const rt = createHostRuntime({
+      getFiles: () => ({ "index.html": "<html></html>" }) as FileMap,
+      getSandboxId: () => "go-sb-3",
+      protocol,
+      invokeHostSession: async () => ({ ok: true }),
+    });
+    await rt.open();
+    await rt.adoptSamInvite({
+      inviteId: "platform-inv-1",
+      shortUrl: "https://go.samkuo.me/i/abc",
+    });
+
+    const prepared = loopOptions!.prepareHandlers();
+    const send = vi.fn();
+    prepared.attachSession({
+      send,
+      close: vi.fn(),
+      getChannel: () => null,
+      pc: {} as RTCPeerConnection,
+      role: "guest",
+    });
+    prepared.handlers.onMessage?.({
+      type: "presence",
+      agentId: "go-guest-1",
+      name: "對手",
+    });
+
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "avatar_relay",
+        to: "go-guest-1",
+        payload: expect.objectContaining({
+          kind: "session_invite",
+          inviteId: "platform-inv-1",
+          sessionId: rt.getStatus().sessionId,
+          role: "player",
+          protocol: expect.objectContaining({ protocolId: "gomoku.v1" }),
+        }),
+      })
+    );
+  });
 });
