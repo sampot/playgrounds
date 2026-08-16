@@ -159,8 +159,22 @@
 
 ## 打算實作（backlog）
 
-（空）本地新作見「已實作」；`pg-holdem` 計劃 [`PG-HOLDEM-PLAN.md`](./PG-HOLDEM-PLAN.md)。**GitHub remote／`gh repo create` 尚未批次 push**——上架 go／`?open=` 前需先建立並推送對應 `sampot/pg-*` public repo。
+短局 SLG 遊戲群規格見 [`PG-SLG-GAMES-PLAN.md`](./PG-SLG-GAMES-PLAN.md)。批次內仍逐款完成；第一款通過上架驗收後才開始下一款。
 
+| 批次 | id | 標題 | 一句話 | 資源就緒度 |
+| --- | --- | --- | --- | --- |
+| A1 | `pg-nightstall` | 夜市攤位爭霸 | 十二夜進貨、定價、宣傳，與 AI 搶客比淨資產 | 中 |
+| A2 | `pg-junzheng` | 三國一郡 | 三政令經營糧兵城防，攻城或守滿十二回合 | 高 |
+| A3 | `pg-alleyclaim` | 巷弄地盤 | 同時下令佔街廓、搶地標、連線得分 | 高 |
+| B1 | `pg-pondfarm` | 塭仔養魚 | 一造管理密度、水質與颱風風險，抓時機收成 | 中 |
+| B2 | `pg-pilgrim` | 廟會遶境路線 | 時限內規劃必訪宮壇與回廟路線，兼顧香火與擾民 | 中低 |
+| B3 | `pg-lixuan` | 里長選舉 | 四週配置拜訪、政見與志工，依議題爭取各鄰支持 | 中 |
+| C1 | `pg-railslot` | 高鐵時刻表戰 | 排發車、停靠與待避，化解延誤並守住準點率 | 中低 |
+| C2 | `pg-pierbox` | 港口貨櫃 | 管堆場、橋機與船期，以最少翻櫃完成合約 | 中低 |
+| C3 | `pg-islesupply` | 島鏈補給 | 排船期與庫存，迎風避颱維持七島十回合供應 | 中 |
+| D1 | `pg-clubbudg` | 校園社團爭預算 | 八週分配幹部工時、爭場地、辦活動拚期末評鑑 | 中 |
+
+首款進型錄時新增遊戲系列 **`策略`**。**GitHub remote／`gh repo create` 尚未建立**——上架 go／`?open=` 前需逐款建立並推送對應 `sampot/pg-*` public repo。
 
 ## 維護備註
 
