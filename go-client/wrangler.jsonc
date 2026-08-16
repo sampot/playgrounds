@@ -2,12 +2,17 @@
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "playgrounds-go",
   "compatibility_date": "2026-08-07",
+  "main": "./src/worker.ts",
   "workers_dev": true,
   "preview_urls": true,
   // Pure-play Guest SPA (DEC-050) — not a field shell.
   "assets": {
     "directory": "./build",
-    "not_found_handling": "single-page-application"
+    "not_found_handling": "single-page-application",
+    "binding": "ASSETS",
+    // `/index.html` is the prerendered home page. Dynamic Invite routes need
+    // SvelteKit's client fallback (`/200.html`) instead.
+    "run_worker_first": ["/i", "/i/*"]
   },
   "routes": [
     {
