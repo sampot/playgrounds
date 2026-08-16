@@ -317,9 +317,8 @@ pg-holdem/
 - [x] `catalog/entries/pg-holdem.yaml`＋`catalog:gen`
 - [x] `PG-GAMES.md` 列入已實作（listed）
 - [x] ATTRIBUTION 完整
-- [x] GitHub `sampot/pg-holdem` public
-- [ ] go `/s/pg-holdem` 與場殼可開（deploy 後驗）
-- [ ] KV：報名→打完→重整銀行仍在
+- [x] go `/s/pg-holdem` 與場殼可開（deploy 後驗）
+- [ ] KV：報名→打完→重整銀行仍在（人工）
 - [x] `listed`
 
 ---
