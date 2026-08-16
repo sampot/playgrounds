@@ -13,7 +13,7 @@
 
 ---
 
-## 已實作（114）
+## 已實作（115）
 
 ### 街機（32＋7 unlisted）
 
@@ -122,7 +122,7 @@
 | `pg-strongman` | 力氣錘 | 蓄力揮錘打鈴／分數帶 |
 | `pg-ticketgrab` | 彩票機 | 投幣抓取彩球、組合獲獎 |
 
-### 桌遊（21＋6 unlisted）
+### 桌遊（22＋6 unlisted）
 
 | id | 標題 | 一句話 |
 | --- | --- | --- |
@@ -153,12 +153,13 @@
 | `pg-undercover` | 影武者詞殺 | 多數同詞、少數異詞、輪流描述投票 |
 | `pg-sketchtell` | 你畫我猜 | 一輪一畫家、其餘猜詞；預留 Invite |
 | `pg-chengyu` | 成語接龍 | 末字起頭接龍、挑戰計分與人機；對戰超時出局，預留 `chengyu.v1` |
+| `pg-holdem` | 德州撲克 | 六人桌 NLHE 對 AI；Sit & Go 盲注遞增、虛擬籌碼；純娛樂非博弈 |
 
 ---
 
 ## 打算實作（backlog）
 
-（空）2026-08-16 批次已將本檔 backlog 全數實作並移入「已實作」；本地 repo 在 `~/dev/sampot/pg-*`，型錄 YAML 已補。**GitHub remote／`gh repo create` 尚未批次 push**——上架 go／`?open=` 前需先建立並推送對應 `sampot/pg-*` public repo。
+（空）本地新作見「已實作」；`pg-holdem` 計劃 [`PG-HOLDEM-PLAN.md`](./PG-HOLDEM-PLAN.md)。**GitHub remote／`gh repo create` 尚未批次 push**——上架 go／`?open=` 前需先建立並推送對應 `sampot/pg-*` public repo。
 
 
 ## 維護備註

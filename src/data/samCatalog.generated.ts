@@ -619,6 +619,16 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     license: "MIT",
   },
   {
+    id: "pg-holdem",
+    title: "德州撲克",
+    kind: "game",
+    series: "桌遊",
+    blurb: "六人桌無限制德州對 AI；Sit & Go 盲注遞增、虛擬籌碼；純娛樂非博弈。",
+    source: "sampot/pg-holdem",
+    status: "listed",
+    license: "MIT",
+  },
+  {
     id: "pg-hoopshot",
     title: "投籃機",
     kind: "game",
