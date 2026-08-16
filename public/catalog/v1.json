@@ -98,12 +98,72 @@
       "license": "MIT"
     },
     {
+      "id": "pg-alleybowl",
+      "title": "騎樓保齡",
+      "kind": "game",
+      "series": "街機",
+      "blurb": "球道物理＋桿數／關卡挑戰。",
+      "source": "sampot/pg-alleybowl",
+      "status": "unlisted",
+      "license": "MIT"
+    },
+    {
       "id": "pg-alleyclaim",
       "title": "巷弄地盤",
       "kind": "game",
       "series": "策略",
       "blurb": "同時下令佔街廓、搶地標、連線得分。",
       "source": "sampot/pg-alleyclaim",
+      "status": "unlisted",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-ascenddeck",
+      "title": "牌途登峰",
+      "kind": "game",
+      "series": "策略",
+      "blurb": "路線地圖、遺物、可重複通關。",
+      "source": "sampot/pg-ascenddeck",
+      "status": "unlisted",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-atticfind",
+      "title": "頂樓尋物",
+      "kind": "game",
+      "series": "懷舊",
+      "blurb": "場景搜尋＋故事章節。",
+      "source": "sampot/pg-atticfind",
+      "status": "unlisted",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-autolegion",
+      "title": "自走軍團",
+      "kind": "game",
+      "series": "策略",
+      "blurb": "羈絆、經濟、站位、賽季排位。",
+      "source": "sampot/pg-autolegion",
+      "status": "unlisted",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-backdoor",
+      "title": "後門任務",
+      "kind": "game",
+      "series": "街機",
+      "blurb": "同一關多解（偷／騙／打／駭）。",
+      "source": "sampot/pg-backdoor",
+      "status": "unlisted",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-bannerwar",
+      "title": "旌旗戰棋",
+      "kind": "game",
+      "series": "策略",
+      "blurb": "戰役章、兵種相剋、陣亡後果。",
+      "source": "sampot/pg-bannerwar",
       "status": "unlisted",
       "license": "MIT"
     },
@@ -178,6 +238,26 @@
       "license": "MIT"
     },
     {
+      "id": "pg-blackward",
+      "title": "廢校夜勤",
+      "kind": "game",
+      "series": "街機",
+      "blurb": "資源稀缺、聲響、有限視野。",
+      "source": "sampot/pg-blackward",
+      "status": "unlisted",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-blockcity",
+      "title": "街區建國",
+      "kind": "game",
+      "series": "策略",
+      "blurb": "分區、交通、民怨長期平衡。",
+      "source": "sampot/pg-blockcity",
+      "status": "unlisted",
+      "license": "MIT"
+    },
+    {
       "id": "pg-blockfit",
       "title": "方塊填格",
       "kind": "game",
@@ -228,6 +308,16 @@
       "license": "MIT"
     },
     {
+      "id": "pg-campusbond",
+      "title": "社團心事",
+      "kind": "game",
+      "series": "懷舊",
+      "blurb": "行程配置＋關係線。",
+      "source": "sampot/pg-campusbond",
+      "status": "unlisted",
+      "license": "MIT"
+    },
+    {
       "id": "pg-candythrow",
       "title": "糖果投掷",
       "kind": "game",
@@ -235,6 +325,16 @@
       "blurb": "瞄準投擲糖果進桶，連擊積分。",
       "source": "sampot/pg-candythrow",
       "status": "listed",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-cardbazaar",
+      "title": "卡市爭鋒",
+      "kind": "game",
+      "series": "桌遊",
+      "blurb": "構築＋排位；≠傳統牌桌。",
+      "source": "sampot/pg-cardbazaar",
+      "status": "unlisted",
       "license": "MIT"
     },
     {
@@ -254,6 +354,16 @@
       "series": "街機",
       "blurb": "康樂球／彈珠桌：拖曳彈射自己的彈珠、碰撞推進對手棋子入口袋得點；簡化物理、回合制人機。",
       "source": "sampot/pg-carrom",
+      "status": "unlisted",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-casefile",
+      "title": "陳年卷宗",
+      "kind": "game",
+      "series": "懷舊",
+      "blurb": "場景熱點、道具組合、推理結案。",
+      "source": "sampot/pg-casefile",
       "status": "unlisted",
       "license": "MIT"
     },
@@ -428,6 +538,16 @@
       "license": "MIT"
     },
     {
+      "id": "pg-deepcatacomb",
+      "title": "深窟探險",
+      "kind": "game",
+      "series": "策略",
+      "blurb": "程序地城、飢餓／光照、死即重來。",
+      "source": "sampot/pg-deepcatacomb",
+      "status": "unlisted",
+      "license": "MIT"
+    },
+    {
       "id": "pg-deliver",
       "title": "外送路線",
       "kind": "game",
@@ -478,6 +598,16 @@
       "license": "MIT"
     },
     {
+      "id": "pg-empirekitchen",
+      "title": "總舖師傳奇",
+      "kind": "game",
+      "series": "策略",
+      "blurb": "菜單研發、員工、展店。",
+      "source": "sampot/pg-empirekitchen",
+      "status": "unlisted",
+      "license": "MIT"
+    },
+    {
       "id": "pg-envkit",
       "title": ".env 工坊",
       "kind": "tool",
@@ -485,6 +615,16 @@
       "blurb": "解析、遮罩、匯出；非密鑰庫。可掛工具開 .env。",
       "source": "sampot/pg-envkit",
       "status": "listed",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-festcrowd",
+      "title": "遶境人潮",
+      "kind": "game",
+      "series": "懷舊",
+      "blurb": "指定動作疏導／救出走位。",
+      "source": "sampot/pg-festcrowd",
+      "status": "unlisted",
       "license": "MIT"
     },
     {
@@ -585,6 +725,26 @@
       "blurb": "直線跑過加減門、終點比人數；短關。",
       "source": "sampot/pg-gatecrowd",
       "status": "listed",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-gatepair",
+      "title": "對門實驗室",
+      "kind": "game",
+      "series": "街機",
+      "blurb": "傳送門／動量關卡。",
+      "source": "sampot/pg-gatepair",
+      "status": "unlisted",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-ghostmark",
+      "title": "查哨夜行",
+      "kind": "game",
+      "series": "街機",
+      "blurb": "視線錐、警報等級、任務鏈。",
+      "source": "sampot/pg-ghostmark",
+      "status": "unlisted",
       "license": "MIT"
     },
     {
@@ -728,6 +888,16 @@
       "license": "MIT"
     },
     {
+      "id": "pg-huntshade",
+      "title": "追匿",
+      "kind": "game",
+      "series": "桌遊",
+      "blurb": "1 追捕 vs 多逃亡；Invite。",
+      "source": "sampot/pg-huntshade",
+      "status": "unlisted",
+      "license": "MIT"
+    },
+    {
       "id": "pg-idmint",
       "title": "識別碼小造",
       "kind": "tool",
@@ -775,6 +945,26 @@
       "blurb": "限時塗地佔分對 AI；抽象色塊。",
       "source": "sampot/pg-inkskirmish",
       "status": "listed",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-islandage",
+      "title": "島鏈紀元",
+      "kind": "game",
+      "series": "策略",
+      "blurb": "探索／擴張／開發／征服；多小時一局。",
+      "source": "sampot/pg-islandage",
+      "status": "unlisted",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-islandloop",
+      "title": "環島賽",
+      "kind": "game",
+      "series": "街機",
+      "blurb": "多賽道盃、車輛改裝、計時榜。",
+      "source": "sampot/pg-islandloop",
+      "status": "unlisted",
       "license": "MIT"
     },
     {
@@ -888,6 +1078,16 @@
       "license": "MIT"
     },
     {
+      "id": "pg-lighttrace",
+      "title": "光跡對決",
+      "kind": "game",
+      "series": "街機",
+      "blurb": "留跡包圍領地。",
+      "source": "sampot/pg-lighttrace",
+      "status": "unlisted",
+      "license": "MIT"
+    },
+    {
       "id": "pg-lixuan",
       "title": "里長選舉",
       "kind": "game",
@@ -915,6 +1115,16 @@
           ]
         }
       ]
+    },
+    {
+      "id": "pg-lockroom",
+      "title": "密室一小時",
+      "kind": "game",
+      "series": "懷舊",
+      "blurb": "多房間線索鏈、一局完整解謎。",
+      "source": "sampot/pg-lockroom",
+      "status": "unlisted",
+      "license": "MIT"
     },
     {
       "id": "pg-logigate",
@@ -1067,6 +1277,36 @@
       "license": "MIT"
     },
     {
+      "id": "pg-nightbrawl",
+      "title": "夜市清街",
+      "kind": "game",
+      "series": "街機",
+      "blurb": "側視一路打、夾擊與投技、關卡頭目。",
+      "source": "sampot/pg-nightbrawl",
+      "status": "unlisted",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-nightmarket",
+      "title": "夜盤",
+      "kind": "game",
+      "series": "策略",
+      "blurb": "多日價格、資訊差、對手 AI。",
+      "source": "sampot/pg-nightmarket",
+      "status": "unlisted",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-nightsnake",
+      "title": "燈籠蛇",
+      "kind": "game",
+      "series": "街機",
+      "blurb": "關卡＋無盡雙模式。",
+      "source": "sampot/pg-nightsnake",
+      "status": "unlisted",
+      "license": "MIT"
+    },
+    {
       "id": "pg-nightstall",
       "title": "夜市攤位爭霸",
       "kind": "game",
@@ -1097,6 +1337,16 @@
       "license": "MIT"
     },
     {
+      "id": "pg-outpost",
+      "title": "離島前哨",
+      "kind": "game",
+      "series": "策略",
+      "blurb": "殖民者需求、心情、生產鏈。",
+      "source": "sampot/pg-outpost",
+      "status": "unlisted",
+      "license": "MIT"
+    },
+    {
       "id": "pg-parkexam",
       "title": "倒車入庫",
       "kind": "game",
@@ -1104,6 +1354,16 @@
       "blurb": "俯視平行停車／S 彎考照小品。",
       "source": "sampot/pg-parkexam",
       "status": "listed",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-partyquest",
+      "title": "結社遠征錄",
+      "kind": "game",
+      "series": "策略",
+      "blurb": "世界地圖、職業裝備、主線多章。",
+      "source": "sampot/pg-partyquest",
+      "status": "unlisted",
       "license": "MIT"
     },
     {
@@ -1157,6 +1417,16 @@
       "license": "MIT"
     },
     {
+      "id": "pg-pitchduel",
+      "title": "操場對決",
+      "kind": "game",
+      "series": "街機",
+      "blurb": "五人制足球場地規則、人機對戰。",
+      "source": "sampot/pg-pitchduel",
+      "status": "unlisted",
+      "license": "MIT"
+    },
+    {
       "id": "pg-pixelhop",
       "title": "像素躍階",
       "kind": "game",
@@ -1184,6 +1454,16 @@
       "blurb": "夜市射靶破球，限彈連擊；致敬射氣球玩法類型。",
       "source": "sampot/pg-popshot",
       "status": "listed",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-porttycoon",
+      "title": "港口大亨",
+      "kind": "game",
+      "series": "策略",
+      "blurb": "航線、倉儲、合約與對手 AI。",
+      "source": "sampot/pg-porttycoon",
+      "status": "unlisted",
       "license": "MIT"
     },
     {
@@ -1234,6 +1514,16 @@
       "blurb": "文字／URL 產碼、下載 PNG。",
       "source": "sampot/pg-qrcode",
       "status": "listed",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-quizleague",
+      "title": "搶答聯賽",
+      "kind": "game",
+      "series": "桌遊",
+      "blurb": "賽季題庫＋段位。",
+      "source": "sampot/pg-quizleague",
+      "status": "unlisted",
       "license": "MIT"
     },
     {
@@ -1297,6 +1587,16 @@
       "license": "MIT"
     },
     {
+      "id": "pg-roofglide",
+      "title": "頂樓滑板",
+      "kind": "game",
+      "series": "街機",
+      "blurb": "路線計分、技名連段。",
+      "source": "sampot/pg-roofglide",
+      "status": "unlisted",
+      "license": "MIT"
+    },
+    {
       "id": "pg-rooftumble",
       "title": "屋頂擊飛",
       "kind": "game",
@@ -1304,6 +1604,16 @@
       "blurb": "同機雙人平台碰撞擊飛出局；抽象人型。",
       "source": "sampot/pg-rooftumble",
       "status": "listed",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-roundtable",
+      "title": "圓桌協議",
+      "kind": "game",
+      "series": "策略",
+      "blurb": "多勢力同時出價與條約；人機可。",
+      "source": "sampot/pg-roundtable",
+      "status": "unlisted",
       "license": "MIT"
     },
     {
@@ -1344,6 +1654,16 @@
       "blurb": "佈艦後輪流點射；人機先、預留 Invite 1v1。",
       "source": "sampot/pg-seabattle",
       "status": "listed",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-seacast",
+      "title": "港邊釣夢",
+      "kind": "game",
+      "series": "懷舊",
+      "blurb": "魚圖鑑、漁場天氣、裝備。",
+      "source": "sampot/pg-seacast",
+      "status": "unlisted",
       "license": "MIT"
     },
     {
@@ -1394,6 +1714,16 @@
       "blurb": "俯視清房、鑰匙開門、近戰短關。",
       "source": "sampot/pg-shrineclear",
       "status": "listed",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-siegepush",
+      "title": "攻城推波",
+      "kind": "game",
+      "series": "街機",
+      "blurb": "組波次攻打 AI 基地。",
+      "source": "sampot/pg-siegepush",
+      "status": "unlisted",
       "license": "MIT"
     },
     {
@@ -1537,6 +1867,36 @@
       "license": "MIT"
     },
     {
+      "id": "pg-straitwing",
+      "title": "海峽空戰",
+      "kind": "game",
+      "series": "街機",
+      "blurb": "俯視狗鬥任務鏈；≠戰車對決。",
+      "source": "sampot/pg-straitwing",
+      "status": "unlisted",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-streetclash",
+      "title": "騎樓格鬥誌",
+      "kind": "game",
+      "series": "街機",
+      "blurb": "多角色招式表、街機／對戰／修練。",
+      "source": "sampot/pg-streetclash",
+      "status": "unlisted",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-stringbeat",
+      "title": "琴弦節拍",
+      "kind": "game",
+      "series": "街機",
+      "blurb": "軌道對應撥弦；≠踏墊四方向。",
+      "source": "sampot/pg-stringbeat",
+      "status": "unlisted",
+      "license": "MIT"
+    },
+    {
       "id": "pg-strongman",
       "title": "力氣錘",
       "kind": "game",
@@ -1574,6 +1934,26 @@
       "blurb": "俯視坦克：人機或 AI 觀戰、履帶炮塔、重低音爆炸；適配手機搖桿，自製音效。",
       "source": "sampot/pg-tankduel",
       "status": "listed",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-templecleave",
+      "title": "廟口斬陣",
+      "kind": "game",
+      "series": "街機",
+      "blurb": "自由移動、技能冷卻、裝備掉落關卡。",
+      "source": "sampot/pg-templecleave",
+      "status": "unlisted",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-templeidle",
+      "title": "香火放置",
+      "kind": "game",
+      "series": "策略",
+      "blurb": "香火累積、建築升級、離線收益。",
+      "source": "sampot/pg-templeidle",
+      "status": "unlisted",
       "license": "MIT"
     },
     {
@@ -1637,6 +2017,16 @@
       "license": "MIT"
     },
     {
+      "id": "pg-tidefort",
+      "title": "潮汐要塞",
+      "kind": "game",
+      "series": "街機",
+      "blurb": "能力回流、地圖填圖。",
+      "source": "sampot/pg-tidefort",
+      "status": "unlisted",
+      "license": "MIT"
+    },
+    {
       "id": "pg-tidewave",
       "title": "潮汐倖存",
       "kind": "game",
@@ -1687,6 +2077,16 @@
       "license": "MIT"
     },
     {
+      "id": "pg-township",
+      "title": "鎮誌",
+      "kind": "game",
+      "series": "懷舊",
+      "blurb": "多日曆、好感、多結局。",
+      "source": "sampot/pg-township",
+      "status": "unlisted",
+      "license": "MIT"
+    },
+    {
       "id": "pg-tubesort",
       "title": "試管分色",
       "kind": "game",
@@ -1714,6 +2114,16 @@
       "blurb": "台灣版紙本規則：買地蓋房、機會命運、熱座 2–4 人／AI 託管；忠孝東路等路名。",
       "source": "sampot/pg-twland",
       "status": "listed",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-typestorm",
+      "title": "字幕風暴",
+      "kind": "game",
+      "series": "街機",
+      "blurb": "打字殺敵／搶修台詞。",
+      "source": "sampot/pg-typestorm",
+      "status": "unlisted",
       "license": "MIT"
     },
     {
@@ -1754,6 +2164,16 @@
       "blurb": "解析／組裝 URL、編輯 query、encodeURIComponent。",
       "source": "sampot/pg-urlkit",
       "status": "listed",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-villagewrath",
+      "title": "里民與天",
+      "kind": "game",
+      "series": "策略",
+      "blurb": "佈置災異與恩賜、引導聚落。",
+      "source": "sampot/pg-villagewrath",
+      "status": "unlisted",
       "license": "MIT"
     },
     {
@@ -1817,6 +2237,16 @@
       "license": "MIT"
     },
     {
+      "id": "pg-whodunit",
+      "title": "誰是兇手",
+      "kind": "game",
+      "series": "桌遊",
+      "blurb": "線索卡、指認；多人／人機。",
+      "source": "sampot/pg-whodunit",
+      "status": "unlisted",
+      "license": "MIT"
+    },
+    {
       "id": "pg-wingrace",
       "title": "翼途競飛",
       "kind": "game",
@@ -1824,6 +2254,16 @@
       "blurb": "簡化飛行棋：擲骰起飛、撞回、終點跑道。",
       "source": "sampot/pg-wingrace",
       "status": "listed",
+      "license": "MIT"
+    },
+    {
+      "id": "pg-worddawn",
+      "title": "晨間一字",
+      "kind": "game",
+      "series": "懷舊",
+      "blurb": "每日＋無盡；≠成語接龍。",
+      "source": "sampot/pg-worddawn",
+      "status": "unlisted",
       "license": "MIT"
     },
     {

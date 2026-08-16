@@ -1,0 +1,7 @@
+title: 夜盤
+kind: game
+series: 策略
+blurb: 多日價格、資訊差、對手 AI。
+source: sampot/pg-nightmarket
+license: MIT
+status: unlisted
