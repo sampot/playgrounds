@@ -176,19 +176,45 @@
 
 ---
 
-## 字型 `fonts/`（2026-08-16 入庫）
+## 字型 `fonts/`（2026-08-16 入庫／擴充）
 
 **硬規則不變：** OFL／CC0 進 `pg-*` **皆須署名**；拷字型時一併附 `OFL.txt`／`License.txt`。  
-網頁優先 **woff2**；像素字請用整數倍字級（例：12／24／36）。
+網頁優先 **woff2**；像素字請用整數倍字級（例：12／24／36）。勿單獨販售字型檔（OFL）。
 
 | 本地路徑 | 名稱 | 授權 | URL | 備註 |
 | --- | --- | --- | --- | --- |
-| `fonts/kenney-fonts/` | Kenney Fonts | CC0 | https://kenney.nl/assets/kenney-fonts | 西文／數字像素與標題體（Pixel／Mini／Rocket／Future…）；**無中文** |
-| `fonts/cubic-11/` | 俐方體11號 Cubic 11 v1.500 | OFL 1.1 | https://github.com/ACh-K/Cubic-11 | 繁中 11×11 點陣；`Cubic_11.woff2`／`.ttf`；保留名 Cubic／俐方體 |
-| `fonts/fusion-pixel-12px/` | 縫合像素 Fusion Pixel 12px proportional | OFL 1.1 | https://github.com/TakWolf/fusion-pixel-font | 2026.08.11；分區 woff2：`zh_hant`／`zh_hans`／`latin`／`ja`／`ko`；台味 UI 優先 `zh_hant` |
-| `fonts/jf-openhuninn/` | jf open 粉圓 v2.1 | OFL 1.1 | https://github.com/justfont/open-huninn-font | 非像素圓體 UI／說明文字；`jf-openhuninn-2.1.ttf`；保留名 open huninn／huninn |
+| `fonts/kenney-fonts/` | Kenney Fonts | CC0 | https://kenney.nl/assets/kenney-fonts | 西文／數字像素與標題體；**無中文** |
+| `fonts/cubic-11/` | 俐方體11號 Cubic 11 | OFL 1.1 | https://github.com/ACh-K/Cubic-11 | 繁中 11×11 點陣 |
+| `fonts/fusion-pixel-12px/` | 縫合像素 Fusion Pixel 12px | OFL 1.1 | https://github.com/TakWolf/fusion-pixel-font | 分區 woff2；台味 UI 優先 `zh_hant` |
+| `fonts/ark-pixel-12px/` | 方舟像素 Ark Pixel 12px | OFL 1.1 | https://github.com/TakWolf/ark-pixel-font | 分區 woff2；字尚未滿可回 Fusion |
+| `fonts/boutique-bitmap-7x7/` | 精品點陣體7×7 | OFL 1.1 | https://github.com/scott0107000/BoutiqueBitmap7x7 | 極小繁中 HUD |
+| `fonts/boutique-bitmap-9x9/` | 精品點陣體9×9 | OFL 1.1 | https://github.com/scott0107000/BoutiqueBitmap9x9 | Regular／Bold＋HK |
+| `fonts/jf-openhuninn/` | jf open 粉圓 v2.1 | OFL 1.1 | https://github.com/justfont/open-huninn-font | 休閒圓體 UI／說明 |
+| `fonts/noto-sans-tc/` | Noto Sans TC（Sans 2.004） | OFL 1.1 | https://github.com/notofonts/noto-cjk | **正式繁中 UI 黑體**；`NotoSansTC-VF.ttf`＋Regular／Medium `.otf` |
+| `fonts/smiley-sans/` | 得意黑 Smiley Sans | OFL 1.1 | https://github.com/atelier-anchor/smiley-sans | 斜體標題／口號 |
+| `fonts/lxgw-wenkai-tc/` | 霞鶩文楷 TC | OFL 1.1 | https://github.com/lxgw/LxgwWenkaiTC | 敘事／credits；進遊戲宜子集 |
+| `fonts/google-fonts-game/` | Google Fonts 遊戲向西文包 | OFL 1.1 | https://github.com/google/fonts | Press Start 2P／VT323／Silkscreen／Orbitron／Cinzel／Exo 2／Nunito／Outfit |
 
-**選用建議：** 像素 HUD／分數 → Kenney（英數）＋ Cubic／Fusion `zh_hant`（中文）；說明／選單長文 → 粉圓。勿單獨販售字型檔（OFL）。
+**選用建議：** 正式 UI → **Noto Sans TC**；休閒說明 → 粉圓；像素 HUD → Kenney＋Cubic／Fusion；標題 → 得意黑；敘事 → 文楷。
+
+---
+
+## 缺口補齊（2026-08-16 晚）
+
+| 本地路徑 | 名稱 | 授權 | URL／來源 | 對應 |
+| --- | --- | --- | --- | --- |
+| `art/sisek-cards-svg/` | 四色牌 SVG（28 面＋背） | CC0（本庫產生） | 程序繪製；對齊 `pg-sisek` 紅黃青白×象車馬炮士將帥 | `pg-sisek` |
+| `art/mahjong-flowers-ai/` | 台麻將花牌／季節 | MIT（自 `pg-mahjong`） | Gemini 產製後裁切；梅蘭竹菊＋春夏秋冬 | `pg-mahjong` |
+| `art/carnival-strongman-svg/` | 力氣錘槌／鈴柱／鈴 | CC0（本庫產生） | `mallet`／`high-striker`／`bell` SVG | `pg-strongman` |
+| `art/oga-hammer-icons/` | CC0 錘圖示合集 | CC0 | OGA hammer icons＋Kutejnikov hammers | `pg-strongman` |
+| `art/survival-kit/` | Kenney Survival Kit | CC0 | https://kenney.nl/assets/survival-kit | 錘／斧／釣架／魚 Previews＋GLB |
+| `art/fishcab-gear-svg/` | 魚竿／捲線器／鉤 | CC0（本庫產生） | `rod`／`reel`／`hook` SVG | `pg-fishcab` |
+| `art/oga-fishing-rod/` | 釣魚竿像素＋Blend | CC-BY 3.0／CC0 | soreCactus（須署名）；OGA fishing-pole Blend＝CC0 | `pg-fishcab` |
+| `art/tiny-creatures/` | Kenney Tiny Creatures | CC0 | https://opengameart.org/content/tiny-creatures | 小生物／怪物 tile（沙丘雜兵可拼） |
+| `art/rts/oga-underground-worm/` | 地下蠕蟲精靈表 | CC0 | Bevouliin @ OGA | `pg-sandrts` 沙蟲風 |
+| `art/rts/sandrts-units-svg/` | 採收機／工人／香料 | CC0（本庫產生） | placeholder 單位 SVG | `pg-sandrts` |
+
+**CC-BY 注意：** `oga-fishing-rod/` 像素竿須署名 **soreCactus**。
 
 ---
 
@@ -196,11 +222,9 @@
 
 | 題材 | 狀態 |
 | --- | --- |
-| 四色牌牌面 | 尚無可靠 CC0 pack；宜自繪或另尋 |
-| 可免署名字型 | Kenney Fonts＝CC0（仍須本專案署名）；CJK 實用面仍以 **OFL** 為主（Cubic／Fusion／粉圓已入庫） |
-| 真麻將「花牌／十六張台規 UI」 | 已由 `sampot/pg-mahjong` 採 Gemini AI 花牌＋桌面 UI；庫內仍僅基礎牌 |
-| 沙丘戰線採收機／香料工人／統一美術 | `art/rts/` 坦克／空中／塔／沙漠已有；步行兵與「沙蟲風」生物仍薄 |
-| 力氣錘專用槌／鈴柱、機台魚竿／捲線器 | 尚無成套 CC0；`pg-strongman`／`pg-fishcab` 需自繪或拼皮 |
-| 磁碟空間 | itch 包含 wav 全套時體積大；進 `pg-*` 只拷需要的 **ogg**（或 mp3）即可；字型進遊戲只拷用到的 woff2／ttf |
+| 沙丘「統一寫實皮」／步行兵成套 | 已有 worm＋SVG 單位／tiny-creatures；成套沙漠部隊仍薄，可續拼 `art/rts/` |
+| 可免署名字型 | 幾乎無；CJK 以 OFL 為主（本專案仍須署名） |
+| Admurin Fishing／LPC Hand Tools 等 | **未入庫**（GPL／CC-BY-SA）；勿混進 MIT 小品 |
+| 磁碟空間 | itch wav 全套大；進 `pg-*` 只拷 ogg；Noto／文楷宜子集或 VF |
 
 捐助（非義務）：https://kenney.nl/donate

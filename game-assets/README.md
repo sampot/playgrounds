@@ -60,9 +60,10 @@ mkdir -p game-assets/{art,sfx,music,fonts,_staging}
 
 - **Kenney**：音效、jingle、撲克／UI／平台／粒子／角色等；另含機台向 **Sports／Fish／Physics／Rolling Ball／Puzzle II／Generic Items／Boardgame**
 - **Kenney（2026-08-16）**：骨牌、Tiny Farm、Cube Pets、Car Kit、準星、國旗、Mini Forest／Cave／Dungeon、光罩、Pattern Extra（見 ATTRIBUTION）
-- **字型 `fonts/`（2026-08-16）**：Kenney Fonts（CC0 西文）、俐方體 Cubic 11／縫合像素 Fusion（OFL 繁中像素）、jf open 粉圓（OFL UI）
-- **麻將／象棋**：FluffyStuff 牌面、OGA 像素麻將、xiangqi-setup CC0 主題、sashite xiongqi
-- **OpenGameArt**：8-bit 音效庫、chiptune 關卡曲、骰子等；機台向 **Basketball Pack**、**Roulette Casino**（SVG）
-- **RTS／軍事**（[`art/rts/`](./art/rts/)）：俯視坦克、飛彈／爆炸、飛機／直升機、砲塔與工廠／沙漠皮（`pg-sandrts` 自由佈局塔防用；皮類 Dune II）
+- **字型 `fonts/`**：Kenney；Cubic／Fusion／Ark／Boutique（繁中像素）；粉圓、**Noto Sans TC**、得意黑、文楷 TC；`google-fonts-game/`
+- **麻將／象棋／四色牌**：FluffyStuff／OGA 麻將、xiangqi CC0、**花牌 AI 回庫**、**四色牌 SVG**
+- **機台缺口補齊**：Survival Kit、錘圖示、力氣錘／魚竿 SVG、OGA 魚竿（CC-BY 像素）
+- **OpenGameArt**：8-bit 音效、chiptune、骰子、Basketball、Roulette、Tiny Creatures、地下蠕蟲
+- **RTS／軍事**（[`art/rts/`](./art/rts/)）：坦克／空中／塔／沙漠＋**沙蟲／採收機工人 SVG**（`pg-sandrts`）
 
 完整清單與 URL 見 [`ATTRIBUTION.md`](./ATTRIBUTION.md)。原始 zip 在 `_staging/`（含 itch 長 BGM：Not Jam／Dylann Taylor／HydroGene）。進遊戲優先拷 **ogg**，勿整包 wav。
