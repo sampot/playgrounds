@@ -105,7 +105,8 @@
 
 - Guest 入座 **只**把狀態推到 `ready`，**不**自動 `active`。  
 - Host UI 在 `ready` 顯示「誰先（執黑）」＋主 CTA「**開始**」→ `act: start`（`payload.firstRole`）→ `active`（黑先手）。席未滿或非 Host → 拒絕 `start`。
-- **再來一局（硬）：** 同 session／同席位；Host `act: reset`（僅 `ended`；可帶新 `firstRole`）→ 清空棋盤 → **直接 `active`**（player 仍在；等同已開始，黑先手，**不必**再按「開始」）；對手已離則 `waiting`。**禁止**把「一局」等同「一 Session」或強制重鑄 Invite／重連 WebRTC。結束連線／session 另用「結束這一場」。
+- **再來一局（硬）：** 同 session／同席位；Host `act: reset`（僅 `ended`；可帶新 `firstRole`）→ 清空棋盤 → **直接 `active`**（player 仍在；等同已開始，黑先手，**不必**再按「開始」）。**禁止**把「一局」等同「一 Session」或強制重鑄 Invite／重連 WebRTC。結束連線／session 另用「結束這一場」。
+- **對手斷線／離席（硬）：** 1v1 視為**整場結束**（`session.closed`／`reason: opponent_left`）；清 session 權威；Host 須**重新開場**再鑄邀請。不做同 Invite 接替或「再來一局」復盤。
 - **結束這一場：** 殼 `close` 前須 fanout `session.closed` 給遠端席；Guest UI 顯示主持已結束（不可無聲斷線）。
 
 ### 5.3 `invite.compose` intent（五子棋）
@@ -191,7 +192,7 @@ dash SSO（已註冊）
 | Invite 過期／撤銷 | Guest 可讀錯誤；可請 Host 重新邀請 |
 | Host 離線（需新握手） | Guest 等 answer 超時；已連上 peer 不受短連結失效影響（資料面已在 WebRTC） |
 | Guest 拒絕 consent | 不入座；不佔用成功 handshake |
-| 斷線中局 | MVP：提示連線中斷；可重開邀請另開一局（不做完美重連） |
+| 斷線中局 | 整場結束；提示對手已離開／請重新開場；須重新開場＋新邀請（不做重連／同場再來一局） |
 
 **UX 硬規則：** 禁止 `alert`／`confirm`／`prompt`；mobile-first（窄屏可完成邀請／加入／落子）。見 `.cursor/rules/no-native-dialogs.mdc`、`mobile-first-ux.mdc`。
 

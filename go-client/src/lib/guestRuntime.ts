@@ -395,7 +395,9 @@ export function createGuestRuntime() {
         markHostEnded(
           event.reason === "host_closed"
             ? "主持已結束這一場"
-            : "這一場已結束"
+            : event.reason === "opponent_left"
+              ? "對手已離開，這一場結束"
+              : "這一場已結束"
         );
       }
     }

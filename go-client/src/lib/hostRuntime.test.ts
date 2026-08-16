@@ -427,13 +427,17 @@ describe("hostRuntime Guest disconnect detection", () => {
     return { rt, prepared, closePeer, invokeHostSession, guestName, startSpy };
   }
 
-  it("clears the seat and notifies when the Guest DataChannel closes", async () => {
+  it("ends the whole session when the Guest DataChannel closes (1v1)", async () => {
     const { rt, prepared, closePeer, invokeHostSession, guestName } =
       await connectAndSeatGuest();
     prepared.handlers.onChannelClose?.();
-    await vi.waitFor(() => expect(rt.getStatus().seats).toHaveLength(0));
-    expect(rt.getStatus().message).toMatch(new RegExp(`${guestName}|離開|斷線`));
-    expect(rt.getStatus().phase).toBe("waiting");
+    await vi.waitFor(() => expect(rt.getStatus().phase).toBe("idle"));
+    expect(rt.getStatus().seats).toHaveLength(0);
+    expect(rt.getStatus().sessionId).toBeNull();
+    expect(rt.getStatus().inviteId).toBeNull();
+    expect(rt.getStatus().message).toMatch(
+      new RegExp(`${guestName}|離開.*重新開場`)
+    );
     expect(closePeer).toHaveBeenCalled();
     expect(invokeHostSession).toHaveBeenCalledWith(
       "/api/session/presence",
@@ -446,33 +450,35 @@ describe("hostRuntime Guest disconnect detection", () => {
   it("reacts to PeerConnection failed／closed the same way", async () => {
     const { rt, prepared } = await connectAndSeatGuest({ name: "阿明" });
     prepared.handlers.onConnectionState?.("failed");
-    await vi.waitFor(() => expect(rt.getStatus().seats).toHaveLength(0));
-    expect(rt.getStatus().message).toMatch(/阿明|離開|斷線/);
+    await vi.waitFor(() => expect(rt.getStatus().phase).toBe("idle"));
+    expect(rt.getStatus().message).toMatch(/阿明|離開.*重新開場/);
   });
 
-  it("marks the match ended when a seated Guest leaves mid-game", async () => {
-    const { rt, prepared } = await connectAndSeatGuest({
+  it("ends the session (not only the round) when a seated Guest leaves mid-game", async () => {
+    const { rt, prepared, startSpy } = await connectAndSeatGuest({
       name: "對手",
       phaseActive: true,
     });
+    const callsBefore = startSpy.mock.calls.length;
     prepared.handlers.onChannelClose?.();
-    await vi.waitFor(() => expect(rt.getStatus().seats).toHaveLength(0));
-    expect(rt.getStatus().phase).toBe("ended");
-    expect(rt.getStatus().message).toMatch(/這一局結束/);
+    await vi.waitFor(() => expect(rt.getStatus().phase).toBe("idle"));
+    expect(rt.getStatus().sessionId).toBeNull();
+    expect(rt.getStatus().message).toMatch(/重新開場/);
+    expect(rt.getStatus().message).not.toMatch(/這一局結束/);
+    expect(startSpy.mock.calls.length).toBe(callsBefore);
   });
 
-  it("does not restart the answer loop when the invite has already expired", async () => {
+  it("does not restart the answer loop after opponent leave (session closed)", async () => {
     vi.useFakeTimers();
-    const expiresAt = Date.now() + 10_000;
+    const expiresAt = Date.now() + 60_000;
     const { rt, prepared, startSpy } = await connectAndSeatGuest({
       expiresAt,
     });
-    await vi.advanceTimersByTimeAsync(10_000);
     const callsBefore = startSpy.mock.calls.length;
     prepared.handlers.onChannelClose?.();
-    await vi.waitFor(() => expect(rt.getStatus().seats).toHaveLength(0));
+    await vi.waitFor(() => expect(rt.getStatus().phase).toBe("idle"));
     expect(startSpy.mock.calls.length).toBe(callsBefore);
-    expect(rt.getStatus().message).toMatch(/離開/);
+    expect(rt.getStatus().inviteId).toBeNull();
     vi.useRealTimers();
     rt.dispose();
   });

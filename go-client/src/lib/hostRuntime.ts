@@ -474,18 +474,24 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
 
   /**
    * Guest closed the page／DataChannel or PeerConnection failed.
-   * Clear seat, update Host chrome, notify SAM presence.
+   * 1v1：整場結束（須重新開場）；多人：清席後可在未過期邀請上接替。
    */
   function handlePeerDisconnected(slot: RelaySlot): void {
     if (slot.lost) return;
     slot.lost = true;
     const peerId = slot.peerId;
-    const wasActive = status.phase === "active";
     const who =
       (peerId &&
         (slot.displayName ||
           status.seats.find(s => s.peerId === peerId)?.displayName)) ||
       "對手";
+    // 1v1：對手斷線＝結束邀請場（不只終局）；勿重開 answer loop。
+    if (guestTarget === 1 && status.sessionId) {
+      const message = `${who}已離開，請重新開場`;
+      chromeSession.setFlash(message, 2800);
+      void close({ message, reason: "opponent_left" });
+      return;
+    }
     const removedInviteIds = new Set(
       status.seats
         .filter(s => (peerId ? s.peerId === peerId : false))
@@ -509,18 +515,14 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
       }
     }
     refreshSessionChatPeers();
-    const message = wasActive
-      ? `${who}已離開，這一局結束`
-      : `${who}已離開`;
+    const message = `${who}已離開`;
     const nextPhase: HostPhase =
-      seats.length === 0 && wasActive && guestTarget === 1
-        ? "ended"
-        : seats.length === 0 &&
-            (status.phase === "ready" ||
-              status.phase === "active" ||
-              status.phase === "ended")
-          ? "waiting"
-          : status.phase;
+      seats.length === 0 &&
+      (status.phase === "ready" ||
+        status.phase === "active" ||
+        status.phase === "ended")
+        ? "waiting"
+        : status.phase;
     set({
       seats,
       message,
@@ -860,18 +862,24 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
     return result;
   }
 
-  async function close(): Promise<void> {
+  async function close(opts?: {
+    message?: string;
+    reason?: string;
+  }): Promise<void> {
     clearInviteExpiryTimer();
     loop?.stop();
     loop = null;
-    // Notify remote Guests before tearing DataChannels (mirror play shell).
-    if (status.sessionId && peerSessions.size > 0) {
+    const closeReason = opts?.reason ?? "host_closed";
+    const closeMessage = opts?.message ?? "已結束邀請場";
+    // Always fanout locally so Host canvas leaves the match UI even if the
+    // disconnecting peer was already dropped from peerSessions.
+    if (status.sessionId) {
       try {
-        publishEvents([{ type: "session.closed", reason: "host_closed" }]);
+        publishEvents([{ type: "session.closed", reason: closeReason }]);
       } catch {
         /* still close locally */
       }
-      if (status.inviteId) {
+      if (status.inviteId && peerSessions.size > 0) {
         sendRelay({
           kind: SESSION_INVITE_CANCEL_KIND,
           inviteId: status.inviteId,
@@ -888,6 +896,7 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
     }
     peerSessions.clear();
     sessionInviteSent.clear();
+    seatBoundSent.clear();
     if (status.inviteId) {
       try {
         await goAuth.revokePlatformInvite(status.inviteId);
@@ -900,7 +909,11 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
         await hostSessionFetch("/api/session/presence", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ playerSeated: false, seats: [] }),
+          body: JSON.stringify({
+            playerSeated: false,
+            seats: [],
+            reason: closeReason,
+          }),
         });
       } catch {
         /* ignore */
@@ -908,7 +921,7 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
     }
     set({
       phase: "idle",
-      message: "已結束邀請場",
+      message: closeMessage,
       error: null,
       sessionId: null,
       channelName: null,
