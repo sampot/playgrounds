@@ -56,7 +56,11 @@ class ChromeSession {
   setFlash(msg: string, ms = 2200): void {
     this.flash = msg;
     if (ms > 0) {
-      window.setTimeout(() => {
+      const schedule =
+        typeof globalThis.setTimeout === "function"
+          ? globalThis.setTimeout.bind(globalThis)
+          : null;
+      schedule?.(() => {
         if (this.flash === msg) this.flash = "";
       }, ms);
     }

@@ -52,6 +52,21 @@ import { publishGoMemoryBroadcast } from "./goMemoryCanvas";
 import type { FileMap } from "@pg/projectTypes";
 import type { HostableProtocol } from "./goCatalog";
 
+/** Platform Invite default TTL (DEC-047) — must match platform-api `INVITE_TTL_MS`. */
+export const DEFAULT_INVITE_TTL_MS = 5 * 60 * 1000;
+
+/** True while `now` is strictly before invite expiry. */
+export function isInviteUnexpired(
+  expiresAt: number | null | undefined,
+  now = Date.now()
+): boolean {
+  return (
+    typeof expiresAt === "number" &&
+    Number.isFinite(expiresAt) &&
+    now < expiresAt
+  );
+}
+
 export type HostPhase =
   | "idle"
   | "open"
@@ -78,6 +93,8 @@ export type HostStatus = {
   channelName: string | null;
   inviteId: string | null;
   shortUrl: string | null;
+  /** Unix ms; Platform Invite expiry (default 5m). */
+  inviteExpiresAt: number | null;
   hostRole: string;
   guestRoles: string[];
   /** Number of remote Guests the protocol expects to seat. */
@@ -136,6 +153,7 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
     channelName: null,
     inviteId: null,
     shortUrl: null,
+    inviteExpiresAt: null,
     hostRole,
     guestRoles,
     guestTarget,
@@ -145,6 +163,7 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
   };
   const listeners = new Set<Listener>();
   let loop: ReturnType<typeof startPlatformHostAnswerLoop> | null = null;
+  let inviteExpiryTimer: ReturnType<typeof setTimeout> | null = null;
   const localAgentId = `go-host-${crypto.randomUUID().slice(0, 8)}`;
   const seatBoundSent = new Set<string>();
   const sessionInviteSent = new Set<string>();
@@ -158,6 +177,8 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
     session: RosterPeerSession | null;
     /** From Guest `presence.name`. */
     displayName: string | null;
+    /** Idempotent tear-down when Guest closes tab／PC fails. */
+    lost?: boolean;
   };
   const slots: RelaySlot[] = [];
 
@@ -451,6 +472,92 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
     );
   }
 
+  /**
+   * Guest closed the page／DataChannel or PeerConnection failed.
+   * Clear seat, update Host chrome, notify SAM presence.
+   */
+  function handlePeerDisconnected(slot: RelaySlot): void {
+    if (slot.lost) return;
+    slot.lost = true;
+    const peerId = slot.peerId;
+    const wasActive = status.phase === "active";
+    const who =
+      (peerId &&
+        (slot.displayName ||
+          status.seats.find(s => s.peerId === peerId)?.displayName)) ||
+      "對手";
+    const removedInviteIds = new Set(
+      status.seats
+        .filter(s => (peerId ? s.peerId === peerId : false))
+        .map(s => s.inviteId)
+    );
+    if (peerId) {
+      peerSessions.delete(peerId);
+      sessionInviteSent.delete(peerId);
+    }
+    for (const inviteId of removedInviteIds) seatBoundSent.delete(inviteId);
+    const seats = peerId
+      ? status.seats.filter(s => s.peerId !== peerId)
+      : status.seats;
+    const sess = slot.session;
+    slot.session = null;
+    if (sess) {
+      try {
+        sess.close();
+      } catch {
+        /* ignore */
+      }
+    }
+    refreshSessionChatPeers();
+    const message = wasActive
+      ? `${who}已離開，這一局結束`
+      : `${who}已離開`;
+    const nextPhase: HostPhase =
+      seats.length === 0 && wasActive && guestTarget === 1
+        ? "ended"
+        : seats.length === 0 &&
+            (status.phase === "ready" ||
+              status.phase === "active" ||
+              status.phase === "ended")
+          ? "waiting"
+          : status.phase;
+    set({
+      seats,
+      message,
+      error: null,
+      phase: nextPhase,
+    });
+    chromeSession.setFlash(message, 2800);
+    if (status.sessionId) {
+      void hostSessionFetch("/api/session/presence", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          playerSeated: seats.length > 0,
+          seats,
+        }),
+      }).catch(() => {
+        /* presence is best-effort */
+      });
+    }
+    // Same invite short URL can accept a replacement Guest — only while unexpired.
+    const inviteId = status.inviteId;
+    const shortUrl = status.shortUrl;
+    if (
+      inviteId &&
+      shortUrl &&
+      seats.length < guestTarget &&
+      isInviteUnexpired(status.inviteExpiresAt)
+    ) {
+      void startAnswerLoopForInvite({
+        inviteId,
+        shortUrl,
+        expiresAt: status.inviteExpiresAt ?? undefined,
+        useRelay: goAuth.wantsTurnRelay(),
+      });
+    }
+  }
+
   function relayHandlers(slot: RelaySlot): RosterPeerHandlers {
     return {
       onMessage: (data: unknown) => {
@@ -506,6 +613,18 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
         refreshSessionChatPeers();
         set({ message: "已連線，等待對手入座…" });
       },
+      onChannelClose: () => {
+        handlePeerDisconnected(slot);
+      },
+      onConnectionState: (state: RTCPeerConnectionState) => {
+        if (
+          state === "failed" ||
+          state === "disconnected" ||
+          state === "closed"
+        ) {
+          handlePeerDisconnected(slot);
+        }
+      },
       onError: (err: Error) => {
         set({ error: err.message, message: "" });
       },
@@ -539,6 +658,52 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
     }
   }
 
+  function clearInviteExpiryTimer(): void {
+    if (inviteExpiryTimer != null) {
+      clearTimeout(inviteExpiryTimer);
+      inviteExpiryTimer = null;
+    }
+  }
+
+  /**
+   * Invite TTL elapsed: stop answering. If nobody joined, drop invite chrome.
+   * Seated peers keep playing; we just won't restart／accept more joins.
+   */
+  function abandonExpiredInvite(inviteId: string): void {
+    if (status.inviteId !== inviteId) return;
+    clearInviteExpiryTimer();
+    loop?.stop();
+    loop = null;
+    const joined = status.seats.length > 0 || peerSessions.size > 0;
+    if (joined) {
+      set({
+        message: "邀請連結已過期（已入座對手不受影響）",
+        error: null,
+      });
+      return;
+    }
+    set({
+      inviteId: null,
+      shortUrl: null,
+      inviteExpiresAt: null,
+      message: "邀請已過期，請重新邀請",
+      error: null,
+    });
+    chromeSession.setFlash("邀請已過期", 2800);
+    void goAuth.revokePlatformInvite(inviteId).catch(() => {
+      /* best-effort */
+    });
+  }
+
+  function scheduleInviteExpiry(inviteId: string, expiresAt: number): void {
+    clearInviteExpiryTimer();
+    const delay = Math.max(0, expiresAt - Date.now());
+    inviteExpiryTimer = setTimeout(() => {
+      inviteExpiryTimer = null;
+      abandonExpiredInvite(inviteId);
+    }, delay);
+  }
+
   /**
    * Start (or restart) the Platform Host answer loop for `inviteId`. Used both
    * by `mintInviteAndAnswer` and when the Host SAM mints by itself.
@@ -546,13 +711,36 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
   async function startAnswerLoopForInvite(opts: {
     inviteId: string;
     shortUrl: string;
+    /** Unix ms; omitted → now + DEFAULT_INVITE_TTL_MS. */
+    expiresAt?: number;
     useRelay?: boolean;
   }): Promise<void> {
-    set({ inviteId: opts.inviteId, shortUrl: opts.shortUrl, error: null });
+    const expiresAt =
+      typeof opts.expiresAt === "number" && Number.isFinite(opts.expiresAt)
+        ? opts.expiresAt
+        : Date.now() + DEFAULT_INVITE_TTL_MS;
+    if (!isInviteUnexpired(expiresAt)) {
+      set({
+        inviteId: null,
+        shortUrl: null,
+        inviteExpiresAt: null,
+        message: "邀請已過期，請重新邀請",
+        error: null,
+      });
+      return;
+    }
+    set({
+      inviteId: opts.inviteId,
+      shortUrl: opts.shortUrl,
+      inviteExpiresAt: expiresAt,
+      error: null,
+    });
     sessionInviteSent.clear();
     loop?.stop();
+    scheduleInviteExpiry(opts.inviteId, expiresAt);
     const apiKey = goAuth.getPlatformApiKeyForHostLoop();
     if (!apiKey) {
+      clearInviteExpiryTimer();
       set({ phase: "error", error: "通行證已失效，請重新登入" });
       return;
     }
@@ -615,6 +803,7 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
       await startAnswerLoopForInvite({
         inviteId: created.invite_id,
         shortUrl: created.short_url,
+        expiresAt: created.expires_at,
         useRelay:
           composeWantsRelay(opts.intent) || goAuth.wantsTurnRelay(),
       });
@@ -636,6 +825,7 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
   async function adoptSamInvite(opts: {
     inviteId: string;
     shortUrl: string;
+    expiresAt?: number;
     useRelay?: boolean;
   }): Promise<void> {
     if (!status.sessionId || status.phase === "idle") {
@@ -647,6 +837,7 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
 
   function stopAnsweringInvite(inviteId: string): void {
     if (!inviteId || status.inviteId !== inviteId) return;
+    clearInviteExpiryTimer();
     loop?.stop();
     loop = null;
     set({ message: "已停止接受新對手" });
@@ -670,6 +861,7 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
   }
 
   async function close(): Promise<void> {
+    clearInviteExpiryTimer();
     loop?.stop();
     loop = null;
     // Notify remote Guests before tearing DataChannels (mirror play shell).
@@ -722,6 +914,7 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
       channelName: null,
       inviteId: null,
       shortUrl: null,
+      inviteExpiresAt: null,
       seats: [],
     });
     goSessionChat.detach();
@@ -745,6 +938,7 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
     hostSessionFetch,
     close,
     dispose() {
+      clearInviteExpiryTimer();
       loop?.stop();
       loop = null;
       goSessionChat.detach();

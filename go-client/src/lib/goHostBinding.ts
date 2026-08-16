@@ -288,6 +288,7 @@ export function createGoHostBinding(deps: GoHostBindingDeps): GoHostBinding {
           await rt.adoptSamInvite({
             inviteId: created.invite_id,
             shortUrl: created.short_url,
+            expiresAt: created.expires_at,
             useRelay:
               composeWantsRelay(options?.intent) || goAuth.wantsTurnRelay(),
           });

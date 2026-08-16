@@ -329,6 +329,7 @@ export function createHostInviteBind(opts: {
     await r.adoptSamInvite({
       inviteId: ev.inviteId,
       shortUrl: ev.shortUrl,
+      expiresAt: ev.expiresAt,
       useRelay: goAuth.wantsTurnRelay(),
     });
     return buildShare({ inviteId: ev.inviteId, shortUrl: ev.shortUrl });

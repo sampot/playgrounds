@@ -348,3 +348,168 @@ describe("hostRuntime.createPlatformInvite adoption path", () => {
     expect(notifiedAt).toBeLessThan(closedAt);
   });
 });
+
+describe("hostRuntime Guest disconnect detection", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  async function connectAndSeatGuest(opts?: {
+    name?: string;
+    phaseActive?: boolean;
+    expiresAt?: number;
+  }) {
+    goAuth.__setApiKeyForTests("pg_sk_test");
+    let loopOptions:
+      | Parameters<typeof platformHostLoop.startPlatformHostAnswerLoop>[0]
+      | null = null;
+    const startSpy = vi
+      .spyOn(platformHostLoop, "startPlatformHostAnswerLoop")
+      .mockImplementation(options => {
+        loopOptions = options;
+        return { stop: vi.fn(), inviteId: options.inviteId };
+      });
+    const invokeHostSession = vi.fn(async (path: string) => {
+      if (path.includes("/presence")) {
+        return { ok: true };
+      }
+      return {
+        ok: true,
+        state: opts?.phaseActive ? { status: "active" } : { status: "ready" },
+      };
+    });
+    const rt = createHostRuntime({
+      getFiles: () => ({ "index.html": "<html></html>" }) as FileMap,
+      getSandboxId: () => "go-sb-disc",
+      protocol,
+      invokeHostSession,
+    });
+    await rt.open();
+    await rt.adoptSamInvite({
+      inviteId: "platform-inv-disc",
+      shortUrl: "https://go.samkuo.me/i/disc",
+      expiresAt: opts?.expiresAt ?? Date.now() + 60_000,
+    });
+    const sessionId = rt.getStatus().sessionId!;
+    const prepared = loopOptions!.prepareHandlers();
+    const closePeer = vi.fn();
+    prepared.attachSession({
+      send: vi.fn(),
+      close: closePeer,
+      getChannel: () => null,
+      pc: {} as RTCPeerConnection,
+      role: "guest",
+    });
+    const guestName = opts?.name ?? "小華";
+    prepared.handlers.onMessage?.({
+      type: "presence",
+      agentId: "go-guest-disc",
+      name: guestName,
+    });
+    prepared.handlers.onMessage?.({
+      type: "avatar_relay",
+      from: "go-guest-disc",
+      payload: {
+        kind: "session_invite_accept",
+        inviteId: "platform-inv-disc",
+        sessionId,
+        role: "player",
+      },
+    });
+    await vi.waitFor(() => expect(rt.getStatus().seats).toHaveLength(1));
+    if (opts?.phaseActive) {
+      await rt.hostSessionFetch("/api/session/act", {
+        method: "POST",
+        body: "{}",
+      });
+      expect(rt.getStatus().phase).toBe("active");
+    }
+    return { rt, prepared, closePeer, invokeHostSession, guestName, startSpy };
+  }
+
+  it("clears the seat and notifies when the Guest DataChannel closes", async () => {
+    const { rt, prepared, closePeer, invokeHostSession, guestName } =
+      await connectAndSeatGuest();
+    prepared.handlers.onChannelClose?.();
+    await vi.waitFor(() => expect(rt.getStatus().seats).toHaveLength(0));
+    expect(rt.getStatus().message).toMatch(new RegExp(`${guestName}|離開|斷線`));
+    expect(rt.getStatus().phase).toBe("waiting");
+    expect(closePeer).toHaveBeenCalled();
+    expect(invokeHostSession).toHaveBeenCalledWith(
+      "/api/session/presence",
+      expect.objectContaining({
+        body: expect.stringContaining('"playerSeated":false'),
+      })
+    );
+  });
+
+  it("reacts to PeerConnection failed／closed the same way", async () => {
+    const { rt, prepared } = await connectAndSeatGuest({ name: "阿明" });
+    prepared.handlers.onConnectionState?.("failed");
+    await vi.waitFor(() => expect(rt.getStatus().seats).toHaveLength(0));
+    expect(rt.getStatus().message).toMatch(/阿明|離開|斷線/);
+  });
+
+  it("marks the match ended when a seated Guest leaves mid-game", async () => {
+    const { rt, prepared } = await connectAndSeatGuest({
+      name: "對手",
+      phaseActive: true,
+    });
+    prepared.handlers.onChannelClose?.();
+    await vi.waitFor(() => expect(rt.getStatus().seats).toHaveLength(0));
+    expect(rt.getStatus().phase).toBe("ended");
+    expect(rt.getStatus().message).toMatch(/這一局結束/);
+  });
+
+  it("does not restart the answer loop when the invite has already expired", async () => {
+    vi.useFakeTimers();
+    const expiresAt = Date.now() + 10_000;
+    const { rt, prepared, startSpy } = await connectAndSeatGuest({
+      expiresAt,
+    });
+    await vi.advanceTimersByTimeAsync(10_000);
+    const callsBefore = startSpy.mock.calls.length;
+    prepared.handlers.onChannelClose?.();
+    await vi.waitFor(() => expect(rt.getStatus().seats).toHaveLength(0));
+    expect(startSpy.mock.calls.length).toBe(callsBefore);
+    expect(rt.getStatus().message).toMatch(/離開/);
+    vi.useRealTimers();
+    rt.dispose();
+  });
+});
+describe("hostRuntime invite TTL / answer loop expiry", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("stops the answer loop when the invite TTL elapses with no Guest", async () => {
+    vi.useFakeTimers();
+    goAuth.__setApiKeyForTests("pg_sk_test");
+    const stop = vi.fn();
+    vi.spyOn(platformHostLoop, "startPlatformHostAnswerLoop").mockReturnValue({
+      stop,
+      inviteId: "inv-ttl",
+    } as never);
+    const rt = createHostRuntime({
+      getFiles: () => ({ "index.html": "<html></html>" }) as FileMap,
+      getSandboxId: () => "go-sb-ttl",
+      protocol,
+      invokeHostSession: async () => ({ ok: true }),
+    });
+    await rt.open();
+    const expiresAt = Date.now() + 5_000;
+    await rt.adoptSamInvite({
+      inviteId: "inv-ttl",
+      shortUrl: "https://go.samkuo.me/i/ttl",
+      expiresAt,
+    });
+    expect(rt.getStatus().inviteId).toBe("inv-ttl");
+
+    await vi.advanceTimersByTimeAsync(5_000);
+
+    expect(stop).toHaveBeenCalled();
+    expect(rt.getStatus().inviteId).toBeNull();
+    expect(rt.getStatus().message).toMatch(/過期/);
+    rt.dispose();
+  });
+});

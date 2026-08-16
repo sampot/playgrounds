@@ -304,6 +304,7 @@ describe("createGoHostBinding — platform invite", () => {
     expect(rt.adoptSamInvite).toHaveBeenCalledWith({
       inviteId: "inv_x",
       shortUrl: "https://go.samkuo.me/i/x",
+      expiresAt: 1780000000000,
       useRelay: true,
     });
   });
