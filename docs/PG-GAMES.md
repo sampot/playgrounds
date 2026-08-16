@@ -13,12 +13,12 @@
 
 ---
 
-## 已實作（79）
+## 已實作（114）
 
-### 精緻可玩（10＋4 unlisted）
+### 精緻可玩（15＋4 unlisted）
 | id | 標題 | 一句話 |
 | --- | --- | --- |
-| `pg-chengyu` | 成語接龍 | 末字起頭接龍、挑戰計分與人機 |
+| `pg-chengyu` | 成語接龍 | 末字起頭接龍、挑戰計分與人機；對戰超時出局，預留 `chengyu.v1` |
 | `pg-diabolo` | 扯鈴 | **unlisted**；節拍連招（抖鈴／拋鈴／接鈴）累加 combo、難度遞增 |
 | `pg-hopkick` | 跳房子踢毽子 | 跳房子節拍點格與踢毽子連擊 |
 | `pg-microdungeon` | 迷你地城 | 三層短局隨機迷宮、找符石開出口、碰撞戰鬥與成長 |
@@ -30,8 +30,13 @@
 | `pg-sandrts` | 沙丘戰線 | **unlisted**；障礙繞行＋空襲；指揮部被毀即出局 |
 | `pg-yakyu` | 野球生涯 | **unlisted**；虛構青棒校隊；打者揮棒或投手兩用、其餘快轉、短賽季決賽 |
 | `pg-gongzhu` | 抽豬 | 夜市抽卡遊戲、避豬計分 |
+| `pg-tinyfarm` | 一季小農園 | 短局翻土澆水收成賣箱；非長期養成 |
+| `pg-shrineclear` | 祠堂試煉 | 俯視清房、鑰匙開門、近戰短關 |
+| `pg-caveline` | 洞穴一筆劃 | 廊道拼路／限步探路 |
+| `pg-abilitycave` | 能力門洞穴 | 3～5 能力解鎖過障、短圖回溯 |
+| `pg-coopswitch` | 雙人機關 | 同機兩角色踩開關推箱過關；預留 Invite |
 
-### 街機（16＋3 unlisted）
+### 街機（29＋3 unlisted）
 
 | id | 標題 | 一句話 |
 | --- | --- | --- |
@@ -52,8 +57,21 @@
 | `pg-tetris` | 俄羅斯方塊 | 七種方塊、消行升級 |
 | `pg-topduel` | 陀螺對戰 | 蓄力發射、轉速碰撞 |
 | `pg-towerdef` | 迷你塔防 | 戰役星等、無盡模式 |
+| `pg-aimbeat` | 準星節拍 | 拍點出靶、換準星造型連擊 |
+| `pg-parkexam` | 倒車入庫 | 俯視平行停車／S 彎考照小品 |
+| `pg-blackout` | 停電尋物 | 手電筒視野找鑰匙／出口 |
+| `pg-puffinhale` | 吸吐清波 | 吸入敵人取得屬性再吐出清波 |
+| `pg-inkskirmish` | 油漆巷戰 | 限時塗地佔分對 AI |
+| `pg-tidewave` | 潮汐倖存 | 走位躲彈、自動射擊、局內三選一升級 |
+| `pg-voidnom` | 黑洞吞噬 | 俯視限時吞噬、體積越大可吃越大 |
+| `pg-tugwar` | 拔河對決 | 時機點按比合力；人機／1v1 |
+| `pg-bowcamp` | 森林射靶營 | 弓箭風阻距離瞄準 |
+| `pg-deliver` | 外送路線 | 限時送達、躲路錐 |
+| `pg-rooftumble` | 屋頂擊飛 | 同機雙人平台碰撞擊飛出局 |
+| `pg-gatecrowd` | 過門加人 | 直線跑過加減門、終點比人數 |
+| `pg-flutter` | 振翅穿林 | 單鍵振翅穿越高低障礙、連續過門計分 |
 
-### 懷舊（17＋8 unlisted）
+### 懷舊（26＋8 unlisted）
 
 | id | 標題 | 一句話 |
 | --- | --- | --- |
@@ -76,6 +94,15 @@
 | `pg-stamppad` | 戳戳樂 | **unlisted**；付代幣戳開格子看獎品、收集過關 |
 | `pg-wanzai` | 尪仔標 | 選牌對拍、翻牌收穫 |
 | `pg-wingrace` | 翼途競飛 | 簡化飛行棋 |
+| `pg-flagquiz` | 國旗快答 | 限時認旗／配對計分（含 TW 等） |
+| `pg-tensum` | 湊十消數 | 框選相鄰數字加總＝10 消除 |
+| `pg-tubesort` | 試管分色 | 倒色液／色球至同色滿管過關 |
+| `pg-blockfit` | 方塊填格 | 放置多聯骨牌清行／列；≠下落俄羅斯 |
+| `pg-merge2048` | 數字合併 | 滑格同數合併挑戰 2048；本機最高分 |
+| `pg-screwout` | 螺絲拆解 | 依序拆釘解層級遮擋過關 |
+| `pg-cubematch` | 方塊寵物配 | 短局翻牌或圖鑑收集 |
+| `pg-fruitmerge` | 合成大果 | 落下同階水果合併升級；杯滿出局 |
+| `pg-carjam` | 出車解謎 | 滑車讓目標車出路 |
 
 ### 機台（17＋1 unlisted）
 
@@ -100,7 +127,7 @@
 | `pg-strongman` | 力氣錘 | 蓄力揮錘打鈴／分數帶 |
 | `pg-ticketgrab` | 彩票機 | 投幣抓取彩球、組合獲獎 |
 
-### 桌遊（15＋6 unlisted）
+### 桌遊（23＋6 unlisted）
 
 | id | 標題 | 一句話 |
 | --- | --- | --- |
@@ -122,99 +149,21 @@
 | `pg-xiangqi` | 象棋 | 楚河漢界、將軍困斃；人機／雙人／AI 對 AI |
 | `pg-xinzang` | 心臟病 | **unlisted**；翻牌見心臟病號碼秒拍、最慢收整疊、對決 AI |
 | `pg-zhuagui` | 抓烏龜 | **unlisted**；丟對子後輪流盲抽、剩烏龜牌者出局、四人童玩 |
+| `pg-domino` | 骨牌接龍 | 雙六骨牌接點出牌、人機 |
+| `pg-seabattle` | 海戰佈艦 | 佈艦後輪流點射；人機先、預留 Invite |
+| `pg-fourline` | 四子棋 | 重力落子連四；人機／雙人，預留 Invite |
+| `pg-sealedbid` | 密封拍賣 | 同時密封出價、揭示比價；3～4 人／人機 |
+| `pg-buzzerquiz` | 搶答題庫 | 同題搶拍計分；單人練習／多人房 |
+| `pg-hotpotato` | 傳炸彈 | 限時傳遞熱土豆、爆者出局；3～4 人／人機 |
+| `pg-undercover` | 影武者詞殺 | 多數同詞、少數異詞、輪流描述投票 |
+| `pg-sketchtell` | 你畫我猜 | 一輪一畫家、其餘猜詞；預留 Invite |
 
 ---
 
 ## 打算實作（backlog）
 
-上架後：把列移到「已實作」、補 `catalog/entries/<id>.yaml`，並跑 `catalog:gen`。
+（空）2026-08-16 批次已將本檔 backlog 全數實作並移入「已實作」；本地 repo 在 `~/dev/sampot/pg-*`，型錄 YAML 已補。**GitHub remote／`gh repo create` 尚未批次 push**——上架 go／`?open=` 前需先建立並推送對應 `sampot/pg-*` public repo。
 
-**選題方針：** **台灣味優先**（在地玩法、夜市／學校／電腦課回憶、華語圈常玩），但**不是限制**——`game-assets/` 已成套、能明顯增加豐富度的通用小品也可排程。  
-**排程軸：** 下表依 **資源就緒度** 排序（高→低）；同檔內台灣味與通用並列，就緒度相同時台灣味靠前。資產路徑見 [`game-assets/ATTRIBUTION.md`](../game-assets/ATTRIBUTION.md)。
-
-| 就緒度 | 含義 |
-| --- | --- |
-| **高** | 美術＋音效（＋可選 BGM）在庫內大致齊；主要寫規則／AI／UI |
-| **中** | 主資產有一部分；台規 UI、關卡圖或少數元件需補 |
-| **低** | 缺成套美術；須自繪或另找 pack 再開工 |
-
-### Backlog（依資源就緒度）
-
-2026-08-16 自 Kenney CC0 新入庫排程（見 [`game-assets/ATTRIBUTION.md`](../game-assets/ATTRIBUTION.md)「2026-08-16」節）。湯姆熊／機台 8 款已於 2026-08-15 上架。同日另排：Poki／瀏覽器小品 5 款、主機機制低風險致敬 5 款、近代熱門手遊機制短局 5 款（僅玩法骨架；自有標題／角色／美術，勿用原作名、商標角色或還原關卡；不做 Gacha／LiveOps meta）、**多人友好** 5 款＋**派對／合作新發想** 5 款（先人機／同機可玩，狀態宜小、預留 Platform Invite／`*.v1`；對齊 `pg-gomoku` 路徑，非開服 MMO）。
-
-| 就緒 | id | 標題 | 一句話 | 主資產 |
-| --- | --- | --- | --- | --- |
-| 高 | `pg-domino` | 骨牌接龍 | 雙六骨牌接點出牌、人機；可換主題皮 | `art/domino-pack/`（＋`sfx/casino-audio/`／`ui-audio`） |
-| 高 | `pg-flagquiz` | 國旗快答 | 限時認旗／配對計分（含 TW 等） | `art/flag-pack/` |
-| 高 | `pg-aimbeat` | 準星節拍 | 拍點出靶、換準星造型連擊；≠光槍彈幕 | `art/crosshair-pack/`（＋`art/rts/shooting-gallery/`） |
-| 高 | `pg-tensum` | 湊十消數 | 框選相鄰數字加總＝10 消除；電腦課益智感 | 純 UI（可選 `art/food-kit/` 換皮） |
-| 高 | `pg-tubesort` | 試管分色 | 倒色液／色球至同色滿管過關 | 純幾何＋色（可選 `art/puzzle-pack-*`） |
-| 高 | `pg-blockfit` | 方塊填格 | 放置多聯骨牌清行／列；≠下落俄羅斯 | `art/physics-assets/`／`puzzle-pack-2/` |
-| 高 | `pg-merge2048` | 數字合併 | 滑格同數合併挑戰 2048；本機最高分 | 純 UI |
-| 高 | `pg-screwout` | 螺絲拆解 | 依序拆釘解層級遮擋過關；純邏輯短關 | 程序釘＋板（可選 `art/generic-items/`） |
-| 高 | `pg-seabattle` | 海戰佈艦 | 佈艦後輪流點射；人機先、預留 Invite 1v1 | 純格子 UI |
-| 高 | `pg-fourline` | 四子棋 | 重力落子連四；人機／雙人，預留 Invite（≠井字／五子） | 純 UI |
-| 高 | `pg-chengyu`（升級） | 成語接龍對戰 | 輪流接龍、超時出局；擴充既有，預留 `chengyu.v1` | 既有詞庫 |
-| 高 | `pg-sealedbid` | 密封拍賣 | 同時密封出價、揭示比價；3～4 人／人機，預留 Invite | 純 UI（可選 `art/boardgame-pack/`） |
-| 高 | `pg-buzzerquiz` | 搶答題庫 | 同題搶拍計分；單人練習／多人房，預留 Invite（≠國旗快答） | 題庫 JSON＋純 UI |
-| 中 | `pg-tinyfarm` | 一季小農園 | 短局翻土澆水收成賣箱；非長期養成 | `art/tiny-farm/` |
-| 中 | `pg-parkexam` | 倒車入庫 | 俯視平行停車／S 彎考照小品 | `art/car-kit/` `Previews/` |
-| 中 | `pg-blackout` | 停電尋物 | 手電筒視野找鑰匙／出口；≠拾光迷宮 | `art/light-masks/`＋cave／dungeon `Previews/` |
-| 中 | `pg-cubematch` | 方塊寵物配 | 短局翻牌或圖鑑收集；長線育成另開 toy | `art/cube-pets/` `Previews/` |
-| 中 | `pg-fruitmerge` | 合成大果 | 落下同階水果合併升級；杯滿出局 | `art/food-kit/`＋簡易物理 |
-| 中 | `pg-shrineclear` | 祠堂試煉 | 俯視清房、鑰匙開門、近戰短關；≠地城成長探索 | `art/mini-dungeon/`／`modular-cave-kit/` |
-| 中 | `pg-puffinhale` | 吸吐清波 | 吸入敵人取得屬性再吐出清波；角色全自創 | `art/shape-characters/`／`toon-characters/` |
-| 中 | `pg-inkskirmish` | 油漆巷戰 | 限時塗地佔分對 AI；抽象色塊、非人型 IP | 程序色塊（可選 `art/particle-pack/`） |
-| 中 | `pg-tidewave` | 潮汐倖存 | 走位躲彈、自動射擊、局內三選一升級；短潮汐一局 | `art/rts/pixel-shmup/`／`top-down-shooter/` |
-| 中 | `pg-voidnom` | 黑洞吞噬 | 俯視限時吞噬、體積越大可吃越大 | 程序圓＋色（可選 `art/particle-pack/`） |
-| 中 | `pg-carjam` | 出車解謎 | 滑車讓目標車出路；≠考照操作 | `art/car-kit/` `Previews/` |
-| 中 | `pg-hotpotato` | 傳炸彈 | 限時傳遞熱土豆、爆者出局；3～4 人／人機，預留 Invite | `art/emotes-pack/`／程序 UI |
-| 中 | `pg-undercover` | 影武者詞殺 | 多數同詞、少數異詞、輪流描述投票；4～6 人／人機，預留 Invite | 詞庫 JSON＋純 UI |
-| 中 | `pg-tugwar` | 拔河對決 | 時機點按比合力；人機／1v1，預留 Invite | 程序 UI（可選 `art/sports-pack/`） |
-| 中 | `pg-sketchtell` | 你畫我猜 | 一輪一畫家、其餘猜詞；先單機提示後多人，預留 Invite | Canvas＋詞庫（可選 `art/emotes-pack/`） |
-| 中低 | `pg-bowcamp` | 森林射靶營 | 弓箭風阻距離瞄準；夜市射氣球的露營版 | `art/mini-forest/`（＋`crosshair-pack`） |
-| 中低 | `pg-caveline` | 洞穴一筆劃 | 廊道拼路／限步探路；≠地城戰鬥成長 | `art/modular-cave-kit/` `Previews/` |
-| 中低 | `pg-deliver` | 外送路線 | 限時送達、躲路錐；≠大型賽車 | `art/car-kit/`＋可選 `roguelike-modern-city/` |
-| 中低 | `pg-abilitycave` | 能力門洞穴 | 3～5 能力解鎖過障、短圖回溯；≠純平台躍階 | `art/modular-cave-kit/`＋`pixel-platformer` |
-| 中低 | `pg-rooftumble` | 屋頂擊飛 | 同機雙人平台碰撞擊飛出局；抽象人型無招式表 | `art/toon-characters/`／`shape-characters/` |
-| 中低 | `pg-gatecrowd` | 過門加人 | 直線跑過加減門、終點比人數；短關數十則 | `art/toon-characters/`／`shape-characters/` |
-| 中低 | `pg-coopswitch` | 雙人機關 | 同機／連線兩角色踩開關推箱過關；預留 Invite 合作 | `art/puzzle-pack-*`／`physics-assets/` |
-| 低 | `pg-flutter` | 振翅穿林 | 單鍵振翅穿越高低障礙、連續過門計分；類 Flappy Bird 短局玩法 | 鳥與障礙需自繪或另找 pack |
-
-已就緒相關 pack：`domino-pack`／`tiny-farm`／`cube-pets`／`car-kit`／`crosshair-pack`／`flag-pack`／`mini-forest`／`modular-cave-kit`／`mini-dungeon`／`light-masks`／`pattern-pack-extra`／`food-kit`／`physics-assets`／`shape-characters`／`toon-characters`／`boardgame-pack`／`emotes-pack`（圖樣多作換皮，不單獨立題）<br>既有可併用：`casino-audio`／`ui-audio`／`shooting-gallery`／`roguelike-modern-city`／機台向 sports／fish／physics 等
-
-**多人預留（不另開 id，phase 2 Invite）：** `pg-gomoku`（已通）、`pg-xiangqi`／`pg-banqi`／`pg-jungle`／`pg-big2`／`pg-liarsdice`／`pg-gongzhu`／`pg-airhockey`／`pg-tankduel`／`pg-topduel`／`pg-inkskirmish`／`pg-rooftumble` 等——先穩單機規則與可序列化狀態，再掛 protocol。
-
-### 已涵蓋、不必再做一顆複製品
-
-| 題材 | 既有 id |
-| --- | --- |
-| 尪仔標、路名地產、成語、暗棋、鬥獸棋、軍棋、象棋、大老二、21點、撿紅點、台灣麻將、新接龍 | `pg-wanzai`、`pg-twland`、`pg-chengyu`、`pg-banqi`、`pg-jungle`、`pg-junqi`、`pg-xiangqi`、`pg-big2`、`pg-blackjack`、`pg-redpick`、`pg-mahjong`、`pg-freecell` |
-| 夜市射氣球／套圈／打地鼠／切水果／糖果投掷／小馬過河 | `pg-popshot`、`pg-ringtoss`、`pg-moletap`、`pg-fruitcut`、`pg-candythrow`、`pg-rivercross` |
-| 小瑪莉、夾娃娃、推幣機、彈珠台、光槍射擊、彩票機、釘珠、賽馬燈、賓果燈、投籃／射門／釣魚／轉轉樂／疊疊／滾球／測力拳／力氣錘 | `pg-mali`、`pg-clawgrab`、`pg-coinpush`、`pg-pinball`、`pg-lightgun`、`pg-ticketgrab`、`pg-pinfall`、`pg-horselit`、`pg-bingolite`、`pg-hoopshot`、`pg-goalshot`、`pg-fishcab`、`pg-prizewheel`、`pg-stacker`、`pg-skeeball`、`pg-punchpad`、`pg-strongman` |
-| 跳房子／踢毽子、木頭人、飛行棋簡化、躍階平台 | `pg-hopkick`、`pg-statue`、`pg-wingrace`、`pg-leaptrail`、`pg-pixelhop`（勿再做水管工側視平台複製品） |
-| 短關地城探索／戰鬥節奏 | `pg-microdungeon`（`pg-caveline`＝廊道拼路；`pg-shrineclear`＝清房鎖門，勿做成複製品） |
-| 青棒／棒球生涯（關鍵打席＋快轉） | `pg-yakyu` |
-| 小地圖收集／避開 | `pg-cityroam`（`pg-voidnom`＝限時吞噬體積，勿做成複製品） |
-| 固定畫面太空射擊 | `pg-starshot`（若做 `pg-spacepulse` 須機制明顯不同；`pg-tidewave`＝走位＋局內三選一，勿做成複製品） |
-| 固定點線塔防 | `pg-towerdef`（`pg-sandrts`＝自由佈局＋出擊 AI，勿做成複製品） |
-| 迴廊拾光 | `pg-mazeglow`（`pg-blackout`＝手電筒尋物，勿做成複製品） |
-| 倒車考照操作 | `pg-parkexam`（`pg-carjam`＝滑車出路解謎，勿做成複製品） |
-| 井字／五子 | `pg-tictactoe`、`pg-gomoku`（`pg-fourline`＝重力四子，勿做成複製品） |
-| 成語接龍（單機／人機挑戰） | `pg-chengyu`（對戰房＝同 id 升級，勿另開複製品） |
-| 國旗快答 | `pg-flagquiz`（`pg-buzzerquiz`＝通用搶答房，勿做成複製品） |
-| 推箱子單人關卡 | `pg-sokoban`（`pg-coopswitch`＝雙人開關合作，勿做成複製品） |
-
-### 候補想法（未排程 id）
-
-- 官兵捉強盜／躲貓貓：地圖追逐對戰，協議重；詞殺／投票已排 `pg-undercover`，勿混成一題
-- 電子雞／長期育成：偏長期養成，可另開 `toy`；短局圖鑑／翻牌已排 `pg-cubematch`
-- 熱血系列／跑跑卡丁／大型實車賽車：授權與體量不適合 SAM 小品（考照／外送已排 `pg-parkexam`／`pg-deliver`）
-- 抓寵屬性對戰／長線島嶼經營／明星角色大亂鬥房：IP 與體量風險高，不排程；機制向短局已排 `pg-inkskirmish`／`pg-rooftumble`／`pg-puffinhale` 等
-- 完整 Merge 經營 LiveOps／開放世界抽卡／MOBA／吃雞：不符 SAM 短局；手遊向短循環已排 `pg-tidewave`／`pg-voidnom`／`pg-gatecrowd`／`pg-screwout`／`pg-carjam`
-- 主持人專用出題房：與 `pg-buzzerquiz`／`pg-sketchtell` 重疊，不另開 id
-
----
 
 ## 維護備註
 
