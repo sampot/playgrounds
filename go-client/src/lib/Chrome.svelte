@@ -487,8 +487,8 @@
             class="profile-avatar"
             src={goAuth.profile.avatar_url}
             alt="已登入"
-            width="26"
-            height="26"
+            width="44"
+            height="44"
             referrerpolicy="no-referrer"
           />
         {:else}

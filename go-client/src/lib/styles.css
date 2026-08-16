@@ -657,13 +657,20 @@ a {
 .chrome .profile-btn--logged .profile-glyph {
   color: rgb(var(--accent));
 }
+/* Avatar fills the button chrome — no inner padding／double border gap. */
+.chrome .profile-btn:has(.profile-avatar) {
+  padding: 0;
+  overflow: hidden;
+}
 .chrome .profile-avatar {
+  position: absolute;
+  inset: 0;
   display: block;
-  width: 1.6rem;
-  height: 1.6rem;
-  border-radius: var(--radius);
+  width: 100%;
+  height: 100%;
   object-fit: cover;
-  border: 2px solid rgb(var(--ink));
+  border: 0;
+  border-radius: 0;
   background: rgb(var(--fill));
 }
 .chrome .profile-status {
