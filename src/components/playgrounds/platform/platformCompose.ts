@@ -15,7 +15,7 @@ export type InviteComposeIntentV1 = {
     consent?: "always_ask";
   };
   transport?: {
-    roster?: { signal?: boolean };
+    roster?: { signal?: boolean; relay?: boolean };
   };
   ux?: {
     confirmOpen?: boolean;
@@ -40,6 +40,14 @@ export function wantsRosterSignal(
   if (kind !== "invite.compose") return false;
   if (!isInviteComposeIntent(intent)) return true;
   return intent.transport?.roster?.signal !== false;
+}
+
+/** TURN is paid／privacy-sensitive transport and therefore explicit opt-in. */
+export function composeWantsRelay(intent: unknown): boolean {
+  return (
+    isInviteComposeIntent(intent) &&
+    intent.transport?.roster?.relay === true
+  );
 }
 
 export function composeNeedsMaximize(intent: unknown): boolean {

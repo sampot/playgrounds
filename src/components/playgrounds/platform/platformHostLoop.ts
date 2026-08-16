@@ -24,6 +24,8 @@ export function startPlatformHostAnswerLoop(opts: {
   inviteId: string;
   apiKey: string;
   lan?: boolean;
+  /** Paid TURN relay is opt-in; omitted／false uses direct STUN connectivity. */
+  useRelay?: boolean;
   localPresence: { agentId: string; name: string };
   /** Called before each accept so the panel can point handlers at the next PC. */
   prepareHandlers: () => {
@@ -68,7 +70,7 @@ export function startPlatformHostAnswerLoop(opts: {
         opts.onStatus?.(
           `排隊握手中（join ${pending.join_id.slice(0, 6)}…）`
         );
-        const iceServers = opts.lan
+        const iceServers = opts.lan || !opts.useRelay
           ? undefined
           : ((await fetchHostTurnIceServers({
               apiKey: opts.apiKey,

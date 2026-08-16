@@ -286,7 +286,10 @@ describe("createGoHostBinding — platform invite", () => {
     });
     const out = await binding.createPlatformInvite({
       kind: "invite.compose",
-      intent: { version: 1 },
+      intent: {
+        version: 1,
+        transport: { roster: { signal: true, relay: true } },
+      },
     });
     expect(out.invite_id).toBe("inv_x");
     expect(fetchSpy).toHaveBeenCalledTimes(1);
@@ -294,6 +297,7 @@ describe("createGoHostBinding — platform invite", () => {
     expect(rt.adoptSamInvite).toHaveBeenCalledWith({
       inviteId: "inv_x",
       shortUrl: "https://go.samkuo.me/i/x",
+      useRelay: true,
     });
   });
 

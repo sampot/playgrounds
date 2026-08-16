@@ -39,6 +39,7 @@ import {
 import { buildSessionActResultPayload } from "@pg/roster/rosterSessionActTunnel";
 import { publishRosterRelayedSessionEvent } from "@pg/roster/rosterHomeSessionTunnel";
 import { startPlatformHostAnswerLoop } from "@pg/platform/platformHostLoop";
+import { composeWantsRelay } from "@pg/platform/platformCompose";
 import { goAuth } from "./goAuth.svelte";
 import { publishGoMemoryBroadcast } from "./goMemoryCanvas";
 import type { FileMap } from "@pg/projectTypes";
@@ -467,6 +468,7 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
   async function startAnswerLoopForInvite(opts: {
     inviteId: string;
     shortUrl: string;
+    useRelay?: boolean;
   }): Promise<void> {
     set({ inviteId: opts.inviteId, shortUrl: opts.shortUrl, error: null });
     sessionInviteSent.clear();
@@ -479,6 +481,7 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
     loop = startPlatformHostAnswerLoop({
       inviteId: opts.inviteId,
       apiKey,
+      useRelay: opts.useRelay === true,
       localPresence: { agentId: localAgentId, name: "玩家 A" },
       prepareHandlers: () => {
         const slot: RelaySlot = { peerId: null, session: null };
@@ -526,6 +529,7 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
       await startAnswerLoopForInvite({
         inviteId: created.invite_id,
         shortUrl: created.short_url,
+        useRelay: composeWantsRelay(opts.intent),
       });
       return { inviteId: created.invite_id, shortUrl: created.short_url };
     } catch (e) {
@@ -545,6 +549,7 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
   async function adoptSamInvite(opts: {
     inviteId: string;
     shortUrl: string;
+    useRelay?: boolean;
   }): Promise<void> {
     if (!status.sessionId || status.phase === "idle") {
       set({ phase: "error", error: "請先開場再邀請" });

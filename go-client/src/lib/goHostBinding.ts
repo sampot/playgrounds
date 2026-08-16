@@ -35,6 +35,7 @@
  *   PR so we don't smuggle scope in.
  */
 import { HostBridgeError } from "@pg/hostBridge";
+import { composeWantsRelay } from "@pg/platform/platformCompose";
 import type { HostRuntime } from "./hostRuntime";
 import { goAuth } from "./goAuth.svelte";
 import { emitGoShellPlatformEvent } from "./goShellPlatform";
@@ -284,6 +285,7 @@ export function createGoHostBinding(deps: GoHostBindingDeps): GoHostBinding {
           await rt.adoptSamInvite({
             inviteId: created.invite_id,
             shortUrl: created.short_url,
+            useRelay: composeWantsRelay(options?.intent),
           });
         }
         // Mirror the field bridge's behaviour: surface the minted invite to the

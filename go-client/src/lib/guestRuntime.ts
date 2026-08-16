@@ -13,6 +13,7 @@ import {
 import {
   composeSamSource,
   composeSessionProtocol,
+  composeWantsRelay,
   wantsRosterSignal,
 } from "@pg/platform/platformCompose";
 import type { FileMap } from "@pg/projectTypes";
@@ -567,12 +568,13 @@ export function createGuestRuntime() {
       localAgentId = newAgentId();
       const join = await createJoin(meta.secret, platformApiOrigin());
       const slot: { s: RosterPeerSession | null } = { s: null };
-      const iceServers =
-        (await fetchGuestTurnIceServers({
-          inviteId: meta.inviteId,
-          joinCap: join.join_cap,
-          origin: platformApiOrigin(),
-        })) ?? undefined;
+      const iceServers = composeWantsRelay(meta.intent)
+        ? ((await fetchGuestTurnIceServers({
+            inviteId: meta.inviteId,
+            joinCap: join.join_cap,
+            origin: platformApiOrigin(),
+          })) ?? undefined)
+        : undefined;
 
       const presence: RosterPresenceMsg = {
         type: "presence",

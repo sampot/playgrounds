@@ -77,7 +77,10 @@
     getPlatformFieldApiKey,
     subscribePlatformFieldCredential,
   } from "../platform/platformFieldCredential";
-  import { wantsRosterSignal } from "../platform/platformCompose";
+  import {
+    composeWantsRelay,
+    wantsRosterSignal,
+  } from "../platform/platformCompose";
   import { getPlatformComposeShell } from "../platform/platformComposeShell";
   import { registerPlatformInviteShell } from "../platform/platformInviteShell";
   import { startPlatformHostAnswerLoop } from "../platform/platformHostLoop";
@@ -652,6 +655,7 @@
       inviteId: created.invite_id,
       apiKey,
       lan,
+      useRelay: composeWantsRelay(opts.intent),
       localPresence: localPresence(),
       // Connection invite: one guest only (API replaces host reply paste).
       maxAnswers: handshake ? 1 : undefined,
