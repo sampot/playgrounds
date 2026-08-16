@@ -38,6 +38,7 @@ import {
   SESSION_INVITE_REJECT_KIND,
   isSessionActResultPayload,
   isSessionEventRelayPayload,
+  isSessionInviteCancelPayload,
   isSessionInvitePayload,
   isSessionSeatBoundPayload,
   type SessionActPayload,
@@ -73,6 +74,7 @@ export type GuestPhase =
   | "waiting_invite"
   | "seating"
   | "ready"
+  | "ended"
   | "cancelled"
   | "error";
 
@@ -202,6 +204,38 @@ export function createGuestRuntime() {
     emit();
   }
 
+  function markHostEnded(message: string): void {
+    if (
+      status.phase === "ended" ||
+      status.phase === "cancelled" ||
+      status.phase === "idle"
+    ) {
+      return;
+    }
+    pendingInvite = null;
+    composeProtocolId = null;
+    accepted = false;
+    try {
+      peerSession?.close();
+    } catch {
+      /* ignore */
+    }
+    peerSession = null;
+    unlistenApi?.();
+    unlistenApi = null;
+    clearMemoryBlobs();
+    set({
+      phase: "ended",
+      error: message,
+      message: "",
+      canvasUrl: null,
+      canvasSrcdoc: null,
+      canvasMode: null,
+      canvasGeneration: 0,
+      loadProgress: null,
+    });
+  }
+
   function sendAvatarRelay(
     payload: Record<string, unknown>,
     to?: string
@@ -273,6 +307,10 @@ export function createGuestRuntime() {
     const msg = raw;
     if (msg.from === localAgentId) return;
     const payload = msg.payload;
+    if (isSessionInviteCancelPayload(payload)) {
+      markHostEnded("主持已結束這一場");
+      return;
+    }
     if (isSessionInvitePayload(payload)) {
       pendingInvite = payload;
       if (!peerAgentId) peerAgentId = msg.from;
@@ -333,6 +371,20 @@ export function createGuestRuntime() {
           seq: payload.seq,
           event: payload.event,
         });
+      }
+      const event =
+        payload.event && typeof payload.event === "object"
+          ? (payload.event as { type?: unknown; reason?: unknown })
+          : null;
+      if (
+        event &&
+        (event.type === "session.closed" || event.type === "match.closed")
+      ) {
+        markHostEnded(
+          event.reason === "host_closed"
+            ? "主持已結束這一場"
+            : "這一場已結束"
+        );
       }
     }
   }
@@ -547,6 +599,18 @@ export function createGuestRuntime() {
               message: "已連線，等待主持邀請入座…",
             });
           },
+          onChannelClose: () => {
+            markHostEnded("主持已結束連線");
+          },
+          onConnectionState: (state: RTCPeerConnectionState) => {
+            if (
+              state === "failed" ||
+              state === "disconnected" ||
+              state === "closed"
+            ) {
+              markHostEnded("主持已結束連線");
+            }
+          },
           onError: (err: Error) => {
             set({
               phase: "error",
@@ -617,6 +681,21 @@ export function createGuestRuntime() {
     decline,
     setDisplayName(name: string) {
       set({ displayName: name });
+    },
+    /** @internal Vitest only — drive relay／channel-close paths without WebRTC. */
+    __testOnRelay(raw: unknown) {
+      onRelay(raw);
+    },
+    __testMarkConnected() {
+      set({
+        phase: "waiting_invite",
+        message: "已連線，等待主持邀請入座…",
+        error: null,
+      });
+      tunnelChannelBySession.set("sess-1", "playgrounds-session:sess-1");
+    },
+    __testOnChannelClose() {
+      markHostEnded("主持已結束連線");
     },
   };
 }

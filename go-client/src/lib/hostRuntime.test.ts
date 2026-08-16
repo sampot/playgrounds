@@ -131,4 +131,61 @@ describe("hostRuntime.createPlatformInvite adoption path", () => {
       })
     );
   });
+
+  it("close notifies connected guests with session.closed before tearing the channel", async () => {
+    goAuth.__setApiKeyForTests("pg_sk_test");
+    let loopOptions:
+      | Parameters<typeof platformHostLoop.startPlatformHostAnswerLoop>[0]
+      | null = null;
+    vi.spyOn(platformHostLoop, "startPlatformHostAnswerLoop").mockImplementation(
+      options => {
+        loopOptions = options;
+        return { stop: vi.fn(), inviteId: options.inviteId };
+      }
+    );
+    const rt = createHostRuntime({
+      getFiles: () => ({ "index.html": "<html></html>" }) as FileMap,
+      getSandboxId: () => "go-sb-4",
+      protocol,
+      invokeHostSession: async () => ({ ok: true }),
+    });
+    await rt.open();
+    await rt.adoptSamInvite({
+      inviteId: "platform-inv-close",
+      shortUrl: "https://go.samkuo.me/i/close",
+    });
+
+    const prepared = loopOptions!.prepareHandlers();
+    const send = vi.fn();
+    const closePeer = vi.fn();
+    prepared.attachSession({
+      send,
+      close: closePeer,
+      getChannel: () => null,
+      pc: {} as RTCPeerConnection,
+      role: "guest",
+    });
+    prepared.handlers.onMessage?.({
+      type: "presence",
+      agentId: "go-guest-close",
+      name: "對手",
+    });
+    send.mockClear();
+
+    await rt.close();
+
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "avatar_relay",
+        payload: expect.objectContaining({
+          kind: "session_event",
+          event: { type: "session.closed", reason: "host_closed" },
+        }),
+      })
+    );
+    expect(closePeer).toHaveBeenCalled();
+    const closedAt = closePeer.mock.invocationCallOrder[0]!;
+    const notifiedAt = send.mock.invocationCallOrder[0]!;
+    expect(notifiedAt).toBeLessThan(closedAt);
+  });
 });

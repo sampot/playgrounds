@@ -28,6 +28,7 @@ import {
 } from "@pg/roster/rosterPeer";
 import {
   SESSION_EVENT_KIND,
+  SESSION_INVITE_CANCEL_KIND,
   SESSION_INVITE_REJECT_KIND,
   SESSION_SEAT_BOUND_KIND,
   buildSessionInvitePayload,
@@ -548,6 +549,21 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
   async function close(): Promise<void> {
     loop?.stop();
     loop = null;
+    // Notify remote Guests before tearing DataChannels (mirror play shell).
+    if (status.sessionId && peerSessions.size > 0) {
+      try {
+        publishEvents([{ type: "session.closed", reason: "host_closed" }]);
+      } catch {
+        /* still close locally */
+      }
+      if (status.inviteId) {
+        sendRelay({
+          kind: SESSION_INVITE_CANCEL_KIND,
+          inviteId: status.inviteId,
+          sessionId: status.sessionId,
+        });
+      }
+    }
     for (const sess of peerSessions.values()) {
       try {
         sess.close();
