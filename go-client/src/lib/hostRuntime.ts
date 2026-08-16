@@ -37,8 +37,10 @@ import {
   type SessionActPayload,
 } from "@pg/roster/rosterSessionBridge";
 import { buildSessionActResultPayload } from "@pg/roster/rosterSessionActTunnel";
+import { publishRosterRelayedSessionEvent } from "@pg/roster/rosterHomeSessionTunnel";
 import { startPlatformHostAnswerLoop } from "@pg/platform/platformHostLoop";
 import { goAuth } from "./goAuth.svelte";
+import { publishGoMemoryBroadcast } from "./goMemoryCanvas";
 import type { FileMap } from "@pg/projectTypes";
 import type { HostableProtocol } from "./goCatalog";
 
@@ -200,14 +202,24 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
   function publishEvents(events: unknown[]): void {
     for (const event of events) {
       seq += 1;
-      sendRelay(
-        {
-          kind: SESSION_EVENT_KIND,
-          sessionId: status.sessionId,
+      const sessionId = status.sessionId;
+      if (!sessionId) continue;
+      const relay = {
+        kind: SESSION_EVENT_KIND,
+        sessionId,
+        seq,
+        event,
+      };
+      sendRelay(relay);
+      if (status.channelName) {
+        publishRosterRelayedSessionEvent(status.channelName, relay);
+        publishGoMemoryBroadcast(status.channelName, {
+          type: "session-event",
+          sessionId,
           seq,
           event,
-        }
-      );
+        });
+      }
     }
     emit();
   }
@@ -243,9 +255,6 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(body),
       })) as { ok?: boolean; events?: unknown[]; state?: unknown };
-      const events = Array.isArray(result?.events) ? result.events : [];
-      if (events.length > 0) publishEvents(events);
-      trackPhaseFromState(result?.state);
       return { ok: true, result };
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);

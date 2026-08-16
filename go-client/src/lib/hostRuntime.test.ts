@@ -7,6 +7,8 @@ import { goAuth } from "./goAuth.svelte";
 import type { FileMap } from "@pg/projectTypes";
 import type { HostableProtocol } from "./goCatalog";
 import * as platformHostLoop from "@pg/platform/platformHostLoop";
+import * as rosterHomeSessionTunnel from "@pg/roster/rosterHomeSessionTunnel";
+import * as goMemoryCanvas from "./goMemoryCanvas";
 
 const protocol: HostableProtocol = {
   protocolId: "gomoku.v1",
@@ -143,9 +145,21 @@ describe("hostRuntime.createPlatformInvite adoption path", () => {
         return { stop: vi.fn(), inviteId: options.inviteId };
       }
     );
+    const placedEvent = {
+      type: "match.placed",
+      row: 1,
+      col: 2,
+      stone: 2,
+    };
+    const publishLocal = vi
+      .spyOn(rosterHomeSessionTunnel, "publishRosterRelayedSessionEvent")
+      .mockImplementation(() => {});
+    const publishMemory = vi
+      .spyOn(goMemoryCanvas, "publishGoMemoryBroadcast")
+      .mockImplementation(() => {});
     const invokeHostSession = vi.fn(async () => ({
       ok: true,
-      events: [],
+      events: [placedEvent],
       state: { status: "active" },
     }));
     const rt = createHostRuntime({
@@ -211,6 +225,14 @@ describe("hostRuntime.createPlatformInvite adoption path", () => {
             payload: { type: "place", row: 1, col: 2 },
           }),
         })
+      );
+      expect(publishLocal).toHaveBeenCalledWith(
+        rt.getStatus().channelName,
+        expect.objectContaining({ event: placedEvent })
+      );
+      expect(publishMemory).toHaveBeenCalledWith(
+        rt.getStatus().channelName,
+        expect.objectContaining({ event: placedEvent })
       );
     });
   });
