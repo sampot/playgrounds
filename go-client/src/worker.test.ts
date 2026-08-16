@@ -14,7 +14,7 @@ describe("go static asset router", () => {
       { ASSETS: { fetch } }
     );
 
-    expect(await response.text()).toBe("/200.html");
+    expect(await response.text()).toBe("/200");
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 

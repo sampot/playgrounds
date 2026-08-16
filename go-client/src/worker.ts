@@ -17,7 +17,9 @@ export default {
       return env.ASSETS.fetch(request);
     }
 
-    const fallbackUrl = new URL("/200.html", url);
+    // Static Assets' HTML handling maps `/200` to `200.html` without emitting
+    // the public redirect that an explicit `/200.html` request would trigger.
+    const fallbackUrl = new URL("/200", url);
     const fallbackRequest = new Request(fallbackUrl, request);
     return env.ASSETS.fetch(fallbackRequest);
   },
