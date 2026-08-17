@@ -1,6 +1,6 @@
 # Playgrounds：`sam-manifest.json`（遊戲下載清單）
 
-> **狀態：** Draft（2026-08-17）— 契約定案；**宿主／go 實作未落地**  
+> **狀態：** Draft（2026-08-17）— 契約定案；**Phase 1 宿主／go 實作已落地**（仍直連 raw；無 Worker）  
 > **相關：** [PG-GAME-AGENT-GUIDE.md](./PG-GAME-AGENT-GUIDE.md)（遊戲側義務；agent 必讀）、[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)（純玩載入／tip／離線）、DEC-016（瀏覽器直連；無通用 proxy）、DEC-050（go）  
 > **非本檔：** Cloudflare Worker／R2／Pages CDN（後階段可另立計劃；**本階段不做**）
 
@@ -161,9 +161,9 @@ ref    = main（無 ref 時；與現行 githubProject 預設一致）
 
 | 階段 | 內容 | 狀態 |
 | --- | --- | --- |
-| **0. 規格** | 本檔＋指南 §2.5／DoD＋go 計劃交叉連結 | **本變更** |
-| **1. 宿主實作** | `githubProject`／go `samLoad` tip＋download 走 manifest；TDD；友善錯誤 | 未做 |
-| **2. Scaffold／既有庫** | template 範例；既有 `pg-*` 補 manifest（可分批） | 本機批次：`node scripts/generate-sam-manifests.mjs`（174 款已寫入各 repo；**須各庫 commit／push** 後 raw 才看得見） |
+| **0. 規格** | 本檔＋指南 §2.5／DoD＋go 計劃交叉連結 | **完成** |
+| **1. 宿主實作** | `fetchGithubProjectFromManifest`／`fetchGithubSamTipRev`；go `samLoad` 強制 manifest；Roster 同；場殼 `fetchGithubProject` 優先 manifest、缺則 Trees；TDD | **完成** |
+| **2. Scaffold／既有庫** | template 範例；既有 `pg-*` 補 manifest（可分批） | 本機批次：`node scripts/generate-sam-manifests.mjs`（174 款已 push） |
 | **3.（可選）CDN** | Worker allowlist cache；另立計劃 | 非本檔 |
 
 ---
@@ -173,7 +173,7 @@ ref    = main（無 ref 時；與現行 githubProject 預設一致）
 - [x] 指南與本檔對 `version`／`rev`／`files`／入口／勿列項一致  
 - [x] go 計劃載入／tip 敘事改為 manifest `rev`，不再寫「GitHub tree SHA」為 game 主路徑  
 - [x] 明示本階段無 Worker、raw 429 仍可能  
-- [ ] （實作後）無 manifest 的型錄 game → 明確錯誤，不 silent Trees  
+- [x] （實作後）無 manifest 的型錄 game → 明確錯誤，不 silent Trees  
 
 ---
 
@@ -182,3 +182,4 @@ ref    = main（無 ref 時；與現行 githubProject 預設一致）
 | 日期 | 變更 |
 | --- | --- |
 | 2026-08-17 | 初版 Draft：`sam-manifest.json` 契約；go 廢 Trees 列檔；無 Worker |
+| 2026-08-17 | Phase 1：`samManifest` 解析＋`fetchGithubProjectFromManifest`／`fetchGithubSamTipRev`；go／Roster 強制；場殼優先 manifest |

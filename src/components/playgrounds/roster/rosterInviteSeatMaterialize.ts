@@ -6,7 +6,7 @@
 import { getCatalogEntry, type InviteCandidate } from "../../../data/samCatalog";
 import { resolveInviteCandidatesWithInstalled } from "../catalogInviteResolve";
 import {
-  fetchGithubProject,
+  fetchGithubProjectFromManifest,
   parseGithubUrl,
   type GithubRef,
 } from "../githubProject";
@@ -68,7 +68,7 @@ const defaultDeps: RosterSeatMaterializeDeps = {
     resolveInviteCandidatesWithInstalled(sessionInviteToCatalogSpec(invite)),
   cloneProject,
   createProject,
-  fetchGithub: async ref => (await fetchGithubProject(ref)).files,
+  fetchGithub: async ref => (await fetchGithubProjectFromManifest(ref)).files,
   parseGithub: parseGithubUrl,
   getCatalogSource: id => getCatalogEntry(id)?.source,
 };

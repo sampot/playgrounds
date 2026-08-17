@@ -2,6 +2,11 @@ import { repoBlobToProjectPath, shouldIncludeRepoPath } from "./gitRepoPaths";
 import { normalizeProjectPath } from "./pathUtils";
 import { bytesToFileContent, type FileMap } from "./projectTypes";
 import type { FileListProgress } from "./transferProgress";
+import {
+  parseSamManifestJson,
+  SAM_MANIFEST_FILENAME,
+  type SamManifest,
+} from "./samManifest";
 
 export interface GithubRef {
   owner: string;
@@ -142,17 +147,113 @@ async function resolveGithubTree(
 
 export type FetchGithubProjectResult = {
   files: FileMap;
-  /** Git tree SHA from the same Trees call used to list files. */
+  /** Manifest `rev` (go／catalog) or Git tree SHA (Trees fallback). */
   tipRev: string;
 };
 
+function githubRawBase(ref: GithubRef, rawRef: string): string {
+  return `https://raw.githubusercontent.com/${ref.owner}/${ref.repo}/${encodeURIComponent(rawRef)}`;
+}
+
+/**
+ * Fetch and validate root `sam-manifest.json` for a public GitHub source.
+ * No GitHub REST API — raw only (PG-GO-SAM-MANIFEST-PLAN).
+ */
+export async function fetchGithubSamManifest(
+  ref: GithubRef,
+  options?: { signal?: AbortSignal }
+): Promise<{ manifest: SamManifest; rawRef: string }> {
+  if (ref.path) {
+    throw new Error("sam-manifest 僅支援儲存庫根目錄來源（勿指定子目錄）");
+  }
+  const rawRef = ref.ref || "main";
+  const url = `${githubRawBase(ref, rawRef)}/${SAM_MANIFEST_FILENAME}`;
+  let res: Response;
+  try {
+    res = await fetch(url, { signal: options?.signal });
+  } catch (e) {
+    if (options?.signal?.aborted) throw new Error("已取消下載");
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new Error(`無法下載 sam-manifest.json：${msg}`);
+  }
+  if (!res.ok) {
+    throw new Error(
+      res.status === 404
+        ? "找不到 sam-manifest.json（來源未就緒）"
+        : `無法下載 sam-manifest.json（HTTP ${res.status}）`
+    );
+  }
+  const text = await res.text();
+  const manifest = parseSamManifestJson(text);
+  return { manifest, rawRef };
+}
+
+/** Tip／offline freshness = manifest `rev` (not Git Trees SHA). */
+export async function fetchGithubSamTipRev(
+  ref: GithubRef,
+  options?: { signal?: AbortSignal }
+): Promise<string> {
+  const { manifest } = await fetchGithubSamManifest(ref, options);
+  return manifest.rev;
+}
+
+/**
+ * Download SAM FileMap using only `sam-manifest.json` + raw files.
+ * Does **not** call api.github.com and does **not** fall back to Trees.
+ */
+export async function fetchGithubProjectFromManifest(
+  ref: GithubRef,
+  options?: {
+    signal?: AbortSignal;
+    maxFiles?: number;
+    onProgress?: (p: FileListProgress) => void;
+  }
+): Promise<FetchGithubProjectResult> {
+  const maxFiles = options?.maxFiles ?? 200;
+  const { manifest, rawRef } = await fetchGithubSamManifest(ref, {
+    signal: options?.signal,
+  });
+  if (manifest.files.length > maxFiles) {
+    throw new Error(`檔案過多（>${maxFiles}），請縮小 sam-manifest files`);
+  }
+
+  const total = manifest.files.length;
+  options?.onProgress?.({ done: 0, total, ratio: 0 });
+
+  const files: FileMap = {};
+  const bust = `?v=${encodeURIComponent(manifest.rev)}`;
+  const base = githubRawBase(ref, rawRef);
+
+  for (let i = 0; i < manifest.files.length; i++) {
+    const repoPath = manifest.files[i]!;
+    const pathEnc = repoPath
+      .split("/")
+      .map(encodeURIComponent)
+      .join("/");
+    const rawUrl = `${base}/${pathEnc}${bust}`;
+    const fileRes = await fetch(rawUrl, { signal: options?.signal });
+    if (!fileRes.ok) {
+      throw new Error(`下載失敗：${repoPath}（HTTP ${fileRes.status}）`);
+    }
+    const bytes = new Uint8Array(await fileRes.arrayBuffer());
+    const projectPath = normalizeProjectPath(repoPath);
+    files[projectPath] = bytesToFileContent(projectPath, bytes);
+    const done = i + 1;
+    options?.onProgress?.({
+      done,
+      total,
+      ratio: done / total,
+      path: repoPath,
+    });
+  }
+
+  return { files, tipRev: manifest.rev };
+}
+
 /**
  * Fetch project files from a public GitHub repo into a FileMap (text + common binaries).
- * Uses the Git Trees API + raw.githubusercontent.com (unauthenticated rate limits apply).
- *
- * Prefer a single Trees call (no extra /repos or /commits). Bust raw HTTP cache with
- * each blob's SHA as a query param so tip updates still land without burning rate limit.
- * Returns `tipRev` so callers need not issue a second tip fetch after download.
+ * Prefer root `sam-manifest.json` when present; otherwise Git Trees API + raw
+ * (field-shell fallback for non-game／legacy sources).
  */
 export async function fetchGithubProject(
   ref: GithubRef,
@@ -162,6 +263,18 @@ export async function fetchGithubProject(
     onProgress?: (p: FileListProgress) => void;
   }
 ): Promise<FetchGithubProjectResult> {
+  if (!ref.path) {
+    try {
+      return await fetchGithubProjectFromManifest(ref, options);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      // Missing manifest → Trees. Other errors (bad JSON, file 404) surface.
+      if (!/找不到 sam-manifest\.json|來源未就緒|HTTP 404/.test(msg)) {
+        throw e;
+      }
+    }
+  }
+
   const maxFiles = options?.maxFiles ?? 200;
   const rootPrefix = ref.path ? normalizeProjectPath(ref.path) : "";
 

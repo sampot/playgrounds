@@ -76,10 +76,92 @@ describe("fetchGithubTipRev", () => {
   });
 });
 
-describe("fetchGithubProject", () => {
-  it("returns files plus tipRev from the same trees call", async () => {
+describe("fetchGithubProjectFromManifest", () => {
+  it("downloads via sam-manifest.json without calling api.github.com", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo) => {
       const url = String(input);
+      if (url.includes("api.github.com")) {
+        throw new Error(`unexpected API: ${url}`);
+      }
+      if (url.includes("/sam-manifest.json")) {
+        return new Response(
+          JSON.stringify({
+            version: 1,
+            rev: "rev-9",
+            files: ["index.html", "app.js"],
+          }),
+          { status: 200 }
+        );
+      }
+      if (url.includes("/index.html")) {
+        return new Response("<html></html>", { status: 200 });
+      }
+      if (url.includes("/app.js")) {
+        return new Response("console.log(1)", { status: 200 });
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    vi.resetModules();
+    const { fetchGithubProjectFromManifest } = await import("./githubProject");
+    const result = await fetchGithubProjectFromManifest({
+      owner: "sampot",
+      repo: "pg-gomoku",
+    });
+    expect(result.tipRev).toBe("rev-9");
+    expect(result.files["index.html"]).toBeDefined();
+    expect(result.files["app.js"]).toBeDefined();
+    expect(
+      fetchMock.mock.calls.every(c => !String(c[0]).includes("api.github.com"))
+    ).toBe(true);
+    vi.unstubAllGlobals();
+  });
+
+  it("errors clearly when manifest is missing (no Trees fallback)", async () => {
+    const fetchMock = vi.fn(async () => new Response("Nope", { status: 404 }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.resetModules();
+    const { fetchGithubProjectFromManifest } = await import("./githubProject");
+    await expect(
+      fetchGithubProjectFromManifest({ owner: "sampot", repo: "pg-x" })
+    ).rejects.toThrow(/來源未就緒|sam-manifest/);
+    expect(
+      fetchMock.mock.calls.some(c => String(c[0]).includes("api.github.com"))
+    ).toBe(false);
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("fetchGithubSamTipRev", () => {
+  it("returns manifest rev from raw", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            version: 1,
+            rev: "tip-rev",
+            files: ["index.html"],
+          })
+        )
+      )
+    );
+    vi.resetModules();
+    const { fetchGithubSamTipRev } = await import("./githubProject");
+    await expect(
+      fetchGithubSamTipRev({ owner: "sampot", repo: "pg-gomoku" })
+    ).resolves.toBe("tip-rev");
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("fetchGithubProject", () => {
+  it("falls back to Trees when sam-manifest.json is missing", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo) => {
+      const url = String(input);
+      if (url.includes("/sam-manifest.json")) {
+        return new Response("missing", { status: 404 });
+      }
       if (url.includes("/git/trees/main")) {
         return Response.json({
           sha: "tipsha123",
@@ -104,15 +186,10 @@ describe("fetchGithubProject", () => {
     const { fetchGithubProject } = await import("./githubProject");
     const result = await fetchGithubProject({
       owner: "sampot",
-      repo: "pg-gomoku",
+      repo: "legacy-demo",
     });
     expect(result.tipRev).toBe("tipsha123");
     expect(result.files["index.html"]).toBeDefined();
-    expect(
-      fetchMock.mock.calls.filter(c =>
-        String(c[0]).includes("api.github.com")
-      )
-    ).toHaveLength(1);
     vi.unstubAllGlobals();
   });
 });

@@ -1,6 +1,6 @@
 import {
-  fetchGithubProject,
-  fetchGithubTipRev,
+  fetchGithubProjectFromManifest,
+  fetchGithubSamTipRev,
   parseGithubUrl,
 } from "@pg/githubProject";
 import type { FileMap } from "@pg/projectTypes";
@@ -16,7 +16,10 @@ export type LoadSamFilesResult = {
   tipRev: string;
 };
 
-/** Fetch SAM FileMap from a catalog／compose `source` (GitHub owner/repo or URL). */
+/**
+ * Fetch SAM FileMap from a catalog／compose `source`.
+ * Catalog games require root `sam-manifest.json` (no Trees fallback).
+ */
 export async function loadSamFiles(
   source: string,
   options?: LoadSamFilesOptions
@@ -25,13 +28,13 @@ export async function loadSamFiles(
   if (!ref) {
     throw new Error(`無法解析小品來源：${source}`);
   }
-  return fetchGithubProject(ref, {
+  return fetchGithubProjectFromManifest(ref, {
     signal: options?.signal,
     onProgress: options?.onProgress,
   });
 }
 
-/** Light GitHub tree SHA for tip／offline freshness checks. */
+/** Tip／offline freshness = sam-manifest `rev`. */
 export async function fetchSamTipRev(
   source: string,
   options?: { signal?: AbortSignal }
@@ -40,7 +43,7 @@ export async function fetchSamTipRev(
   if (!ref) {
     throw new Error(`無法解析小品來源：${source}`);
   }
-  return fetchGithubTipRev(ref, { signal: options?.signal });
+  return fetchGithubSamTipRev(ref, { signal: options?.signal });
 }
 
 export function assertSamHasIndex(files: FileMap): void {
