@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   APPS_PAGE_SIZE,
-  appsAdSplit,
   appsPageCount,
   appsPageSlice,
   clampAppsPage,
@@ -9,16 +8,16 @@ import {
 } from "./goAppsPaging";
 
 describe("goAppsPaging", () => {
-  it("uses page size 10", () => {
-    expect(APPS_PAGE_SIZE).toBe(10);
+  it("uses page size 5", () => {
+    expect(APPS_PAGE_SIZE).toBe(5);
   });
 
   it("counts pages", () => {
     expect(appsPageCount(0)).toBe(0);
     expect(appsPageCount(1)).toBe(1);
-    expect(appsPageCount(10)).toBe(1);
-    expect(appsPageCount(11)).toBe(2);
-    expect(appsPageCount(27)).toBe(3);
+    expect(appsPageCount(5)).toBe(1);
+    expect(appsPageCount(6)).toBe(2);
+    expect(appsPageCount(27)).toBe(6);
   });
 
   it("clamps page into range", () => {
@@ -38,19 +37,11 @@ describe("goAppsPaging", () => {
   });
 
   it("slices the current page", () => {
-    const ids = Array.from({ length: 25 }, (_, i) => `g${i + 1}`);
-    expect(appsPageSlice(ids, 1)).toEqual(ids.slice(0, 10));
-    expect(appsPageSlice(ids, 2)).toEqual(ids.slice(10, 20));
-    expect(appsPageSlice(ids, 3)).toEqual(ids.slice(20, 25));
-    expect(appsPageSlice(ids, 99)).toEqual(ids.slice(20, 25));
+    const ids = Array.from({ length: 12 }, (_, i) => `g${i + 1}`);
+    expect(appsPageSlice(ids, 1)).toEqual(ids.slice(0, 5));
+    expect(appsPageSlice(ids, 2)).toEqual(ids.slice(5, 10));
+    expect(appsPageSlice(ids, 3)).toEqual(ids.slice(10, 12));
+    expect(appsPageSlice(ids, 99)).toEqual(ids.slice(10, 12));
     expect(appsPageSlice([], 1)).toEqual([]);
-  });
-
-  it("splits ad on the page length, not the full list", () => {
-    expect(appsAdSplit(0)).toBe(0);
-    expect(appsAdSplit(1)).toBe(1);
-    expect(appsAdSplit(2)).toBe(1);
-    expect(appsAdSplit(10)).toBe(5);
-    expect(appsAdSplit(3)).toBe(1);
   });
 });

@@ -16,7 +16,6 @@
   } from "$lib/goLoadProgress";
   import GoAdSlot from "$lib/GoAdSlot.svelte";
   import {
-    appsAdSplit,
     appsPageCount,
     appsPageSlice,
     clampAppsPage,
@@ -52,8 +51,6 @@
     )
   );
   const pageApps = $derived(appsPageSlice(apps, currentPage));
-  /** Mid-list ad on the **current page** slice (PG-GO-ADS-PLAN §5.1.1). */
-  const adSplit = $derived(appsAdSplit(pageApps.length));
   const showPager = $derived(pageCount > 1);
 
   async function goToPage(next: number, count: number = pageCount) {
@@ -313,42 +310,40 @@
     <a class="pixel-btn empty-cta" href="/">回首頁找遊戲</a>
   </div>
 {:else}
+  {#if showPager}
+    <nav class="apps-pager" aria-label="分頁">
+      <div class="apps-pager-row">
+        <button
+          type="button"
+          class="pixel-btn apps-pager-btn"
+          disabled={currentPage <= 1}
+          onclick={() => void goToPage(currentPage - 1)}
+        >
+          上一頁
+        </button>
+        <p class="apps-pager-status">第 {currentPage}／{pageCount} 頁</p>
+        <button
+          type="button"
+          class="pixel-btn apps-pager-btn"
+          disabled={currentPage >= pageCount}
+          onclick={() => void goToPage(currentPage + 1)}
+        >
+          下一頁
+        </button>
+      </div>
+      <p class="apps-pager-total">共 {apps.length} 款</p>
+    </nav>
+  {/if}
+
   <ul class="app-list" aria-label="已下載的遊戲">
-    {#each pageApps.slice(0, adSplit) as app (app.id)}
-      {@render appRow(app)}
-    {/each}
-    <li class="app-list-ad">
-      <GoAdSlot />
-    </li>
-    {#each pageApps.slice(adSplit) as app (app.id)}
+    {#each pageApps as app (app.id)}
       {@render appRow(app)}
     {/each}
   </ul>
 
-  {#if showPager}
-    <nav class="apps-pager" aria-label="分頁">
-      <button
-        type="button"
-        class="pixel-btn apps-pager-btn"
-        disabled={currentPage <= 1}
-        onclick={() => void goToPage(currentPage - 1)}
-      >
-        上一頁
-      </button>
-      <p class="apps-pager-status">
-        第 {currentPage}／{pageCount} 頁
-        <span class="apps-pager-total">（共 {apps.length} 款）</span>
-      </p>
-      <button
-        type="button"
-        class="pixel-btn apps-pager-btn"
-        disabled={currentPage >= pageCount}
-        onclick={() => void goToPage(currentPage + 1)}
-      >
-        下一頁
-      </button>
-    </nav>
-  {/if}
+  <div class="apps-ad">
+    <GoAdSlot />
+  </div>
 
   <section class="apps-advanced">
     <h2>進階</h2>
@@ -545,38 +540,43 @@
     flex-direction: column;
     gap: 0.5rem;
   }
-  .app-list-ad {
-    list-style: none;
-    margin: 0.4rem 0;
-    padding: 0.35rem 0;
+  .apps-ad {
+    margin: 1rem 0 0;
     display: flex;
     justify-content: center;
   }
-  .app-list-ad :global(.go-ad-slot) {
+  .apps-ad :global(.go-ad-slot) {
     margin-top: 0;
   }
   .apps-pager {
     display: grid;
-    grid-template-columns: 1fr;
-    gap: 0.65rem;
+    gap: 0.35rem;
+    margin: 0 0 0.85rem;
+    padding: 0 0 0.75rem;
+  }
+  .apps-pager-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    gap: 0.5rem;
     align-items: center;
-    margin: 1rem 0 0;
-    padding: 0.75rem 0;
   }
   .apps-pager-btn {
     min-height: 44px;
     width: 100%;
+    padding-inline: 0.55rem;
+    font-size: 0.85rem;
   }
   .apps-pager-status {
     margin: 0;
     text-align: center;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     font-family: var(--pixel);
     color: color-mix(in oklab, rgb(var(--ink)) 88%, transparent);
+    white-space: nowrap;
   }
   .apps-pager-total {
-    display: block;
-    margin-top: 0.2rem;
+    margin: 0;
+    text-align: center;
     font-size: 0.75rem;
     color: rgb(var(--muted));
     font-family: var(--sans);
@@ -675,18 +675,24 @@
     .confirm-dialog {
       margin: auto;
     }
-    .apps-pager {
-      grid-template-columns: minmax(6.5rem, auto) minmax(0, 1fr) minmax(6.5rem, auto);
+    .apps-pager-row {
       gap: 0.75rem;
     }
     .apps-pager-btn {
       width: auto;
       min-width: 6.5rem;
+      justify-self: stretch;
+      font-size: inherit;
+      padding-inline: 0.85rem;
     }
-    .apps-pager-total {
-      display: inline;
-      margin-top: 0;
-      margin-left: 0.35rem;
+    .apps-pager-btn:first-child {
+      justify-self: start;
+    }
+    .apps-pager-btn:last-child {
+      justify-self: end;
+    }
+    .apps-pager-status {
+      font-size: 0.85rem;
     }
     .app-actions {
       grid-template-columns: repeat(3, minmax(0, 1fr));

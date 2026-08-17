@@ -1,9 +1,9 @@
 /**
- * Client-side paging for go `/apps` offline list (max 10 per page).
- * Ad mid-split is computed on the **current page slice**, not the full list.
+ * Client-side paging for go `/apps` offline list (max 5 per page).
+ * House ad sits below the current page list (not mid-split).
  */
 
-export const APPS_PAGE_SIZE = 10;
+export const APPS_PAGE_SIZE = 5;
 
 /** How many pages for `total` items (0 items → 0 pages). */
 export function appsPageCount(
@@ -43,13 +43,4 @@ export function appsPageSlice<T>(
   if (count === 0) return [];
   const start = (p - 1) * pageSize;
   return items.slice(start, start + pageSize);
-}
-
-/**
- * Insert house banner after this many rows of the **current page**.
- * Same rule as PG-GO-ADS-PLAN §5.1.1: floor(n/2); n<2 → after all.
- */
-export function appsAdSplit(pageLength: number): number {
-  if (pageLength < 2) return pageLength;
-  return Math.floor(pageLength / 2);
 }
