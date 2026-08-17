@@ -24,13 +24,12 @@
   const buildStamp = formatGoBuildStamp(GO_BUILD_ISO);
 
   let input = $state("");
-  // 穩定推薦池：只在「再次推薦」時重新產生，捲動不改變內容。
-  // 初值用區域常數，避免 $state 初始化時互相引用（state_referenced_locally）。
-  const initialPool = recommendHome(4);
-  const initialRecCount = homeRecCount();
-  let pool = $state<GoCatalogEntry[]>(initialPool);
-  let recCount = $state(initialRecCount);
-  let recs = $state<GoCatalogEntry[]>(initialPool.slice(0, initialRecCount));
+  // 推薦池只在瀏覽器產生：prerender／SSR 若呼叫 recommendHome，會把建置當下
+  // 的封面寫進靜態 HTML，hydration 後標題換了圖卻仍卡在那四張。
+  let pool = $state<GoCatalogEntry[]>([]);
+  let recCount = $state(4);
+  let recs = $state<GoCatalogEntry[]>([]);
+  let recsReady = $state(false);
   let isSearching = $state(false);
   const og = goOgMeta({
     title: GO_HOME_DOCUMENT_TITLE,
@@ -40,6 +39,8 @@
   const websiteLd = goWebsiteJsonLd();
   const websiteLdJson = JSON.stringify(websiteLd);
   onMount(() => {
+    applyFreshPool();
+
     let authChecks = 0;
     let timer: ReturnType<typeof setTimeout>;
 
@@ -83,6 +84,14 @@
     return 2;
   }
 
+  function applyFreshPool() {
+    pool = recommendHome(4);
+    recCount = homeRecCount();
+    recs = pool.slice(0, recCount);
+    isSearching = false;
+    recsReady = true;
+  }
+
   // 只在跨越斷點時調整「顯示數量」，從穩定池中切片——不重新洗牌。
   function syncCount() {
     const n = homeRecCount();
@@ -93,10 +102,7 @@
 
   function reshuffle() {
     input = "";
-    pool = recommendHome(4);
-    recCount = homeRecCount();
-    recs = pool.slice(0, recCount);
-    isSearching = false;
+    applyFreshPool();
   }
 
   function handleSearch(event: Event) {
@@ -104,7 +110,8 @@
     input = target.value.trim();
 
     if (input.length === 0) {
-      syncCount();
+      recCount = homeRecCount();
+      recs = pool.slice(0, recCount);
       isSearching = false;
     } else {
       recs = searchGoCatalog(input, 3);
@@ -177,12 +184,14 @@
         <li>
           <a class="home-grid-card" href={`/s/${encodeURIComponent(entry.id)}`}>
             <span class="home-grid-cover" aria-hidden="true">
-              <GoEntryCover
-                cover={entry.cover}
-                series={entry.series}
-                variant="fill"
-                size={34}
-              />
+              {#key `${entry.id}:${entry.cover ?? ""}`}
+                <GoEntryCover
+                  cover={entry.cover}
+                  series={entry.series}
+                  variant="fill"
+                  size={34}
+                />
+              {/key}
             </span>
             <span class="home-grid-name">{entry.title}</span>
             {#if entry.blurb}
@@ -194,6 +203,8 @@
     </ul>
   {:else if isSearching}
     <p class="search-no-results">沒有找到符合的遊戲</p>
+  {:else if !recsReady}
+    <p class="search-placeholder-text">正在挑選推薦…</p>
   {:else}
     <p class="search-placeholder-text">搜尋遊戲名稱或 id，或點「再次推薦」隨機選取</p>
   {/if}

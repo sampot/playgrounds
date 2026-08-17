@@ -6,7 +6,12 @@ const offline = vi.hoisted(() => ({
   equal: vi.fn(),
 }));
 const samLoad = vi.hoisted(() => ({
-  load: vi.fn(async () => ({ "index.html": "<main>new</main>" })),
+  load: vi.fn(
+    async (
+      _source?: string,
+      _options?: { onProgress?: (p: unknown) => void }
+    ) => ({ "index.html": "<main>new</main>" })
+  ),
   tip: vi.fn(async () => "tip-sha"),
 }));
 
@@ -32,15 +37,20 @@ describe("runUpdate", () => {
     offline.get.mockResolvedValue(null);
     offline.put.mockResolvedValue(true);
     offline.equal.mockReturnValue(false);
-    samLoad.load.mockImplementation(async (_source, options) => {
-      options?.onProgress?.({
-        done: 1,
-        total: 2,
-        ratio: 0.5,
-        path: "index.html",
-      });
-      return { "index.html": "<main>new</main>" };
-    });
+    samLoad.load.mockImplementation(
+      async (
+        _source?: string,
+        options?: { onProgress?: (p: unknown) => void }
+      ) => {
+        options?.onProgress?.({
+          done: 1,
+          total: 2,
+          ratio: 0.5,
+          path: "index.html",
+        });
+        return { "index.html": "<main>new</main>" };
+      }
+    );
     samLoad.tip.mockResolvedValue("tip-sha");
   });
 
