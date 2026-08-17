@@ -1,5 +1,6 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
+  import { page } from "$app/state";
   import { chromeSession } from "$lib/chromeSession.svelte";
   import { getGoCatalogEntry } from "$lib/goCatalog";
   import {
@@ -9,6 +10,13 @@
   } from "$lib/goGameActions";
   import GoEntryCover from "$lib/GoEntryCover.svelte";
   import GoAdSlot from "$lib/GoAdSlot.svelte";
+  import {
+    appsAdSplit,
+    appsPageCount,
+    appsPageSlice,
+    clampAppsPage,
+    parseAppsPageParam,
+  } from "$lib/goAppsPaging";
   import { clearAllGoProgress } from "$lib/goScoreStorage";
   import { clearAllGoSamOfflineCache, listGoSamOfflineCatalogIds } from "$lib/goSamOfflineCache";
 
@@ -30,10 +38,33 @@
 
   let apps = $state<AppEntry[]>([]);
 
-  /** Insert house banner after this many rows (floor(n/2); n<2 → after all). */
-  const adSplit = $derived(
-    apps.length < 2 ? apps.length : Math.floor(apps.length / 2)
+  const pageCount = $derived(appsPageCount(apps.length));
+  const currentPage = $derived(
+    clampAppsPage(
+      parseAppsPageParam(page.url.searchParams.get("page")),
+      pageCount
+    )
   );
+  const pageApps = $derived(appsPageSlice(apps, currentPage));
+  /** Mid-list ad on the **current page** slice (PG-GO-ADS-PLAN §5.1.1). */
+  const adSplit = $derived(appsAdSplit(pageApps.length));
+  const showPager = $derived(pageCount > 1);
+
+  async function goToPage(next: number, count: number = pageCount) {
+    const clamped = clampAppsPage(next, count);
+    expandedId = null;
+    const url = new URL(page.url.href);
+    if (clamped <= 1) url.searchParams.delete("page");
+    else url.searchParams.set("page", String(clamped));
+    const nextHref = `${url.pathname}${url.search}${url.hash}`;
+    const cur = `${page.url.pathname}${page.url.search}${page.url.hash}`;
+    if (nextHref === cur) return;
+    await goto(nextHref, {
+      replaceState: true,
+      keepFocus: true,
+      noScroll: true,
+    });
+  }
 
   async function refresh() {
     loading = true;
@@ -49,6 +80,15 @@
           cover: e?.cover,
         };
       });
+      const count = appsPageCount(apps.length);
+      const wanted = parseAppsPageParam(page.url.searchParams.get("page"));
+      const clamped = clampAppsPage(wanted, count);
+      if (
+        wanted !== clamped ||
+        (clamped <= 1 && page.url.searchParams.has("page"))
+      ) {
+        await goToPage(clamped, count);
+      }
     } catch {
       loadError = "無法讀取這台裝置的離線下載，請稍後再試。";
     } finally {
@@ -262,16 +302,41 @@
   </div>
 {:else}
   <ul class="app-list" aria-label="可離線玩的遊戲">
-    {#each apps.slice(0, adSplit) as app (app.id)}
+    {#each pageApps.slice(0, adSplit) as app (app.id)}
       {@render appRow(app)}
     {/each}
     <li class="app-list-ad">
       <GoAdSlot />
     </li>
-    {#each apps.slice(adSplit) as app (app.id)}
+    {#each pageApps.slice(adSplit) as app (app.id)}
       {@render appRow(app)}
     {/each}
   </ul>
+
+  {#if showPager}
+    <nav class="apps-pager" aria-label="分頁">
+      <button
+        type="button"
+        class="pixel-btn apps-pager-btn"
+        disabled={currentPage <= 1}
+        onclick={() => void goToPage(currentPage - 1)}
+      >
+        上一頁
+      </button>
+      <p class="apps-pager-status">
+        第 {currentPage}／{pageCount} 頁
+        <span class="apps-pager-total">（共 {apps.length} 款）</span>
+      </p>
+      <button
+        type="button"
+        class="pixel-btn apps-pager-btn"
+        disabled={currentPage >= pageCount}
+        onclick={() => void goToPage(currentPage + 1)}
+      >
+        下一頁
+      </button>
+    </nav>
+  {/if}
 
   <section class="apps-advanced">
     <h2>進階</h2>
@@ -473,6 +538,32 @@
   .app-list-ad :global(.go-ad-slot) {
     margin-top: 0;
   }
+  .apps-pager {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
+    align-items: center;
+    margin: 1rem 0 0;
+    padding: 0.75rem 0;
+  }
+  .apps-pager-btn {
+    min-height: 44px;
+    width: 100%;
+  }
+  .apps-pager-status {
+    margin: 0;
+    text-align: center;
+    font-size: 0.85rem;
+    font-family: var(--pixel);
+    color: color-mix(in oklab, rgb(var(--ink)) 88%, transparent);
+  }
+  .apps-pager-total {
+    display: block;
+    margin-top: 0.2rem;
+    font-size: 0.75rem;
+    color: rgb(var(--muted));
+    font-family: var(--sans);
+  }
   .app-row {
     display: block;
     padding: 0.75rem;
@@ -563,6 +654,19 @@
   @media (min-width: 42rem) {
     .confirm-dialog {
       margin: auto;
+    }
+    .apps-pager {
+      grid-template-columns: minmax(6.5rem, auto) minmax(0, 1fr) minmax(6.5rem, auto);
+      gap: 0.75rem;
+    }
+    .apps-pager-btn {
+      width: auto;
+      min-width: 6.5rem;
+    }
+    .apps-pager-total {
+      display: inline;
+      margin-top: 0;
+      margin-left: 0.35rem;
     }
     .app-actions {
       grid-template-columns: repeat(3, minmax(0, 1fr));
