@@ -79,6 +79,23 @@ describe("PG.libs dual-shell parity", () => {
     expect(html).not.toMatch(/playgrounds\/libs\//u);
   });
 
+  it("play public/sw.js injectBridge also injects PG SDK (field canvas path)", () => {
+    // Field shell serves canvas HTML via SW memory snapshot + injectBridge.
+    // That path must stay aligned with injectCanvasBridge (sdk.js), or games
+    // that need PG.libs (e.g. pg-skyrun / three) never see window.PG.
+    const sw = readFileSync(playSw, "utf8");
+    expect(sw).toMatch(/data-playgrounds-sdk/u);
+    expect(sw).toMatch(
+      /<script src="\/playgrounds\/sdk\.js" data-playgrounds-sdk>/u,
+    );
+    // Idempotent gate must require the SDK marker, not only shim+bridge.
+    const injectFn = sw.match(
+      /function injectBridge\([\s\S]*?\n\}/u,
+    )?.[0];
+    expect(injectFn).toBeTruthy();
+    expect(injectFn).toMatch(/data-playgrounds-sdk/u);
+  });
+
   it("play strategy: libs passthrough; sdk remains offline-eligible", () => {
     expect(isPlaygroundsLibsPath("/playgrounds/libs/phaser-4.2.1.min.js")).toBe(
       true,

@@ -934,18 +934,31 @@ function localStorageShim(storageScope) {
 </script>`;
 }
 
+/** Keep in sync with PLAYGROUNDS_SDK_SCRIPT_TAG in canvasSwProtocol.ts */
+const PLAYGROUNDS_SDK_SCRIPT_TAG =
+  '<script src="/playgrounds/sdk.js" data-playgrounds-sdk></script>';
+
 /**
  * @param {string} html
  * @param {string} storageScope
  */
 function injectBridge(html, storageScope) {
+  // Align with injectCanvasBridge (canvasSwProtocol.ts): shim + bridge + SDK.
+  // Field canvas is served only via this SW path; missing sdk.js means
+  // window.PG never mounts and PG.libs (e.g. three) cannot load.
   if (
     html.includes("data-playgrounds-ls-shim") &&
-    html.includes("data-playgrounds-bridge")
-  ) return html;
+    html.includes("data-playgrounds-bridge") &&
+    html.includes("data-playgrounds-sdk")
+  ) {
+    return html;
+  }
   const injection =
-    (html.includes("data-playgrounds-ls-shim") ? "" : localStorageShim(storageScope)) +
-    (html.includes("data-playgrounds-bridge") ? "" : BRIDGE);
+    (html.includes("data-playgrounds-ls-shim")
+      ? ""
+      : localStorageShim(storageScope)) +
+    (html.includes("data-playgrounds-bridge") ? "" : BRIDGE) +
+    (html.includes("data-playgrounds-sdk") ? "" : PLAYGROUNDS_SDK_SCRIPT_TAG);
   if (/<head[\s>]/i.test(html)) {
     return html.replace(/<head([^>]*)>/i, `<head$1>${injection}`);
   }
