@@ -78,22 +78,6 @@ type GhTreeItem = {
   sha?: string;
 };
 
-async function resolveDefaultBranch(
-  owner: string,
-  repo: string,
-  signal?: AbortSignal
-): Promise<string> {
-  const res = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
-    headers: GH_JSON,
-    signal,
-  });
-  if (!res.ok) {
-    throw new Error(`無法讀取儲存庫（HTTP ${res.status}）`);
-  }
-  const data = (await res.json()) as { default_branch?: string };
-  return data.default_branch || "main";
-}
-
 async function fetchRepoTree(
   owner: string,
   repo: string,
@@ -147,26 +131,20 @@ async function resolveGithubTree(
   ref: GithubRef,
   signal?: AbortSignal
 ): Promise<{ sha: string; rawRef: string; tree: GhTreeItem[] }> {
-  let rawRef = ref.ref || "main";
-  let treeResult = await fetchRepoTree(ref.owner, ref.repo, rawRef, signal);
-
-  if (!treeResult.ok && !ref.ref && treeResult.status === 404) {
-    rawRef = "master";
-    treeResult = await fetchRepoTree(ref.owner, ref.repo, rawRef, signal);
-  }
-
-  if (!treeResult.ok && !ref.ref && treeResult.status === 404) {
-    rawRef = await resolveDefaultBranch(ref.owner, ref.repo, signal);
-    if (rawRef !== "main" && rawRef !== "master") {
-      treeResult = await fetchRepoTree(ref.owner, ref.repo, rawRef, signal);
-    }
-  }
-
+  // Default branch is always `main` (no master／/repos fallback — saves API quota).
+  const rawRef = ref.ref || "main";
+  const treeResult = await fetchRepoTree(ref.owner, ref.repo, rawRef, signal);
   if (!treeResult.ok) {
     throw new Error(`無法列出檔案樹（HTTP ${treeResult.status}）`);
   }
   return { sha: treeResult.sha, rawRef, tree: treeResult.tree };
 }
+
+export type FetchGithubProjectResult = {
+  files: FileMap;
+  /** Git tree SHA from the same Trees call used to list files. */
+  tipRev: string;
+};
 
 /**
  * Fetch project files from a public GitHub repo into a FileMap (text + common binaries).
@@ -174,6 +152,7 @@ async function resolveGithubTree(
  *
  * Prefer a single Trees call (no extra /repos or /commits). Bust raw HTTP cache with
  * each blob's SHA as a query param so tip updates still land without burning rate limit.
+ * Returns `tipRev` so callers need not issue a second tip fetch after download.
  */
 export async function fetchGithubProject(
   ref: GithubRef,
@@ -182,11 +161,11 @@ export async function fetchGithubProject(
     maxFiles?: number;
     onProgress?: (p: FileListProgress) => void;
   }
-): Promise<FileMap> {
+): Promise<FetchGithubProjectResult> {
   const maxFiles = options?.maxFiles ?? 200;
   const rootPrefix = ref.path ? normalizeProjectPath(ref.path) : "";
 
-  const { rawRef, tree } = await resolveGithubTree(ref, options?.signal);
+  const { sha, rawRef, tree } = await resolveGithubTree(ref, options?.signal);
 
   const candidates = tree.filter(
     item =>
@@ -233,5 +212,5 @@ export async function fetchGithubProject(
     });
   }
 
-  return files;
+  return { files, tipRev: sha };
 }

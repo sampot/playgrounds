@@ -50,7 +50,10 @@ describe("resolveGoSamFiles", () => {
       files: fixtures.cachedFiles,
       tipRev: "sha-old",
     });
-    fixtures.loadFiles.mockResolvedValue(fixtures.freshFiles);
+    fixtures.loadFiles.mockResolvedValue({
+      files: fixtures.freshFiles,
+      tipRev: "sha-from-download",
+    });
     fixtures.putCache.mockResolvedValue(true);
     fixtures.fetchTip.mockResolvedValue("sha-new");
   });
@@ -64,6 +67,24 @@ describe("resolveGoSamFiles", () => {
     expect(result.origin).toBe("cache");
     expect(fixtures.fetchTip).not.toHaveBeenCalled();
     expect(fixtures.loadFiles).not.toHaveBeenCalled();
+  });
+
+  it("local-first download stores tipRev from load — no extra tip fetch", async () => {
+    fixtures.getCache.mockResolvedValue(null);
+    const { resolveGoSamFiles } = await import("./goSamResolve");
+    const result = await resolveGoSamFiles({
+      source: "sampot/pg-gomoku",
+      updatePolicy: "local-first",
+    });
+    expect(result.origin).toBe("download");
+    expect(result.files).toBe(fixtures.freshFiles);
+    expect(fixtures.fetchTip).not.toHaveBeenCalled();
+    expect(fixtures.putCache).toHaveBeenCalledWith(
+      "pg-gomoku",
+      "sampot/pg-gomoku",
+      fixtures.freshFiles,
+      "sha-from-download"
+    );
   });
 
   it("check-tip reuses cache when tipRev matches", async () => {

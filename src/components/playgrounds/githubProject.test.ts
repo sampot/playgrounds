@@ -53,4 +53,66 @@ describe("fetchGithubTipRev", () => {
     ).resolves.toBe("deadbeefcafebabe");
     vi.unstubAllGlobals();
   });
+
+  it("defaults to main only — no master or /repos fallback", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo) => {
+      const url = String(input);
+      if (url.includes("/git/trees/main")) {
+        return new Response("Not Found", { status: 404 });
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    vi.resetModules();
+    const { fetchGithubTipRev } = await import("./githubProject");
+    await expect(
+      fetchGithubTipRev({ owner: "sampot", repo: "legacy-master" })
+    ).rejects.toThrow(/HTTP 404/);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const urls = fetchMock.mock.calls.map(c => String(c[0]));
+    expect(urls.some(u => u.includes("/git/trees/master"))).toBe(false);
+    expect(urls.some(u => /\/repos\/[^/]+\/[^/]+$/.test(u))).toBe(false);
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("fetchGithubProject", () => {
+  it("returns files plus tipRev from the same trees call", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo) => {
+      const url = String(input);
+      if (url.includes("/git/trees/main")) {
+        return Response.json({
+          sha: "tipsha123",
+          tree: [
+            {
+              path: "index.html",
+              type: "blob",
+              sha: "blobsha",
+              size: 12,
+            },
+          ],
+          truncated: false,
+        });
+      }
+      if (url.includes("raw.githubusercontent.com")) {
+        return new Response("<html></html>", { status: 200 });
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    vi.resetModules();
+    const { fetchGithubProject } = await import("./githubProject");
+    const result = await fetchGithubProject({
+      owner: "sampot",
+      repo: "pg-gomoku",
+    });
+    expect(result.tipRev).toBe("tipsha123");
+    expect(result.files["index.html"]).toBeDefined();
+    expect(
+      fetchMock.mock.calls.filter(c =>
+        String(c[0]).includes("api.github.com")
+      )
+    ).toHaveLength(1);
+    vi.unstubAllGlobals();
+  });
 });

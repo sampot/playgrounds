@@ -1,6 +1,6 @@
 # 我是山姆鍋 — 架構與工程決策
 
-> **最後更新：** 2026-08-17（DEC-054 Proposed：go shell 廣告版位；含 `/apps` 中段）
+> **最後更新：** 2026-08-17（DEC-054 Proposed：go shell 廣告版位；含 `/apps` 列表下方）
 > **對象：** 作者、AI agents；必要時給之後的自己讀
 
 本文件以輕量 **ADR**（Architecture Decision Record）記錄本站**顯著且耐久**的架構／工程選擇：選了什麼、為何不選其他、後續工作不可踩破的後果。細節規格仍以 [AGENTS.md](./AGENTS.md)、[TOOLS-PLAN.md](./TOOLS-PLAN.md) 等為準；此檔是可掃讀的決策索引，避免只活在 PR 與聊天裡。
@@ -1037,6 +1037,7 @@
   - 勿承諾 Invite `/i/` 離線可玩或把短鏈當永久離線遊戲入口；離線／主畫面／本機分數快樂路徑僅 `/s/`（及為其服務的 `/`）。
   - 勿讓所有 `/s/<id>` 共用同一社群預覽 title；分享／`og:title` 須依小品 `entry.title`，且爬蟲可見。
   - 勿把產品內卡面封面（`/covers/<id>.png`／型錄 `cover`）當成離線就緒訊號，或當成每小品 `og:image`；勿在首頁 runtime 向 GitHub 拉封面。
+  - 勿對型錄 game 以 GitHub Trees 掃整棵 repo 當 go 下載主路徑；權威下載集合＝遊戲 repo 根 **`sam-manifest.json`**（見計劃）。
   - 勿把 Header「分享」做成僅 Web Share→複製而無現場 QR；勿把型錄傳閱 QR 與邀請 `/i/` QR 混成同一碼。
   - 勿以 NFC／Nearby／自建區網 discovery 當 `/s/` 現場主路徑；勿為 `/s/` 另鑄 Platform short。
   - 勿 fork 整份 `PlaygroundsApp`；抽共用 library（含 `goSamShareHref`／`shareOrCopy`／QR 編碼）。
@@ -1056,6 +1057,7 @@
 - **Revision（2026-08-08）：** Header「更多」＝本機溢流（已下載／分層清除）；≠ 只有推薦；Invite 不露。
 - **Revision（2026-08-11）：** 登入（play 相容 `#pg_provision=`）＋ Header profile 見 **DEC-052**／[PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md)；`go` 仍為保留名，僅作為 **provision target** 例外放行。站群定位：**go＝玩家主場**（作者＝場 `play.samkuo.me`；兩 UI 共用同一份型錄）；後續玩家主場互邀＝**GO-INVITE**（見 DEC-052）。
 - **Revision（2026-08-17）：** 產品內卡面封面（計劃 §5.8）：repo `thumbnail.png` → 靜態 `/covers/<id>.png`＋型錄可選 `cover`；系列 icon 為 fallback；**≠**離線訊號；**≠**每小品 `og:image`；禁止首頁 runtime 打 GitHub。
+- **Revision（2026-08-17）：** 型錄 game 下載契約：repo 根 **`sam-manifest.json`**（`rev`＋`files[]`）；go tip／全量下載依此；**廢** go 主路徑 GitHub Trees 列檔；本階段無 Worker CDN（見 [PG-GO-SAM-MANIFEST-PLAN.md](./PG-GO-SAM-MANIFEST-PLAN.md)、指南 §2.5）。
 
 ### DEC-051: Playgrounds API scopes（環境能力準入）
 
@@ -1128,7 +1130,7 @@
 - **Status:** Proposed（2026-08-17；契約見 [PG-GO-ADS-PLAN.md](./PG-GO-ADS-PLAN.md)；Phase 1 house 已落地）
 - **Context:** `go.samkuo.me` 是玩家主場與型錄傳閱入口（DEC-050）；點數制只回收官方 TURN 成本。需要一條不擋玩的維持／變現路徑，且對齊 DEC-004（非產品腔）與 DEC-007（勿預設塞追蹤）。廣告必須是 shell 能力，不得進入 SAM iframe／可攜契約（DEC-053）。
 - **Decision:**
-  1. **投放面：** `/`、**`/s/<id>` 載入等待面**（一級）、**`/apps` 列表中段**；**不**掛 `/help`、`/i/`、畫布遊玩中（`canvasActive`）；**永不**進 SAM iframe。
+  1. **投放面：** `/`、**`/s/<id>` 載入等待面**（一級）、**`/apps` 列表下方**；**不**掛 `/help`、`/i/`、畫布遊玩中（`canvasActive`）；**永不**進 SAM iframe。
   2. **尺寸：** 窄屏 **320×100**；寬屏 **728×90**（`min-width` 升階）。
   3. **Phase 1：** **house**——單則自推其他 `kind: game`（同源 cover／title → `/s/<id>`）；IAB 形單槽，**不是**「試試這些」迷你型錄；零第三方腳本；與 SAM fetch **並行**、不拖延 boot。
   4. **Phase 2：** **EthicalAds／Carbon 類**（否決 AdSense）；同一 `GoAdSlot` 換 provider；失敗可回退 house。
@@ -1141,6 +1143,7 @@
   - Phase 2 才放寬 CSP／help 披露；Phase 1 不引入追蹤同意牆。
 - **Revision（2026-08-17）：** 初版 Proposed。
 - **Revision（2026-08-17）：** 投放面補 **`/apps` 列表中段** banner（撤回「/apps 不掛」）。
+- **Revision（2026-08-17）：** `/apps` 改為**列表下方**一格；每頁 **5** 款；分頁控制在列表上方。
 
 ---
 
@@ -1186,6 +1189,7 @@
 | [PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md) | Platform 點數制與官方 TURN（Draft；非訂閱；**否決**自備 TURN） |
 | [PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md) | 場邀請 E2E MVP（載體五子棋／`gomoku.v1`；DEC-047／045／023） |
 | [PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md) | 純玩版客戶端＠`go.samkuo.me`（短網址 canonical；DEC-050） |
+| [PG-GO-SAM-MANIFEST-PLAN.md](./PG-GO-SAM-MANIFEST-PLAN.md) | 遊戲 `sam-manifest.json` 下載清單（廢 go Trees 列檔；無 Worker） |
 | [PG-GO-ADS-PLAN.md](./PG-GO-ADS-PLAN.md) | 純玩版 shell 廣告版位（**DEC-054**；house／EthicalAds 類） |
 | [PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md) | 純玩版登入（play 相容協定）＋ Header profile（DEC-052 Proposed） |
 | [PG-GO-SESSION-CHAT-PLAN.md](./PG-GO-SESSION-CHAT-PLAN.md) | 純玩版同 session 輕量聊天（Draft；從屬 DEC-050／045 transport） |

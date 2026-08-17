@@ -68,19 +68,15 @@ async function downloadAndCache(opts: {
   signal?: AbortSignal;
   onProgress?: (p: FileListProgress) => void;
 }): Promise<GoSamResolveResult> {
-  const files = await loadSamFiles(opts.source, {
+  const loaded = await loadSamFiles(opts.source, {
     signal: opts.signal,
     onProgress: opts.onProgress,
   });
+  const files = loaded.files;
   assertSamHasIndex(files);
-  let tipRev = opts.tipRev?.trim() || null;
-  if (!tipRev) {
-    try {
-      tipRev = await fetchSamTipRev(opts.source, { signal: opts.signal });
-    } catch {
-      tipRev = null;
-    }
-  }
+  // Prefer caller tip (e.g. check-tip already fetched); else reuse Trees SHA
+  // from the download — never a second tip API call.
+  const tipRev = opts.tipRev?.trim() || loaded.tipRev.trim() || null;
   if (opts.target) {
     await putGoSamOfflineCache(
       opts.target.catalogId,

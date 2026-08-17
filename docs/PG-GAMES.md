@@ -8,9 +8,9 @@
 > **開發規則：** 遊戲 repo 不加入 `node_modules`、不安裝任何套件；需要工具（含測試）時一律以 `npx <pkg>` 臨時執行，不入 repo。
 > **測試指引：** 單元測試統一以 `npx vitest run` 執行。
 > **倉庫說明：** 每個遊戲都是獨立的 GitHub repo，本地路徑位於 `~/dev/sampot/<repo-name>`。
-> **Coding agent：** 獨立開發（含 go 相容、`PG`／`PG.libs`、生命週期／輸入義務）以 [PG-GAME-AGENT-GUIDE.md](./PG-GAME-AGENT-GUIDE.md) 為唯一必讀；不必再翻其它宿主 SPEC。  
+> **Coding agent：** 獨立開發（含 go 相容、`PG`／`PG.libs`、生命週期／輸入義務、**根目錄 `sam-manifest.json`**）以 [PG-GAME-AGENT-GUIDE.md](./PG-GAME-AGENT-GUIDE.md) 為唯一必讀；不必再翻其它宿主 SPEC。下載契約摘要見該指南 §2.5／[PG-GO-SAM-MANIFEST-PLAN.md](./PG-GO-SAM-MANIFEST-PLAN.md)。  
 > **殼契約借鑑：** 主機式責任切分（平台薄服務＋釘版 middleware；遊戲寫玩法）見該指南 §1.1／§3.5，以及 [PG-UI-SDK-SPEC §1.4](./PG-UI-SDK-SPEC.md)、[PG-LIBS-SPEC §1.5](./PG-LIBS-SPEC.md)。  
-> **新遊戲 starter：** GitHub template [`sampot/pg-game-scaffold`](https://github.com/sampot/pg-game-scaffold)；遊戲內只留 `AGENTS.md` 指針，**不要**複製指南全文到每個 `pg-*`。
+> **新遊戲 starter：** GitHub template [`sampot/pg-game-scaffold`](https://github.com/sampot/pg-game-scaffold)；遊戲內只留 `AGENTS.md` 指針，**不要**複製指南全文到每個 `pg-*`（template 應含範例 `sam-manifest.json`）。
 
 純玩入口：`https://go.samkuo.me/s/<id>` · 場型錄：`/sam/?kind=game`
 

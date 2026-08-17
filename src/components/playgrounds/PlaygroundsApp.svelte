@@ -3802,10 +3802,12 @@
       let starterName = name || "Coding Agent";
       let source = "playgrounds-coding-orch-spawn-pg-llm-agent";
       try {
-        starterFiles = await fetchGithubProject({
-          owner: "sampot",
-          repo: "pg-llm-agent",
-        });
+        starterFiles = (
+          await fetchGithubProject({
+            owner: "sampot",
+            repo: "pg-llm-agent",
+          })
+        ).files;
         starterName = name || "Coding Agent";
       } catch {
         // Offline／rate limit：退回狗糧 starter（非產品規格）
@@ -4821,11 +4823,13 @@
     error = null;
     status = "自 GitHub 複製中…";
     try {
-      const remoteFiles = await fetchGithubProject(parsed, {
-        onProgress: p => {
-          openTransferProgress = fileListToOpenProgress(p);
-        },
-      });
+      const remoteFiles = (
+        await fetchGithubProject(parsed, {
+          onProgress: p => {
+            openTransferProgress = fileListToOpenProgress(p);
+          },
+        })
+      ).files;
       openTransferProgress = { ratio: 1, detail: "完成" };
       status = "正在寫入本機 OPFS…";
       const name = parsed.path
@@ -5037,11 +5041,13 @@
           statusExtra = `（含 ${summarizeStateParts(applied)}）`;
         }
       } else if (intent.kind === "github") {
-        const remoteFiles = await fetchGithubProject(intent.ref, {
-          onProgress: p => {
-            openTransferProgress = fileListToOpenProgress(p);
-          },
-        });
+        const remoteFiles = (
+          await fetchGithubProject(intent.ref, {
+            onProgress: p => {
+              openTransferProgress = fileListToOpenProgress(p);
+            },
+          })
+        ).files;
         openTransferProgress = { ratio: 1, detail: "完成" };
         status = "正在寫入本機 OPFS…";
         const name =

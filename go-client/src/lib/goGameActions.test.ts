@@ -10,7 +10,10 @@ const samLoad = vi.hoisted(() => ({
     async (
       _source?: string,
       _options?: { onProgress?: (p: unknown) => void }
-    ) => ({ "index.html": "<main>new</main>" })
+    ) => ({
+      files: { "index.html": "<main>new</main>" },
+      tipRev: "tip-sha",
+    })
   ),
   tip: vi.fn(async () => "tip-sha"),
 }));
@@ -48,7 +51,10 @@ describe("runUpdate", () => {
           ratio: 0.5,
           path: "index.html",
         });
-        return { "index.html": "<main>new</main>" };
+        return {
+          files: { "index.html": "<main>new</main>" },
+          tipRev: "tip-sha",
+        };
       }
     );
     samLoad.tip.mockResolvedValue("tip-sha");

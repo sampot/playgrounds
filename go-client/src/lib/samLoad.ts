@@ -11,11 +11,16 @@ export type LoadSamFilesOptions = {
   onProgress?: (p: FileListProgress) => void;
 };
 
+export type LoadSamFilesResult = {
+  files: FileMap;
+  tipRev: string;
+};
+
 /** Fetch SAM FileMap from a catalog／compose `source` (GitHub owner/repo or URL). */
 export async function loadSamFiles(
   source: string,
   options?: LoadSamFilesOptions
-): Promise<FileMap> {
+): Promise<LoadSamFilesResult> {
   const ref = parseGithubUrl(source);
   if (!ref) {
     throw new Error(`無法解析小品來源：${source}`);

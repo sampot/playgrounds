@@ -68,7 +68,7 @@ const defaultDeps: RosterSeatMaterializeDeps = {
     resolveInviteCandidatesWithInstalled(sessionInviteToCatalogSpec(invite)),
   cloneProject,
   createProject,
-  fetchGithub: fetchGithubProject,
+  fetchGithub: async ref => (await fetchGithubProject(ref)).files,
   parseGithub: parseGithubUrl,
   getCatalogSource: id => getCatalogEntry(id)?.source,
 };

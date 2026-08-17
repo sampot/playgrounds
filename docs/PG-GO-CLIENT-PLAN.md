@@ -1,9 +1,9 @@
 # Playgrounds 純玩版客戶端（`go.samkuo.me`）
 
-> **狀態：** Draft（2026-08-08；修訂 2026-08-17：§5.8 卡面封面）— 契約／階段草案；Invite 路徑實作進行中；型錄 `/s/<id>`／分享面／換片／§5.5.1 OG／**§5.8 產品內封面**／§6.5 離線分數／**§6.6「更多」本機溢流**／**§6.7 架構硬規則**／**§6.7.1 `env.HOST` 注入（DEC-053）** 已定案  
+> **狀態：** Draft（2026-08-08；修訂 2026-08-17：§5.8 卡面封面；**§5.4／§6.5 `sam-manifest.json` 下載契約**）— 契約／階段草案；Invite 路徑實作進行中；型錄 `/s/<id>`／分享面／換片／§5.5.1 OG／**§5.8 產品內封面**／§6.5 離線分數／**§6.6「更多」本機溢流**／**§6.7 架構硬規則**／**§6.7.1 `env.HOST` 注入（DEC-053）** 已定案  
 
 > **權威決策：** 建議 [DECISIONS.md](./DECISIONS.md) **DEC-050**（Proposed）／**DEC-053**（UI 只走 `/api/...`；shell/runtime 走 env binding）  
-> **相關：** [PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)（五子棋 E2E；Invite Guest 主路徑）、[PG-CATALOG-UX-PLAN.md](./PG-CATALOG-UX-PLAN.md)（型錄「分享」→ go）、[PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)、[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（官方 TURN；Guest 經 `join_cap`）、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)、[PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md)（go 登入＋Header profile；玩家主場；DEC-052）、[PG-GO-BOSS-FLASH-PLAN.md](./PG-GO-BOSS-FLASH-PLAN.md)（老闆歡迎氣泡）、[PG-GO-UX-POLISH-PLAN.md](./PG-GO-UX-POLISH-PLAN.md)（玩家 UX 打磨 Draft）、[PG-GO-SESSION-CHAT-PLAN.md](./PG-GO-SESSION-CHAT-PLAN.md)（同 session 輕量聊天 Draft）、DEC-004／009／023／025／042／045／047／048、[GLOSSARY.md](./GLOSSARY.md)
+> **相關：** [PG-GO-SAM-MANIFEST-PLAN.md](./PG-GO-SAM-MANIFEST-PLAN.md)（遊戲 `sam-manifest.json`；廢 Trees 列檔）、[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)（五子棋 E2E；Invite Guest 主路徑）、[PG-CATALOG-UX-PLAN.md](./PG-CATALOG-UX-PLAN.md)（型錄「分享」→ go）、[PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)、[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（官方 TURN；Guest 經 `join_cap`）、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)、[PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md)（go 登入＋Header profile；玩家主場；DEC-052）、[PG-GO-BOSS-FLASH-PLAN.md](./PG-GO-BOSS-FLASH-PLAN.md)（老闆歡迎氣泡）、[PG-GO-UX-POLISH-PLAN.md](./PG-GO-UX-POLISH-PLAN.md)（玩家 UX 打磨 Draft）、[PG-GO-SESSION-CHAT-PLAN.md](./PG-GO-SESSION-CHAT-PLAN.md)（同 session 輕量聊天 Draft）、[PG-GO-ADS-PLAN.md](./PG-GO-ADS-PLAN.md)、DEC-004／009／023／025／042／045／047／048、[GLOSSARY.md](./GLOSSARY.md)
 
 一句話：**玩家主場**——獨立於場殼的純玩客戶端＠`go.samkuo.me`（作者主場＝`play.samkuo.me`，兩 UI 共用同一份型錄）：同時只跑一個 SAM、無編輯環境、不依賴持久 OPFS；啟動不限 Invite（型錄 id 傳閱與 Invite 短鏈並列）；傳閱網址 `/s/<catalog_id>`（內嵌 catalog）；`/s/` game 可換片；可安裝／造訪後離線／本機分數；Header「更多」＝本機溢流（已下載／分層清除）≠ 僅推薦；Invite `/i/`＝臨時 session（不能離線、不換片、無本機選單）；**登入（DEC-052）＝玩家身分；後續玩家主場互邀（GO-INVITE）**。
 
@@ -127,10 +127,10 @@ GET go.samkuo.me/i/<short_id>
 | 形狀 | **`https://go.samkuo.me/s/<catalog_id>`** 僅此；**無** query 必要參數；**不**帶 `name`／`source`／`open` |
 | `catalog_id` | 型錄 YAML／codegen 的穩定 **`id`**（例：`pg-breakout`、`pg-gomoku`）；與 `catalog/entries/<id>.yaml` 檔名一致 |
 | Resolve | go **建置內嵌**型錄資料（與場 `catalog:gen` → `public/catalog/v1.json`／typed module **同一產線**）；runtime **不**依賴抓 `play…/catalog/v1.json` 才能開 |
-| 載入 | 嵌入表查 `id` → 取 `source`（及 title 等）→ 記憶體 fetch／FileMap（**頁內進度條**：檔案數 `done/total`）→ 跑 player UI |
+| 載入 | 嵌入表查 `id` → 取 `source`（及 title 等）→ **讀 repo 根 `sam-manifest.json`**（`rev`＋`files[]`）→ 依清單 raw 下載 FileMap（**頁內進度條**：檔案數 `done/total`）→ 跑 player UI。權威契約見 [PG-GO-SAM-MANIFEST-PLAN.md](./PG-GO-SAM-MANIFEST-PLAN.md)、遊戲義務見 [PG-GAME-AGENT-GUIDE §2.5](./PG-GAME-AGENT-GUIDE.md)。**禁止**對型錄 game 用 GitHub Trees API 列檔；缺 manifest → 頁內錯誤（勿 silent fallback Trees） |
 | 未命中 | 頁內錯誤（下架／draft／未知 id）；**禁止** silent fallback 猜 `source` |
 | 非型錄 SAM | **不產生** `/s/` 連；go Header 分享禁用或隱藏 |
-| 否決 | `/?open=`、`/o?open=`、完整 Git URL、`source` path、`#open=`、Platform 非 Invite 短碼、占用 `/i/` |
+| 否決 | `/?open=`、`/o?open=`、完整 Git URL、`source` path、`#open=`、Platform 非 Invite 短碼、占用 `/i/`；**以 Trees 掃整棵 repo 當 go 下載主路徑** |
 
 **內嵌 catalog：**
 
@@ -324,7 +324,7 @@ GET go.samkuo.me/i/<short_id>
 | --- | --- |
 | **範圍** | **僅**模式 B（`/s/<id>`）與為其服務的殼（首頁 `/` 可作安裝／回訪入口）。**模式 A（`/i/`）排除。** |
 | **加到主畫面** | go origin 提供 Web App Manifest＋圖示（含 iOS `apple-touch-icon`／必要 meta），使標準 Safari／Chrome 可「加入主畫面」／安裝。start_url 宜為 **`/`** 或穩定 `/s/<id>`（實作可定預設 `/`；深鏈開啟仍尊重 path）。**勿**引導使用者把 **`/i/<short_id>`** 釘成主畫面圖示當永久遊戲（短鏈會過期）。 |
-| **離線可玩** | **造訪過才離線**（對齊場殼 DEC-009 精神；非全型錄預先下載）：曾成功載入之 `/s/<id>`（及 Invite 曾下載之同 source）的殼資產＋該 SAM FileMap（或等價 Cache）在網路失敗時仍可再開同 id。嵌入 catalog 已可離線 resolve；差在小品本體與殼 bundle 的 Cache。**`/s/`＝local-first**（本機有同 source 離線包即重用；玩家明示「更新遊戲」才 tip-sync、下載並套用）。**Invite `/i/`＝入座前 check-tip**（比 GitHub tree SHA；沒包或 tipRev 過期才全量下載；相符則重用離線包）。 |
+| **離線可玩** | **造訪過才離線**（對齊場殼 DEC-009 精神；非全型錄預先下載）：曾成功載入之 `/s/<id>`（及 Invite 曾下載之同 source）的殼資產＋該 SAM FileMap（或等價 Cache）在網路失敗時仍可再開同 id。嵌入 catalog 已可離線 resolve；差在小品本體與殼 bundle 的 Cache。**`/s/`＝local-first**（本機有同 source 離線包即重用；玩家明示「更新遊戲」才 tip-sync、下載並套用）。**Invite `/i/`＝入座前 check-tip**（比 **`sam-manifest.json` 的 `rev`**（＝離線 `tipRev`）；沒包或 tipRev 過期才全量下載；相符則重用離線包）。**本階段**仍直連 `raw.githubusercontent.com`（無 Worker CDN）；可能遇 raw 429——友善錯誤＋stale-cache 既有語意。 |
 | **分數／實例狀態** | **本機、本 origin**。權威＝SAM 應用模型：`UI → /api → functions.js → env.KV／env.DB`。go 注入同形 bindings，後端為 **IndexedDB（主）＋ localStorage（後備）**，命名空間穩定綁 **`catalog_id`**（`catalog:<id>`），**不**綁每次隨機 `sandboxId`、**不**用 OPFS。Invite 畫布用 ephemeral／非 durable 記憶體 ns。舊 UI 直寫 `localStorage` 的 shim（`injectGoScoreStorage`）僅相容尚未遷移的小品。**無**雲端、**無**跨 `play`↔`go` 自動搬。§6.6 分層清除含 KV／DB＋舊 shim。 |
 | **Invite 排除（硬）** | `/i/`：**不能**離線入座／對弈；不承諾該局分數長期保留；短鏈失效後重開＝頁內錯誤（請 Host 重新邀請）。可保留非局偏好（例：Roster 顯示名）。載入小品：入座前 **check-tip**（與 `/s/` 同離線庫；tip 相符才跳過全量下載）。 |
 | **敘事** | 對讀者：「傳閱連結可留在手機、沒網路也能玩過的那幾顆」——**不是**「邀請 QR 離線也能加入」。 |
@@ -680,3 +680,4 @@ dash provision → 場殼記憶體 API key
 | 2026-08-17 | **§5.8：** 產品內卡面封面（repo `thumbnail.png` → 靜態 `/covers/<id>.png`＋型錄可選 `cover`）；≠離線訊號；≠每小品 `og:image`；禁止 runtime 打 GitHub |
 | 2026-08-17 | §6.5／§6.6：玩家用語改為「已下載的遊戲／更新遊戲／刪除遊戲」；更新顯示下載進度，solo 當前遊戲有變時自動重新掛載 |
 | 2026-08-17 | 相關：[PG-GO-ADS-PLAN.md](./PG-GO-ADS-PLAN.md)（go shell 廣告／贊助橫幅 Draft；未實作） |
+| 2026-08-17 | **§5.4／§6.5：** 型錄 game 下載改依 repo 根 **`sam-manifest.json`**（`rev`＋`files[]`）；tip＝`rev`；廢 go 主路徑 Trees API；無 Worker（見 [PG-GO-SAM-MANIFEST-PLAN.md](./PG-GO-SAM-MANIFEST-PLAN.md)） |

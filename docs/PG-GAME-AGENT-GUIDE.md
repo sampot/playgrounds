@@ -1,9 +1,9 @@
 # Playgrounds 遊戲開發指南（Coding Agent）
 
-> **狀態：** Draft（2026-08-17；修訂：§3.8 業界共識適用項；既有 §3.6／§3.7／§1.1／§3.5／§2.4）  
+> **狀態：** Draft（2026-08-17；修訂：§2.5 `sam-manifest.json`；既有 §3.8／§3.6／§3.7／§1.1／§3.5／§2.4）  
 > **讀者：** Coding agent（次要：人類作者）  
 > **範圍：** 獨立 `pg-*` 遊戲 repo；產物須能在 **go 純玩**（`https://go.samkuo.me/s/<id>`）與 **play 畫布**同契約執行。  
-> **自足：** 開發遊戲時**只讀本檔**即可；不必讀宿主其它 SPEC／PLAN／源碼。上架型錄、改殼、加新 lib id **不在**本檔範圍。  
+> **自足：** 開發遊戲時**只讀本檔**即可；不必讀宿主其它 SPEC／PLAN／源碼。上架型錄、改殼、加新 lib id **不在**本檔範圍。宿主下載協定細節見 [PG-GO-SAM-MANIFEST-PLAN.md](./PG-GO-SAM-MANIFEST-PLAN.md)（維護者；agent 以本檔 §2.5 為準即可）。  
 > **Starter：** 新遊戲請用 template repo [`sampot/pg-game-scaffold`](https://github.com/sampot/pg-game-scaffold)（`gh repo create … --template sampot/pg-game-scaffold`）。遊戲 repo 只保留短 `AGENTS.md` **指針**指向本檔；**禁止**把本指南全文拷進每個 `pg-*`。  
 > **借鑑：** go／play 殼契約對齊主機 SDK 的責任切分（平台供應釘版能力＋薄系統服務；遊戲寫玩法）——見 §1.1；細節與非目標見 [PG-UI-SDK-SPEC](./PG-UI-SDK-SPEC.md) §1.4、[PG-LIBS-SPEC](./PG-LIBS-SPEC.md) §1.5。
 
@@ -18,6 +18,7 @@
 | **產物** | 獨立 GitHub repo（慣例 id／repo 名＝`pg-<name>`），靜態檔可直接掛進畫布 iframe |
 | **開新庫** | 優先自 [`pg-game-scaffold`](https://github.com/sampot/pg-game-scaffold) template 建立；勿從舊遊戲整棵複製，亦勿 vendoring 本指南 |
 | **交付形式** | **僅** HTML + CSS + JavaScript；**禁止**任何 build 階段、**禁止**把 `node_modules` 或套件鎖進 repo |
+| **下載清單** | 根目錄 **`sam-manifest.json`**（修訂號＋執行期檔列表）必備——見 §2.5；go 依此下載，不掃整棵 repo |
 | **執行期** | 宿主注入 `window.PG`；你**不要**自己載入 `/playgrounds/sdk.js` |
 | **相容** | 同一套檔在 go 與 play **同形**；**禁止**依 `location.host` 特判 go／play |
 | **工具** | 需要測試／暫用工具時用 `npx <pkg>`，**不**寫進依賴清單當運行時需求 |
@@ -26,7 +27,8 @@
 
 1. 禁止執行期外連 CDN／任意 URL 載入函式庫；大型引擎／物理／音訊只許 `PG.libs.load(白名單 id)`。  
 2. 禁止 `window.alert`／`confirm`／`prompt`。  
-3. 禁止用裸 `localStorage`（或同類）當分數／進度的**權威**；持久化走 `PG.kv`（或自訂 `/api`）。
+3. 禁止用裸 `localStorage`（或同類）當分數／進度的**權威**；持久化走 `PG.kv`（或自訂 `/api`）。  
+4. 禁止交付時缺少根目錄 `sam-manifest.json`，或 `files` 漏列執行期會載入的相對路徑資源。
 
 做完後依 **§11 Definition of Done** 逐項自檢再停。
 
@@ -89,11 +91,12 @@ cd pg-<name>
 ### 2.1 最小可玩
 
 ```text
-index.html      # 入口（必）
-app.js          # 或 inline module；可再拆檔
+index.html           # 入口（必）
+app.js               # 或 inline module；可再拆檔
 style.css
+sam-manifest.json    # 下載清單（必；見 §2.5）
 README.md
-ATTRIBUTION.md  # 有第三方素材時必填；建議一律有
+ATTRIBUTION.md       # 有第三方素材時必填；建議一律有
 ```
 
 ### 2.2 建議完整
@@ -103,12 +106,13 @@ index.html
 app.js                 # 或 src/ 多檔，仍無 build：用 <script type="module">
 style.css
 assets/…               # 圖像／音效／字型（拷進本 repo）
+sam-manifest.json      # 必；files 須涵蓋上方執行期會載入的路徑
 thumbnail.png          # 交付應產出；go／型錄卡面封面（見 §2.4）
 tests/game.test.js     # 規則／純函式
 ATTRIBUTION.md
 README.md
 # 可選——僅當預設 /api 不夠時：
-functions.js
+functions.js           # 若有：亦須列入 sam-manifest.json 的 files
 ```
 
 ### 2.3 契約
@@ -116,6 +120,7 @@ functions.js
 | 規則 | 說明 |
 | --- | --- |
 | 入口 | 可直接開啟的 `index.html` |
+| 下載清單 | 根目錄 `sam-manifest.json`（§2.5）；go 只拉清單內檔案 |
 | 路徑 | 資源用**相對路徑**（`./app.js`、`./assets/…`） |
 | 禁止入庫 | `node_modules/`、bundler 產物、自帶的 Phaser／Pixi／Three 等大型 vendor |
 | SDK | **禁止** `<script src="/playgrounds/sdk.js">`（宿主已注入；再載會重複） |
@@ -165,6 +170,38 @@ functions.js
   </body>
 </html>
 ```
+
+### 2.5 下載清單 `sam-manifest.json`（硬）
+
+go 純玩（與日後型錄 game 下載主路徑）**只**依此清單向 GitHub raw 拉檔，**不**掃描整棵 repo。缺檔或漏列 → 玩家開不了或缺資源。宿主協定見 [PG-GO-SAM-MANIFEST-PLAN.md](./PG-GO-SAM-MANIFEST-PLAN.md)。
+
+| 項 | 規格 |
+| --- | --- |
+| **路徑** | 僅認 repo 根 **`sam-manifest.json`** |
+| **契約版** | `"version": 1`（整數；目前僅此） |
+| **修訂號** | `"rev"`：非空字串；寫入 go 離線 tip；**改 files 或任一列檔內容就必須 bump** |
+| **檔列表** | `"files"`：相對根目錄的路徑陣列；**必須含** `"index.html"`；禁止 `..`、絕對路徑、開頭 `/`、重複 |
+| **列什麼** | 執行期會載入的 HTML／CSS／JS／assets／（若有）`functions.js` |
+| **預設不列** | `AGENTS.md`、測試檔、`README.md`、`ATTRIBUTION.md`、`thumbnail.png`（封面走宿主 `covers:sync`，非 runtime 下載） |
+
+範例：
+
+```json
+{
+  "version": 1,
+  "rev": "2026-08-17",
+  "files": [
+    "index.html",
+    "style.css",
+    "app.js",
+    "assets/board.png"
+  ]
+}
+```
+
+**Agent 義務：** 新增／刪除／改名執行期資源時同步改 `files` 並更新 `rev`。交付前用本機靜態伺服確認：清單內每個 path 在 repo 都存在，且頁面不會再請求清單外的相對路徑檔。
+
+**否決：** 無 manifest 就當交付完成；只 bump `rev` 卻忘改 `files`（或相反）；把整份指南或無關大檔塞進 `files` 浪費下載。
 
 ---
 
@@ -746,7 +783,8 @@ npx vitest run
 21. `playing` 時仍整頁顯示 hero／難度模式／常駐規則，舞台被擠成一條（違反 §3.6）  
 22. 只做直式長頁＋`min-width` 略加寬，短高橫式無法玩或需「請旋轉」（違反 §3.7）  
 23. 旋轉螢幕重置整局，或固定 px 畫布在矮視口溢出／擋操作  
-24. 照抄「請旋轉」／orientation lock／依賴 Fullscreen 當唯一可玩條件（違反 §3.8）
+24. 照抄「請旋轉」／orientation lock／依賴 Fullscreen 當唯一可玩條件（違反 §3.8）  
+25. 無 `sam-manifest.json`，或 `files` 漏列執行期資源／改檔不 bump `rev`（違反 §2.5）
 
 ---
 
@@ -773,6 +811,7 @@ npx vitest run
 - [ ] 無 go／play 特判；相對路徑資源正確  
 - [ ] 未發明殼級操控／獎盃 API；單機未依賴 Invite／`SESSION`  
 - [ ] 根目錄 `thumbnail.png` 已依 §2.4 產生（真實遊玩幀、4:3、約 640×480、PNG ≤~50KB）並入庫  
+- [ ] 根目錄 `sam-manifest.json` 已依 §2.5（`version` 1、`rev` 已 bump、`files` 含 `index.html` 與所有執行期相對路徑資源）  
 ---
 
 ## 12. 本指南不涵蓋（不要擅自擴 scope）

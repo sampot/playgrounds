@@ -78,9 +78,11 @@ export async function runUpdate(
   }
   let freshFiles;
   try {
-    freshFiles = await loadSamFiles(entry.source, {
+    const loaded = await loadSamFiles(entry.source, {
       onProgress: options?.onProgress,
     });
+    freshFiles = loaded.files;
+    if (!tipRev) tipRev = loaded.tipRev;
   } catch {
     return {
       ok: false,
