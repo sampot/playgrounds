@@ -57,6 +57,7 @@
 | `pg-microdungeon` | 迷你地城 | 三層短局隨機迷宮、找符石開出口、碰撞戰鬥與成長 |
 | `pg-reacttap` | 表情對決 | **unlisted（已重寫・待上架）**；看表情種類限時搶拍、連續答對 combo 加速 |
 | `pg-skyburst` | 蒼穹連射 | 垂直捲軸射擊、武裝升級、首領彈幕 |
+| `pg-skyrun` | 環道飛行 | 3D 環道飛行（`PG.libs` three）、收集能量環、油量與機體管理 |
 | `pg-sandrts` | 沙丘戰線 | **unlisted**；障礙繞行＋空襲；指揮部被毀即出局 |
 | `pg-yakyu` | 野球生涯 | **unlisted**；虛構青棒校隊；打者揮棒或投手兩用、其餘快轉、短賽季決賽 |
 | `pg-shrineclear` | 祠堂試煉 | 俯視清房、鑰匙開門、近戰短關 |

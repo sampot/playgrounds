@@ -61,6 +61,7 @@
     "kind": "other",
     "label": "Three.js",
     "format": "esm",
+    "assets": ["three.core.min.js"],
     "license": "MIT",
     "licenseFile": "LICENSE-three.txt",
     "source": "https://www.npmjs.com/package/three/v/0.185.1"

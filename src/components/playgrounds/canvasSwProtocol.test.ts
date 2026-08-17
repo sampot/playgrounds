@@ -10,6 +10,7 @@ import {
   FUNCTIONS_NO_SHELL_ERROR,
   PROJECT_NOT_READY_ERROR,
   injectCanvasBridge,
+  PLAYGROUNDS_SDK_SCRIPT_TAG,
   isCanvasApiPath,
   isCanvasPathname,
   isPlaygroundsShellPath,
@@ -177,10 +178,14 @@ describe("api stub + HTML bridge", () => {
     const out = injectCanvasBridge(
       "<!doctype html><html><head><title>t</title></head><body></body></html>"
     );
-    // SDK script must load before user code so `window.PG` is available at
-    // first paint. `defer` lets the parser continue; SDK is self-mounting.
+    // Blocking (no defer/async): memory-canvas composePreview appends the
+    // entry module dynamically; those can run before deferred classics, so
+    // sdk.js must execute while the parser is still in head.
+    expect(PLAYGROUNDS_SDK_SCRIPT_TAG).toContain('src="/playgrounds/sdk.js"');
+    expect(PLAYGROUNDS_SDK_SCRIPT_TAG).not.toMatch(/\bdefer\b/);
+    expect(PLAYGROUNDS_SDK_SCRIPT_TAG).not.toMatch(/\basync\b/);
     expect(out).toContain(
-      '<script src="/playgrounds/sdk.js" defer data-playgrounds-sdk>'
+      '<script src="/playgrounds/sdk.js" data-playgrounds-sdk>'
     );
     // Idempotent: re-injecting does not duplicate the SDK tag.
     expect(injectCanvasBridge(out)).toBe(out);

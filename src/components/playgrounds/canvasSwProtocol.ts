@@ -778,8 +778,12 @@ export const CANVAS_BRIDGE_SCRIPT = `<script data-playgrounds-bridge>
 })();
 </script>`;
 
+// Blocking (no defer/async): go memory canvas runs composePreview, which
+// dynamically appends the entry module. Dynamically-inserted modules can
+// evaluate before deferred classic scripts, so sdk.js must run while the
+// parser is still in <head> and mount window.PG before any game code.
 export const PLAYGROUNDS_SDK_SCRIPT_TAG =
-  '<script src="/playgrounds/sdk.js" defer data-playgrounds-sdk></script>';
+  '<script src="/playgrounds/sdk.js" data-playgrounds-sdk></script>';
 
 export function injectCanvasBridge(html: string, storageScope?: string): string {
   // Idempotent guards: each marker is unique, so re-injection is a no-op.

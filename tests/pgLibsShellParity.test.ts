@@ -73,7 +73,7 @@ describe("PG.libs dual-shell parity", () => {
       "<!doctype html><html><head></head><body></body></html>",
     );
     expect(html).toContain(
-      '<script src="/playgrounds/sdk.js" defer data-playgrounds-sdk>',
+      '<script src="/playgrounds/sdk.js" data-playgrounds-sdk>',
     );
     // Bridge must not preload any lib script.
     expect(html).not.toMatch(/playgrounds\/libs\//u);

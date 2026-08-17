@@ -1768,6 +1768,16 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     license: "MIT",
   },
   {
+    id: "pg-skyrun",
+    title: "環道飛行",
+    kind: "game",
+    series: "街機",
+    blurb: "3D 環道飛行：收集能量環、管油量、閃岩柱，撞牆扣機體。",
+    source: "sampot/pg-skyrun",
+    status: "listed",
+    license: "MIT",
+  },
+  {
     id: "pg-sokoban",
     title: "推箱子",
     kind: "game",

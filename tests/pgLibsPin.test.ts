@@ -61,6 +61,32 @@ describe("PG.libs pin table", () => {
     }
   });
 
+  it("every relative import inside an ESM pin is vendored too", () => {
+    // three ships a split build: three.module.min.js imports ./three.core.min.js.
+    // A missing sibling chunk resolves to the SPA fallback (200 text/html), so
+    // `PG.libs.load` fails with a MIME error instead of an obvious 404.
+    const pin = readPin();
+    for (const [id, entry] of Object.entries(pin)) {
+      if ((entry as { format?: string }).format !== "esm") continue;
+      const source = readFileSync(join(libsDir, entry.file), "utf8");
+      const specifiers = [
+        ...source.matchAll(/(?:from|import)\s*["'](\.\.?\/[^"']+)["']/gu),
+      ].map(m => m[1]!);
+      const declared = (entry as { assets?: string[] }).assets ?? [];
+      for (const spec of new Set(specifiers)) {
+        const sibling = spec.replace(/^\.\//u, "");
+        expect(
+          existsSync(join(libsDir, sibling)),
+          `${id}: ${entry.file} imports ${spec} — vendor it into public/playgrounds/libs/`,
+        ).toBe(true);
+        expect(
+          declared.includes(sibling),
+          `${id}: declare "${sibling}" in pin.json assets`,
+        ).toBe(true);
+      }
+    }
+  });
+
   it("sdk.js embeds the same id/version/file for every pin.json entry", () => {
     const pin = readPin();
     const sdk = readFileSync(sdkPath, "utf8");

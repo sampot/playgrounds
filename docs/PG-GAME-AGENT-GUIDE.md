@@ -1,6 +1,6 @@
 # Playgrounds 遊戲開發指南（Coding Agent）
 
-> **狀態：** Draft（2026-08-17；修訂：§1.1 殼／遊戲邊界、§3.5 生命週期、平台義務、§2.4 可選封面）  
+> **狀態：** Draft（2026-08-17；修訂：§1.1 殼／遊戲邊界、§3.5 生命週期、平台義務、§2.4 封面產生）  
 > **讀者：** Coding agent（次要：人類作者）  
 > **範圍：** 獨立 `pg-*` 遊戲 repo；產物須能在 **go 純玩**（`https://go.samkuo.me/s/<id>`）與 **play 畫布**同契約執行。  
 > **自足：** 開發遊戲時**只讀本檔**即可；不必讀宿主其它 SPEC／PLAN／源碼。上架型錄、改殼、加新 lib id **不在**本檔範圍。  
@@ -103,7 +103,7 @@ index.html
 app.js                 # 或 src/ 多檔，仍無 build：用 <script type="module">
 style.css
 assets/…               # 圖像／音效／字型（拷進本 repo）
-thumbnail.png          # 可選；go／型錄卡面封面（見 §2.4）
+thumbnail.png          # 交付應產出；go／型錄卡面封面（見 §2.4）
 tests/game.test.js     # 規則／純函式
 ATTRIBUTION.md
 README.md
@@ -121,21 +121,32 @@ functions.js
 | SDK | **禁止** `<script src="/playgrounds/sdk.js">`（宿主已注入；再載會重複） |
 | 素材來源 | 開發期可從維護者本機素材庫拷貝；**定稿必須在遊戲 repo 內**；禁止 runtime 指到宿主 `game-assets/` 路徑 |
 
-### 2.4 可選封面 `thumbnail.png`
+### 2.4 卡面封面 `thumbnail.png`
 
-遊戲 repo **根目錄**可放一張 **`thumbnail.png`**，供 go 首頁推薦卡、`/apps`、換片「試試這些」等**產品內卡面**替換預設系列圖示。屬**漸進增強**：沒有檔＝宿主繼續用系列 icon；**不是**交付硬門檻。
+遊戲 repo **根目錄**須有一張 **`thumbnail.png`**，供 go 首頁推薦卡、`/apps`、換片「試試這些」等**產品內卡面**替換預設系列圖示。舊遊戲尚未補圖時宿主會 fallback 系列 icon；**新做／重寫遊戲的 agent 交付前應產出此檔**（見下方「如何產生」與 §11）。
 
 | 項 | 規格 |
 | --- | --- |
 | **路徑** | 僅認 repo 根 `thumbnail.png`（勿改名、勿放 `assets/` 才當封面權威） |
-| **內容** | **真實遊玩畫面**（一幀可辨識玩法）；勿只放 logo／純字 title card |
-| **比例** | 優先 **4:3**（約 640×480 或 800×600），對齊 go 推薦卡 cover；若暫用正方形，宿主會 `object-fit: cover` 裁切——可接受但非首選 |
+| **內容** | **真實遊玩畫面**（一幀可辨識玩法）；勿只放 logo／純字 title card／抽象裝飾圖 |
+| **比例** | **4:3**（**640×480** 優先；或 800×600）。正方形僅過渡可接受——宿主會 `object-fit: cover` 裁切，非首選 |
 | **格式／體積** | PNG；建議 **≤ ~50KB**（可損壓）；勿丟未壓縮大圖 |
 | **署名** | 畫面含第三方素材時，仍依 §8 在 `ATTRIBUTION.md`（及必要時 credits）署名；封面本身不另開授權例外 |
 | **語意（硬）** | 有 thumbnail **≠**「這台裝置可離線玩」。離線＝造訪後 cache（go `/apps`／「更多」已下載）；封面只負責「長什麼樣」 |
-| **如何進卡面** | 作者只負責把檔放進遊戲 repo。**宿主**建置／維護腳本把檔同步到 go（等）靜態 **`/covers/<catalog_id>.png`**，型錄產物可選帶 `cover` 路徑——見 [PG-GO-CLIENT-PLAN §5.8](./PG-GO-CLIENT-PLAN.md)、[PG-CATALOG-QUERY-PLAN](./PG-CATALOG-QUERY-PLAN.md)。**禁止**指望 go 首頁 runtime 去打 GitHub raw |
+| **如何進卡面** | 作者／agent 只負責把檔放進遊戲 repo。**宿主**建置／維護腳本把檔同步到 go（等）靜態 **`/covers/<catalog_id>.png`**，型錄產物可選帶 `cover` 路徑——見 [PG-GO-CLIENT-PLAN §5.8](./PG-GO-CLIENT-PLAN.md)、[PG-CATALOG-QUERY-PLAN](./PG-CATALOG-QUERY-PLAN.md)。**禁止**指望 go 首頁 runtime 去打 GitHub raw；**禁止**在遊戲任務裡自行改宿主 `/covers/` 或型錄 YAML（§12） |
 
-**否決（遊戲側）：** 為封面引入 build／套件；把封面當 `og:image` 義務（社群預覽仍是 go 站級圖，見 go 計劃 §5.5.1）；用「有無 thumbnail」暗示離線就緒。
+#### 如何產生（agent 義務）
+
+交付前依序做：
+
+1. **跑起來**：在本機靜態伺／go／play 畫布實際開玩，等到主玩法畫面可見（非僅開場選單——除非選單本身已清楚展示玩法）。
+2. **截一幀可辨識玩法的畫面**：須看得出「這是什麼遊戲」（例如盤面、跑道、角色與主要物件），不要空白場、loading、純 UI chrome。
+3. **裁成 4:3 並縮放**：輸出 **640×480**（或 800×600）PNG；可暫用系統／瀏覽器截圖工具、`sips`、一次性 `npx` 影像工具等——**禁止**為此在遊戲 repo 加 build 管線或長期依賴。
+4. **壓體積**：目標 **≤ ~50KB**；過大再損壓，仍須可辨識。
+5. **寫入權威路徑**：存成 repo 根 **`thumbnail.png`** 並納入版本庫；勿只留在 `/tmp` 或聊天附件。
+6. **自檢**：肉眼確認非 logo-only；比例正確；檔名／路徑正確。宿主 `covers:sync` 由維護者另跑——agent **不必**、也**不應**在遊戲任務中改 playgrounds 宿主。
+
+**否決（遊戲側）：** 為封面引入常駐 build／套件；把封面當 `og:image` 義務（社群預覽仍是 go 站級圖，見 go 計劃 §5.5.1）；用「有無 thumbnail」暗示離線就緒；用 AI／貼圖湊一張與實際遊玩無關的卡面充數；把封面放進 `assets/` 卻不放根目錄。
 
 `index.html` 開頭慣例：
 
@@ -644,7 +655,7 @@ npx vitest run
 - [ ] `npx vitest run` 綠（有規則可測時）  
 - [ ] 無 go／play 特判；相對路徑資源正確  
 - [ ] 未發明殼級操控／獎盃 API；單機未依賴 Invite／`SESSION`  
-- [ ] （建議）根目錄 `thumbnail.png` 符合 §2.4；無則可略  
+- [ ] 根目錄 `thumbnail.png` 已依 §2.4 產生（真實遊玩幀、4:3、約 640×480、PNG ≤~50KB）並入庫  
 ---
 
 ## 12. 本指南不涵蓋（不要擅自擴 scope）

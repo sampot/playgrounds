@@ -7,7 +7,8 @@
  * redefine window.fetch (CANVAS_BRIDGE owns the rewrite), and does NOT
  * expose secret values (DEC-029/035).
  *
- * Loaded by the canvas bridge as `<script src="/playgrounds/sdk.js" defer>`.
+ * Loaded by the canvas bridge as `<script src="/playgrounds/sdk.js">`
+ * (blocking; no defer — see PG-UI-SDK-SPEC §5.1).
  *
  * window.PG is published in two phases:
  *   1. synchronously:  window.PG = { version: "1", libs, ready: <Promise>, … }
