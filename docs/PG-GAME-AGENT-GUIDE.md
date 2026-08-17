@@ -1,6 +1,6 @@
 # Playgrounds 遊戲開發指南（Coding Agent）
 
-> **狀態：** Draft（2026-08-17）  
+> **狀態：** Draft（2026-08-17；修訂：§3.2 行動觸控操控）  
 > **讀者：** Coding agent（次要：人類作者）  
 > **範圍：** 獨立 `pg-*` 遊戲 repo；產物須能在 **go 純玩**（`https://go.samkuo.me/s/<id>`）與 **play 畫布**同契約執行。  
 > **自足：** 開發遊戲時**只讀本檔**即可；不必讀宿主其它 SPEC／PLAN／源碼。上架型錄、改殼、加新 lib id **不在**本檔範圍。  
@@ -130,13 +130,78 @@ functions.js
 - 佈局用 flex／stack；CSS 預設＝手機，用 `@media (min-width: …)` 加寬，不要反過來只靠 `max-width` 補丁。
 - go 頂列 chrome 可能出現／自動收合：HUD 勿假設「永遠全螢幕無邊」；優先 `100dvh`、留安全邊距。
 
-### 3.2 禁止原生 Dialog
+### 3.2 行動觸控操控（虛擬搖桿／方向）
+
+動作、射擊、平台等需要**持續移動**的遊戲，**禁止**只靠固定小圓「虛擬方向鍵」（◀▲▼▶／3×2 `data-key` 網格）當唯一手機操控——拇指難對準、無法斜向微調，手感差。桌面仍可用鍵盤；手機須另有可用方案。
+
+操控 UI **只在遊戲 iframe 內**實作。**不要**發明 `PG.controls`／`PG.input`；**不要**假設殼會注入虛擬手把。殼（尤其 go）會佔用**左右邊緣中段**（抽屜／對話把手）；**雙下角與下緣**留給遊戲虛擬操作——把搖桿／動作鍵放左下／右下，並留 `env(safe-area-inset-*)`。
+
+#### 選型（依玩法擇一為主）
+
+| 模式 | 適用 | 作法 |
+| --- | --- | --- |
+| **類比搖桿** | 俯視移動、坦克、需 360°／斜向的動作 | 左下搖桿；優先 `await PG.libs.load("nipple")`。右側放開火／技能等大鈕（≥約 64×64 CSS px） |
+| **畫布拖曳／跟隨** | 固定畫面或垂直捲軸射擊 | 觸控／指標位置驅動自機（可 soft-chase）；自動連射時按下＝開火或僅定位。**不要**為此類硬加方向鍵 |
+| **離散 D-pad／swipe** | 格子移動、單步 hop、長按重複一步 | 可用螢幕方向鍵或畫布 swipe；鍵面仍 ≥44×44。可選長按重複（約 300ms 後／100–130ms 一步） |
+| **平台左右＋動作** | 橫向平台 | 左：類比（多半只取 X）或大面積左／右熱區；右：獨立跳躍（必要時再加攻擊）。**不要**用三顆小方向鈕冒充 |
+
+同一遊戲可鍵盤＋觸控並存；粗指標（手機）顯示虛擬層，細指標可藏 overlay，但**不得**只留鍵盤可玩。
+
+#### 輸入契約（建議）
+
+鍵盤、搖桿、拖曳最後都寫入同一狀態，規則邏輯只讀狀態、不直接綁 DOM：
+
+```js
+// 建議形狀（欄位可裁剪；語意保持一致）
+const input = {
+  moveX: 0, // -1..1
+  moveY: 0, // -1..1
+  aimX: 0,
+  aimY: 0,
+  primary: false,   // 開火／確認（按住）
+  secondary: false, // 炸彈／技能
+};
+```
+
+#### 事件與版面硬規則
+
+- 一律 **Pointer Events**（`pointerdown`／`move`／`up`／`cancel`）；**禁止**新遊戲再寫 touch + mouse 雙綁（易漏放開＝黏鍵）。
+- 按住類控件：`setPointerCapture`；放開、`pointercancel`、失焦／隱藏頁面時**必須歸零**移動與按住狀態。
+- 畫布與搖桿區：`touch-action: none`（避免捲動搶手勢）；動作鈕可用 `manipulation`。
+- 類比：死區約 **0.12–0.18**；單位圓正規化；多點觸控時左＝移動、右＝動作，互不搶同一 pointer。
+- 浮動搖桿（nipple dynamic／等同）優於「必須先點中固定圓心」的小盤。
+- 觀戰／不可操控時隱藏或 `pointer-events: none` 虛擬層。
+
+```js
+await PG.ready;
+const nipplejs = await PG.libs.load("nipple");
+const manager = nipplejs.create({
+  zone: document.getElementById("stick-zone"),
+  mode: "dynamic", // 或 static；優先讓第一觸點即可拖
+  size: 96,
+  restOpacity: 0.45,
+});
+manager.on("move", (_evt, data) => {
+  const f = data.force > 1 ? 1 : data.force;
+  const rad = data.angle.radian;
+  input.moveX = Math.cos(rad) * f;
+  input.moveY = -Math.sin(rad) * f; // 螢幕 Y 向下時可依座標系調整
+});
+manager.on("end", () => {
+  input.moveX = 0;
+  input.moveY = 0;
+});
+```
+
+桌遊、牌、消消、點格謎題等**不需要**本節搖桿；點選／拖曳即可，勿無故 `load("nipple")`。
+
+### 3.3 禁止原生 Dialog
 
 - **禁止** `alert`／`confirm`／`prompt`。
 - 結束、錯誤、提示 → 頁內面板／toast／HUD 文案。
 - **破壞性**操作（覆寫存檔、清除進度）→ 頁內確認（可取消、可關閉）；**非破壞**且使用者已明確發起的流程（例如選檔上傳建新）→ **不要**再多一層「確定？」。
 
-### 3.3 可玩驗收（上架／交付門檻）
+### 3.4 可玩驗收（上架／交付門檻）
 
 每款至少滿足：
 
@@ -282,7 +347,7 @@ const game = new Phaser.Game({
 | `planck` | 1.3.x | Box2D 形 | `planck` | Matter 不夠用時 |
 | `howler` | 2.2.x | SFX／BGM | `Howler`／`Howl` | 跨品類音效 |
 | `tone` | 15.x | 合成／Transport | `Tone` | 節拍／合成；體積大→真需要才 load |
-| `nipple` | 1.0.x | 虛擬搖桿 | `nipplejs` | 觸控方向鍵 |
+| `nipple` | 1.0.x | 類比虛擬搖桿 | `nipplejs` | 俯視／連續移動（見 §3.2；勿用小方向鍵代替） |
 | `seedrandom` | 3.0.x | 可重現 RNG | `Math.seedrandom` | 關卡種子／可重播 |
 
 ```js
@@ -317,6 +382,13 @@ const PIXI = await PG.libs.load("pixi");             // ESM
 
 只要 seeded RNG
   → seedrandom（或自寫一小段）
+
+手機連續移動／俯視動作
+  → load("nipple") 或畫布拖曳（§3.2）；不要只做固定小 D-pad
+  → 已 load("phaser") 時可優先 Phaser pointer／虛擬鍵，必要再疊 nipple
+
+格子／單步／桌遊點選
+  → vanilla pointer／swipe；不要無故 load("nipple")
 ```
 
 **禁止進殼、也禁止你自行 CDN 引入當「替代方案」：** GSAP（授權門檻）、以及任何未列於上表的大型第三方 runtime。動畫用 CSS、自寫、或 Phaser tween。
@@ -461,12 +533,15 @@ npx vitest run
 7. 同時 load phaser + pixi「雙引擎」  
 8. 提交 `node_modules` 或 build 產物  
 9. 僅鍵盤可玩、觸控熱區過小  
-10. 無署名或素材未拷進 repo  
-11. 用按鈕列表冒充可玩深度  
-12. 為 go／play 寫兩套分支  
-13. UI 讀密鑰或發明 `PG.secrets`  
-14. `load("https://…")` 或自創 lib id  
-15. 引入 GSAP 或其它未白名單庫
+10. 連續移動卻只用固定小虛擬方向鍵（應 §3.2 類比搖桿或畫布拖曳）  
+11. 新遊戲 touch+mouse 雙綁、或放開後未歸零（黏鍵）  
+12. 虛擬鍵佔左右邊緣中段、與殼把手重疊；或未留 safe-area  
+13. 無署名或素材未拷進 repo  
+14. 用按鈕列表冒充可玩深度  
+15. 為 go／play 寫兩套分支  
+16. UI 讀密鑰或發明 `PG.secrets`／`PG.controls`  
+17. `load("https://…")` 或自創 lib id  
+18. 引入 GSAP 或其它未白名單庫
 
 ---
 
@@ -481,7 +556,8 @@ npx vitest run
 - [ ] 需引擎／物理／音訊 → 僅 `PG.libs.load` 白名單；否則未 load  
 - [ ] 無 CDN 函式庫；無 GSAP／未列庫  
 - [ ] Mobile-first；主操作觸控可用；無 `alert`／`confirm`／`prompt`  
-- [ ] 可玩標準 §3.3（操作／狀態／挑戰／輸贏／測試／素材）  
+- [ ] 需持續移動時符合 §3.2（類比／拖曳／離散擇一；非唯小 D-pad；Pointer＋歸零）  
+- [ ] 可玩標準 §3.4（操作／狀態／挑戰／輸贏／測試／素材）  
 - [ ] `ATTRIBUTION.md`（及必要時遊戲內 credits）齊  
 - [ ] `npx vitest run` 綠（有規則可測時）  
 - [ ] 無 go／play 特判；相對路徑資源正確  
