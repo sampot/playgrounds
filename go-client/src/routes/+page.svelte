@@ -17,6 +17,7 @@
   import { goAuth } from "$lib/goAuth.svelte";
   import { recommendHome, searchGoCatalog, type GoCatalogEntry } from "$lib/goCatalog";
   import GoEntryCover from "$lib/GoEntryCover.svelte";
+  import GoAdSlot from "$lib/GoAdSlot.svelte";
   import { formatGoBuildStamp, GO_BUILD_ISO } from "$lib/goBuildStamp";
   import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
 
@@ -197,6 +198,8 @@
     <p class="search-placeholder-text">搜尋遊戲名稱或 id，或點「再次推薦」隨機選取</p>
   {/if}
 </section>
+
+<GoAdSlot />
 
 <button type="button" class="home-reshuffle pixel-btn pixel-btn--primary" onclick={reshuffle}>
   再次推薦

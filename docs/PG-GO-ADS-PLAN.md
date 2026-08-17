@@ -227,8 +227,8 @@ go-client/src/lib/
 
 | Phase | 內容 | 完成定義 | 狀態 |
 | --- | --- | --- | --- |
-| **0. 契約** | 本文件＋**DEC-054**；面／尺寸／house／Phase 2＝A／standalone＝僅 house | 開問題清空 | **進行中** |
-| **1. House 版位** | `GoAdSlot`（320×100／寬 728×90）＋house 自推；`/` ＋ `/s/` 載入；boot 後收起 | 點進其他 `/s/<id>`；非迷你型錄；standalone 可顯示 house；`/apps`／`/help`／`/i/`／玩中無 | 未排程 |
+| **0. 契約** | 本文件＋**DEC-054**；面／尺寸／house／Phase 2＝A／standalone＝僅 house | 開問題清空 | **完成** |
+| **1. House 版位** | `GoAdSlot`（320×100／寬 728×90）＋house 自推；`/` ＋ `/s/` 載入；boot 後收起 | 點進其他 `/s/<id>`；非迷你型錄；standalone 可顯示 house；`/apps`／`/help`／`/i/`／玩中無 | **已落地**（手測待） |
 | **2. EthicalAds／Carbon** | 同一槽換 A；CSP／env；失敗或 standalone → house | 分頁可出聯盟；standalone **僅** house；載入面不擋 boot | 未排程 |
 | **3. 同意／披露** | help＋必要時頁內同意（略過＝house） | 拒聯盟仍可玩 | 未排程 |
 | **4.（可選）** | chrome 展開薄條 | 另議 | — |
@@ -237,17 +237,17 @@ go-client/src/lib/
 
 ## 11. 驗收清單（草案）
 
-- [ ] 廣告僅 shell；SAM iframe／repo 無廣告 SDK
-- [ ] **Phase 1：** 窄屏 **320×100**、寬屏 **728×90**；內容＝**其他** `kind: game`；點擊 → `/s/<id>`
-- [ ] **不是**「試試這些」多卡／迷你型錄；**無** catalog `ads` 旗標
-- [ ] **`/s/` 載入中**露版位；**boot／`canvasActive` 後立即收起**
-- [ ] house 與 SAM fetch **並行**；**不**延長載入
-- [ ] `/i/`、`/apps`、`/help` 與遊玩中無版位
-- [ ] **standalone：僅 house**；不請求聯盟
-- [ ] 斷網：house 同源素材仍可顯示（或優雅塌縮）；不阻 `/s/` 離線再開
-- [ ] Phase 1 **零**第三方廣告腳本
-- [ ] 無原生 dialog；讀者文案無訂閱／Pro／Billing
-- [ ] 與點數、play analytics **無**計費耦合
+- [x] 廣告僅 shell；SAM iframe／repo 無廣告 SDK
+- [x] **Phase 1：** 窄屏 **320×100**、寬屏 **728×90**；內容＝**其他** `kind: game`；點擊 → `/s/<id>`
+- [x] **不是**「試試這些」多卡／迷你型錄；**無** catalog `ads` 旗標
+- [x] **`/s/` 載入中**露版位；**boot／`canvasActive` 後立即收起**（載入分支卸載）
+- [x] house 與 SAM fetch **並行**；**不**延長載入
+- [x] `/i/`、`/apps`、`/help` 與遊玩中無版位
+- [x] **standalone：僅 house**（Phase 1 本就 house）
+- [ ] 斷網：house 同源素材仍可顯示（或優雅塌縮）；不阻 `/s/` 離線再開（手測）
+- [x] Phase 1 **零**第三方廣告腳本
+- [x] 無原生 dialog；讀者文案無訂閱／Pro／Billing
+- [x] 與點數、play analytics **無**計費耦合
 
 ---
 
@@ -286,3 +286,4 @@ go-client/src/lib/
 | 2026-08-17 | **定案 Phase 1：** house **推廣站內 game**；槽依 **廣告版位 dimension**（§6.1／§7.3）；非迷你型錄；Phase 2 再接聯盟 |
 | 2026-08-17 | **定案尺寸：** 窄屏版位 **320×100** |
 | 2026-08-17 | **開問題全定案：** Phase 2＝A；standalone＝僅 house；另立 **DEC-054**；無 catalog `ads` 旗標；寬屏 **728×90** |
+| 2026-08-17 | **Phase 1 落地：** `GoAdSlot`＋`pickHouseGame`；掛 `/` 與 `/s/` 載入／錯誤面；help 短述；`VITE_GO_ADS_ENABLED` |

@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { chromeSession } from "$lib/chromeSession.svelte";
   import GoSamLoadBar from "$lib/GoSamLoadBar.svelte";
+  import GoAdSlot from "$lib/GoAdSlot.svelte";
   import {
     GO_SAM_UNKNOWN_DESCRIPTION,
     GO_SAM_UNKNOWN_DOCUMENT_TITLE,
@@ -325,6 +326,7 @@
       label="小品下載進度"
     />
   </div>
+  <GoAdSlot excludeCatalogId={catalogId} canvasActive={false} />
 {:else if status.phase === "error"}
   <h1 class="pixel-text">打不開</h1>
   <div class="pixel-status" role="alert">
@@ -340,6 +342,7 @@
       </p>
     {/if}
   </div>
+  <GoAdSlot excludeCatalogId={catalogId} canvasActive={false} />
 {:else}
   <h1 class="sr-only">{status.entry?.title || entry?.title || "小品"}</h1>
   {#if entry?.blurb}
