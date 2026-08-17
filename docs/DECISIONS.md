@@ -1,6 +1,6 @@
 # 我是山姆鍋 — 架構與工程決策
 
-> **最後更新：** 2026-08-12（DEC-053 Revision：`createGoHostBinding` 落實——go 純玩版同形 `env.HOST` 注入）
+> **最後更新：** 2026-08-17（DEC-054 Proposed：go shell 廣告版位；含 `/apps` 中段）
 > **對象：** 作者、AI agents；必要時給之後的自己讀
 
 本文件以輕量 **ADR**（Architecture Decision Record）記錄本站**顯著且耐久**的架構／工程選擇：選了什麼、為何不選其他、後續工作不可踩破的後果。細節規格仍以 [AGENTS.md](./AGENTS.md)、[TOOLS-PLAN.md](./TOOLS-PLAN.md) 等為準；此檔是可掃讀的決策索引，避免只活在 PR 與聊天裡。
@@ -92,6 +92,7 @@
 | [DEC-051](#dec-051-playgrounds-api-scopes環境能力準入) | Playgrounds API scopes（環境能力準入） | Accepted |
 | [DEC-052](#dec-052-純玩版登入與-header-profile) | 純玩版登入（play 相容協定；玩家主場 go）＋ Header profile | Proposed |
 | [DEC-053](#dec-053-sam-ui-只走-apifunctionsjsshellruntime-走-env-binding) | SAM UI 只走 `/api` → `functions.js`；shell/runtime 走 env binding | Accepted |
+| [DEC-054](#dec-054-純玩版-go-shell-廣告版位) | 純玩版 go shell 廣告版位（house → EthicalAds／Carbon 類） | Proposed |
 
 ---
 
@@ -1122,6 +1123,25 @@
   - 非破壞變更：未遷移 SAM 仍能透過 `/api/shell/...` SW dispatch 運作。
 - **Revision（2026-08-12）：** `createGoHostBinding` 在 go 純玩版落實——hostable sandbox 注入同形 `env.HOST`；與 `hostInviteBind` 共用 `hostRuntime` 單例；既有 `/api/shell/session/*` 與 `/api/shell/platform/*` 派發降為過渡層（見 [PG-GO-CLIENT-PLAN.md §6.7.1](./PG-GO-CLIENT-PLAN.md)）。
 
+### DEC-054: 純玩版 go shell 廣告版位
+
+- **Status:** Proposed（2026-08-17；契約見 [PG-GO-ADS-PLAN.md](./PG-GO-ADS-PLAN.md)；Phase 1 house 已落地）
+- **Context:** `go.samkuo.me` 是玩家主場與型錄傳閱入口（DEC-050）；點數制只回收官方 TURN 成本。需要一條不擋玩的維持／變現路徑，且對齊 DEC-004（非產品腔）與 DEC-007（勿預設塞追蹤）。廣告必須是 shell 能力，不得進入 SAM iframe／可攜契約（DEC-053）。
+- **Decision:**
+  1. **投放面：** `/`、**`/s/<id>` 載入等待面**（一級）、**`/apps` 列表中段**；**不**掛 `/help`、`/i/`、畫布遊玩中（`canvasActive`）；**永不**進 SAM iframe。
+  2. **尺寸：** 窄屏 **320×100**；寬屏 **728×90**（`min-width` 升階）。
+  3. **Phase 1：** **house**——單則自推其他 `kind: game`（同源 cover／title → `/s/<id>`）；IAB 形單槽，**不是**「試試這些」迷你型錄；零第三方腳本；與 SAM fetch **並行**、不拖延 boot。
+  4. **Phase 2：** **EthicalAds／Carbon 類**（否決 AdSense）；同一 `GoAdSlot` 換 provider；失敗可回退 house。
+  5. **standalone PWA：** **僅 house**；永不載聯盟腳本。
+  6. **不做** catalog YAML `ads` 旗標；與點數／play analytics **不**耦合計費。
+  7. 讀者敘事：house＝站內互推；聯盟＝贊助／本站維持——**不用**訂閱／Pro／Billing 腔（DEC-004）。
+- **Consequences:**
+  - 細節／階段以 [PG-GO-ADS-PLAN.md](./PG-GO-ADS-PLAN.md) 為準。
+  - 勿在 Invite 關鍵路徑或玩中浮層塞廣告；勿為曝光刻意拖慢載入。
+  - Phase 2 才放寬 CSP／help 披露；Phase 1 不引入追蹤同意牆。
+- **Revision（2026-08-17）：** 初版 Proposed。
+- **Revision（2026-08-17）：** 投放面補 **`/apps` 列表中段** banner（撤回「/apps 不掛」）。
+
 ---
 
 ## 4. 相關文件
@@ -1166,6 +1186,7 @@
 | [PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md) | Platform 點數制與官方 TURN（Draft；非訂閱；**否決**自備 TURN） |
 | [PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md) | 場邀請 E2E MVP（載體五子棋／`gomoku.v1`；DEC-047／045／023） |
 | [PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md) | 純玩版客戶端＠`go.samkuo.me`（短網址 canonical；DEC-050） |
+| [PG-GO-ADS-PLAN.md](./PG-GO-ADS-PLAN.md) | 純玩版 shell 廣告版位（**DEC-054**；house／EthicalAds 類） |
 | [PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md) | 純玩版登入（play 相容協定）＋ Header profile（DEC-052 Proposed） |
 | [PG-GO-SESSION-CHAT-PLAN.md](./PG-GO-SESSION-CHAT-PLAN.md) | 純玩版同 session 輕量聊天（Draft；從屬 DEC-050／045 transport） |
 | [PG-STANDALONE-PLAN.md](./PG-STANDALONE-PLAN.md) | 場網／Workers／開源／舊場暫留（DEC-041／042） |

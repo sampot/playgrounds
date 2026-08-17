@@ -21,7 +21,7 @@
 
 - **營收面（近程）：** Phase 1 先用版位做**站內遊戲互推**（驗證尺寸／gate／載入生命週期）；Phase 2+ 再接聯盟變現。
 - **產品面：** 廣告＝**shell chrome** 能力；SAM 可攜契約不變（DEC-053）；不進 FileMap／`functions.js`。
-- **UX：** mobile-first；**IAB 形廣告尺寸槽**、無 CLS；**`/s/` 載入中為一級投放**；玩中與 Invite／`/apps`／`/help` 不露。
+- **UX：** mobile-first；**IAB 形廣告尺寸槽**、無 CLS；**`/s/` 載入中為一級投放**；**`/apps` 列表中段一格**；玩中與 Invite／`/help` 不露。
 - **敘事：** 讀者用語偏「也玩玩看／本站小品」（house）或日後「贊助」；內部一律 `GoAdSlot`／provider。
 - **可換供應商：** Phase 1＝**house**；Phase 2＝**EthicalAds／Carbon 類（A）**；槽尺寸預留聯盟 creative；勿做成「推薦卡第二排」。
 - **standalone：** 加主畫面／`display-mode: standalone` → **僅 house**（永不載聯盟腳本）。
@@ -63,11 +63,22 @@
 | --- | --- | --- |
 | **`/s/<id>` 載入中** | ✅ **一級** | 進度條／等待面期間露贊助格；玩家本來就在等（§5.2） |
 | **`/` 首頁** | ✅ | 推薦卡**下方**一格；不進 hero |
-| **`/apps`、`/help`** | ❌ | 管理／說明頁不掛；披露文案可在 `/help`，但**無**廣告槽 |
+| **`/apps`** | ✅ | **列表中段**插入一格（§5.1.1）；空態／載入中不掛 |
+| **`/help`** | ❌ | 披露文案可寫在此，但**無**廣告槽 |
 | **`/s/<id>` 錯誤／尚無畫布** | ✅ 可同槽 | 載入失敗頁可保留同一槽；**不**在錯誤上強制多一層 |
 | **`canvasActive` 遊玩中** | ❌ 預設關 | boot 成功 → **立刻收起／卸載**版位；勿搶觸控 |
 | **`/i/`** | ❌ | Invite 全程不掛（含其 SAM 下載等待） |
 | **SAM iframe 內** | ❌ 永不 | shell only |
+
+#### 5.1.1 `/apps` 列表中段（定案）
+
+| 項 | 規格 |
+| --- | --- |
+| **何時** | 僅 `apps.length ≥ 1` 的列表態；loading／error／空態**不**掛 |
+| **位置** | 列表**中間**：前半列項之後、後半之前。切開點＝`floor(n/2)`（`n=1` → 該則之後；`n=2` → 兩則之間） |
+| **形狀** | 同一 `GoAdSlot`（320×100／寬 728×90）；**不是**列表列樣式複製品 |
+| **內容** | house 自推其他 game（可排除列表中已有 id 為加分，非硬；預設仍 `pickHouseGame()`） |
+| **語意** | 管理面中的站內互推；勿擋「開始／管理」熱區 |
 
 ### 5.2 `/s/` 載入等待面（硬；一級投放）
 
@@ -191,7 +202,7 @@ go-client/src/lib/
     # adsense — 否決
 ```
 
-- 掛點：`/` 頁底槽；`/s/` 載入 UI（與 `GoSamLoadBar` 同層）；`canvasActive` → 卸載。
+- 掛點：`/` 頁底槽；`/s/` 載入 UI；**`/apps` 列表中段**；`canvasActive` → 卸載。
 - `pickHouseGame(excludeId?)`：listed `kind: game` 池；**TDD** 建議。
 - Svelte 5 **runes**（DEC-005）。
 
@@ -228,7 +239,7 @@ go-client/src/lib/
 | Phase | 內容 | 完成定義 | 狀態 |
 | --- | --- | --- | --- |
 | **0. 契約** | 本文件＋**DEC-054**；面／尺寸／house／Phase 2＝A／standalone＝僅 house | 開問題清空 | **完成** |
-| **1. House 版位** | `GoAdSlot`（320×100／寬 728×90）＋house 自推；`/` ＋ `/s/` 載入；boot 後收起 | 點進其他 `/s/<id>`；非迷你型錄；standalone 可顯示 house；`/apps`／`/help`／`/i/`／玩中無 | **已落地**（手測待） |
+| **1. House 版位** | `GoAdSlot`（320×100／寬 728×90）＋house；`/` ＋ `/s/` 載入＋**`/apps` 中段**；boot 後收起 | 點進其他 `/s/<id>`；非迷你型錄；`/help`／`/i/`／玩中無 | **已落地**（含 `/apps`） |
 | **2. EthicalAds／Carbon** | 同一槽換 A；CSP／env；失敗或 standalone → house | 分頁可出聯盟；standalone **僅** house；載入面不擋 boot | 未排程 |
 | **3. 同意／披露** | help＋必要時頁內同意（略過＝house） | 拒聯盟仍可玩 | 未排程 |
 | **4.（可選）** | chrome 展開薄條 | 另議 | — |
@@ -242,7 +253,7 @@ go-client/src/lib/
 - [x] **不是**「試試這些」多卡／迷你型錄；**無** catalog `ads` 旗標
 - [x] **`/s/` 載入中**露版位；**boot／`canvasActive` 後立即收起**（載入分支卸載）
 - [x] house 與 SAM fetch **並行**；**不**延長載入
-- [x] `/i/`、`/apps`、`/help` 與遊玩中無版位
+- [x] `/i/`、`/help` 與遊玩中無版位；**`/apps` 列表中段有一格**
 - [x] **standalone：僅 house**（Phase 1 本就 house）
 - [ ] 斷網：house 同源素材仍可顯示（或優雅塌縮）；不阻 `/s/` 離線再開（手測）
 - [x] Phase 1 **零**第三方廣告腳本
@@ -261,7 +272,7 @@ go-client/src/lib/
 | 4 | Catalog `ads` 旗標 | **不用** |
 | 5 | 寬屏尺寸 | **另開 728×90**（窄屏 320×100） |
 
-其餘已定：投放＝`/` ＋ `/s/` 載入；不掛 `/apps`／`/help`／`/i/`／玩中；Phase 1＝house 自推站內 game。
+其餘已定：投放＝`/` ＋ `/s/` 載入＋**`/apps` 列表中段**；不掛 `/help`／`/i/`／玩中；Phase 1＝house 自推站內 game。
 
 ---
 
@@ -287,3 +298,4 @@ go-client/src/lib/
 | 2026-08-17 | **定案尺寸：** 窄屏版位 **320×100** |
 | 2026-08-17 | **開問題全定案：** Phase 2＝A；standalone＝僅 house；另立 **DEC-054**；無 catalog `ads` 旗標；寬屏 **728×90** |
 | 2026-08-17 | **Phase 1 落地：** `GoAdSlot`＋`pickHouseGame`；掛 `/` 與 `/s/` 載入／錯誤面；help 短述；`VITE_GO_ADS_ENABLED` |
+| 2026-08-17 | **修訂：** `/apps` **列表中段**加入 banner（撤回「/apps 不掛」）；`/help` 仍不掛 |

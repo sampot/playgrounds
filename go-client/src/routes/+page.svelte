@@ -199,7 +199,9 @@
   {/if}
 </section>
 
-<GoAdSlot />
+<div class="home-ad">
+  <GoAdSlot />
+</div>
 
 <button type="button" class="home-reshuffle pixel-btn pixel-btn--primary" onclick={reshuffle}>
   再次推薦
@@ -244,6 +246,15 @@
   }
   .home-rec {
     margin: 0 0 1rem;
+  }
+  .home-ad {
+    margin: 0;
+  }
+  .home-ad:has(:global(.go-ad-slot)) {
+    margin: 0 0 1.15rem;
+  }
+  .home-ad :global(.go-ad-slot) {
+    margin-top: 0;
   }
   .home-reshuffle {
     display: block;

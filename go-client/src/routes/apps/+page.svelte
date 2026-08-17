@@ -8,6 +8,7 @@
     runUpdate,
   } from "$lib/goGameActions";
   import GoEntryCover from "$lib/GoEntryCover.svelte";
+  import GoAdSlot from "$lib/GoAdSlot.svelte";
   import { clearAllGoProgress } from "$lib/goScoreStorage";
   import { clearAllGoSamOfflineCache, listGoSamOfflineCatalogIds } from "$lib/goSamOfflineCache";
 
@@ -28,6 +29,11 @@
   let confirmOpen = false;
 
   let apps = $state<AppEntry[]>([]);
+
+  /** Insert house banner after this many rows (floor(n/2); n<2 → after all). */
+  const adSplit = $derived(
+    apps.length < 2 ? apps.length : Math.floor(apps.length / 2)
+  );
 
   async function refresh() {
     loading = true;
@@ -256,61 +262,14 @@
   </div>
 {:else}
   <ul class="app-list" aria-label="可離線玩的遊戲">
-    {#each apps as app (app.id)}
-      <li class="app-row pixel-box">
-        <div class="app-summary">
-          <span class="app-icon" aria-hidden="true">
-            <GoEntryCover cover={app.cover} series={app.series} size={20} />
-          </span>
-          <div class="app-copy">
-            <a class="app-name" href={`/s/${encodeURIComponent(app.id)}`}>
-              {app.title}
-            </a>
-            <span class="offline-status">● 可離線玩</span>
-          </div>
-          <a class="play-btn pixel-btn" href={`/s/${encodeURIComponent(app.id)}`}>
-            開始
-          </a>
-          <button
-            type="button"
-            class="manage-btn pixel-btn"
-            aria-expanded={expandedId === app.id}
-            aria-controls={`app-actions-${app.id}`}
-            onclick={() => (expandedId = expandedId === app.id ? null : app.id)}
-          >
-            {expandedId === app.id ? "收起" : "管理"}
-          </button>
-        </div>
-
-        {#if expandedId === app.id}
-          <div id={`app-actions-${app.id}`} class="app-actions">
-            <button
-              type="button"
-              class="action-btn pixel-btn"
-              disabled={Boolean(busyAction)}
-              onclick={() => void updateApp(app)}
-            >
-              {busyAction === `update:${app.id}` ? "檢查中…" : "檢查更新"}
-            </button>
-            <button
-              type="button"
-              class="action-btn pixel-btn"
-              disabled={Boolean(busyAction)}
-              onclick={() => askClearScores(app.id, app.title)}
-            >
-              清除進度
-            </button>
-            <button
-              type="button"
-              class="action-btn pixel-btn pixel-btn--danger-outline"
-              disabled={Boolean(busyAction)}
-              onclick={() => askRemoveOffline(app.id, app.title)}
-            >
-              移除離線下載
-            </button>
-          </div>
-        {/if}
-      </li>
+    {#each apps.slice(0, adSplit) as app (app.id)}
+      {@render appRow(app)}
+    {/each}
+    <li class="app-list-ad">
+      <GoAdSlot />
+    </li>
+    {#each apps.slice(adSplit) as app (app.id)}
+      {@render appRow(app)}
     {/each}
   </ul>
 
@@ -325,6 +284,63 @@
     </button>
   </section>
 {/if}
+
+{#snippet appRow(app: AppEntry)}
+  <li class="app-row pixel-box">
+    <div class="app-summary">
+      <span class="app-icon" aria-hidden="true">
+        <GoEntryCover cover={app.cover} series={app.series} size={20} />
+      </span>
+      <div class="app-copy">
+        <a class="app-name" href={`/s/${encodeURIComponent(app.id)}`}>
+          {app.title}
+        </a>
+        <span class="offline-status">● 可離線玩</span>
+      </div>
+      <a class="play-btn pixel-btn" href={`/s/${encodeURIComponent(app.id)}`}>
+        開始
+      </a>
+      <button
+        type="button"
+        class="manage-btn pixel-btn"
+        aria-expanded={expandedId === app.id}
+        aria-controls={`app-actions-${app.id}`}
+        onclick={() => (expandedId = expandedId === app.id ? null : app.id)}
+      >
+        {expandedId === app.id ? "收起" : "管理"}
+      </button>
+    </div>
+
+    {#if expandedId === app.id}
+      <div id={`app-actions-${app.id}`} class="app-actions">
+        <button
+          type="button"
+          class="action-btn pixel-btn"
+          disabled={Boolean(busyAction)}
+          onclick={() => void updateApp(app)}
+        >
+          {busyAction === `update:${app.id}` ? "檢查中…" : "檢查更新"}
+        </button>
+        <button
+          type="button"
+          class="action-btn pixel-btn"
+          disabled={Boolean(busyAction)}
+          onclick={() => askClearScores(app.id, app.title)}
+        >
+          清除進度
+        </button>
+        <button
+          type="button"
+          class="action-btn pixel-btn pixel-btn--danger-outline"
+          disabled={Boolean(busyAction)}
+          onclick={() => askRemoveOffline(app.id, app.title)}
+        >
+          移除離線下載
+        </button>
+      </div>
+    {/if}
+  </li>
+{/snippet}
 
 <style>
   .back {
@@ -446,6 +462,16 @@
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+  }
+  .app-list-ad {
+    list-style: none;
+    margin: 0.15rem 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+  }
+  .app-list-ad :global(.go-ad-slot) {
+    margin-top: 0;
   }
   .app-row {
     display: block;
