@@ -2,7 +2,7 @@
 
 > **狀態：** Draft（2026-08-17；修訂：禁 precache、授權門檻、路線圖）  
 > **規格權威：** [PG-LIBS-SPEC.md](./PG-LIBS-SPEC.md)  
-> **相關：** [PG-UI-SDK-PLAN.md](./PG-UI-SDK-PLAN.md)、[PG-GAMES.md](./PG-GAMES.md)
+> **相關：** [PG-UI-SDK-PLAN.md](./PG-UI-SDK-PLAN.md)、[PG-GAMES.md](./PG-GAMES.md)、[PG-GAME-AGENT-GUIDE.md](./PG-GAME-AGENT-GUIDE.md)（agent 開發自足指南）
 
 ---
 

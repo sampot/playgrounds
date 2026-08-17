@@ -2,7 +2,7 @@
 
 > **狀態：** Draft（2026-08-17；`PG.libs`；同日修訂：禁 precache、授權門檻、候選路線圖）  
 > **權威決策：** 不立新 DEC；掛在既有宿主／UI SDK 決策之下（DEC-015 釘版精神、DEC-041／050 雙殼、DEC-053 UI 契約邊界）。  
-> **相關：** [PG-UI-SDK-SPEC.md](./PG-UI-SDK-SPEC.md)（`window.PG`）、[PG-UI-SDK-PLAN.md](./PG-UI-SDK-PLAN.md)、[PG-GAMES.md](./PG-GAMES.md)（遊戲交付約束）、[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)（go 靜態同步）、實作階段見 [PG-LIBS-PLAN.md](./PG-LIBS-PLAN.md)。  
+> **相關：** [PG-UI-SDK-SPEC.md](./PG-UI-SDK-SPEC.md)（`window.PG`）、[PG-UI-SDK-PLAN.md](./PG-UI-SDK-PLAN.md)、[PG-GAMES.md](./PG-GAMES.md)（遊戲交付約束）、[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)（go 靜態同步）、實作階段見 [PG-LIBS-PLAN.md](./PG-LIBS-PLAN.md)、遊戲 coding agent 自足指南見 [PG-GAME-AGENT-GUIDE.md](./PG-GAME-AGENT-GUIDE.md)。  
 > **動機：** SAM（尤其 `kind: game`）需要可選的大型 UI 函式庫（2D 引擎、物理、音訊等），但不違反「遊戲 repo 無 build、不安裝套件」；函式庫由 **play／go 殼** 釘版船運，經 **`window.PG.libs` 動態載入**；不需要者 **零下載**。機制不限遊戲——凡殼釘版、白名單 id 的 UI 側函式庫皆可走同一入口。
 
 一句話：**殼釘版供應授權清楚的 UI 函式庫；僅經 `PG.libs.load(id)` 懶載（禁止 precache）；SAM 仍只交 HTML＋CSS＋JS。**
