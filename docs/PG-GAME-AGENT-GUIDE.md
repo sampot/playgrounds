@@ -1,10 +1,11 @@
 # Playgrounds 遊戲開發指南（Coding Agent）
 
-> **狀態：** Draft（2026-08-17；修訂：§3.2 行動觸控操控）  
+> **狀態：** Draft（2026-08-17；修訂：§1.1 殼／遊戲邊界、§3.5 生命週期、平台義務）  
 > **讀者：** Coding agent（次要：人類作者）  
 > **範圍：** 獨立 `pg-*` 遊戲 repo；產物須能在 **go 純玩**（`https://go.samkuo.me/s/<id>`）與 **play 畫布**同契約執行。  
 > **自足：** 開發遊戲時**只讀本檔**即可；不必讀宿主其它 SPEC／PLAN／源碼。上架型錄、改殼、加新 lib id **不在**本檔範圍。  
-> **Starter：** 新遊戲請用 template repo [`sampot/pg-game-scaffold`](https://github.com/sampot/pg-game-scaffold)（`gh repo create … --template sampot/pg-game-scaffold`）。遊戲 repo 只保留短 `AGENTS.md` **指針**指向本檔；**禁止**把本指南全文拷進每個 `pg-*`。
+> **Starter：** 新遊戲請用 template repo [`sampot/pg-game-scaffold`](https://github.com/sampot/pg-game-scaffold)（`gh repo create … --template sampot/pg-game-scaffold`）。遊戲 repo 只保留短 `AGENTS.md` **指針**指向本檔；**禁止**把本指南全文拷進每個 `pg-*`。  
+> **借鑑：** go／play 殼契約對齊主機 SDK 的責任切分（平台供應釘版能力＋薄系統服務；遊戲寫玩法）——見 §1.1；細節與非目標見 [PG-UI-SDK-SPEC](./PG-UI-SDK-SPEC.md) §1.4、[PG-LIBS-SPEC](./PG-LIBS-SPEC.md) §1.5。
 
 ---
 
@@ -61,6 +62,25 @@ cd pg-<name>
 - UI **沒有** `env.KV`；只有 `window.PG`（或你自訂的 `/api/*`）。
 - 沙盒**沒有** `functions.js` 時，宿主會裝**預設** `/api/kv`／`/api/db`／…——多數單機遊戲夠用。
 - `PG.libs` **不會**在開局預抓；沒呼叫 `load`＝零 libs 流量。桌遊／牌類預設 **不要** load。
+
+### 1.1 殼／遊戲責任（主機 SDK 借鑑）
+
+對齊主機平台的切分：**殼＝平台；iframe 內＝遊戲。**
+
+| 層 | 誰負責 | 例子 |
+| --- | --- | --- |
+| **殼（play／go）** | 注入 `window.PG`、預設 `/api`、釘版 `PG.libs`、場／純玩 chrome | 頂列、邊緣抽屜把手、SDK、libs 靜態檔 |
+| **遊戲（你的 repo）** | 玩法、HUD、虛擬搖桿／觸控層、頁內確認／toast、素材 | `#game`、結束面板、Credits |
+| **線上（另約）** | Invite／session／signaling | **不是** `PG.libs`；單機預設不碰 `PG.SESSION` |
+
+**殼不做、你也不要發明成「平台 API」的：**
+
+- `PG.controls`／`PG.input`／殼注入虛擬手把  
+- 殼級成就／獎盃／內購／商店  
+- 用 `alert`／`confirm`／`prompt` 充當系統對話框  
+- 把 matchmaking／WebRTC 塞進 `PG.libs.load`
+
+**平台義務（遊戲必須履行；多數是文件級硬規則，不是新 `PG.*`）：** 存檔走 `PG.kv`、錯誤頁內提示、生命週期暫停（§3.5）、輸入歸零（§3.2）、mobile-first。
 
 ---
 
@@ -200,6 +220,7 @@ manager.on("end", () => {
 - **禁止** `alert`／`confirm`／`prompt`。
 - 結束、錯誤、提示 → 頁內面板／toast／HUD 文案。
 - **破壞性**操作（覆寫存檔、清除進度）→ 頁內確認（可取消、可關閉）；**非破壞**且使用者已明確發起的流程（例如選檔上傳建新）→ **不要**再多一層「確定？」。
+- 平台錯誤（存檔失敗、`functions_no_leader` 等）同樣**頁內**提示；**不要**假設殼會彈系統級對話框（MVP 無 `PG.toast`／系統 flash——見 UI SDK 開放點）。
 
 ### 3.4 可玩驗收（上架／交付門檻）
 
@@ -210,7 +231,46 @@ manager.on("end", () => {
 3. **有挑戰**——AI 或關卡會因玩家選擇改變。  
 4. **輸贏清楚**——可勝可敗，且來自玩家操作。  
 5. **測試測規則**——不是只斷言「某個欄位有變」。  
-6. **美術／音效有實際用上**，且署名齊（§8）。
+6. **美術／音效有實際用上**，且署名齊（§8）。  
+7. **生命週期（§3.5）**——背景／隱藏時不繼續吃輸入、不無意義燒 CPU／音訊。
+
+### 3.5 生命週期（Suspend／Resume）
+
+對齊主機「前景／背景」義務。Web 對應：`document.visibilityState`、`visibilitychange`、`pagehide`（以及視需要 `blur`／`pageshow`）。**MVP 不新增** `PG.lifecycle`；遊戲自行監聽。
+
+**隱藏／背景／卸載時（硬）：**
+
+1. **輸入歸零**——`moveX`／`moveY`／按住類 `primary` 等全部清零；釋放 pointer capture 語意上的「黏鍵」。  
+2. **停止或暫停即時迴圈**——`requestAnimationFrame`／固定步模擬在背景應 pause 或降載；禁止隱藏分頁仍全速模擬。  
+3. **音訊**——BGM／循環 SFX 暫停或靜音；回到可見再依產品選擇續播或停在暫停選單。  
+4. **引擎**——已 `load("phaser")` 時：pause 場景或等價；換沙盒／離頁前 `game.destroy(true)`（釋放 WebGL）。Howler／Tone 同等處理。
+
+**回到可見時：**
+
+- 不要假設輸入狀態仍有效；從零恢復或進暫停選單。  
+- 可再讀一次 `PG.kv` 若你的設計需要「他處已寫入」的同步（多數單機不必）。
+
+```js
+function suspend() {
+  input.moveX = 0;
+  input.moveY = 0;
+  input.primary = false;
+  // pause raf / Phaser scene / Howler …
+}
+
+function resume() {
+  // 可選：開暫停面板，勿自動「帶著舊按住狀態」開跑
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") suspend();
+  else resume();
+});
+
+window.addEventListener("pagehide", suspend);
+```
+
+桌遊／純回合制若本來就沒有連續迴圈，至少仍須在隱藏時清掉「按住／拖曳中」狀態，避免回來後誤觸。
 
 ---
 
@@ -283,12 +343,13 @@ try {
 
 遊戲常見 `code`：`functions_no_leader`、`functions_unavailable`、`kv_key_too_large`、`internal_error`。  
 libs：`unknown_lib`、`load_failed`（見 §5）。  
-一律**頁內**提示，禁止 `alert`。
+一律**頁內**提示，禁止 `alert`。KV／配額類失敗時遊戲應可降級繼續玩（本局分數仍可顯示；同步失敗用 toast／HUD）。
 
 ### 4.4 不要做的事
 
 - 不要假設存在 `PG.secrets`（UI 不暴露密鑰值）。  
 - 不要在 UI 直連「後端 env」。  
+- 不要發明 `PG.controls`／`PG.input`／`PG.lifecycle`／`PG.achievements`（殼不注入操控；生命週期見 §3.5；無獎盃 API）。  
 - `PG.SESSION`／`COMPUTE`／`HOST`／`DELEGATE` 為 **capability**：未準入時**屬性不存在**（`"SESSION" in PG === false`）。**單機小品預設不要依賴它們。** 多人／Invite 協定超出本指南（§12）。
 
 ### 4.5 自訂 API 逃生艙
@@ -539,9 +600,11 @@ npx vitest run
 13. 無署名或素材未拷進 repo  
 14. 用按鈕列表冒充可玩深度  
 15. 為 go／play 寫兩套分支  
-16. UI 讀密鑰或發明 `PG.secrets`／`PG.controls`  
+16. UI 讀密鑰或發明 `PG.secrets`／`PG.controls`／`PG.input`  
 17. `load("https://…")` 或自創 lib id  
-18. 引入 GSAP 或其它未白名單庫
+18. 引入 GSAP 或其它未白名單庫  
+19. 分頁隱藏仍全速模擬／BGM，或 resume 時帶著舊按住狀態（違反 §3.5）  
+20. 把 Invite／對戰協定塞進 `PG.libs` 或當單機預設依賴 `PG.SESSION`
 
 ---
 
@@ -557,11 +620,13 @@ npx vitest run
 - [ ] 無 CDN 函式庫；無 GSAP／未列庫  
 - [ ] Mobile-first；主操作觸控可用；無 `alert`／`confirm`／`prompt`  
 - [ ] 需持續移動時符合 §3.2（類比／拖曳／離散擇一；非唯小 D-pad；Pointer＋歸零）  
-- [ ] 可玩標準 §3.4（操作／狀態／挑戰／輸贏／測試／素材）  
+- [ ] §3.5 生命週期：hidden／pagehide 時輸入歸零＋暫停迴圈／音訊；引擎有銷毀慣例  
+- [ ] 平台錯誤（KV 等）頁內提示，可降級續玩  
+- [ ] 可玩標準 §3.4（操作／狀態／挑戰／輸贏／測試／素材／生命週期）  
 - [ ] `ATTRIBUTION.md`（及必要時遊戲內 credits）齊  
 - [ ] `npx vitest run` 綠（有規則可測時）  
 - [ ] 無 go／play 特判；相對路徑資源正確  
-
+- [ ] 未發明殼級操控／獎盃 API；單機未依賴 Invite／`SESSION`
 ---
 
 ## 12. 本指南不涵蓋（不要擅自擴 scope）
@@ -580,4 +645,4 @@ npx vitest run
 
 ## 13. 給維護者的註腳（agent 可略）
 
-本檔內容摘自宿主契約（UI SDK、`PG.libs`、遊戲交付約束、UX 硬規則）。若與殼上實際 `sdk.js`／`pin.json` 衝突，以殼運行為準，並應回修本檔附表版本。Agent 開發遊戲時仍以本檔為唯一必讀。
+本檔內容摘自宿主契約（UI SDK、`PG.libs`、遊戲交付約束、UX／生命週期硬規則、主機 SDK 責任借鑑）。若與殼上實際 `sdk.js`／`pin.json` 衝突，以殼運行為準，並應回修本檔附表版本。Agent 開發遊戲時仍以本檔為唯一必讀。

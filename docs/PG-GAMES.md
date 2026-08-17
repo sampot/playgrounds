@@ -8,7 +8,8 @@
 > **開發規則：** 遊戲 repo 不加入 `node_modules`、不安裝任何套件；需要工具（含測試）時一律以 `npx <pkg>` 臨時執行，不入 repo。
 > **測試指引：** 單元測試統一以 `npx vitest run` 執行。
 > **倉庫說明：** 每個遊戲都是獨立的 GitHub repo，本地路徑位於 `~/dev/sampot/<repo-name>`。
-> **Coding agent：** 獨立開發（含 go 相容、`PG`／`PG.libs`）以 [PG-GAME-AGENT-GUIDE.md](./PG-GAME-AGENT-GUIDE.md) 為唯一必讀；不必再翻其它宿主 SPEC。  
+> **Coding agent：** 獨立開發（含 go 相容、`PG`／`PG.libs`、生命週期／輸入義務）以 [PG-GAME-AGENT-GUIDE.md](./PG-GAME-AGENT-GUIDE.md) 為唯一必讀；不必再翻其它宿主 SPEC。  
+> **殼契約借鑑：** 主機式責任切分（平台薄服務＋釘版 middleware；遊戲寫玩法）見該指南 §1.1／§3.5，以及 [PG-UI-SDK-SPEC §1.4](./PG-UI-SDK-SPEC.md)、[PG-LIBS-SPEC §1.5](./PG-LIBS-SPEC.md)。  
 > **新遊戲 starter：** GitHub template [`sampot/pg-game-scaffold`](https://github.com/sampot/pg-game-scaffold)；遊戲內只留 `AGENTS.md` 指針，**不要**複製指南全文到每個 `pg-*`。
 
 純玩入口：`https://go.samkuo.me/s/<id>` · 場型錄：`/sam/?kind=game`
@@ -26,7 +27,7 @@
 | `pg-carrom` | 康樂球 | **unlisted**；拖曳彈射打擊珠、碰撞推進對手棋子入口袋得點 |
 | `pg-cityroam` | 巷弄迷走 | 街區撿金幣、躲警察、走到出口；30×20 格小地圖 |
 | `pg-dancepad` | 節奏踏墊 | 四軌箭頭下落、踩拍連擊 |
-| `pg-foodcatch` | 接食材 | **unlisted**；移動菜藍接食物、躲壞番茄；連擊加倍、20 秒升級 |
+| `pg-foodcatch` | 接食材 | **unlisted（已重寫・待上架）**；移動菜藍接食物、躲壞番茄；連擊加倍、20 秒升級 |
 | `pg-frogcross` | 青蛙過街 | 過馬路、木筏、進巢 |
 | `pg-leaptrail` | 躍階旅人 | 短關平台跳躍 |
 | `pg-marblepit` | 玻璃彈珠坑 | 凹坑對撞、撥彈進洞 |
@@ -54,7 +55,7 @@
 | `pg-diabolo` | 扯鈴 | **unlisted**；節拍連招（抖鈴／拋鈴／接鈴）累加 combo、難度遞增 |
 | `pg-hopkick` | 跳房子踢毽子 | 跳房子節拍點格與踢毽子連擊 |
 | `pg-microdungeon` | 迷你地城 | 三層短局隨機迷宮、找符石開出口、碰撞戰鬥與成長 |
-| `pg-reacttap` | 表情對決 | **unlisted**；看表情種類限時搶拍、連續答對 combo 加速 |
+| `pg-reacttap` | 表情對決 | **unlisted（已重寫・待上架）**；看表情種類限時搶拍、連續答對 combo 加速 |
 | `pg-skyburst` | 蒼穹連射 | 垂直捲軸射擊、武裝升級、首領彈幕 |
 | `pg-sandrts` | 沙丘戰線 | **unlisted**；障礙繞行＋空襲；指揮部被毀即出局 |
 | `pg-yakyu` | 野球生涯 | **unlisted**；虛構青棒校隊；打者揮棒或投手兩用、其餘快轉、短賽季決賽 |
@@ -62,22 +63,22 @@
 | `pg-abilitycave` | 能力門洞穴 | 3～5 能力解鎖過障、短圖回溯 |
 | `pg-streetclash` | 騎樓格鬥誌 | **unlisted（重做中）**；多角色招式表、街機／對戰／修練 |
 | `pg-nightbrawl` | 夜市清街 | **unlisted（重做中）**；側視一路打、夾擊與投技、關卡頭目 |
-| `pg-islandloop` | 環島賽 | **unlisted（重做中）**；多賽道盃、車輛改裝、計時榜 |
-| `pg-pitchduel` | 操場對決 | **unlisted（重做中）**；五人制足球場地規則、人機對戰 |
-| `pg-alleybowl` | 騎樓保齡 | **unlisted（重做中）**；球道物理＋桿數／關卡挑戰 |
-| `pg-roofglide` | 頂樓滑板 | **unlisted（重做中）**；路線計分、技名連段 |
-| `pg-straitwing` | 海峽空戰 | **unlisted（重做中）**；俯視狗鬥任務鏈 |
+| `pg-islandloop` | 環島賽 | **unlisted（已重寫・待上架）**；多賽道盃、車輛改裝、計時榜 |
+| `pg-pitchduel` | 操場對決 | **unlisted（已重寫・待上架）**；五人制足球場地規則、人機對戰 |
+| `pg-alleybowl` | 騎樓保齡 | **unlisted（已重寫・待上架）**；球道物理＋桿數／關卡挑戰 |
+| `pg-roofglide` | 頂樓滑板 | **unlisted（已重寫・待上架）**；路線計分、技名連段 |
+| `pg-straitwing` | 海峽空戰 | **unlisted（已重寫・待上架）**；俯視狗鬥任務鏈 |
 | `pg-templecleave` | 廟口斬陣 | **unlisted（重做中）**；自由移動、技能冷卻、裝備掉落關卡 |
-| `pg-siegepush` | 攻城推波 | **unlisted（重做中）**；組波次攻打 AI 基地 |
+| `pg-siegepush` | 攻城推波 | **unlisted（已重寫・待上架）**；組波次攻打 AI 基地 |
 | `pg-tidefort` | 潮汐要塞 | **unlisted（重做中）**；能力回流、地圖填圖 |
 | `pg-ghostmark` | 查哨夜行 | **unlisted（重做中）**；視線錐、警報等級、任務鏈 |
 | `pg-blackward` | 廢校夜勤 | **unlisted（重做中）**；資源稀缺、聲響、有限視野 |
 | `pg-backdoor` | 後門任務 | **unlisted（重做中）**；同一關多解（偷／騙／打／駭） |
-| `pg-gatepair` | 對門實驗室 | **unlisted（重做中）**；傳送門／動量關卡 |
-| `pg-nightsnake` | 燈籠蛇 | **unlisted（重做中）**；關卡＋無盡雙模式 |
-| `pg-lighttrace` | 光跡對決 | **unlisted（重做中）**；留跡包圍領地 |
-| `pg-typestorm` | 字幕風暴 | **unlisted（重做中）**；打字殺敵／搶修台詞 |
-| `pg-stringbeat` | 琴弦節拍 | **unlisted（重做中）**；軌道對應撥弦 |
+| `pg-gatepair` | 對門實驗室 | **unlisted（已重寫・待上架）**；傳送門／動量關卡 |
+| `pg-nightsnake` | 燈籠蛇 | **unlisted（已重寫・待上架）**；關卡＋無盡雙模式 |
+| `pg-lighttrace` | 光跡對決 | **unlisted（已重寫・待上架）**；留跡包圍領地 |
+| `pg-typestorm` | 字幕風暴 | **unlisted（已重寫・待上架）**；打字殺敵／搶修台詞 |
+| `pg-stringbeat` | 琴弦節拍 | **unlisted（已重寫・待上架）**；軌道對應撥弦 |
 
 ### 懷舊（27＋16 unlisted）
 
@@ -118,14 +119,14 @@
 | `pg-tinyfarm` | 一季小農園 | 短局翻土澆水收成賣箱；非長期養成 |
 | `pg-caveline` | 洞穴一筆劃 | 廊道拼路／限步探路 |
 | `pg-coopswitch` | 雙人機關 | 同機兩角色踩開關推箱過關；預留 Invite |
-| `pg-casefile` | 陳年卷宗 | **unlisted（重做中）**；場景熱點、道具組合、推理結案 |
+| `pg-casefile` | 陳年卷宗 | **unlisted（已重寫・待上架）**；場景熱點、道具組合、推理結案 |
 | `pg-township` | 鎮誌 | **unlisted（重做中）**；多日曆、好感、多結局 |
 | `pg-campusbond` | 社團心事 | **unlisted（重做中）**；行程配置＋關係線 |
 | `pg-seacast` | 港邊釣夢 | **unlisted（重做中）**；魚圖鑑、漁場天氣、裝備 |
-| `pg-lockroom` | 密室一小時 | **unlisted（重做中）**；多房間線索鏈、一局完整解謎 |
-| `pg-atticfind` | 頂樓尋物 | **unlisted（重做中）**；場景搜尋＋故事章節 |
-| `pg-festcrowd` | 遶境人潮 | **unlisted（重做中）**；指定動作疏導／救出走位 |
-| `pg-worddawn` | 晨間一字 | **unlisted（重做中）**；每日＋無盡 Wordle 系文字謎 |
+| `pg-lockroom` | 密室一小時 | **unlisted（已重寫・待上架）**；多房間線索鏈、一局完整解謎 |
+| `pg-atticfind` | 頂樓尋物 | **unlisted（已重寫・待上架）**；場景搜尋＋故事章節 |
+| `pg-festcrowd` | 遶境人潮 | **unlisted（已重寫・待上架）**；指定動作疏導／救出走位 |
+| `pg-worddawn` | 晨間一字 | **unlisted（已重寫・待上架）**；每日＋無盡 Wordle 系文字謎 |
 
 ### 機台（17＋1 unlisted）
 
@@ -203,16 +204,16 @@
 | `pg-pierbox` | 港口貨櫃 | **unlisted**；管堆場、橋機與船期，以最少翻櫃完成合約 |
 | `pg-islesupply` | 島鏈補給 | **unlisted**；排船期與庫存，迎風避颱維持七島十回合供應 |
 | `pg-clubbudg` | 校園社團爭預算 | **unlisted**；八週分配幹部工時、爭場地、辦活動拚期末評鑑 |
-| `pg-bannerwar` | 旌旗戰棋 | **unlisted（重做中）**；戰役章、兵種相剋、陣亡後果 |
+| `pg-bannerwar` | 旌旗戰棋 | **unlisted（已重寫・待上架）**；戰役章、兵種相剋、陣亡後果 |
 | `pg-islandage` | 島鏈紀元 | **unlisted（重做中）**；探索／擴張／開發／征服 |
 | `pg-autolegion` | 自走軍團 | **unlisted（重做中）**；羈絆、經濟、站位、賽季排位 |
-| `pg-ascenddeck` | 牌途登峰 | **unlisted（重做中）**；路線地圖、遺物、可重複通關 |
-| `pg-deepcatacomb` | 深窟探險 | **unlisted（重做中）**；程序地城、飢餓／光照、死即重來 |
+| `pg-ascenddeck` | 牌途登峰 | **unlisted（已重寫・待上架）**；路線地圖、遺物、可重複通關 |
+| `pg-deepcatacomb` | 深窟探險 | **unlisted（已重寫・待上架）**；程序地城、飢餓／光照、死即重來 |
 | `pg-villagewrath` | 里民與天 | **unlisted（重做中）**；佈置災異與恩賜、引導聚落 |
 | `pg-outpost` | 離島前哨 | **unlisted（重做中）**；殖民者需求、心情、生產鏈 |
 | `pg-roundtable` | 圓桌協議 | **unlisted（重做中）**；多勢力同時出價與條約 |
 | `pg-partyquest` | 結社遠征錄 | **unlisted（重做中）**；世界地圖、職業裝備、主線多章 |
-| `pg-blockcity` | 街區建國 | **unlisted（重做中）**；分區、交通、民怨長期平衡 |
+| `pg-blockcity` | 街區建國 | **unlisted（已重寫・待上架）**；分區、交通、民怨長期平衡 |
 | `pg-porttycoon` | 港口大亨 | **unlisted（重做中）**；航線、倉儲、合約與對手 AI |
 | `pg-empirekitchen` | 總舖師傳奇 | **unlisted（重做中）**；菜單研發、員工、展店 |
 | `pg-nightmarket` | 夜盤 | **unlisted（重做中）**；多日價格、資訊差、對手 AI |
@@ -222,7 +223,7 @@
 
 ## 打算實作（backlog）
 
-類型覆蓋 44 款（上表標 **unlisted（重做中）**）目前只有 scaffold 等級的內容：多數 `app.js` 只把 `getLegalActions()` 畫成 3～4 顆按鈕，缺實際操作介面與遊戲深度，**不符可玩要求**。已全數改回 `status: unlisted`，逐款重寫至可玩後才重新上架。
+類型覆蓋 44 款曾全數為 scaffold（`getLegalActions` 按鈕空殼），已改回 `status: unlisted`。進度：**20** 款標 **unlisted（已重寫・待上架）**（仍未改 `listed`，待人工驗收）；其餘 **24** 款仍標 **unlisted（重做中）**。另有街機 `pg-foodcatch`／`pg-reacttap` 亦已重寫、同標待上架。逐款通過下方驗收標準後才重新上架。
 
 驗收標準（每款都要滿足才可改 `listed`）：
 
@@ -232,6 +233,26 @@
 4. **輸贏路徑清楚**——可勝可敗，且來自玩家操作。
 5. **測試驗玩法規則**——不是只斷言欄位有變。
 6. **美術／音效實際用在畫面上**，且署名齊備。
+
+### 開源 Phaser 移植候補（素材＋玩法；不搬程式）
+
+> itch 篩選：Asset license **CC0**（或來源 pack 同等清楚）；程式授權可忽略（一律在 scaffold 上重寫＋`PG.libs.load("phaser")`）。定稿前仍核 zip 內逐檔授權；進 `pg-*` 須 `ATTRIBUTION.md`。勿與已上架玩法硬撞名。
+
+#### 新 id
+
+| 暫定 id | 標題 | 系列 | 靈感（itch） | 一句話 |
+| --- | --- | --- | --- | --- |
+| `pg-holdtrade` | 限艙商運 | 街機 | [Shoot'n Trade](https://patbgames.itch.io/ld54-shoot-n-trade)（CC0） | 艙位配置砲／盾／貨、遠航販賣擴艙；≠純彈幕升級 |
+| `pg-dogtide` | 狗海蓋樓 | 策略 | [House of Dog](https://pizzasgood.itch.io/house-of-dog)（CC0） | 漲潮狗海 vs 蓋樓；沙發／磚／礦井生產鏈 |
+| `pg-bunnyisle` | 兔島神遊 | 策略 | [Bunny Island](https://melchizedek6809.itch.io/bunny-island)（CC0） | 挖填地形養兔、控過密；≠`pg-tinyfarm` 種田 |
+| `pg-mutantfeed` | 異株催活 | 街機 | [Feed Me!](https://hawkhelm.itch.io/feed-me)（CC0） | 三資源餵養異株、摘果計分；≠`pg-foodcatch` 接物 |
+
+#### 餵既有（不新開同型 id）
+
+| 靈感（itch） | 資產授權 | 餵向 | 用途 |
+| --- | --- | --- | --- |
+| [One Class Shooter](https://euophrys.itch.io/one-class-shooter) | CC0 | `pg-skyburst`／`pg-starshot`／`pg-straitwing`（及同類重做） | shmup 皮、敵波節奏、觸控拖曳開火 |
+| [Zero to Hero](https://rafaeldelboni.itch.io/zero-to-hero) | CC0（含 Kenney 1-bit 等已列來源） | `pg-abilitycave`（及平台能力關） | 能力習得關卡密度／1-bit 皮參考 |
 
 ## 維護備註
 

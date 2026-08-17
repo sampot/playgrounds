@@ -1,11 +1,11 @@
 # Playgrounds 宿主函式庫（`PG.libs`）— 規格
 
-> **狀態：** Draft（2026-08-17；`PG.libs`；同日修訂：禁 precache、授權門檻、候選路線圖）  
+> **狀態：** Draft（2026-08-17；`PG.libs`；同日修訂：禁 precache、授權門檻、候選路線圖、§1.5 主機 middleware 借鑑）  
 > **權威決策：** 不立新 DEC；掛在既有宿主／UI SDK 決策之下（DEC-015 釘版精神、DEC-041／050 雙殼、DEC-053 UI 契約邊界）。  
-> **相關：** [PG-UI-SDK-SPEC.md](./PG-UI-SDK-SPEC.md)（`window.PG`）、[PG-UI-SDK-PLAN.md](./PG-UI-SDK-PLAN.md)、[PG-GAMES.md](./PG-GAMES.md)（遊戲交付約束）、[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)（go 靜態同步）、實作階段見 [PG-LIBS-PLAN.md](./PG-LIBS-PLAN.md)、遊戲 coding agent 自足指南見 [PG-GAME-AGENT-GUIDE.md](./PG-GAME-AGENT-GUIDE.md)。  
+> **相關：** [PG-UI-SDK-SPEC.md](./PG-UI-SDK-SPEC.md)（`window.PG`；§1.4 殼／畫布邊界）、[PG-UI-SDK-PLAN.md](./PG-UI-SDK-PLAN.md)、[PG-GAMES.md](./PG-GAMES.md)（遊戲交付約束）、[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)（go 靜態同步）、實作階段見 [PG-LIBS-PLAN.md](./PG-LIBS-PLAN.md)、遊戲 coding agent 自足指南見 [PG-GAME-AGENT-GUIDE.md](./PG-GAME-AGENT-GUIDE.md)（含生命週期義務）。  
 > **動機：** SAM（尤其 `kind: game`）需要可選的大型 UI 函式庫（2D 引擎、物理、音訊等），但不違反「遊戲 repo 無 build、不安裝套件」；函式庫由 **play／go 殼** 釘版船運，經 **`window.PG.libs` 動態載入**；不需要者 **零下載**。機制不限遊戲——凡殼釘版、白名單 id 的 UI 側函式庫皆可走同一入口。
 
-一句話：**殼釘版供應授權清楚的 UI 函式庫；僅經 `PG.libs.load(id)` 懶載（禁止 precache）；SAM 仍只交 HTML＋CSS＋JS。**
+一句話：**殼釘版供應授權清楚的 UI 函式庫；僅經 `PG.libs.load(id)` 懶載（禁止 precache）；SAM 仍只交 HTML＋CSS＋JS。** 定位對齊主機「認證 middleware」——不是玩法 API、不是線上服務。
 
 ---
 
@@ -66,6 +66,23 @@
 - `PG.libs` 走 capability 準入或 `PG.HOST`（非敏感授權面）。
 - SAM 自行註冊／上傳 plugin URL（那是另一套擴充模型）。
 - 為動畫／特效引入授權有疑慮的庫（用 Phaser tween、CSS、或自寫）。
+- **線上／帳號／對戰 SDK**（Invite、WebRTC、matchmaking、`PG.SESSION`）——走 Platform／capability，**永不**進 libs 白名單。
+- **殼注入輸入層**（`PG.controls`／虛擬手把）——操控 UI 在遊戲 iframe 內；`nipple` 僅為可選 middleware。
+- **成就／獎盃／內購／商店 API**——非本產品定位；不經 `PG.libs` 也不經本規格擴張。
+
+### 1.5 主機 middleware 借鑑（產品定位）
+
+傳統遊戲主機 SDK 常區分：**系統服務**（存檔、帳號）vs **認證 middleware**（引擎／物理／音訊，按 title 選用）。本規格只覆蓋後者在 Web 場的對應：
+
+| 主機概念 | go／play |
+| --- | --- |
+| 認證、釘版 middleware | `PG.libs.load` 白名單＋殼靜態檔 |
+| 系統存檔服務 | `PG.kv`／預設 `/api`（[UI SDK](./PG-UI-SDK-SPEC.md)）——**不是** libs |
+| 線上服務 | Platform Invite／session——**不是** libs |
+| 系統軟體必裝、大型套件選裝 | `sdk.js` 恆小；libs **禁止 precache**（G6） |
+| 遊戲銷毀／換 title | 換沙盒＝整頁 canvas 卸載；遊戲負責 `destroy`（無 MVP `unload`） |
+
+遊戲側暫停／背景義務（visibility、輸入歸零、音訊）見 [PG-GAME-AGENT-GUIDE §3.5](./PG-GAME-AGENT-GUIDE.md)；**不**由 `PG.libs` 代管 pause。
 
 ---
 
@@ -346,6 +363,7 @@ phaser, matter, howler, tone, nipple, three, pixi, seedrandom, planck
 | O4 | `.d.ts` 是否為各 id overload？ | 是 |
 | O5 | ~~libs 是否 precache？~~ | **已決：禁止（G6）** |
 | O6 | catalog YAML 宣告 `libs: […]`？ | 可選 DX；**不得**預載；宿主不依 YAML 下載 |
+| O7 | `PG.libs` 是否代管 Game pause／unload？ | **否**；生命週期義務在遊戲（Agent Guide §3.5）；換沙盒＝整頁卸載 |
 
 ---
 
@@ -353,7 +371,8 @@ phaser, matter, howler, tone, nipple, three, pixi, seedrandom, planck
 
 | 既有 | 關係 |
 | --- | --- |
-| **PG-UI-SDK-SPEC** | 擴充 §3 intrinsic：`libs` |
+| **PG-UI-SDK-SPEC** | 擴充 §3 intrinsic：`libs`；殼／畫布邊界見該檔 §1.4 |
+| **PG-GAME-AGENT-GUIDE** | 遊戲側用法＋生命週期；本檔管船運／白名單 |
 | **PG-GAMES.md** | 交付約束不變；懶載＋授權見本檔 |
 | **DEC-015** | 釘版；自托管；**libs 不走 CDN、不 precache** |
 | **DEC-041／042／050** | 場殼與 go 同契約 |
@@ -369,4 +388,5 @@ phaser, matter, howler, tone, nipple, three, pixi, seedrandom, planck
 - 規格本檔；進度 [PG-LIBS-PLAN.md](./PG-LIBS-PLAN.md)。  
 - 新增／退役 id → §3.2、§4.1、§5。  
 - 授權或 precache 政策變更 → §1.3 G6／G7、§4.2、§8。  
+- 產品定位／主機借鑑變更 → §1.4／§1.5。  
 - SDK 表面 → `sdk.js`／`sdk.d.ts`／測試＋ UI SDK 交叉引用。  

@@ -1,8 +1,8 @@
 # Playgrounds UI 端 SDK（`window.PG`）— 規格
 
-> **狀態：** Draft（2026-08-12；本刀規格）
+> **狀態：** Draft（2026-08-17；修訂：§1.3／§1.4 殼邊界與主機 SDK 借鑑、開放點 O6–O7）
 > **權威決策：** 不立新 DEC；對齊 [DECISIONS.md](./DECISIONS.md) **DEC-031**（UI←網路→後端↔resources）／**DEC-038**（後端執行面＝Backend Runtime；離開 UI 主執行緒）／**DEC-053**（UI 對外契約＝`fetch("/api/...")`；shell/runtime 能力只走 `env.*` binding）
-> **相關：** [PG-SAM-ENV-SPEC.md](./PG-SAM-ENV-SPEC.md)（`env.vars`／`env.secrets.*`）、[PG-SAM-BINDINGS-SPEC.md](./PG-SAM-BINDINGS-SPEC.md)（intrinsic vs capability／注入）、[PG-API-SCOPES-SPEC.md](./PG-API-SCOPES-SPEC.md)（OAuth-style scopes／`env.HOST` 子集）、[PG-BACKEND-RUNTIME-SPEC.md](./PG-BACKEND-RUNTIME-SPEC.md)（Runtime 拓撲／通道）、[PG-AGENT-MODEL-SPEC.md §4.2](./PG-AGENT-MODEL-SPEC.md)（UI←網路→後端硬規則）、[PG-DELEGATE-GRANT-PLAN.md](./PG-DELEGATE-GRANT-PLAN.md)（`env.DELEGATE`）
+> **相關：** [PG-SAM-ENV-SPEC.md](./PG-SAM-ENV-SPEC.md)（`env.vars`／`env.secrets.*`）、[PG-SAM-BINDINGS-SPEC.md](./PG-SAM-BINDINGS-SPEC.md)（intrinsic vs capability／注入）、[PG-API-SCOPES-SPEC.md](./PG-API-SCOPES-SPEC.md)（OAuth-style scopes／`env.HOST` 子集）、[PG-BACKEND-RUNTIME-SPEC.md](./PG-BACKEND-RUNTIME-SPEC.md)（Runtime 拓撲／通道）、[PG-AGENT-MODEL-SPEC.md §4.2](./PG-AGENT-MODEL-SPEC.md)（UI←網路→後端硬規則）、[PG-DELEGATE-GRANT-PLAN.md](./PG-DELEGATE-GRANT-PLAN.md)（`env.DELEGATE`）、[PG-LIBS-SPEC.md](./PG-LIBS-SPEC.md)（`PG.libs`）、[PG-GAME-AGENT-GUIDE.md](./PG-GAME-AGENT-GUIDE.md)（遊戲側平台義務）
 > **動機：** 每個 SAM 為存取 intrinsic（`env.KV`／`env.DB`／`env.vars`）各寫一份 `functions.js` 的 CRUD handler、UI 又各抄一份 `fetch("/api/...")` 封裝。**DX 重複、跨 SAM 難以統一版本。** 把 UI 端封裝抽成一份共享 SDK，並由主機（Runtime）提供一份**預設 `functions.js`** 把 intrinsic 攤成標準 `/api/*` 路由——兩端同源。
 
 一句話：**UI 端薄 SDK 封裝 `fetch("/api/...")`；後端預設 `functions.js` 把 `env.KV`／`env.DB`／`env.vars`／`env.secrets` 攤成對應路由；SDK 與後端共用契約、跨 SAM 統一。** UI 看到的「像直接呼叫」實為 SDK 內部的網路呼叫；`env` 物件本體仍在 Backend Runtime 內對 `functions.js`／`controller.js` 可見。
@@ -62,6 +62,25 @@
 - 為 SDK 加跨沙盒「自由指定 sandboxId」：SDK 永遠綁當前 canvas；換沙盒 = 重新載 canvas。
 - 在 SDK 內建立自己的快取／離線副本：重複資源會破 DEC-018／038 單權威；快取由後端決定（若未來要）。
 - 取代 `functions.js`：SAM 仍可寫自訂後端；SDK 只負責 UI 端入口；二者解耦。
+- **殼注入玩法 UI：** 不提供 `PG.controls`／`PG.input`、不注入虛擬手把／系統確認框充當遊戲 UX（對齊 no-native-dialogs；確認／toast 在 SAM 頁內）。
+- **主機商店面：** 成就／獎盃／內購／訂閱檢查——非本 SDK 範圍。
+- **執行期強制「可玩認證」閘門：** TRC／Lotcheck 類以文件＋上架驗收為準（[PG-GAME-AGENT-GUIDE](./PG-GAME-AGENT-GUIDE.md)／[PG-GAMES.md](./PG-GAMES.md)），不在 `sdk.js` 攔截玩法。
+- **把線上協定塞進 intrinsic：** Invite／WebRTC／matchmaking 走 Platform 與 capability（`SESSION` 等），不擴成永遠掛載的對戰 SDK。
+
+### 1.4 殼／畫布責任與主機 SDK 借鑑
+
+對齊傳統主機「平台供應薄系統服務＋認證 middleware；遊戲寫玩法」：
+
+| 主機概念 | play／go |
+| --- | --- |
+| 系統存檔 API | `PG.kv`（＋預設 `/api/kv`）；沙盒 scope 鎖定（§5.4） |
+| 選配系統功能 | capability：`SESSION`／`HOST`／`COMPUTE`／`DELEGATE`（未準入＝屬性不存在） |
+| 認證 middleware | `PG.libs`（[PG-LIBS-SPEC](./PG-LIBS-SPEC.md)；懶載、禁 precache） |
+| 系統 chrome | 殼頂列／邊緣把手；**不**佔遊戲雙下角操控區慣例 |
+| 遊戲 title 義務 | 生命週期暫停、輸入歸零、頁內錯誤提示——**文件硬規則**（Agent Guide §3.5），MVP **不**新增 `PG.lifecycle` |
+| 線上服務 | Platform API／Invite；與 `/api` intrinsic、`PG.libs` 分離 |
+
+**加深、不另發明大表面：** 優先穩定錯誤碼（如 `functions_no_leader`、`kv_key_too_large`）、雙殼同契約、libs 白名單。可選薄狀態通道見 §9 O6。
 
 ---
 
@@ -511,11 +530,14 @@ if ("HOST" in PG) {
 | O3 | SDK 是否暴露 SAM 端自訂 helpers（如 `PG.runtime.{context, files}`） | 否；SAM 作者自 import helper |
 | O4 | DB `prepare` 序列化（statement 物件 vs 每次新 prepare） | 每次 RPC 帶 SQL + bind；不維護長連 statement（與 KV 同） |
 | O5 | SDK `vars` 是否暴露 meta（哪個檔案／mtime） | 否；`.env` 靜態，UI 用 `fetch("/api/vars")` 看當下快照即可 |
+| O6 | 殼是否提供極薄非阻塞狀態槽（如 `PG.flash`／系統 toast）專給平台錯誤？ | 延期；MVP 由 SAM 頁內 toast。若做：僅非阻塞、不可取代破壞性確認、不可變相 `alert` |
+| O7 | 是否新增 `PG.lifecycle`（suspend／resume 事件）？ | **否（MVP）**；遊戲聽 `visibilitychange`／`pagehide`（[Agent Guide §3.5](./PG-GAME-AGENT-GUIDE.md)）。僅當多殼行為嚴重不一致再評估薄通知 |
 
 ---
 
 ## 10. 文件維護
 
 - 本檔為**規格**；實作進度走 [PG-UI-SDK-PLAN.md](./PG-UI-SDK-PLAN.md)。
+- 殼／遊戲邊界或主機借鑑政策變更 → §1.3／§1.4、§9 O6–O7；並同步 [PG-GAME-AGENT-GUIDE](./PG-GAME-AGENT-GUIDE.md)、[PG-LIBS-SPEC](./PG-LIBS-SPEC.md)。
 - 新 SDK method → 更新 §3；新 binding 行為變更 → 更新 §4；新 capability → 更新 §6.3 對照表。
 - 不再需要新 DEC（DEC-031／038／053 已涵）；本檔掛在 `DEC-053` 之下即可。

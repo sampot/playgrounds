@@ -1,8 +1,8 @@
 # Playgrounds 宿主函式庫（`PG.libs`）— 實作計畫
 
-> **狀態：** Draft（2026-08-17；修訂：禁 precache、授權門檻、路線圖）  
+> **狀態：** Draft（2026-08-17；修訂：禁 precache、授權門檻、路線圖、文件借鑑主機 SDK）  
 > **規格權威：** [PG-LIBS-SPEC.md](./PG-LIBS-SPEC.md)  
-> **相關：** [PG-UI-SDK-PLAN.md](./PG-UI-SDK-PLAN.md)、[PG-GAMES.md](./PG-GAMES.md)、[PG-GAME-AGENT-GUIDE.md](./PG-GAME-AGENT-GUIDE.md)（agent 開發自足指南）
+> **相關：** [PG-UI-SDK-PLAN.md](./PG-UI-SDK-PLAN.md)、[PG-UI-SDK-SPEC.md](./PG-UI-SDK-SPEC.md)（§1.4 殼邊界）、[PG-GAMES.md](./PG-GAMES.md)、[PG-GAME-AGENT-GUIDE.md](./PG-GAME-AGENT-GUIDE.md)（agent 開發自足指南；§3.5 生命週期）
 
 ---
 
@@ -74,11 +74,14 @@
 
 | 項 | 完成定義 |
 | --- | --- |
-| 交叉引用 | UI SDK／GAMES 已指向本 SPEC |
-| 遊戲 README 慣例 | `PG.libs.load("phaser")` |
-| SPEC → Accepted | 實作綠後 |
+| 4.1 交叉引用 | UI SDK／GAMES 已指向本 SPEC |
+| 4.2 遊戲 README 慣例 | `PG.libs.load("phaser")` |
+| 4.3 主機 SDK 借鑑入規 | Agent Guide §1.1／§3.5；LIBS §1.5；UI SDK §1.4；開放點 flash／lifecycle |
+| 4.4 SPEC → Accepted | 實作綠後 |
 
-- [ ] 4.2–4.3
+- [x] 4.1（交叉引用）
+- [x] 4.3（2026-08-17：殼／遊戲邊界、生命週期義務、非目標）
+- [ ] 4.2、4.4
 
 ---
 
