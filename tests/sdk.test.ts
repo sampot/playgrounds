@@ -523,6 +523,242 @@ describe("PG.fetch escape hatch", () => {
   });
 });
 
+type PgLibsSurface = {
+  list: () => Promise<
+    Array<{ id: string; version: string; kind?: string; label?: string }>
+  >;
+  load: (id: string) => Promise<unknown>;
+};
+
+function installScriptLoadStub(opts: {
+  onAppend?: (script: HTMLScriptElement) => void;
+  globalName?: string;
+  globalValue?: unknown;
+  fail?: boolean;
+}): () => void {
+  const head = document.head ?? document.documentElement;
+  const originalAppend = head.appendChild.bind(head);
+  head.appendChild = ((node: Node) => {
+    if (node instanceof HTMLScriptElement) {
+      const script = node;
+      opts.onAppend?.(script);
+      queueMicrotask(() => {
+        if (opts.fail) {
+          const err = new Event("error");
+          if (typeof script.onerror === "function") {
+            script.onerror(err as ErrorEvent);
+          }
+          script.dispatchEvent(err);
+          return;
+        }
+        if (opts.globalName) {
+          (window as unknown as Record<string, unknown>)[opts.globalName] =
+            opts.globalValue ?? { __stub: opts.globalName };
+        }
+        const load = new Event("load");
+        if (typeof script.onload === "function") {
+          script.onload(load);
+        }
+        script.dispatchEvent(load);
+      });
+      return node;
+    }
+    return originalAppend(node);
+  }) as typeof head.appendChild;
+  return () => {
+    head.appendChild = originalAppend;
+  };
+}
+
+describe("PG.libs (PG-LIBS-SPEC)", () => {
+  let restoreCreate: (() => void) | undefined;
+
+  afterEach(() => {
+    restoreCreate?.();
+    restoreCreate = undefined;
+    delete (window as unknown as { Phaser?: unknown }).Phaser;
+    delete (window as unknown as { Matter?: unknown }).Matter;
+    delete (window as unknown as { Howler?: unknown }).Howler;
+    delete (Math as unknown as { seedrandom?: unknown }).seedrandom;
+  });
+
+  it("mounts libs as an intrinsic with list/load", async () => {
+    fetchMock = buildFetchStub([]);
+    await loadSdk();
+    const PG = (window as unknown as { PG: { libs: PgLibsSurface } }).PG;
+    expect(PG.libs).toBeDefined();
+    expect(typeof PG.libs.list).toBe("function");
+    expect(typeof PG.libs.load).toBe("function");
+  });
+
+  it("list() returns pinned libs without requesting /playgrounds/libs/", async () => {
+    fetchMock = buildFetchStub([]);
+    await loadSdk();
+    const before = recorded.length;
+    const list = await (
+      window as unknown as { PG: { libs: PgLibsSurface } }
+    ).PG.libs.list();
+    expect(list.length).toBe(9);
+    expect(list.map((e) => e.id).sort()).toEqual([
+      "howler",
+      "matter",
+      "nipple",
+      "phaser",
+      "pixi",
+      "planck",
+      "seedrandom",
+      "three",
+      "tone",
+    ]);
+    const phaser = list.find((e) => e.id === "phaser");
+    expect(phaser?.version).toMatch(/^\d+\.\d+\.\d+/u);
+    expect(phaser?.kind).toBe("engine");
+    expect(list.find((e) => e.id === "matter")?.kind).toBe("physics");
+    expect(list.find((e) => e.id === "howler")?.kind).toBe("audio");
+    expect(list.find((e) => e.id === "three")?.kind).toBe("other");
+    const afterLibs = recorded.slice(before);
+    expect(afterLibs.every((c) => !c.url.includes("/playgrounds/libs/"))).toBe(
+      true,
+    );
+  });
+
+  it("load(unknown) rejects with unknown_lib and does not inject a script", async () => {
+    fetchMock = buildFetchStub([]);
+    await loadSdk();
+    let appended = 0;
+    restoreCreate = installScriptLoadStub({
+      onAppend: () => {
+        appended += 1;
+      },
+    });
+    const PG = (window as unknown as { PG: { libs: PgLibsSurface } }).PG;
+    await expect(PG.libs.load("nope")).rejects.toMatchObject({
+      name: "PgError",
+      code: "unknown_lib",
+    });
+    await expect(
+      PG.libs.load("https://evil.example/x.js" as unknown as string),
+    ).rejects.toMatchObject({
+      name: "PgError",
+      code: "unknown_lib",
+    });
+    expect(appended).toBe(0);
+  });
+
+  it("load(phaser) injects /playgrounds/libs/phaser-*.min.js and returns global", async () => {
+    fetchMock = buildFetchStub([]);
+    await loadSdk();
+    const stubPhaser = { Game: function Game() {} };
+    let src = "";
+    restoreCreate = installScriptLoadStub({
+      globalName: "Phaser",
+      globalValue: stubPhaser,
+      onAppend: (script) => {
+        src = script.src;
+      },
+    });
+    const PG = (window as unknown as { PG: { libs: PgLibsSurface } }).PG;
+    const mod = await PG.libs.load("phaser");
+    expect(src).toMatch(/\/playgrounds\/libs\/phaser-\d+\.\d+\.\d+\.min\.js$/u);
+    expect(mod).toBe(stubPhaser);
+  });
+
+  it("load(matter) and load(howler) inject matching paths", async () => {
+    fetchMock = buildFetchStub([]);
+    await loadSdk();
+    const srcs: string[] = [];
+    restoreCreate = installScriptLoadStub({
+      onAppend: (script) => {
+        srcs.push(script.src);
+        const id = script.getAttribute("data-pg-lib");
+        if (id === "matter") {
+          (window as unknown as { Matter: unknown }).Matter = { Engine: {} };
+        }
+        if (id === "howler") {
+          (window as unknown as { Howler: unknown }).Howler = { mute: () => {} };
+        }
+      },
+    });
+    const PG = (window as unknown as { PG: { libs: PgLibsSurface } }).PG;
+    const Matter = await PG.libs.load("matter");
+    const Howler = await PG.libs.load("howler");
+    expect(srcs.some((s) => /\/matter-0\.20\.0\.min\.js$/u.test(s))).toBe(true);
+    expect(srcs.some((s) => /\/howler-2\.2\.4\.min\.js$/u.test(s))).toBe(true);
+    expect(Matter).toEqual({ Engine: {} });
+    expect(Howler).toEqual({ mute: expect.any(Function) });
+  });
+
+  it("load(three) uses ESM import and does not inject a script tag", async () => {
+    fetchMock = buildFetchStub([]);
+    await loadSdk();
+    let appended = 0;
+    restoreCreate = installScriptLoadStub({
+      onAppend: () => {
+        appended += 1;
+      },
+    });
+    const PG = (window as unknown as { PG: { libs: PgLibsSurface } }).PG;
+    // jsdom cannot fetch /playgrounds/libs/* → load_failed; still must not use <script>.
+    await expect(PG.libs.load("three")).rejects.toMatchObject({
+      name: "PgError",
+      code: "load_failed",
+    });
+    expect(appended).toBe(0);
+  });
+
+  it("load(seedrandom) reads Math.seedrandom after script load", async () => {
+    fetchMock = buildFetchStub([]);
+    await loadSdk();
+    const stub = function seedrandom() {
+      return 0.5;
+    };
+    restoreCreate = installScriptLoadStub({
+      onAppend: () => {
+        (Math as unknown as { seedrandom: unknown }).seedrandom = stub;
+      },
+    });
+    const PG = (window as unknown as { PG: { libs: PgLibsSurface } }).PG;
+    const fn = await PG.libs.load("seedrandom");
+    expect(fn).toBe(stub);
+  });
+
+  it("load(phaser) is idempotent — second call reuses the module without a second script", async () => {
+    fetchMock = buildFetchStub([]);
+    await loadSdk();
+    let appended = 0;
+    restoreCreate = installScriptLoadStub({
+      globalName: "Phaser",
+      globalValue: { once: true },
+      onAppend: () => {
+        appended += 1;
+      },
+    });
+    const PG = (window as unknown as { PG: { libs: PgLibsSurface } }).PG;
+    const a = await PG.libs.load("phaser");
+    const b = await PG.libs.load("phaser");
+    expect(a).toBe(b);
+    expect(appended).toBe(1);
+  });
+
+  it("load_failed when script errors; a later load can retry", async () => {
+    fetchMock = buildFetchStub([]);
+    await loadSdk();
+    restoreCreate = installScriptLoadStub({ fail: true });
+    const PG = (window as unknown as { PG: { libs: PgLibsSurface } }).PG;
+    await expect(PG.libs.load("phaser")).rejects.toMatchObject({
+      name: "PgError",
+      code: "load_failed",
+    });
+    restoreCreate();
+    restoreCreate = installScriptLoadStub({
+      globalName: "Phaser",
+      globalValue: { recovered: true },
+    });
+    const mod = await PG.libs.load("phaser");
+    expect(mod).toEqual({ recovered: true });
+  });
+});
+
 describe("contract invariants", () => {
   it("never redefines window.fetch (CANVAS_BRIDGE owns the rewrite)", async () => {
     fetchMock = buildFetchStub([

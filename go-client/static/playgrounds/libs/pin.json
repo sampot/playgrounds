@@ -1,0 +1,101 @@
+{
+  "phaser": {
+    "id": "phaser",
+    "version": "4.2.1",
+    "file": "phaser-4.2.1.min.js",
+    "kind": "engine",
+    "label": "Phaser",
+    "globalName": "Phaser",
+    "license": "MIT",
+    "licenseFile": "LICENSE-phaser.txt",
+    "source": "https://www.npmjs.com/package/phaser/v/4.2.1"
+  },
+  "matter": {
+    "id": "matter",
+    "version": "0.20.0",
+    "file": "matter-0.20.0.min.js",
+    "kind": "physics",
+    "label": "Matter.js",
+    "globalName": "Matter",
+    "license": "MIT",
+    "licenseFile": "LICENSE-matter.txt",
+    "source": "https://www.npmjs.com/package/matter-js/v/0.20.0"
+  },
+  "howler": {
+    "id": "howler",
+    "version": "2.2.4",
+    "file": "howler-2.2.4.min.js",
+    "kind": "audio",
+    "label": "Howler.js",
+    "globalName": "Howler",
+    "license": "MIT",
+    "licenseFile": "LICENSE-howler.txt",
+    "source": "https://www.npmjs.com/package/howler/v/2.2.4"
+  },
+  "tone": {
+    "id": "tone",
+    "version": "15.1.22",
+    "file": "tone-15.1.22.js",
+    "kind": "audio",
+    "label": "Tone.js",
+    "globalName": "Tone",
+    "license": "MIT",
+    "licenseFile": "LICENSE-tone.txt",
+    "source": "https://www.npmjs.com/package/tone/v/15.1.22"
+  },
+  "nipple": {
+    "id": "nipple",
+    "version": "1.0.4",
+    "file": "nipplejs-1.0.4.min.js",
+    "kind": "input",
+    "label": "nipplejs",
+    "globalName": "nipplejs",
+    "license": "MIT",
+    "licenseFile": "LICENSE-nipple.txt",
+    "source": "https://www.npmjs.com/package/nipplejs/v/1.0.4"
+  },
+  "three": {
+    "id": "three",
+    "version": "0.185.1",
+    "file": "three-0.185.1.module.min.js",
+    "kind": "other",
+    "label": "Three.js",
+    "format": "esm",
+    "license": "MIT",
+    "licenseFile": "LICENSE-three.txt",
+    "source": "https://www.npmjs.com/package/three/v/0.185.1"
+  },
+  "pixi": {
+    "id": "pixi",
+    "version": "8.19.0",
+    "file": "pixi-8.19.0.min.mjs",
+    "kind": "engine",
+    "label": "PixiJS",
+    "format": "esm",
+    "license": "MIT",
+    "licenseFile": "LICENSE-pixi.txt",
+    "source": "https://www.npmjs.com/package/pixi.js/v/8.19.0"
+  },
+  "seedrandom": {
+    "id": "seedrandom",
+    "version": "3.0.5",
+    "file": "seedrandom-3.0.5.min.js",
+    "kind": "other",
+    "label": "seedrandom",
+    "globalPath": "Math.seedrandom",
+    "license": "MIT",
+    "licenseFile": "LICENSE-seedrandom.txt",
+    "source": "https://www.npmjs.com/package/seedrandom/v/3.0.5"
+  },
+  "planck": {
+    "id": "planck",
+    "version": "1.3.0",
+    "file": "planck-1.3.0.min.js",
+    "kind": "physics",
+    "label": "Planck.js",
+    "globalName": "planck",
+    "license": "MIT",
+    "licenseFile": "LICENSE-planck.txt",
+    "source": "https://www.npmjs.com/package/planck-js/v/1.3.0"
+  }
+}

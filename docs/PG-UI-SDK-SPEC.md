@@ -368,6 +368,7 @@ SDK 載入時呼叫一次決定要不要把 `PG.SESSION` 等屬性標成「存�
 載入策略：
 - **MVP：** 經 [`CANVAS_BRIDGE_SCRIPT`](../../src/components/playgrounds/canvasSwProtocol.ts) 注入一行 `<script src="/playgrounds/sdk.js" defer data-playgrounds-sdk>` 進 `index.html` head；SDK 自掛 `window.PG`。
 - **未來：** 若 SDK 體積變大或要分 chunk，改為 dynamic import + cache；不破壞「永遠在頭」契約。
+- **宿主函式庫（擴張）：** `PG.libs` 為主機船運的 UI 函式庫懶載器（**不**經 `/api`、**不**由 bridge 預注入、**不** precache libs；僅授權清楚之開源庫）。契約細節見 [PG-LIBS-SPEC.md](./PG-LIBS-SPEC.md)（Draft）。
 
 ### 5.2 與 `CANVAS_BRIDGE_SCRIPT` 的分工
 
@@ -506,7 +507,7 @@ if ("HOST" in PG) {
 | # | 題 | 傾向 |
 | --- | --- | --- |
 | O1 | SDK 對 `secrets:list` 是否另開 `PG.secrets.list()`（僅 names）？ | 否；走 `PG.HOST.listSecretNames()`，維持單一 HOST 形 |
-| O2 | `pg-sdk.js` 體積／dynamic import 策略 | MVP：內聯或單檔；觀察；> 30 KiB 時再分 chunk |
+| O2 | `pg-sdk.js` 體積／dynamic import 策略 | MVP：內聯或單檔；觀察；> 30 KiB 時再分 chunk；大型宿主函式庫不進 SDK 本體，見 [PG-LIBS-SPEC.md](./PG-LIBS-SPEC.md) |
 | O3 | SDK 是否暴露 SAM 端自訂 helpers（如 `PG.runtime.{context, files}`） | 否；SAM 作者自 import helper |
 | O4 | DB `prepare` 序列化（statement 物件 vs 每次新 prepare） | 每次 RPC 帶 SQL + bind；不維護長連 statement（與 KV 同） |
 | O5 | SDK `vars` 是否暴露 meta（哪個檔案／mtime） | 否；`.env` 靜態，UI 用 `fetch("/api/vars")` 看當下快照即可 |

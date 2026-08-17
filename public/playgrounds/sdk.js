@@ -1,14 +1,16 @@
 /*!
- * Playgrounds UI SDK — window.PG (PG-UI-SDK-SPEC.md §3 / §4)
+ * Playgrounds UI SDK — window.PG (PG-UI-SDK-SPEC.md §3 / §4;
+ * PG-LIBS-SPEC.md for PG.libs)
  *
- * Thin wrapper around `fetch("/api/...")`. The SDK does NOT hold any env
- * object (DEC-031), does NOT redefine window.fetch (CANVAS_BRIDGE owns the
- * rewrite), and does NOT expose secret values (DEC-029/035).
+ * Thin wrapper around `fetch("/api/...")` plus host-shipped library loader
+ * (`PG.libs`). The SDK does NOT hold any env object (DEC-031), does NOT
+ * redefine window.fetch (CANVAS_BRIDGE owns the rewrite), and does NOT
+ * expose secret values (DEC-029/035).
  *
  * Loaded by the canvas bridge as `<script src="/playgrounds/sdk.js" defer>`.
  *
  * window.PG is published in two phases:
- *   1. synchronously:  window.PG = { version: "1", ready: <Promise> }
+ *   1. synchronously:  window.PG = { version: "1", libs, ready: <Promise>, … }
  *   2. after bootstrap:  the Promise resolves to the full surface; SESSION /
  *      COMPUTE / DELEGATE / HOST attach only when the backend advertises
  *      them in /api/capabilities (SPEC §6.1; absent attribute = unadmitted).
@@ -253,6 +255,222 @@
   }
 
   // -------------------------------------------------------------------------
+  // PG.libs — host-shipped UI libraries (PG-LIBS-SPEC). Lazy load only;
+  // never precache. Pin table is embedded (list does not fetch).
+  // -------------------------------------------------------------------------
+  // Keep in sync with public/playgrounds/libs/pin.json
+  var LIB_PIN = {
+    phaser: {
+      id: "phaser",
+      version: "4.2.1",
+      file: "phaser-4.2.1.min.js",
+      kind: "engine",
+      label: "Phaser",
+      globalName: "Phaser",
+    },
+    matter: {
+      id: "matter",
+      version: "0.20.0",
+      file: "matter-0.20.0.min.js",
+      kind: "physics",
+      label: "Matter.js",
+      globalName: "Matter",
+    },
+    howler: {
+      id: "howler",
+      version: "2.2.4",
+      file: "howler-2.2.4.min.js",
+      kind: "audio",
+      label: "Howler.js",
+      globalName: "Howler",
+    },
+    tone: {
+      id: "tone",
+      version: "15.1.22",
+      file: "tone-15.1.22.js",
+      kind: "audio",
+      label: "Tone.js",
+      globalName: "Tone",
+    },
+    nipple: {
+      id: "nipple",
+      version: "1.0.4",
+      file: "nipplejs-1.0.4.min.js",
+      kind: "input",
+      label: "nipplejs",
+      globalName: "nipplejs",
+    },
+    three: {
+      id: "three",
+      version: "0.185.1",
+      file: "three-0.185.1.module.min.js",
+      kind: "other",
+      label: "Three.js",
+      format: "esm",
+    },
+    pixi: {
+      id: "pixi",
+      version: "8.19.0",
+      file: "pixi-8.19.0.min.mjs",
+      kind: "engine",
+      label: "PixiJS",
+      format: "esm",
+    },
+    seedrandom: {
+      id: "seedrandom",
+      version: "3.0.5",
+      file: "seedrandom-3.0.5.min.js",
+      kind: "other",
+      label: "seedrandom",
+      globalPath: "Math.seedrandom",
+    },
+    planck: {
+      id: "planck",
+      version: "1.3.0",
+      file: "planck-1.3.0.min.js",
+      kind: "physics",
+      label: "Planck.js",
+      globalName: "planck",
+    },
+  };
+
+  function pgError(code, message) {
+    var err = new Error(message);
+    err.name = "PgError";
+    err.code = code;
+    return err;
+  }
+
+  /** Resolve `Phaser` or dotted `Math.seedrandom` from window. */
+  function readGlobalPath(path) {
+    if (!path) return undefined;
+    var parts = String(path).split(".");
+    var cur = window;
+    for (var i = 0; i < parts.length; i++) {
+      if (cur == null) return undefined;
+      cur = cur[parts[i]];
+    }
+    return cur;
+  }
+
+  function makeLibs() {
+    var inflight = Object.create(null);
+    var resolved = Object.create(null);
+
+    function finishOk(id, mod, resolve, reject) {
+      delete inflight[id];
+      if (mod == null) {
+        reject(pgError("load_failed", "Lib loaded but entry missing: " + id));
+        return;
+      }
+      resolved[id] = mod;
+      resolve(mod);
+    }
+
+    return {
+      list: function () {
+        var out = [];
+        for (var id in LIB_PIN) {
+          if (!Object.prototype.hasOwnProperty.call(LIB_PIN, id)) continue;
+          var p = LIB_PIN[id];
+          out.push({
+            id: p.id,
+            version: p.version,
+            label: p.label,
+            kind: p.kind,
+          });
+        }
+        return Promise.resolve(out);
+      },
+      load: function (id) {
+        if (typeof id !== "string" || !Object.prototype.hasOwnProperty.call(LIB_PIN, id)) {
+          return Promise.reject(
+            pgError("unknown_lib", "Unknown or unshipped lib: " + String(id)),
+          );
+        }
+        if (Object.prototype.hasOwnProperty.call(resolved, id)) {
+          return Promise.resolve(resolved[id]);
+        }
+        if (inflight[id]) return inflight[id];
+
+        var pin = LIB_PIN[id];
+        var url = "/playgrounds/libs/" + pin.file;
+        var existing =
+          pin.globalPath
+            ? readGlobalPath(pin.globalPath)
+            : pin.globalName
+              ? window[pin.globalName]
+              : undefined;
+        if (existing != null) {
+          resolved[id] = existing;
+          return Promise.resolve(resolved[id]);
+        }
+
+        if (pin.format === "esm") {
+          inflight[id] = Promise.resolve()
+            .then(function () {
+              return import(/* webpackIgnore: true */ url);
+            })
+            .then(function (mod) {
+              var entry = mod;
+              if (mod && typeof mod === "object") {
+                var keys = [];
+                for (var k in mod) {
+                  if (Object.prototype.hasOwnProperty.call(mod, k) && k !== "__esModule") {
+                    keys.push(k);
+                  }
+                }
+                // Sole `default` export → unwrap; otherwise return namespace.
+                if (keys.length === 1 && keys[0] === "default") {
+                  entry = mod.default;
+                }
+              }
+              if (entry == null) {
+                delete inflight[id];
+                return Promise.reject(
+                  pgError("load_failed", "ESM lib entry missing: " + id),
+                );
+              }
+              resolved[id] = entry;
+              delete inflight[id];
+              return entry;
+            })
+            .catch(function (e) {
+              delete inflight[id];
+              if (e && e.name === "PgError") return Promise.reject(e);
+              var msg = e && e.message ? e.message : String(e);
+              return Promise.reject(
+                pgError("load_failed", "Failed to import lib: " + id + " (" + msg + ")"),
+              );
+            });
+          return inflight[id];
+        }
+
+        inflight[id] = new Promise(function (resolve, reject) {
+          var script = document.createElement("script");
+          script.src = url;
+          script.async = true;
+          script.setAttribute("data-pg-lib", id);
+          script.onload = function () {
+            var mod = pin.globalPath
+              ? readGlobalPath(pin.globalPath)
+              : pin.globalName
+                ? window[pin.globalName]
+                : undefined;
+            finishOk(id, mod, resolve, reject);
+          };
+          script.onerror = function () {
+            delete inflight[id];
+            reject(pgError("load_failed", "Failed to load lib: " + id));
+          };
+          (document.head || document.documentElement).appendChild(script);
+        });
+        return inflight[id];
+      },
+    };
+  }
+
+  // -------------------------------------------------------------------------
   // Mount window.PG. capabilities() drives attribute presence; the snapshot
   // for vars is loaded here. We publish a placeholder synchronously so callers
   // can `await PG.ready`; the full surface is published once bootstrap
@@ -284,6 +502,7 @@
       kv: makeKv(),
       db: makeDb(),
       vars: makeVars(),
+      libs: makeLibs(),
       // signalled once bootstrap completes; the resolved value is the list
       // of capabilities (intrinsics + admitted bindings).
       ready: undefined,

@@ -5,7 +5,7 @@
  *
  * Must stay aligned with field public/sw.js for canvas-bridge + API forward.
  */
-const GO_SW_REV = 7;
+const GO_SW_REV = 8;
 const CANVAS_PREFIX = "/canvas/";
 const SYNC_TYPE = "playgrounds-canvas-sync";
 const SYNC_ACK = "playgrounds-canvas-sync-ack";
@@ -298,6 +298,13 @@ function isShellCacheablePath(pathname) {
   if (pathname.startsWith(CANVAS_PREFIX)) return false;
   if (pathname.startsWith("/__go_offline_sam__/")) return false;
   if (isInvitePath(pathname)) return false;
+  // PG-LIBS-SPEC G6: host UI libs lazy-load only — never SW-cache / precache.
+  if (
+    pathname === "/playgrounds/libs" ||
+    pathname.startsWith("/playgrounds/libs/")
+  ) {
+    return false;
+  }
   if (pathname.startsWith("/_app/")) return true;
   if (
     pathname === "/" ||

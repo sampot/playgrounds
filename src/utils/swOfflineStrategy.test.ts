@@ -102,6 +102,28 @@ describe("selectOfflineFetchStrategy", () => {
     ).toBe("passthrough");
   });
 
+  it("PG.libs paths are passthrough (no SW cache; PG-LIBS-SPEC G6)", () => {
+    expect(
+      selectOfflineFetchStrategy({
+        pathname: "/playgrounds/libs/phaser-4.2.1.min.js",
+        requestMode: "cors",
+      })
+    ).toBe("passthrough");
+    expect(
+      selectOfflineFetchStrategy({
+        pathname: "/playgrounds/libs/pixi-8.19.0.min.mjs",
+        requestMode: "cors",
+      })
+    ).toBe("passthrough");
+    // sdk.js itself remains a shell offline asset
+    expect(
+      selectOfflineFetchStrategy({
+        pathname: "/playgrounds/sdk.js",
+        requestMode: "cors",
+      })
+    ).toBe("network-first-document");
+  });
+
   it("network-first caches register-sw.js (needed offline; not the SW entry)", () => {
     expect(
       selectOfflineFetchStrategy({

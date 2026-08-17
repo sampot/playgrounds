@@ -9,7 +9,7 @@
 /* eslint-disable no-restricted-globals */
 
 // Bump when offline strategy or canvas bridge changes (clears sticky Cache API entries).
-const CACHE_NAME = "samkuo-offline-v14";
+const CACHE_NAME = "samkuo-offline-v15";
 /** Embedded in BRIDGE string — change when console mirror behaviour changes. */
 const CANVAS_BRIDGE_REV = 9;
 const OFFLINE_URL = "/offline/";
@@ -77,9 +77,18 @@ function isPlaygroundsShellClientPath(pathname) {
   return false;
 }
 
+function isPlaygroundsLibsPath(pathname) {
+  return (
+    pathname === "/playgrounds/libs" ||
+    pathname.startsWith("/playgrounds/libs/")
+  );
+}
+
 function isPlaygroundsOfflinePath(pathname) {
   if (isCanvasVirtualPath(pathname)) return false;
   if (isSwEntryScript(pathname)) return false;
+  // PG-LIBS-SPEC G6: host UI libs are lazy-load only — never SW-cache.
+  if (isPlaygroundsLibsPath(pathname)) return false;
   if (pathname === OFFLINE_URL) return true;
   if (
     pathname === "/playgrounds" ||
@@ -117,6 +126,7 @@ function shouldNetworkFirstAsset(url) {
   if (isDevOnlyPath(pathname)) return false;
   if (isCanvasVirtualPath(pathname)) return false;
   if (isSwEntryScript(pathname)) return false;
+  if (isPlaygroundsLibsPath(pathname)) return false;
   // /_app/* (and legacy /_astro/*): network-first online; Cache API only offline fallback.
   if (pathname.startsWith("/icons/")) return true;
   if (pathname === "/favicon.svg") return true;
@@ -312,6 +322,8 @@ function respondWithOfflineCache(event) {
   if (isSwEntryScript(url.pathname)) return false;
   // Vite / Astro-dev modules: never intercept (avoids 504 Outdated Optimize Dep).
   if (isDevOnlyPath(url.pathname)) return false;
+  // PG-LIBS-SPEC G6: do not intercept libs (browser HTTP cache only).
+  if (isPlaygroundsLibsPath(url.pathname)) return false;
 
   // No cache-first paths: while online, network (+ no-cache) always wins.
   if (isPlaygroundsOfflinePath(url.pathname)) {

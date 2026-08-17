@@ -233,6 +233,7 @@
 
 ## 維護備註
 
+- **宿主函式庫（可選）：** 需 2D／物理／音訊等時經殼內 `PG.libs.load(id)` **懶載**（預設完整 2D＝Phaser 4）；**禁止** precache、遊戲 repo 套件／build、外連 CDN、或授權有疑慮的第三方。規格：[PG-LIBS-SPEC.md](./PG-LIBS-SPEC.md)。桌遊／牌類等以 vanilla 為預設，勿無故 load。
 - **非 game：** `toy`／`tool`／`agent`／`media` 不列本檔（例：`pg-cellife` 生命格子＝玩具模擬）。
 - **命名：** 勿與既有 id／玩法撞名（例：魔術方塊 `pg-rubik` ≠ 俄羅斯方塊 `pg-tetris`）。
 - **持久狀態（分數／進度）：** 有分數／進度的新作，前端只能透過 **`fetch('/api/…')`** 調用，由 runtime 代為持久化；**禁止** UI 直寫裸 `localStorage` 當權威（僅可作輕量臨時緩存）。規則如下：

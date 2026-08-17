@@ -34,6 +34,7 @@ describe("copyGoPlaygroundsStatic", () => {
     root = await makeFakeRoot();
     await tree(root, {
       "public/playgrounds/sdk.js": "// sdk v1\n",
+      "public/playgrounds/sdk.d.ts": "// dts v1\n",
       "public/playgrounds/functions-runtime.js": "// helper v1\n",
     });
   });
@@ -46,6 +47,7 @@ describe("copyGoPlaygroundsStatic", () => {
     const report = await copyGoPlaygroundsStatic({ projectRoot: root, dryRun: false });
     expect(report.copied).toEqual([
       "go-client/static/playgrounds/sdk.js",
+      "go-client/static/playgrounds/sdk.d.ts",
       "go-client/static/playgrounds/functions-runtime.js",
     ]);
     expect(report.skipped).toEqual([]);
@@ -56,6 +58,11 @@ describe("copyGoPlaygroundsStatic", () => {
       "utf8",
     );
     expect(sdk).toBe("// sdk v1\n");
+    const dts = await readFile(
+      join(root, "go-client/static/playgrounds/sdk.d.ts"),
+      "utf8",
+    );
+    expect(dts).toBe("// dts v1\n");
     const helper = await readFile(
       join(root, "go-client/static/playgrounds/functions-runtime.js"),
       "utf8",
@@ -69,6 +76,7 @@ describe("copyGoPlaygroundsStatic", () => {
     expect(report.copied).toEqual([]);
     expect(report.skipped).toEqual([
       "go-client/static/playgrounds/sdk.js",
+      "go-client/static/playgrounds/sdk.d.ts",
       "go-client/static/playgrounds/functions-runtime.js",
     ]);
   });
@@ -77,6 +85,7 @@ describe("copyGoPlaygroundsStatic", () => {
     const report = await copyGoPlaygroundsStatic({ projectRoot: root, dryRun: true });
     expect(report.copied).toEqual([
       "go-client/static/playgrounds/sdk.js",
+      "go-client/static/playgrounds/sdk.d.ts",
       "go-client/static/playgrounds/functions-runtime.js",
     ]);
     await expect(
@@ -89,6 +98,7 @@ describe("copyGoPlaygroundsStatic", () => {
     const report = await copyGoPlaygroundsStatic({ projectRoot: root, dryRun: false });
     expect(report.missing).toContain("public/playgrounds/sdk.js");
     expect(report.copied).toEqual([
+      "go-client/static/playgrounds/sdk.d.ts",
       "go-client/static/playgrounds/functions-runtime.js",
     ]);
   });
@@ -103,5 +113,29 @@ describe("copyGoPlaygroundsStatic", () => {
       "utf8",
     );
     expect(sdk).toBe("// sdk v2\n");
+  });
+
+  it("copies public/playgrounds/libs/** as binary-equal files", async () => {
+    const bin = Buffer.from([0x00, 0x01, 0xfe, 0xff]);
+    await tree(root, {
+      "public/playgrounds/libs/pin.json": '{"phaser":{"version":"4.2.1"}}\n',
+      "public/playgrounds/libs/README.md": "# libs\n",
+    });
+    await writeFile(
+      join(root, "public/playgrounds/libs/phaser-4.2.1.min.js"),
+      bin,
+    );
+    const report = await copyGoPlaygroundsStatic({ projectRoot: root, dryRun: false });
+    expect(report.copied).toEqual(
+      expect.arrayContaining([
+        "go-client/static/playgrounds/libs/pin.json",
+        "go-client/static/playgrounds/libs/README.md",
+        "go-client/static/playgrounds/libs/phaser-4.2.1.min.js",
+      ]),
+    );
+    const copiedBin = await readFile(
+      join(root, "go-client/static/playgrounds/libs/phaser-4.2.1.min.js"),
+    );
+    expect(copiedBin.equals(bin)).toBe(true);
   });
 });

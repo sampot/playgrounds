@@ -17,6 +17,8 @@ interface PgSdk {
   readonly kv: PgKv;
   readonly db: PgDb;
   readonly vars: PgVars;
+  /** Host-shipped UI libraries (PG-LIBS-SPEC); lazy load only. */
+  readonly libs: PgLibs;
   /** Capabilities: mounted only when admitted (`"SESSION" in PG === true`). */
   readonly SESSION?: PgSession;
   readonly COMPUTE?: PgCompute;
@@ -63,6 +65,32 @@ interface PgVars {
   readonly [key: string]: string | undefined;
   keys(): ReadonlyArray<string>;
   has(key: string): boolean;
+}
+
+/** See PG-LIBS-SPEC.md — whitelist grows with the shell pin table. */
+type PgLibId =
+  | "phaser"
+  | "matter"
+  | "howler"
+  | "tone"
+  | "nipple"
+  | "three"
+  | "pixi"
+  | "seedrandom"
+  | "planck";
+
+interface PgLibInfo {
+  id: PgLibId;
+  version: string;
+  label?: string;
+  kind?: "engine" | "physics" | "audio" | "input" | "other";
+}
+
+interface PgLibs {
+  /** Pin table only; does not fetch `/playgrounds/libs/*`. */
+  list(): Promise<ReadonlyArray<PgLibInfo>>;
+  /** Lazy-load a pinned lib; rejects unknown_lib | load_failed. */
+  load(id: PgLibId): Promise<unknown>;
 }
 
 interface PgSession {
@@ -138,6 +166,8 @@ interface PgError extends Error {
     | "session_not_seated"
     | "functions_unavailable"
     | "functions_no_leader"
+    | "unknown_lib"
+    | "load_failed"
     | "internal_error";
   status: number;
   upstream?: { code?: string; message?: string };

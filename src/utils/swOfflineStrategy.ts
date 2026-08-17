@@ -36,10 +36,21 @@ export function isServiceWorkerScript(pathname: string): boolean {
  * Paths eligible for Playgrounds offline document/asset cache.
  * Blog: `/playgrounds/**`. Standalone host root is handled in `public/sw.js`
  * (hostname gate); strategy helpers here cover path shape only.
+ *
+ * `/playgrounds/libs/**` is excluded (PG-LIBS-SPEC G6): host UI libs are
+ * lazy-loaded only — never SW-cached / precached.
  */
+export function isPlaygroundsLibsPath(pathname: string): boolean {
+  return (
+    pathname === "/playgrounds/libs" ||
+    pathname.startsWith("/playgrounds/libs/")
+  );
+}
+
 export function isPlaygroundsOfflinePath(pathname: string): boolean {
   if (isCanvasVirtualPath(pathname)) return false;
   if (isSwEntryScript(pathname)) return false;
+  if (isPlaygroundsLibsPath(pathname)) return false;
   return (
     pathname === OFFLINE_URL ||
     pathname === "/playgrounds" ||
@@ -75,6 +86,7 @@ export function shouldNetworkFirstAsset(pathname: string): boolean {
   if (isDevOnlyPath(pathname)) return false;
   if (isCanvasVirtualPath(pathname)) return false;
   if (isSwEntryScript(pathname)) return false;
+  if (isPlaygroundsLibsPath(pathname)) return false;
   if (pathname.startsWith("/icons/")) return true;
   if (pathname === "/favicon.svg") return true;
   if (pathname === "/manifest.webmanifest") return true;
@@ -130,6 +142,9 @@ export function selectOfflineFetchStrategy(options: {
   if (isCanvasVirtualPath(options.pathname)) return "passthrough";
   // Vite / Kit-dev — never SW-cache.
   if (isDevOnlyPath(options.pathname)) return "passthrough";
+
+  // PG-LIBS-SPEC G6: never SW-cache host UI libs (lazy load only).
+  if (isPlaygroundsLibsPath(options.pathname)) return "passthrough";
 
   if (isPlaygroundsOfflinePath(options.pathname)) {
     return "network-first-document";

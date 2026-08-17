@@ -35,6 +35,7 @@ describe("public/playgrounds/sdk.d.ts", () => {
     expect(text).toMatch(/\bkv\s*:\s*PgKv\b/u);
     expect(text).toMatch(/\bdb\s*:\s*PgDb\b/u);
     expect(text).toMatch(/\bvars\s*:\s*PgVars\b/u);
+    expect(text).toMatch(/\blibs\s*:\s*PgLibs\b/u);
     // Capability slots
     expect(text).toMatch(/\bSESSION\?\s*:\s*PgSession\b/u);
     expect(text).toMatch(/\bCOMPUTE\?\s*:\s*PgCompute\b/u);
@@ -55,6 +56,8 @@ describe("public/playgrounds/sdk.d.ts", () => {
     expect(text).toMatch(/"session_not_seated"/u);
     expect(text).toMatch(/"functions_unavailable"/u);
     expect(text).toMatch(/"functions_no_leader"/u);
+    expect(text).toMatch(/"unknown_lib"/u);
+    expect(text).toMatch(/"load_failed"/u);
     expect(text).toMatch(/"internal_error"/u);
     expect(text).toMatch(/status\s*:\s*number/u);
   });
@@ -111,6 +114,7 @@ describe("public/playgrounds/sdk.d.ts", () => {
       "kv",
       "db",
       "vars",
+      "libs",
       "SESSION",
       "COMPUTE",
       "DELEGATE",

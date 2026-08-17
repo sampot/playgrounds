@@ -1,21 +1,21 @@
 #!/usr/bin/env node
 /**
- * Sync `public/playgrounds/{sdk.js,functions-runtime.js}` →
+ * Sync `public/playgrounds/{sdk.js,sdk.d.ts,functions-runtime.js,libs/**}` →
  * `go-client/static/playgrounds/`.
  *
- * The two Runtime shells ship the same SDK and helper so a single
- * Playgrounds contract holds across `play.samkuo.me` and `go.samkuo.me`
- * (PG-UI-SDK-SPEC G4). The sync keeps both targets byte-equivalent with
- * the sources and is idempotent: re-running on an up-to-date tree is a
- * no-op (no FS writes).
+ * The two Runtime shells ship the same SDK, helper, types, and host libs so a
+ * single Playgrounds contract holds across `play.samkuo.me` and
+ * `go.samkuo.me` (PG-UI-SDK-SPEC G4 / PG-LIBS-SPEC). The sync keeps both
+ * targets byte-equivalent with the sources and is idempotent.
  *
- * Wired into `go-client/package.json`'s `prebuild` so every go build
- * pulls the latest SDK. Intended to be run from the playgrounds repo
- * root; pass `--root <path>` to override.
+ * Shipping libs into go static ≠ SW precache (PG-LIBS-SPEC G6).
+ *
+ * Wired into `go-client/package.json`'s `prebuild`. Run from repo root;
+ * pass `--root <path>` to override.
  */
 
-import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { copyFile, mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
+import { dirname, join, relative } from "node:path";
 
 export interface CopyReport {
   copied: string[];
@@ -23,16 +23,15 @@ export interface CopyReport {
   missing: string[];
 }
 
-const SOURCES: ReadonlyArray<string> = [
+const TEXT_SOURCES: ReadonlyArray<string> = [
   "public/playgrounds/sdk.js",
+  "public/playgrounds/sdk.d.ts",
   "public/playgrounds/functions-runtime.js",
 ];
 
+const LIBS_DIR = "public/playgrounds/libs";
+
 function targetFor(sourceRel: string): string {
-  // Mirror the path under go-client/static/. We keep the
-  // `playgrounds/<name>` directory layout so the runtime URL contract
-  // (`/playgrounds/sdk.js`, `/playgrounds/functions-runtime.js`) is
-  // identical on both shells.
   return sourceRel.replace(/^public\//u, "go-client/static/");
 }
 
@@ -41,36 +40,116 @@ export interface CopyOptions {
   dryRun?: boolean;
 }
 
+async function listFilesRecursive(absDir: string): Promise<string[]> {
+  const out: string[] = [];
+  let entries;
+  try {
+    entries = await readdir(absDir, { withFileTypes: true });
+  } catch {
+    return out;
+  }
+  for (const ent of entries) {
+    const abs = join(absDir, ent.name);
+    if (ent.isDirectory()) {
+      out.push(...(await listFilesRecursive(abs)));
+    } else if (ent.isFile()) {
+      out.push(abs);
+    }
+  }
+  return out;
+}
+
+async function copyOneText(
+  projectRoot: string,
+  sourceRel: string,
+  dryRun: boolean | undefined,
+  report: CopyReport,
+): Promise<void> {
+  const sourceAbs = join(projectRoot, ...sourceRel.split("/"));
+  const targetRel = targetFor(sourceRel);
+  const targetAbs = join(projectRoot, ...targetRel.split("/"));
+  let sourceContent: string;
+  try {
+    sourceContent = await readFile(sourceAbs, "utf8");
+  } catch {
+    report.missing.push(sourceRel);
+    return;
+  }
+  let targetContent: string | null = null;
+  try {
+    targetContent = await readFile(targetAbs, "utf8");
+  } catch {
+    targetContent = null;
+  }
+  if (targetContent === sourceContent) {
+    report.skipped.push(targetRel);
+    return;
+  }
+  if (!dryRun) {
+    await mkdir(dirname(targetAbs), { recursive: true });
+    await writeFile(targetAbs, sourceContent, "utf8");
+  }
+  report.copied.push(targetRel);
+}
+
+async function copyOneBinary(
+  projectRoot: string,
+  sourceAbs: string,
+  dryRun: boolean | undefined,
+  report: CopyReport,
+): Promise<void> {
+  const sourceRel = relative(projectRoot, sourceAbs).split("\\").join("/");
+  const targetRel = targetFor(sourceRel);
+  const targetAbs = join(projectRoot, ...targetRel.split("/"));
+  let sourceBuf: Buffer;
+  try {
+    sourceBuf = await readFile(sourceAbs);
+  } catch {
+    report.missing.push(sourceRel);
+    return;
+  }
+  let same = false;
+  try {
+    const targetBuf = await readFile(targetAbs);
+    same = targetBuf.equals(sourceBuf);
+  } catch {
+    same = false;
+  }
+  if (same) {
+    report.skipped.push(targetRel);
+    return;
+  }
+  if (!dryRun) {
+    await mkdir(dirname(targetAbs), { recursive: true });
+    await copyFile(sourceAbs, targetAbs);
+  }
+  report.copied.push(targetRel);
+}
+
 export async function copyGoPlaygroundsStatic(
   opts: CopyOptions,
 ): Promise<CopyReport> {
   const report: CopyReport = { copied: [], skipped: [], missing: [] };
-  for (const rel of SOURCES) {
-    const sourceAbs = join(opts.projectRoot, ...rel.split("/"));
-    const targetRel = targetFor(rel);
-    const targetAbs = join(opts.projectRoot, ...targetRel.split("/"));
-    let sourceContent: string;
-    try {
-      sourceContent = await readFile(sourceAbs, "utf8");
-    } catch {
-      report.missing.push(rel);
-      continue;
-    }
-    let targetContent: string | null = null;
-    try {
-      targetContent = await readFile(targetAbs, "utf8");
-    } catch {
-      targetContent = null;
-    }
-    if (targetContent === sourceContent) {
-      report.skipped.push(targetRel);
-      continue;
-    }
-    if (!opts.dryRun) {
-      await mkdir(dirname(targetAbs), { recursive: true });
-      await writeFile(targetAbs, sourceContent, "utf8");
-    }
-    report.copied.push(targetRel);
+  for (const rel of TEXT_SOURCES) {
+    await copyOneText(opts.projectRoot, rel, opts.dryRun, report);
+  }
+
+  const libsAbs = join(opts.projectRoot, ...LIBS_DIR.split("/"));
+  let libsStat;
+  try {
+    libsStat = await stat(libsAbs);
+  } catch {
+    libsStat = null;
+  }
+  if (!libsStat || !libsStat.isDirectory()) {
+    // Libs dir optional until Phase 1 pins land; do not fail the sync.
+    return report;
+  }
+  const libFiles = await listFilesRecursive(libsAbs);
+  // Stable order for reports / tests.
+  libFiles.sort();
+  for (const abs of libFiles) {
+    await copyOneBinary(opts.projectRoot, abs, opts.dryRun, report);
   }
   return report;
 }
