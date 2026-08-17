@@ -1,5 +1,5 @@
 /**
- * 遊戲級操作（清分／移除離線／檢查更新）的共用實作。
+ * 遊戲級操作（清分／刪除下載／更新遊戲）的共用實作。
  * `GoMorePanel` 與 canvas play 的 `GoGameDrawer` 共用，避免邏輯重複。
  */
 
@@ -12,10 +12,19 @@ import {
 } from "./goSamOfflineCache";
 import { fetchSamTipRev, loadSamFiles } from "./samLoad";
 import { clearGoProgressForCatalog } from "./goScoreStorage";
+import type { FileListProgress } from "@pg/transferProgress";
 
 export type GameActionResult =
   | { ok: true; flash: string }
   | { ok: false; flash: string };
+
+export type UpdateActionResult =
+  | { ok: true; changed: boolean; flash: string }
+  | { ok: false; changed: false; flash: string };
+
+export type RunUpdateOptions = {
+  onProgress?: (progress: FileListProgress) => void;
+};
 
 /** 清除這個遊戲在本機的進度／分數。 */
 export async function runClearScores(
@@ -32,7 +41,7 @@ export async function runClearScores(
   };
 }
 
-/** 移除這個遊戲的離線包。 */
+/** 刪除這個遊戲在本機的下載內容。 */
 export async function runRemoveOffline(
   catalogId: string,
   title: string
@@ -41,15 +50,16 @@ export async function runRemoveOffline(
   return {
     ok,
     flash: ok
-      ? `已移除「${title}」的離線下載`
-      : `找不到「${title}」的離線下載`,
+      ? `已刪除「${title}」`
+      : `找不到已下載的「${title}」`,
   };
 }
 
-/** 檢查並套用這個遊戲的最新版本（離線包）。 */
+/** 下載並儲存這個遊戲的最新版本。 */
 export async function runUpdate(
-  entry: GoCatalogEntry
-): Promise<GameActionResult> {
+  entry: GoCatalogEntry,
+  options?: RunUpdateOptions
+): Promise<UpdateActionResult> {
   const id = entry.id;
   const title = entry.title ?? id;
   let tipRev: string | null = null;
@@ -60,13 +70,23 @@ export async function runUpdate(
   }
   const cached = await getGoSamOfflineCache(id);
   if (cached?.tipRev && tipRev && cached.tipRev === tipRev) {
-    return { ok: true, flash: `「${title}」已是最新版本` };
+    return {
+      ok: true,
+      changed: false,
+      flash: `「${title}」已是最新版本`,
+    };
   }
   let freshFiles;
   try {
-    freshFiles = await loadSamFiles(entry.source);
+    freshFiles = await loadSamFiles(entry.source, {
+      onProgress: options?.onProgress,
+    });
   } catch {
-    return { ok: false, flash: `檢查更新失敗：無法讀取「${title}」的來源` };
+    return {
+      ok: false,
+      changed: false,
+      flash: `無法更新「${title}」：讀取遊戲來源失敗`,
+    };
   }
   if (!cached) {
     const stored = await putGoSamOfflineCache(
@@ -78,14 +98,19 @@ export async function runUpdate(
     if (!stored) {
       return {
         ok: false,
-        flash: `無法儲存「${title}」的離線下載，請確認瀏覽器儲存空間`,
+        changed: false,
+        flash: `無法儲存「${title}」，請確認瀏覽器儲存空間`,
       };
     }
-    return { ok: true, flash: `已為「${title}」建立離線下載` };
+    return { ok: true, changed: true, flash: `已下載「${title}」` };
   }
   if (fileMapsEqual(freshFiles, cached.files)) {
     await putGoSamOfflineCache(id, entry.source, cached.files, tipRev);
-    return { ok: true, flash: `「${title}」已是最新版本` };
+    return {
+      ok: true,
+      changed: false,
+      flash: `「${title}」已是最新版本`,
+    };
   }
   const stored = await putGoSamOfflineCache(
     id,
@@ -96,8 +121,9 @@ export async function runUpdate(
   if (!stored) {
     return {
       ok: false,
-      flash: `無法儲存「${title}」的更新，請確認瀏覽器儲存空間`,
+      changed: false,
+      flash: `無法更新「${title}」，請確認瀏覽器儲存空間`,
     };
   }
-  return { ok: true, flash: `已更新「${title}」至最新版本` };
+  return { ok: true, changed: true, flash: `已更新「${title}」` };
 }

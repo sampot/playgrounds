@@ -590,7 +590,7 @@
 
 <GoProfilePanel open={profileOpen} onClose={() => (profileOpen = false)} />
 
-{#if canvasActive && catalogId}
+{#if canvasActive && catalogId && mode === "solo"}
   <GoGameDrawer
     catalogId={catalogId}
     onFlash={(msg) => chromeSession.setFlash(msg)}

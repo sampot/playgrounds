@@ -153,7 +153,7 @@
   <span>選一個遊戲直接玩。造訪過的離線也能再開。</span>
 </p>
 <p class="home-help">
-  <a href="/apps">可離線玩的遊戲</a>
+  <a href="/apps">已下載的遊戲</a>
   <span class="home-help-sep" aria-hidden="true">·</span>
   <a href="/help">使用說明 · 加入主畫面</a>
 </p>

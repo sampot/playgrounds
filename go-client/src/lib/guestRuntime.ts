@@ -478,7 +478,7 @@ export function createGuestRuntime() {
     set({
       phase: "loading_sam",
       message: "正在檢查小品版本…",
-      loadProgress: { ratio: null, detail: "檢查更新…" },
+      loadProgress: { ratio: null, detail: "檢查遊戲版本…" },
     });
     try {
       // Invite：入座前檢查 tip；沒包或 tipRev 過期才全量下載。

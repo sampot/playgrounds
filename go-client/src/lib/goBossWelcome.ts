@@ -20,7 +20,7 @@ export const GO_BOSS_WELCOMES = [
 
 export const GO_BOSS_WELCOMES_OFFLINE = [
   "線路不太穩？已下載的還能從「更多」開。",
-  "店裡燈還亮著。有離線包的，照常玩。",
+  "店裡燈還亮著。已下載的遊戲，照常玩。",
 ] as const;
 
 export const GO_BOSS_WELCOMES_SIGNED_IN = [

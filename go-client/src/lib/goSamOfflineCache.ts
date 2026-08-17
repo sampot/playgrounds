@@ -1,6 +1,6 @@
 /**
  * Visit-then-offline FileMap cache for go `/s/<id>` and Invite `/i/` (DEC-050 §6.5).
- * `/s/` is local-first (明示「檢查更新」才 tip-sync)；Invite join checks tipRev first.
+ * `/s/` is local-first (明示「更新遊戲」才 tip-sync)；Invite join checks tipRev first.
  */
 
 import type { FileMap } from "@pg/projectTypes";
@@ -17,7 +17,7 @@ type WireBundle = {
   v: 1;
   id: string;
   source: string;
-  /** GitHub tree SHA when known (Invite freshness／「檢查更新」). */
+  /** GitHub tree SHA when known (Invite freshness／「更新遊戲」). */
   tipRev?: string;
   files: Record<string, WireFile>;
 };

@@ -80,6 +80,7 @@
   const runtime = createSoloRuntime({
     getHostRuntime: () => hostRuntimeRef,
   });
+  let handledReloadRequest = chromeSession.gameReloadRequest;
 
   // —— play analytics (PG-ANALYTICS-PLAN) ——
   let playTracker = $state<GoPlayTracker | null>(null);
@@ -169,6 +170,15 @@
   });
 
   $effect(() => {
+    const id = catalogId;
+    if (!id) return;
+    void runtime.bootFromCatalogId(id);
+  });
+
+  $effect(() => {
+    const request = chromeSession.gameReloadRequest;
+    if (request === handledReloadRequest) return;
+    handledReloadRequest = request;
     const id = catalogId;
     if (!id) return;
     void runtime.bootFromCatalogId(id);

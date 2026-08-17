@@ -14,6 +14,12 @@
     runRemoveOffline,
     runUpdate,
   } from "$lib/goGameActions";
+  import { chromeSession } from "$lib/chromeSession.svelte";
+  import GoSamLoadBar from "$lib/GoSamLoadBar.svelte";
+  import {
+    goLoadProgressFromFiles,
+    type GoLoadProgress,
+  } from "$lib/goLoadProgress";
 
   type Props = {
     open: boolean;
@@ -52,6 +58,7 @@
 
   let dialogEl = $state<HTMLDialogElement | null>(null);
   let actionBusy = $state(false);
+  let updateProgress = $state<GoLoadProgress | null>(null);
   let confirm = $state<{
     kind: ConfirmKind;
     id: string | null;
@@ -134,7 +141,7 @@
       } else if (c.kind === "all") {
         const scores = await clearAllGoProgress();
         const packs = await clearAllGoSamOfflineCache();
-        const flash = `已清除全部本機遊戲資料（分數 ${scores} 筆、離線包 ${packs} 個）`;
+        const flash = `已清除全部本機遊戲資料（分數 ${scores} 筆、已下載遊戲 ${packs} 個）`;
         confirm = null;
         onClose();
         if (onClearedAll) onClearedAll(flash);
@@ -150,16 +157,26 @@
   async function onUpdate() {
     if (!currentCatalogId || actionBusy) return;
     actionBusy = true;
+    updateProgress = { ratio: null, detail: "正在檢查版本…" };
     try {
       const entry = getGoCatalogEntry(currentCatalogId);
       if (!entry) {
         onFlash(`找不到「${currentTitle || currentCatalogId}」的型錄資料`);
         return;
       }
-      const r = await runUpdate(entry);
+      const r = await runUpdate(entry, {
+        onProgress: progress => {
+          updateProgress = goLoadProgressFromFiles(progress);
+        },
+      });
       onFlash(r.flash);
+      if (r.ok && r.changed) {
+        onClose();
+        chromeSession.requestGameReload();
+      }
     } finally {
       actionBusy = false;
+      updateProgress = null;
     }
   }
 
@@ -174,14 +191,14 @@
     }
     if (confirm.kind === "offline") {
       return {
-        title: "移除離線下載",
-        body: `移除「${confirm.title}」的離線包？下次離線前需再連線載入一次。`,
-        ok: "移除下載",
+        title: "刪除遊戲",
+        body: `從這台裝置刪除「${confirm.title}」？已儲存的進度與分數不受影響；下次開啟需要連線重新下載。`,
+        ok: "刪除遊戲",
       };
     }
     return {
       title: "清除全部本機遊戲資料",
-      body: "清除所有小品的進度／分數與離線下載，並回到首頁。不會清除主題等偏好設定。無法復原。",
+      body: "清除所有遊戲的進度／分數與已下載內容，並回到首頁。不會清除主題等偏好設定。無法復原。",
       ok: "全部清除",
     };
   });
@@ -298,10 +315,10 @@
 
         <section class="go-more-section" aria-labelledby="go-more-apps-title">
           <h3 id="go-more-apps-title" class="go-more-section-title">
-            離線遊戲
+            已下載的遊戲
           </h3>
           <a class="go-more-btn go-more-link" href="/apps" onclick={onClose}>
-            管理可離線玩的遊戲
+            管理已下載的遊戲
           </a>
         </section>
 
@@ -334,7 +351,7 @@
                     currentTitle || currentCatalogId
                   )}
               >
-                移除離線
+                刪除遊戲
               </button>
               <button
                 type="button"
@@ -342,8 +359,9 @@
                 disabled={actionBusy}
                 onclick={() => void onUpdate()}
               >
-                檢查更新
+                {actionBusy ? "更新中…" : "更新遊戲"}
               </button>
+              <GoSamLoadBar progress={updateProgress} label="遊戲更新進度" />
             </div>
           </section>
         {/if}

@@ -13,6 +13,8 @@ class ChromeSession {
   mode = $state<ChromePlayMode>(null);
   /** True when SAM canvas fills the viewport — chrome overlays, does not steal height. */
   canvasActive = $state(false);
+  /** Monotonic signal for remounting the active solo game after an update. */
+  gameReloadRequest = $state(0);
   flash = $state("");
 
   /** Solo `/s/` — share + same-kind swap. */
@@ -42,6 +44,10 @@ class ChromeSession {
 
   setCanvasActive(active: boolean): void {
     this.canvasActive = active;
+  }
+
+  requestGameReload(): void {
+    this.gameReloadRequest += 1;
   }
 
   clear(): void {

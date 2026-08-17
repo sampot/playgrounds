@@ -1,6 +1,12 @@
 <script lang="ts">
   import { getGoCatalogEntry } from "$lib/goCatalog";
   import { runClearScores, runRemoveOffline, runUpdate } from "$lib/goGameActions";
+  import { chromeSession } from "$lib/chromeSession.svelte";
+  import GoSamLoadBar from "$lib/GoSamLoadBar.svelte";
+  import {
+    goLoadProgressFromFiles,
+    type GoLoadProgress,
+  } from "$lib/goLoadProgress";
 
   type Props = {
     /** Solo `/s/` current id — only shown when present. */
@@ -14,6 +20,7 @@
     $props();
 
   let busy = $state(false);
+  let updateProgress = $state<GoLoadProgress | null>(null);
   let confirm = $state<{
     kind: "scores" | "offline";
     title: string;
@@ -66,11 +73,18 @@
   async function doUpdate() {
     if (!entry || busy) return;
     busy = true;
+    updateProgress = { ratio: null, detail: "正在檢查版本…" };
     try {
-      const r = await runUpdate(entry);
+      const r = await runUpdate(entry, {
+        onProgress: progress => {
+          updateProgress = goLoadProgressFromFiles(progress);
+        },
+      });
       onFlash(r.flash);
+      if (r.ok && r.changed) chromeSession.requestGameReload();
     } finally {
       busy = false;
+      updateProgress = null;
     }
   }
 
@@ -83,8 +97,8 @@
       };
     }
     return {
-      title: "移除離線下載",
-      body: `移除「${confirm.title}」的離線包？下次離線前需再連線載入一次。`,
+      title: "刪除遊戲",
+      body: `從這台裝置刪除「${confirm.title}」？已儲存的進度與分數不受影響；下次開啟需要連線重新下載。`,
     };
   });
 </script>
@@ -152,7 +166,7 @@
                   else void doOffline();
                 }}
               >
-                {confirm.kind === "scores" ? "清除進度" : "移除下載"}
+                {confirm.kind === "scores" ? "清除進度" : "刪除遊戲"}
               </button>
             </div>
           </div>
@@ -171,7 +185,7 @@
             disabled={busy}
             onclick={askOffline}
           >
-            移除離線
+            刪除遊戲
           </button>
           <button
             type="button"
@@ -179,8 +193,9 @@
             disabled={busy}
             onclick={() => void doUpdate()}
           >
-            檢查更新
+            {busy ? "更新中…" : "更新遊戲"}
           </button>
+          <GoSamLoadBar progress={updateProgress} label="遊戲更新進度" />
         {/if}
       </div>
     {/if}

@@ -109,7 +109,7 @@
 <section class="help-section pixel-frame" aria-labelledby="help-offline">
   <h2 id="help-offline">離線再玩</h2>
   <p>
-    連線成功開過一次的遊戲，之後可在「更多 → 管理可離線玩的遊戲」再開。邀請短連結（<span
+    連線成功開過一次的遊戲，之後可在「更多 → 管理已下載的遊戲」再開。邀請短連結（<span
       class="mono">/i/…</span
     >）是臨時的，不能當離線入口。
   </p>
@@ -133,7 +133,7 @@
 <section class="help-section pixel-frame" aria-labelledby="help-ads">
   <h2 id="help-ads">本站小品推薦</h2>
   <p>
-    首頁、遊戲載入時，以及「可離線玩的遊戲」列表中段，可能會出現一格「也玩玩看」——只推廣本站其他遊戲，點了仍留在純玩。沒有第三方廣告腳本；加入主畫面後也一樣只推本站小品。
+    首頁、遊戲載入時，以及「已下載的遊戲」列表中段，可能會出現一格「也玩玩看」——只推廣本站其他遊戲，點了仍留在純玩。沒有第三方廣告腳本；加入主畫面後也一樣只推本站小品。
   </p>
 </section>
 

@@ -2,7 +2,7 @@
  * SAM FileMap resolve for go `/s/` and Invite `/i/`.
  *
  * Policies:
- * - `local-first`（`/s/`）：有同 source 離線包即重用；tip 同步僅經「檢查更新」。
+ * - `local-first`（`/s/`）：有同 source 離線包即重用；tip 同步僅經「更新遊戲」。
  * - `check-tip`（Invite Guest）：入座前比 GitHub tree SHA；沒包或 tipRev 過期才重抓。
  */
 

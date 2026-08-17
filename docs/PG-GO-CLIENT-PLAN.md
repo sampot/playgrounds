@@ -324,7 +324,7 @@ GET go.samkuo.me/i/<short_id>
 | --- | --- |
 | **範圍** | **僅**模式 B（`/s/<id>`）與為其服務的殼（首頁 `/` 可作安裝／回訪入口）。**模式 A（`/i/`）排除。** |
 | **加到主畫面** | go origin 提供 Web App Manifest＋圖示（含 iOS `apple-touch-icon`／必要 meta），使標準 Safari／Chrome 可「加入主畫面」／安裝。start_url 宜為 **`/`** 或穩定 `/s/<id>`（實作可定預設 `/`；深鏈開啟仍尊重 path）。**勿**引導使用者把 **`/i/<short_id>`** 釘成主畫面圖示當永久遊戲（短鏈會過期）。 |
-| **離線可玩** | **造訪過才離線**（對齊場殼 DEC-009 精神；非全型錄預先下載）：曾成功載入之 `/s/<id>`（及 Invite 曾下載之同 source）的殼資產＋該 SAM FileMap（或等價 Cache）在網路失敗時仍可再開同 id。嵌入 catalog 已可離線 resolve；差在小品本體與殼 bundle 的 Cache。**`/s/`＝local-first**（本機有同 source 離線包即重用；明示「檢查更新」才 tip-sync）。**Invite `/i/`＝入座前 check-tip**（比 GitHub tree SHA；沒包或 tipRev 過期才全量下載；相符則重用離線包）。 |
+| **離線可玩** | **造訪過才離線**（對齊場殼 DEC-009 精神；非全型錄預先下載）：曾成功載入之 `/s/<id>`（及 Invite 曾下載之同 source）的殼資產＋該 SAM FileMap（或等價 Cache）在網路失敗時仍可再開同 id。嵌入 catalog 已可離線 resolve；差在小品本體與殼 bundle 的 Cache。**`/s/`＝local-first**（本機有同 source 離線包即重用；玩家明示「更新遊戲」才 tip-sync、下載並套用）。**Invite `/i/`＝入座前 check-tip**（比 GitHub tree SHA；沒包或 tipRev 過期才全量下載；相符則重用離線包）。 |
 | **分數／實例狀態** | **本機、本 origin**。權威＝SAM 應用模型：`UI → /api → functions.js → env.KV／env.DB`。go 注入同形 bindings，後端為 **IndexedDB（主）＋ localStorage（後備）**，命名空間穩定綁 **`catalog_id`**（`catalog:<id>`），**不**綁每次隨機 `sandboxId`、**不**用 OPFS。Invite 畫布用 ephemeral／非 durable 記憶體 ns。舊 UI 直寫 `localStorage` 的 shim（`injectGoScoreStorage`）僅相容尚未遷移的小品。**無**雲端、**無**跨 `play`↔`go` 自動搬。§6.6 分層清除含 KV／DB＋舊 shim。 |
 | **Invite 排除（硬）** | `/i/`：**不能**離線入座／對弈；不承諾該局分數長期保留；短鏈失效後重開＝頁內錯誤（請 Host 重新邀請）。可保留非局偏好（例：Roster 顯示名）。載入小品：入座前 **check-tip**（與 `/s/` 同離線庫；tip 相符才跳過全量下載）。 |
 | **敘事** | 對讀者：「傳閱連結可留在手機、沒網路也能玩過的那幾顆」——**不是**「邀請 QR 離線也能加入」。 |
@@ -353,10 +353,12 @@ GET go.samkuo.me/i/<short_id>
 | 項 | 規格 |
 | --- | --- |
 | **語意** | 這台裝置**曾成功載入**、可供離線再開的 `/s/<id>`（FileMap／等價 cache 命中）——**不是**「我的沙盒庫／收藏／遊戲庫」 |
-| **用語** | 「已下載」或「可離線玩」；**勿**「我的遊戲庫」「收藏夾」 |
+| **用語** | 玩家 UI 使用一般遊戲用語：「已下載的遊戲」「更新遊戲」「刪除遊戲」；「離線」只描述能力（例如「沒有網路也能玩」），不把 cache／FileMap 稱為「離線包」。**勿**「我的遊戲庫」「收藏夾」 |
 | **UI** | 點「更多」→ **頁內面板**（禁止 `alert`）列出小品 **title**（有 `cover` 時可顯示小縮圖，§5.8）；點一筆 → `/s/<id>`（取代當前唯一 slot）。空態一句話：「連線玩過一次後會出現在這裡。」 |
 | **範圍** | **只**列本機有離線包的 id；**禁止**完整型錄、搜尋、filter、跨 kind 貨架 |
 | **可見** | `/` 與 `/s/` 皆可開（回訪主路徑）；**不**綁「正在玩才出現」 |
+
+「更新遊戲」是一個明示的一鍵動作：先比 tip，若有新版即自動下載，下載時須在操作原位顯示進度；若從正在運作的 solo Game drawer／更多面板發起且內容有變，下載完成後須重新掛載當前遊戲。已是最新版本時只顯示 status／flash，不得無故重開。Invite 對局不露這組本機管理操作。
 
 #### 6.6.3 清除（必須分層）
 
@@ -365,7 +367,7 @@ GET go.samkuo.me/i/<short_id>
 | 層 | 動作 | 效果 |
 | --- | --- | --- |
 | **1** | 清除這個遊戲的進度／分數 | 僅當前（或選定）`catalog_id` 的分數／進度 ns（§6.5 localStorage 前綴） |
-| **2** | 移除這個遊戲的離線下載 | 僅該 id 的 SAM FileMap cache；下次需連線重抓才能離線 |
+| **2** | 刪除遊戲 | 僅移除這台裝置上該 id 的 SAM FileMap cache；保留進度／分數，並明示下次開啟需連線重新下載 |
 | **3（可選進階）** | 清除全部本機遊戲資料 | 所有小品分數 ns＋offline SAM cache。**預設勿**一併清 theme／Roster 顯示名等非遊戲偏好；若一併清須文案明示 |
 
 清除成功→頁內 flash／status；列表與當前可否離線狀態立刻更新。
@@ -674,6 +676,7 @@ dash provision → 場殼記憶體 API key
 | 2026-08-10 | §5.5.1：站級 `og:image`＝`/og.png`（避免 FB 回退 favicon）；仍不做每小品專圖 |
 | 2026-08-10 | SEO：`robots.txt`（Allow `/`／`/help`／`/s/`；Disallow `/i/`）＋`sitemap.xml`（listed `/s/`）；`/i/` `noindex` |
 | 2026-08-16 | TURN：啟用備援的邀請＝**relay-only**（go Guest 不試直連）；對齊點數計劃 §7.2 |
-| 2026-08-16 | §6.5：**`/s/` local-first**；**Invite Guest check-tip**（入座前比 tipRev；過期才重抓）；明示「檢查更新」寫 tipRev |
+| 2026-08-16 | §6.5：**`/s/` local-first**；**Invite Guest check-tip**（入座前比 tipRev；過期才重抓）；明示更新才寫 tipRev |
 | 2026-08-17 | **§5.8：** 產品內卡面封面（repo `thumbnail.png` → 靜態 `/covers/<id>.png`＋型錄可選 `cover`）；≠離線訊號；≠每小品 `og:image`；禁止 runtime 打 GitHub |
+| 2026-08-17 | §6.5／§6.6：玩家用語改為「已下載的遊戲／更新遊戲／刪除遊戲」；更新顯示下載進度，solo 當前遊戲有變時自動重新掛載 |
 | 2026-08-17 | 相關：[PG-GO-ADS-PLAN.md](./PG-GO-ADS-PLAN.md)（go shell 廣告／贊助橫幅 Draft；未實作） |

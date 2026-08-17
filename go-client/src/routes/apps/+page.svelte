@@ -9,6 +9,11 @@
     runUpdate,
   } from "$lib/goGameActions";
   import GoEntryCover from "$lib/GoEntryCover.svelte";
+  import GoSamLoadBar from "$lib/GoSamLoadBar.svelte";
+  import {
+    goLoadProgressFromFiles,
+    type GoLoadProgress,
+  } from "$lib/goLoadProgress";
   import GoAdSlot from "$lib/GoAdSlot.svelte";
   import {
     appsAdSplit,
@@ -26,6 +31,7 @@
   let loading = $state(true);
   let loadError = $state("");
   let busyAction = $state("");
+  let updateProgress = $state<GoLoadProgress | null>(null);
   let expandedId = $state<string | null>(null);
   let confirm = $state<{
     kind: ConfirmKind;
@@ -90,7 +96,7 @@
         await goToPage(clamped, count);
       }
     } catch {
-      loadError = "無法讀取這台裝置的離線下載，請稍後再試。";
+      loadError = "無法讀取這台裝置已下載的遊戲，請稍後再試。";
     } finally {
       loading = false;
     }
@@ -122,17 +128,23 @@
     if (busyAction) return;
     const entry = getGoCatalogEntry(app.id);
     if (!entry) {
-      showFlash(`找不到「${app.title}」的型錄資料，無法檢查更新`);
+      showFlash(`找不到「${app.title}」的型錄資料，無法更新遊戲`);
       return;
     }
     busyAction = `update:${app.id}`;
+    updateProgress = { ratio: null, detail: "正在檢查版本…" };
     try {
-      const result = await runUpdate(entry);
+      const result = await runUpdate(entry, {
+        onProgress: progress => {
+          updateProgress = goLoadProgressFromFiles(progress);
+        },
+      });
       showFlash(result.flash);
     } catch {
-      showFlash(`檢查「${app.title}」更新時發生錯誤`);
+      showFlash(`更新「${app.title}」時發生錯誤`);
     } finally {
       busyAction = "";
+      updateProgress = null;
     }
   }
 
@@ -155,7 +167,7 @@
         confirm = null;
         await goto("/");
         chromeSession.setFlash(
-          `已清除全部本機遊戲資料（分數 ${scores} 筆、離線下載 ${packs} 個）`
+          `已清除全部本機遊戲資料（分數 ${scores} 筆、已下載遊戲 ${packs} 個）`
         );
         return;
       }
@@ -179,14 +191,14 @@
     }
     if (confirm.kind === "offline") {
       return {
-        title: "移除離線下載",
-        body: `移除「${confirm.title}」的離線包？下次離線前需再連線載入一次。`,
-        ok: "移除下載",
+        title: "刪除遊戲",
+        body: `從這台裝置刪除「${confirm.title}」？已儲存的進度與分數不受影響；下次開啟需要連線重新下載。`,
+        ok: "刪除遊戲",
       };
     }
     return {
       title: "清除全部本機遊戲資料",
-      body: "清除所有小品的進度／分數與離線下載，並回到首頁。不會清除主題等偏好設定。無法復原。",
+      body: "清除所有遊戲的進度／分數與已下載內容，並回到首頁。不會清除主題等偏好設定。無法復原。",
       ok: "全部清除",
     };
   });
@@ -225,8 +237,8 @@
 </script>
 
 <svelte:head>
-  <title>可離線玩的遊戲</title>
-  <meta name="description" content="管理這台裝置可離線玩的遊戲與小品" />
+  <title>已下載的遊戲</title>
+  <meta name="description" content="管理這台裝置已下載的遊戲" />
   <meta name="robots" content="noindex, nofollow" />
 </svelte:head>
 
@@ -235,7 +247,7 @@
 </p>
 
 <header class="page-heading">
-  <h1 class="pixel-text">可離線玩的遊戲</h1>
+  <h1 class="pixel-text">已下載的遊戲</h1>
   <p>連線成功載入過的遊戲會保留在這台裝置，之後沒有網路也能再玩。</p>
 </header>
 
@@ -278,7 +290,7 @@
 {#if loading}
   <div class="loading pixel-frame" role="status">
     <span class="loading-dot" aria-hidden="true"></span>
-    正在讀取離線下載…
+    正在讀取已下載的遊戲…
   </div>
 {:else if loadError}
   <div class="load-error pixel-frame" role="alert">
@@ -297,11 +309,11 @@
       <rect x="7" y="6" width="1" height="1" fill="rgb(var(--fill))" />
       <rect x="5" y="7" width="2" height="1" fill="rgb(var(--fill))" />
     </svg>
-    <p>還沒有可離線玩的遊戲。連線玩過一次後就會出現在這裡。</p>
+    <p>還沒有已下載的遊戲。連線玩過一次後就會出現在這裡。</p>
     <a class="pixel-btn empty-cta" href="/">回首頁找遊戲</a>
   </div>
 {:else}
-  <ul class="app-list" aria-label="可離線玩的遊戲">
+  <ul class="app-list" aria-label="已下載的遊戲">
     {#each pageApps.slice(0, adSplit) as app (app.id)}
       {@render appRow(app)}
     {/each}
@@ -360,7 +372,7 @@
         <a class="app-name" href={`/s/${encodeURIComponent(app.id)}`}>
           {app.title}
         </a>
-        <span class="offline-status">● 可離線玩</span>
+        <span class="offline-status">● 已下載</span>
       </div>
       <a class="play-btn pixel-btn" href={`/s/${encodeURIComponent(app.id)}`}>
         開始
@@ -384,7 +396,7 @@
           disabled={Boolean(busyAction)}
           onclick={() => void updateApp(app)}
         >
-          {busyAction === `update:${app.id}` ? "檢查中…" : "檢查更新"}
+          {busyAction === `update:${app.id}` ? "更新中…" : "更新遊戲"}
         </button>
         <button
           type="button"
@@ -400,8 +412,13 @@
           disabled={Boolean(busyAction)}
           onclick={() => askRemoveOffline(app.id, app.title)}
         >
-          移除離線下載
+          刪除遊戲
         </button>
+        {#if busyAction === `update:${app.id}`}
+          <div class="app-update-progress">
+            <GoSamLoadBar progress={updateProgress} label={`${app.title}更新進度`} />
+          </div>
+        {/if}
       </div>
     {/if}
   </li>
@@ -635,6 +652,9 @@
     margin-top: 0.75rem;
     padding-top: 0.75rem;
     border-top: 2px dashed color-mix(in oklab, rgb(var(--ink)) 25%, transparent);
+  }
+  .app-update-progress {
+    grid-column: 1 / -1;
   }
   .apps-advanced {
     margin-top: 1.25rem;
