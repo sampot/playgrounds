@@ -1760,7 +1760,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     series: "桌遊",
     blurb: "佈艦後輪流點射；人機先、預留 Invite 1v1。",
     source: "sampot/pg-seabattle",
-    status: "listed",
+    status: "unlisted",
     license: "MIT",
     cover: "/covers/pg-seabattle.png",
   },

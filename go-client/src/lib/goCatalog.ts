@@ -2,8 +2,8 @@
  * Embedded SAM catalog for go `/s/<id>` resolve + same-kind swap (DEC-050).
  * Same codegen authority as field `catalog:gen` → samCatalog.generated.ts.
  *
- * `unlisted` entries resolve on `/s/<id>` and prerender, but are omitted from
- * home recommendations and「下一個」swap pools.
+ * `unlisted` entries resolve on `/s/<id>` and prerender, and remain searchable
+ * on home; they are omitted from home recommendations and「下一個」swap pools.
  */
 
 import {
@@ -232,7 +232,7 @@ export function recommendHome(
 /**
  * 搜尋小品：比對 id／title／blurb（不區分大小寫），回傳最多 limit 個 game。
  * 排序：精確 id > id 包含 > title 包含 > blurb 包含。
- * 含 listed 與 unlisted。
+ * 含 listed 與 unlisted（直連／搜尋可達；不進首頁推薦／換片池）。
  */
 export function searchGoCatalog(
   query: string,

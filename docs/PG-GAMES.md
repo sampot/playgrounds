@@ -62,7 +62,7 @@
 | `pg-yakyu` | 野球生涯 | **unlisted**；虛構青棒校隊；打者揮棒或投手兩用、其餘快轉、短賽季決賽 |
 | `pg-shrineclear` | 祠堂試煉 | 俯視清房、鑰匙開門、近戰短關 |
 | `pg-abilitycave` | 能力門洞穴 | 3～5 能力解鎖過障、短圖回溯 |
-| `pg-streetclash` | 騎樓格鬥誌 | **unlisted（重做中）**；多角色招式表、街機／對戰／修練 |
+| `pg-streetclash` | 騎樓格鬥誌 | **unlisted（已重寫・待上架）**；多角色招式表、街機／對戰／修練 |
 | `pg-nightbrawl` | 夜市清街 | **unlisted（已重寫・待上架）**；側視一路打、夾擊與投技、關卡頭目 |
 | `pg-islandloop` | 環島賽 | **unlisted（已重寫・待上架）**；多賽道盃、車輛改裝、計時榜 |
 | `pg-pitchduel` | 操場對決 | **unlisted（已重寫・待上架）**；五人制足球場地規則、人機對戰 |
@@ -175,7 +175,7 @@
 | `pg-xinzang` | 心臟病 | **unlisted**；翻牌見心臟病號碼秒拍、最慢收整疊、對決 AI |
 | `pg-zhuagui` | 抓烏龜 | **unlisted**；丟對子後輪流盲抽、剩烏龜牌者出局、四人童玩 |
 | `pg-domino` | 骨牌接龍 | 雙六骨牌接點出牌、人機 |
-| `pg-seabattle` | 海戰佈艦 | 佈艦後輪流點射；人機先、預留 Invite |
+| `pg-seabattle` | 海戰佈艦 | **unlisted（未完成）**；自動布艦無船圖、無法交戰；佈艦後點射／人機／Invite 待補 |
 | `pg-fourline` | 四子棋 | 重力落子連四；人機／雙人，預留 Invite |
 | `pg-sealedbid` | 密封拍賣 | 同時密封出價、揭示比價；3～4 人／人機 |
 | `pg-buzzerquiz` | 搶答題庫 | 同題搶拍計分；單人練習／多人房 |
@@ -186,7 +186,7 @@
 | `pg-holdem` | 德州撲克 | 六人桌 NLHE 對 AI；Sit & Go 盲注遞增、虛擬籌碼；純娛樂非博弈 |
 | `pg-cardbazaar` | 卡市爭鋒 | **unlisted（已重寫・待上架）**；構築＋排位；≠傳統牌桌 |
 | `pg-whodunit` | 誰是兇手 | **unlisted（已重寫・待上架）**；線索卡、指認；多人／人機 |
-| `pg-huntshade` | 追匿 | **unlisted（重做中）**；1 追捕 vs 多逃亡；Invite |
+| `pg-huntshade` | 追匿 | **unlisted（已重寫・待上架）**；1 追捕 vs 多逃亡；Invite |
 | `pg-quizleague` | 搶答聯賽 | **unlisted（已重寫・待上架）**；賽季題庫＋段位 |
 
 ### 策略（24 unlisted）
@@ -206,16 +206,16 @@
 | `pg-islesupply` | 島鏈補給 | **unlisted**；排船期與庫存，迎風避颱維持七島十回合供應 |
 | `pg-clubbudg` | 校園社團爭預算 | **unlisted**；八週分配幹部工時、爭場地、辦活動拚期末評鑑 |
 | `pg-bannerwar` | 旌旗戰棋 | **unlisted（已重寫・待上架）**；戰役章、兵種相剋、陣亡後果 |
-| `pg-islandage` | 島鏈紀元 | **unlisted（重做中）**；探索／擴張／開發／征服 |
-| `pg-autolegion` | 自走軍團 | **unlisted（重做中）**；羈絆、經濟、站位、賽季排位 |
+| `pg-islandage` | 島鏈紀元 | **unlisted（已重寫・待上架）**；探索／擴張／開發／征服 |
+| `pg-autolegion` | 自走軍團 | **unlisted（已重寫・待上架）**；羈絆、經濟、站位、賽季排位 |
 | `pg-ascenddeck` | 牌途登峰 | **unlisted（已重寫・待上架）**；路線地圖、遺物、可重複通關 |
 | `pg-deepcatacomb` | 深窟探險 | **unlisted（已重寫・待上架）**；程序地城、飢餓／光照、死即重來 |
-| `pg-villagewrath` | 里民與天 | **unlisted（重做中）**；佈置災異與恩賜、引導聚落 |
-| `pg-outpost` | 離島前哨 | **unlisted（重做中）**；殖民者需求、心情、生產鏈 |
-| `pg-roundtable` | 圓桌協議 | **unlisted（重做中）**；多勢力同時出價與條約 |
-| `pg-partyquest` | 結社遠征錄 | **unlisted（重做中）**；世界地圖、職業裝備、主線多章 |
+| `pg-villagewrath` | 里民與天 | **unlisted（已重寫・待上架）**；佈置災異與恩賜、引導聚落 |
+| `pg-outpost` | 離島前哨 | **unlisted（已重寫・待上架）**；殖民者需求、心情、生產鏈 |
+| `pg-roundtable` | 圓桌協議 | **unlisted（已重寫・待上架）**；多勢力同時出價與條約 |
+| `pg-partyquest` | 結社遠征錄 | **unlisted（已重寫・待上架）**；世界地圖、職業裝備、主線多章 |
 | `pg-blockcity` | 街區建國 | **unlisted（已重寫・待上架）**；分區、交通、民怨長期平衡 |
-| `pg-porttycoon` | 港口大亨 | **unlisted（重做中）**；航線、倉儲、合約與對手 AI |
+| `pg-porttycoon` | 港口大亨 | **unlisted（已重寫・待上架）**；航線、倉儲、合約與對手 AI |
 | `pg-empirekitchen` | 總舖師傳奇 | **unlisted（已重寫・待上架）**；菜單研發、員工、展店 |
 | `pg-nightmarket` | 夜盤 | **unlisted（已重寫・待上架）**；多日價格、資訊差、對手 AI |
 | `pg-templeidle` | 香火放置 | **unlisted（已重寫・待上架）**；香火累積、建築升級、離線收益 |
@@ -224,7 +224,7 @@
 
 ## 打算實作（backlog）
 
-類型覆蓋 44 款曾全數為 scaffold（`getLegalActions` 按鈕空殼），已改回 `status: unlisted`。進度：**35** 款標 **unlisted（已重寫・待上架）**（仍未改 `listed`，待人工驗收）；其餘 **9** 款仍標 **unlisted（重做中）**。另有街機 `pg-foodcatch`／`pg-reacttap` 亦已重寫、同標待上架。逐款通過下方驗收標準後才重新上架。
+類型覆蓋 44 款曾全數為 scaffold（`getLegalActions` 按鈕空殼），已改回 `status: unlisted`。進度：**44** 款標 **unlisted（已重寫・待上架）**（仍未改 `listed`，待人工驗收）；**重做中已清零**（類型覆蓋 44 款皆已重寫）。另有街機 `pg-foodcatch`／`pg-reacttap` 亦已重寫、同標待上架。逐款通過下方驗收標準後才重新上架。
 
 驗收標準（每款都要滿足才可改 `listed`）：
 

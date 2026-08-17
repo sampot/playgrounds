@@ -162,12 +162,15 @@ describe("searchGoCatalogById", () => {
   });
 
   it("includes unlisted games", () => {
-    // 搜尋 "pg-" 會匹配到很多遊戲，包括 unlisted
-    const result = searchGoCatalogById("pg-");
-    // 確認結果包含 listed 和 unlisted 的遊戲
-    expect(result.length).toBeGreaterThan(0);
-    // 所有結果都應該是 game 類型
-    expect(result.every(r => r.kind === "game")).toBe(true);
+    expect(searchGoCatalogById("pg-carrom").map(e => e.id)).toEqual([
+      "pg-carrom",
+    ]);
+    expect(searchGoCatalogById("康樂球").some(r => r.id === "pg-carrom")).toBe(
+      true
+    );
+    expect(
+      searchGoCatalog("pg-", 50).some(r => r.status === "unlisted")
+    ).toBe(true);
   });
 
   it("matches Chinese title and blurb, not only id", () => {
