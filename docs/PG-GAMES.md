@@ -251,7 +251,7 @@
 
 | 靈感（itch） | 資產授權 | 餵向 | 用途 |
 | --- | --- | --- | --- |
-| [One Class Shooter](https://euophrys.itch.io/one-class-shooter) | CC0 | `pg-skyburst`／`pg-starshot`／`pg-straitwing`（及同類重做） | shmup 皮、敵波節奏、觸控拖曳開火 |
+| [One Class Shooter](https://euophrys.itch.io/one-class-shooter) | CC0 | `pg-skyburst`／`pg-starshot`／`pg-straitwing`（及同類重做） | **已餵** `pg-skyburst`／`pg-starshot`（圖集／SFX／軟追蹤／護盾掉落）；shmup 皮、敵波節奏、觸控拖曳開火 |
 | [Zero to Hero](https://rafaeldelboni.itch.io/zero-to-hero) | CC0（含 Kenney 1-bit 等已列來源） | `pg-abilitycave`（及平台能力關） | 能力習得關卡密度／1-bit 皮參考 |
 
 ## 維護備註
