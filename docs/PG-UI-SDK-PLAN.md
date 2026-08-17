@@ -112,7 +112,7 @@
 | 工作 | 檔案 | 驗收 |
 | --- | --- | --- |
 | 2.1 SDK 源碼 | `public/playgrounds/sdk.js`（或 `static/`） | IIFE；無外部依賴；暴露 `window.PG`；method shape 對齊 SPEC §3 |
-| 2.2 載入點 | `src/components/playgrounds/canvasSwProtocol.ts` `injectCanvasBridge` | 在 `CANVAS_BRIDGE_SCRIPT` 旁加 `<script src="/playgrounds/sdk.js" defer data-playgrounds-sdk>` |
+| 2.2 載入點 | `src/components/playgrounds/canvasSwProtocol.ts` `injectCanvasBridge` | 在 `CANVAS_BRIDGE_SCRIPT` 旁加 `<script src="/playgrounds/sdk.js" data-playgrounds-sdk>`（blocking） |
 | 2.3 capabilities 探測 | SDK 內部 | 啟動時 `fetch("/api/capabilities")`；依回應決定屬性存在；UI 用 `in` 探測（不是 `=== undefined`） |
 | 2.4 錯誤型別 | SDK 內部 | `PgError` 對齊 SPEC §3.4；`Response.status !== 2xx` 時丟帶 `code` 的 Error |
 | 2.5 測試 | `tests/sdk.test.ts`（jsdom） | 用 jsdom + `fetch` mock 驗：method 路由、`PgError.code` mapping、capabilities 探測屬性可見性 |

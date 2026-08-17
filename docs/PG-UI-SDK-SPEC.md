@@ -385,7 +385,7 @@ SDK 載入時呼叫一次決定要不要把 `PG.SESSION` 等屬性標成「存�
 主機隨殼 ship **靜態檔** `/playgrounds/sdk.js`（殼根路徑依 [`playgroundsPaths.ts`](../../src/components/playgrounds/playgroundsPaths.ts)）。SDK **不**透過 SAM 沙盒檔案樹（避免污染）；**也不**透過 CDN（避免第三方依賴破 DEC-015 釘版）。
 
 載入策略：
-- **MVP：** 經 [`CANVAS_BRIDGE_SCRIPT`](../../src/components/playgrounds/canvasSwProtocol.ts) 注入一行 `<script src="/playgrounds/sdk.js" defer data-playgrounds-sdk>` 進 `index.html` head；SDK 自掛 `window.PG`。
+- **MVP：** 經 [`CANVAS_BRIDGE_SCRIPT`](../../src/components/playgrounds/canvasSwProtocol.ts) 注入一行 `<script src="/playgrounds/sdk.js" data-playgrounds-sdk>` 進 `index.html` head（**blocking**，無 `defer`／`async`——避免 memory canvas 動態插入的 module 早於 SDK 執行）；SDK 自掛 `window.PG`。
 - **未來：** 若 SDK 體積變大或要分 chunk，改為 dynamic import + cache；不破壞「永遠在頭」契約。
 - **宿主函式庫（擴張）：** `PG.libs` 為主機船運的 UI 函式庫懶載器（**不**經 `/api`、**不**由 bridge 預注入、**不** precache libs；僅授權清楚之開源庫）。契約細節見 [PG-LIBS-SPEC.md](./PG-LIBS-SPEC.md)（Draft）。
 

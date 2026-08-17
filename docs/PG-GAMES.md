@@ -62,13 +62,13 @@
 | `pg-shrineclear` | 祠堂試煉 | 俯視清房、鑰匙開門、近戰短關 |
 | `pg-abilitycave` | 能力門洞穴 | 3～5 能力解鎖過障、短圖回溯 |
 | `pg-streetclash` | 騎樓格鬥誌 | **unlisted（重做中）**；多角色招式表、街機／對戰／修練 |
-| `pg-nightbrawl` | 夜市清街 | **unlisted（重做中）**；側視一路打、夾擊與投技、關卡頭目 |
+| `pg-nightbrawl` | 夜市清街 | **unlisted（已重寫・待上架）**；側視一路打、夾擊與投技、關卡頭目 |
 | `pg-islandloop` | 環島賽 | **unlisted（已重寫・待上架）**；多賽道盃、車輛改裝、計時榜 |
 | `pg-pitchduel` | 操場對決 | **unlisted（已重寫・待上架）**；五人制足球場地規則、人機對戰 |
 | `pg-alleybowl` | 騎樓保齡 | **unlisted（已重寫・待上架）**；球道物理＋桿數／關卡挑戰 |
 | `pg-roofglide` | 頂樓滑板 | **unlisted（已重寫・待上架）**；路線計分、技名連段 |
 | `pg-straitwing` | 海峽空戰 | **unlisted（已重寫・待上架）**；俯視狗鬥任務鏈 |
-| `pg-templecleave` | 廟口斬陣 | **unlisted（重做中）**；自由移動、技能冷卻、裝備掉落關卡 |
+| `pg-templecleave` | 廟口斬陣 | **unlisted（已重寫・待上架）**；自由移動、技能冷卻、裝備掉落關卡 |
 | `pg-siegepush` | 攻城推波 | **unlisted（已重寫・待上架）**；組波次攻打 AI 基地 |
 | `pg-tidefort` | 潮汐要塞 | **unlisted（重做中）**；能力回流、地圖填圖 |
 | `pg-ghostmark` | 查哨夜行 | **unlisted（重做中）**；視線錐、警報等級、任務鏈 |
@@ -184,7 +184,7 @@
 | `pg-chengyu` | 成語接龍 | 末字起頭接龍、挑戰計分與人機；對戰超時出局，預留 `chengyu.v1` |
 | `pg-holdem` | 德州撲克 | 六人桌 NLHE 對 AI；Sit & Go 盲注遞增、虛擬籌碼；純娛樂非博弈 |
 | `pg-cardbazaar` | 卡市爭鋒 | **unlisted（重做中）**；構築＋排位；≠傳統牌桌 |
-| `pg-whodunit` | 誰是兇手 | **unlisted（重做中）**；線索卡、指認；多人／人機 |
+| `pg-whodunit` | 誰是兇手 | **unlisted（已重寫・待上架）**；線索卡、指認；多人／人機 |
 | `pg-huntshade` | 追匿 | **unlisted（重做中）**；1 追捕 vs 多逃亡；Invite |
 | `pg-quizleague` | 搶答聯賽 | **unlisted（重做中）**；賽季題庫＋段位 |
 
@@ -223,7 +223,7 @@
 
 ## 打算實作（backlog）
 
-類型覆蓋 44 款曾全數為 scaffold（`getLegalActions` 按鈕空殼），已改回 `status: unlisted`。進度：**20** 款標 **unlisted（已重寫・待上架）**（仍未改 `listed`，待人工驗收）；其餘 **24** 款仍標 **unlisted（重做中）**。另有街機 `pg-foodcatch`／`pg-reacttap` 亦已重寫、同標待上架。逐款通過下方驗收標準後才重新上架。
+類型覆蓋 44 款曾全數為 scaffold（`getLegalActions` 按鈕空殼），已改回 `status: unlisted`。進度：**23** 款標 **unlisted（已重寫・待上架）**（仍未改 `listed`，待人工驗收）；其餘 **21** 款仍標 **unlisted（重做中）**。另有街機 `pg-foodcatch`／`pg-reacttap` 亦已重寫、同標待上架。逐款通過下方驗收標準後才重新上架。
 
 驗收標準（每款都要滿足才可改 `listed`）：
 
