@@ -121,8 +121,8 @@
 | `pg-caveline` | 洞穴一筆劃 | 廊道拼路／限步探路 |
 | `pg-coopswitch` | 雙人機關 | 同機兩角色踩開關推箱過關；預留 Invite |
 | `pg-casefile` | 陳年卷宗 | **unlisted（已重寫・待上架）**；場景熱點、道具組合、推理結案 |
-| `pg-township` | 鎮誌 | **unlisted（重做中）**；多日曆、好感、多結局 |
-| `pg-campusbond` | 社團心事 | **unlisted（重做中）**；行程配置＋關係線 |
+| `pg-township` | 鎮誌 | **unlisted（已重寫・待上架）**；多日曆、好感、多結局 |
+| `pg-campusbond` | 社團心事 | **unlisted（已重寫・待上架）**；行程配置＋關係線 |
 | `pg-seacast` | 港邊釣夢 | **unlisted（已重寫・待上架）**；魚圖鑑、漁場天氣、裝備 |
 | `pg-lockroom` | 密室一小時 | **unlisted（已重寫・待上架）**；多房間線索鏈、一局完整解謎 |
 | `pg-atticfind` | 頂樓尋物 | **unlisted（已重寫・待上架）**；場景搜尋＋故事章節 |
@@ -216,7 +216,7 @@
 | `pg-partyquest` | 結社遠征錄 | **unlisted（重做中）**；世界地圖、職業裝備、主線多章 |
 | `pg-blockcity` | 街區建國 | **unlisted（已重寫・待上架）**；分區、交通、民怨長期平衡 |
 | `pg-porttycoon` | 港口大亨 | **unlisted（重做中）**；航線、倉儲、合約與對手 AI |
-| `pg-empirekitchen` | 總舖師傳奇 | **unlisted（重做中）**；菜單研發、員工、展店 |
+| `pg-empirekitchen` | 總舖師傳奇 | **unlisted（已重寫・待上架）**；菜單研發、員工、展店 |
 | `pg-nightmarket` | 夜盤 | **unlisted（已重寫・待上架）**；多日價格、資訊差、對手 AI |
 | `pg-templeidle` | 香火放置 | **unlisted（已重寫・待上架）**；香火累積、建築升級、離線收益 |
 
@@ -224,7 +224,7 @@
 
 ## 打算實作（backlog）
 
-類型覆蓋 44 款曾全數為 scaffold（`getLegalActions` 按鈕空殼），已改回 `status: unlisted`。進度：**32** 款標 **unlisted（已重寫・待上架）**（仍未改 `listed`，待人工驗收）；其餘 **12** 款仍標 **unlisted（重做中）**。另有街機 `pg-foodcatch`／`pg-reacttap` 亦已重寫、同標待上架。逐款通過下方驗收標準後才重新上架。
+類型覆蓋 44 款曾全數為 scaffold（`getLegalActions` 按鈕空殼），已改回 `status: unlisted`。進度：**35** 款標 **unlisted（已重寫・待上架）**（仍未改 `listed`，待人工驗收）；其餘 **9** 款仍標 **unlisted（重做中）**。另有街機 `pg-foodcatch`／`pg-reacttap` 亦已重寫、同標待上架。逐款通過下方驗收標準後才重新上架。
 
 驗收標準（每款都要滿足才可改 `listed`）：
 
