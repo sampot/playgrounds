@@ -60,6 +60,11 @@ export interface SamEntry {
   license?: string;
   /** Optional session protocols this SAM can join (catalog declaration). */
   protocols?: readonly SamCatalogProtocol[];
+  /**
+   * Product card art (`/covers/<id>.png`) when synced; omit → series／identicon.
+   * Not an offline signal; not og:image (go §5.8).
+   */
+  cover?: string;
 }
 
 /**
@@ -88,6 +93,7 @@ function toSamEntry(e: GeneratedSamEntry): SamEntry {
     status: e.status ?? "listed",
     ...(e.license ? { license: e.license } : {}),
     ...(e.protocols?.length ? { protocols: e.protocols } : {}),
+    ...(e.cover ? { cover: e.cover } : {}),
   };
 }
 

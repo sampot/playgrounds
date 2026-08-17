@@ -2,7 +2,7 @@
 
 > **狀態：** Phase 0–4 **已落地**  
 > **權威決策：** [DECISIONS.md](./DECISIONS.md) **DEC-046**（Draft→實作中）  
-> **相關：** [PG-CATALOG-PLAN.md](./PG-CATALOG-PLAN.md)（YAML 權威／`/sam/`）、[PG-CATALOG-UX-PLAN.md](./PG-CATALOG-UX-PLAN.md)（人機 UX）、DEC-023（session 邀請＋型錄 lazy install）、DEC-025（`?open=`）、DEC-041／045、[GLOSSARY.md](./GLOSSARY.md)
+> **相關：** [PG-CATALOG-PLAN.md](./PG-CATALOG-PLAN.md)（YAML 權威／`/sam/`）、[PG-CATALOG-UX-PLAN.md](./PG-CATALOG-UX-PLAN.md)（人機 UX）、[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)（§5.8 卡面封面）、[PG-GAME-AGENT-GUIDE.md](./PG-GAME-AGENT-GUIDE.md)（§2.4）、DEC-023（session 邀請＋型錄 lazy install）、DEC-025（`?open=`）、DEC-041／045、[GLOSSARY.md](./GLOSSARY.md)
 
 一句話：**`catalog:gen` 在產生 `/sam/` 所用 typed module 之外，同步產出版本化 JSON；Playgrounds 以同一權威查詢型錄（含 lazy install 解析），不刮網頁、不另開 CMS。**
 
@@ -73,10 +73,13 @@
 | `status` | 是 | `listed`（預設）｜`unlisted`（登錄／可 resolve，不進 `/sam/` 瀏覽） |
 | `license` | 否 | 如 MIT |
 | `protocols` | 否 | 此 SAM 宣告可參與的 session protocol 摘要；省略＝不參與 protocol 匹配 |
+| `cover` | 否 | 產品內卡面圖之**站內相對路徑**（例 `/covers/pg-breakout.png`）。**僅**當宿主已同步靜態檔時由 gen／covers 腳本寫入；YAML **不**手填。無此欄＝UI 用系列 icon。契約見 [PG-GO-CLIENT-PLAN §5.8](./PG-GO-CLIENT-PLAN.md)、[PG-GAME-AGENT-GUIDE §2.4](./PG-GAME-AGENT-GUIDE.md)。**≠**離線就緒；**≠** `og:image` |
 
 **`status`：** `listed`＝人機型錄與推薦；`unlisted`＝機器登錄（`/catalog/v1.json`、go `/s/<id>`、protocol 匹配）但不出現在 `/sam/`／go 首頁推薦。YAML `draft` 不寫入產物。
 
 **`protocols`：** 陣列，元素至少含 `protocolId`、`apiVersion`；可含 `roles[]`。用於邀請附完整規格時的型錄匹配。未宣告則 **不**假裝支援任意 protocol——匹配只能靠明確 id／source，或本機已安裝 SAM 的 **`sam:protocol` head**（Phase 4）。
+
+**`cover`：** 來源權威＝已提交之靜態 **`/covers/<id>.png`**（go `go-client/static/covers/`；play 若共用可鏡像同 path）。遊戲 repo 根 `thumbnail.png` 只是作者側慣例；**必須**經維護同步進宿主靜態後，產物才帶 `cover`。首頁／推薦**禁止** runtime 向 GitHub 取圖。
 
 本機 head：`<meta name="sam:protocol" content="…">`，逗號分隔 token：`protocolId[@apiVersion][:role[+role…]]`；省略 `@apiVersion` 時視為 `"1"`（與既有 `brainstorm.v1` 狗糧相容）。
 
@@ -154,3 +157,4 @@
 | 2026-08-05 | Phase 3：YAML `protocols`；`matchCatalogForProtocol`；`pg-llm-agent` 宣告 `coding-orchestration.v1` |
 | 2026-08-05 | Phase 4：`sam:protocol` 結構化解析；`resolveInviteCandidates`＋OPFS probe |
 | 2026-08-06 | 交叉引用 [PG-CATALOG-UX-PLAN.md](./PG-CATALOG-UX-PLAN.md)；人機／機器分工表更新 |
+| 2026-08-17 | 可選欄位 `cover`（靜態 `/covers/<id>.png`；非 YAML 手填；≠離線／OG） |

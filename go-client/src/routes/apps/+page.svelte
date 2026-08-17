@@ -7,12 +7,12 @@
     runRemoveOffline,
     runUpdate,
   } from "$lib/goGameActions";
-  import GoSeriesIcon from "$lib/GoSeriesIcon.svelte";
+  import GoEntryCover from "$lib/GoEntryCover.svelte";
   import { clearAllGoProgress } from "$lib/goScoreStorage";
   import { clearAllGoSamOfflineCache, listGoSamOfflineCatalogIds } from "$lib/goSamOfflineCache";
 
   type ConfirmKind = "scores" | "offline" | "all";
-  type AppEntry = { id: string; title: string; series?: string };
+  type AppEntry = { id: string; title: string; series?: string; cover?: string };
 
   let loading = $state(true);
   let loadError = $state("");
@@ -36,7 +36,12 @@
       const ids = await listGoSamOfflineCatalogIds();
       apps = ids.map((id) => {
         const e = getGoCatalogEntry(id);
-        return { id, title: e?.title ?? id, series: e?.series ?? undefined };
+        return {
+          id,
+          title: e?.title ?? id,
+          series: e?.series ?? undefined,
+          cover: e?.cover,
+        };
       });
     } catch {
       loadError = "無法讀取這台裝置的離線下載，請稍後再試。";
@@ -255,7 +260,7 @@
       <li class="app-row pixel-box">
         <div class="app-summary">
           <span class="app-icon" aria-hidden="true">
-            <GoSeriesIcon series={app.series} size={20} />
+            <GoEntryCover cover={app.cover} series={app.series} size={20} />
           </span>
           <div class="app-copy">
             <a class="app-name" href={`/s/${encodeURIComponent(app.id)}`}>
@@ -458,9 +463,17 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    overflow: hidden;
+    border-radius: 2px;
     color: rgb(var(--accent));
     font-size: 1.3rem;
     line-height: 1;
+  }
+  .app-icon :global(.go-entry-cover--thumb) {
+    width: 2.25rem;
+    height: 2.25rem;
   }
   .app-copy {
     display: grid;

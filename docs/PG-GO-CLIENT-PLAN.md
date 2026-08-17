@@ -1,6 +1,6 @@
 # Playgrounds 純玩版客戶端（`go.samkuo.me`）
 
-> **狀態：** Draft（2026-08-08）— 契約／階段草案；Invite 路徑實作進行中；型錄 `/s/<id>`／分享面／換片／§5.5.1 OG／§6.5 離線分數／**§6.6「更多」本機溢流**／**§6.7 架構硬規則**／**§6.7.1 `env.HOST` 注入（DEC-053）** 已定案  
+> **狀態：** Draft（2026-08-08；修訂 2026-08-17：§5.8 卡面封面）— 契約／階段草案；Invite 路徑實作進行中；型錄 `/s/<id>`／分享面／換片／§5.5.1 OG／**§5.8 產品內封面**／§6.5 離線分數／**§6.6「更多」本機溢流**／**§6.7 架構硬規則**／**§6.7.1 `env.HOST` 注入（DEC-053）** 已定案  
 
 > **權威決策：** 建議 [DECISIONS.md](./DECISIONS.md) **DEC-050**（Proposed）／**DEC-053**（UI 只走 `/api/...`；shell/runtime 走 env binding）  
 > **相關：** [PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)（五子棋 E2E；Invite Guest 主路徑）、[PG-CATALOG-UX-PLAN.md](./PG-CATALOG-UX-PLAN.md)（型錄「分享」→ go）、[PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)、[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（官方 TURN；Guest 經 `join_cap`）、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)、[PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md)（go 登入＋Header profile；玩家主場；DEC-052）、[PG-GO-BOSS-FLASH-PLAN.md](./PG-GO-BOSS-FLASH-PLAN.md)（老闆歡迎氣泡）、[PG-GO-UX-POLISH-PLAN.md](./PG-GO-UX-POLISH-PLAN.md)（玩家 UX 打磨 Draft）、[PG-GO-SESSION-CHAT-PLAN.md](./PG-GO-SESSION-CHAT-PLAN.md)（同 session 輕量聊天 Draft）、DEC-004／009／023／025／042／045／047／048、[GLOSSARY.md](./GLOSSARY.md)
@@ -184,7 +184,7 @@ GET go.samkuo.me/i/<short_id>
 | **`<title>`／`og:title`／`twitter:title`** | **每個** listed `/s/<id>` **不同**；須含該筆 `entry.title`。形狀：`{title} · 山姆鍋遊樂場`（文案勿單用「遊樂場」）。未知／下架 id → 錯誤頁泛稱，**勿**冒充某小品名 |
 | **`og:description`／`description`** | **一律含站群脈絡**。有 blurb → `山姆鍋遊樂場 · 純玩｜{blurb}`；無則短站群句＋小品名。不同小品宜可分辨 |
 | **`og:url`** | 對應該 `/s/<id>` canonical |
-| **`og:image`** | **站級** `https://go.samkuo.me/og.png`（1200×630；`twitter:card`＝`summary_large_image`）。**勿**為每小品做專圖；title／description 仍靠文字分辨小品 |
+| **`og:image`** | **站級** `https://go.samkuo.me/og.png`（1200×630；`twitter:card`＝`summary_large_image`）。**勿**為每小品做專圖；title／description 仍靠文字分辨小品。產品內卡面封面（`/covers/<id>.png`）見 **§5.8**，**不**充當本欄 |
 | **爬蟲可見（硬）** | 預覽爬蟲多半**不執行**客戶端 JS。每個 listed `catalog_id` 的首包 HTML（或邊緣等價注入）就須帶上述 meta——**建置 prerender** `/s/<id>`（entries 來自嵌入 catalog）或 Worker／HTML rewrite 注入；**否決**只靠 SPA hydrate 後改 `<title>` 當社群預覽快樂路徑 |
 | **Invite `/i/`** | 短鏈預覽用**中性**泛稱：`接受邀請 · 山姆鍋遊樂場`（description 同脈絡）；**禁止**預設「對弈／對局」。**不**要求依局內 SAM 變 title（分享小品仍走 `/s/`＋本節） |
 | **否決** | 全站單一 `og:title`；複製連結有小品名但貼網址預覽卻是「純玩」；為預覽而把 secret 放進 `/i/` 公開 HTML；為每小品強制專屬 `og:image` |
@@ -219,7 +219,23 @@ GET go.samkuo.me/i/<short_id>
 | 來源 | 嵌入 catalog；**優先**場 picks 中的 **game** 洗牌取用，不足再從其他 **game** 補 |
 | kind | **僅 `game`**（與 §5.6 一致；不推工具／代理等） |
 | chrome | mark＋遊樂場；分享 disabled；**可**露「更多」（§6.6 本機）；**無**「下一個」 |
+| **卡面** | 有型錄 `cover` 時用靜態封面圖；否則系列圖示（§5.8）。**勿**用封面暗示「可離線」 |
 | 否決 | 搜尋／filter／完整型錄列表；首頁跨 kind 湊數 |
+
+### 5.8 產品內卡面封面（定案）
+
+與 §5.5.1 **`og:image`（站級、社群爬蟲）**分開：本節只規範 go（及可選 play `/sam/`）**產品內**列表／推薦卡的視覺。
+
+| 項 | 規格 |
+| --- | --- |
+| **來源** | 遊戲 repo 根目錄可選 **`thumbnail.png`**（作者契約見 [PG-GAME-AGENT-GUIDE §2.4](./PG-GAME-AGENT-GUIDE.md)） |
+| **宿主收斂（硬）** | 維護腳本／建置把檔同步為同源靜態 **`/covers/<catalog_id>.png`**（go：`go-client/static/covers/`）。`catalog:gen`（或緊鄰腳本）若該檔存在 → 產物寫可選欄位 **`cover": "/covers/<id>.png"`**；YAML **不必**手填 cover（避免雙源） |
+| **UI** | 有 `entry.cover` → 卡面 `<img>`（`object-fit: cover`；卡片比例維持現有 **4:3**）；無 → 既有**系列圖示**＋紋理底。適用：首頁「推薦試試」、`/apps`、換片「試試這些」（與共用 cover 元件一致即可） |
+| **語意（硬）** | 封面＝美觀／辨識。**「可離線玩」**仍只由本機離線 cache 決定（§6.5／§6.6／`/apps` 明示狀態）。**禁止**「有 cover／thumbnail ⇒ 已可離線」 |
+| **效能／離線殼** | 封面 URL 須為 **go origin 靜態**（可進 SW shell／cache 策略）。**禁止**首頁／推薦卡 runtime `fetch` GitHub raw／API 拉圖 |
+| **與 OG** | **不**把每小品 cover 當成 `og:image`；社群預覽維持站級 `/og.png`（§5.5.1） |
+| **滾動節奏** | 允許網格「有的有圖、有的系列 icon」；不要求全 listed 齊封面才上 UI。維護可另排批次補圖 |
+| **否決** | 為卡面打 GitHub；用 thumbnail 檔存在與否當離線 badge；為社群預覽強制每小品專圖；把 cover 做成第二型錄權威欄（權威圖檔＝已同步之 `/covers/<id>.png`） |
 
 ---
 
@@ -338,7 +354,7 @@ GET go.samkuo.me/i/<short_id>
 | --- | --- |
 | **語意** | 這台裝置**曾成功載入**、可供離線再開的 `/s/<id>`（FileMap／等價 cache 命中）——**不是**「我的沙盒庫／收藏／遊戲庫」 |
 | **用語** | 「已下載」或「可離線玩」；**勿**「我的遊戲庫」「收藏夾」 |
-| **UI** | 點「更多」→ **頁內面板**（禁止 `alert`）列出小品 **title**；點一筆 → `/s/<id>`（取代當前唯一 slot）。空態一句話：「連線玩過一次後會出現在這裡。」 |
+| **UI** | 點「更多」→ **頁內面板**（禁止 `alert`）列出小品 **title**（有 `cover` 時可顯示小縮圖，§5.8）；點一筆 → `/s/<id>`（取代當前唯一 slot）。空態一句話：「連線玩過一次後會出現在這裡。」 |
 | **範圍** | **只**列本機有離線包的 id；**禁止**完整型錄、搜尋、filter、跨 kind 貨架 |
 | **可見** | `/` 與 `/s/` 皆可開（回訪主路徑）；**不**綁「正在玩才出現」 |
 
@@ -585,7 +601,7 @@ dash provision → 場殼記憶體 API key
 - [x] `/i/` 不出現換片控件
 - [ ] 手測：`go:dev` 開 `/s/pg-breakout` 可玩；型錄分享連指向 go
 - [x] 首頁 `/` 呈現至多 3 則**game**推薦（picks 優先）；點進 `/s/<id>`
-
+- [x] **卡面封面（§5.8）：** 同步 `/covers/<id>.png`＋型錄可選 `cover`；有則替換系列 icon；無則 fallback；**勿**當離線 badge；**勿** runtime 打 GitHub；**勿**當每小品 `og:image`（`covers:sync`＋`catalog:gen`＋`GoEntryCover`）
 **`/s/` 可安裝／離線／本機分數（§6.5；Phase 6）**
 
 - [x] go 有 Web App Manifest＋圖示（`manifest.webmanifest`／favicon；start_url＝`/`）
@@ -659,3 +675,5 @@ dash provision → 場殼記憶體 API key
 | 2026-08-10 | SEO：`robots.txt`（Allow `/`／`/help`／`/s/`；Disallow `/i/`）＋`sitemap.xml`（listed `/s/`）；`/i/` `noindex` |
 | 2026-08-16 | TURN：啟用備援的邀請＝**relay-only**（go Guest 不試直連）；對齊點數計劃 §7.2 |
 | 2026-08-16 | §6.5：**`/s/` local-first**；**Invite Guest check-tip**（入座前比 tipRev；過期才重抓）；明示「檢查更新」寫 tipRev |
+| 2026-08-17 | **§5.8：** 產品內卡面封面（repo `thumbnail.png` → 靜態 `/covers/<id>.png`＋型錄可選 `cover`）；≠離線訊號；≠每小品 `og:image`；禁止 runtime 打 GitHub |
+| 2026-08-17 | 相關：[PG-GO-ADS-PLAN.md](./PG-GO-ADS-PLAN.md)（go shell 廣告／贊助橫幅 Draft；未實作） |

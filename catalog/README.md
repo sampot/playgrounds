@@ -11,6 +11,7 @@ Authority for the field `/sam/` page lives here: one YAML file per entry under [
    - `listed` (default): public `/sam/` browse + go resolve
    - `unlisted`: written to `catalog/v1.json` and go can open `/s/<id>`, but **hidden** from `/sam/` and go home／「下一個」推薦（測試／彩蛋用）
    - `draft`: omitted from codegen entirely
+   - **Do not** put a `cover` field in YAML. Card covers come from synced static `/covers/<id>.png` → gen optional `cover` path（see [PG-GO-CLIENT-PLAN §5.8](../docs/PG-GO-CLIENT-PLAN.md); game repo root `thumbnail.png` per [PG-GAME-AGENT-GUIDE §2.4](../docs/PG-GAME-AGENT-GUIDE.md)).
 4. Run `npm run catalog:gen` and commit the updated `samCatalog.generated.ts` **and** `public/catalog/v1.json` with your YAML.
    - `picks.yaml` ids must be `listed` (not unlisted／draft).
 5. Open a PR. Prefer the catalog PR template if present.
@@ -29,6 +30,7 @@ Authority for the field `/sam/` page lives here: one YAML file per entry under [
 
 ```bash
 npm run catalog:gen   # regenerate typed module + /catalog/v1.json from YAML
+npm run covers:sync   # optional: ~/dev/sampot/<id>/thumbnail.png → go/public /covers/<id>.png（then catalog:gen）
 npm test
-npm run build         # runs catalog:gen then check + astro build
+npm run build         # runs catalog:gen then check + vite build
 ```

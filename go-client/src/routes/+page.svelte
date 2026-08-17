@@ -16,7 +16,7 @@
   import { chromeSession } from "$lib/chromeSession.svelte";
   import { goAuth } from "$lib/goAuth.svelte";
   import { recommendHome, searchGoCatalog, type GoCatalogEntry } from "$lib/goCatalog";
-  import GoSeriesIcon from "$lib/GoSeriesIcon.svelte";
+  import GoEntryCover from "$lib/GoEntryCover.svelte";
   import { formatGoBuildStamp, GO_BUILD_ISO } from "$lib/goBuildStamp";
   import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
 
@@ -176,9 +176,12 @@
         <li>
           <a class="home-grid-card" href={`/s/${encodeURIComponent(entry.id)}`}>
             <span class="home-grid-cover" aria-hidden="true">
-              <span class="home-grid-cover-icon">
-                <GoSeriesIcon series={entry.series} size={34} />
-              </span>
+              <GoEntryCover
+                cover={entry.cover}
+                series={entry.series}
+                variant="fill"
+                size={34}
+              />
             </span>
             <span class="home-grid-name">{entry.title}</span>
             {#if entry.blurb}

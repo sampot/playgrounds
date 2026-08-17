@@ -25,6 +25,13 @@ describe("goCatalog game-kind swap", () => {
     expect(GO_RECOMMEND_KIND).toBe("game");
   });
 
+  it("embeds cover path when static /covers/<id>.png is present", () => {
+    const withCover = getGoCatalogEntry("pg-pixelhop");
+    expect(withCover?.cover).toBe("/covers/pg-pixelhop.png");
+    const without = getGoCatalogEntry("pg-breakout");
+    expect(without?.cover).toBeUndefined();
+  });
+
   it("home and swap pools never include unlisted", () => {
     expect(recommendHome(5, () => 0.2).every(e => e.status === "listed")).toBe(
       true

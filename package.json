@@ -8,6 +8,7 @@
     "dev": "vite dev",
     "start": "vite dev",
     "catalog:gen": "node --experimental-strip-types --experimental-transform-types scripts/generate-catalog.ts",
+    "covers:sync": "node --experimental-strip-types --experimental-transform-types scripts/sync-game-covers.ts",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "prepare": "svelte-kit sync || echo ''",
     "build": "npm run catalog:gen && npm run check && vite build",

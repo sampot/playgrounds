@@ -415,7 +415,8 @@
       "blurb": "隨機街區撿金幣、躲警察、走到出口；30×22 格小地圖，行動裝置優先、無依賴。",
       "source": "sampot/pg-cityroam",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-cityroam.png"
     },
     {
       "id": "pg-clawgrab",
@@ -665,7 +666,8 @@
       "blurb": "移動菜藍接住掉下來的食物、躲開壞掉的番茄；連擊加倍、20 秒升級。行動裝置優先、無依賴。",
       "source": "sampot/pg-foodcatch",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-foodcatch.png"
     },
     {
       "id": "pg-fourline",
@@ -1234,7 +1236,8 @@
       "blurb": "三層短局隨機迷宮；找符石開出口、碰撞戰鬥、追擊怪物、寶箱與成長；行動裝置優先、無依賴。",
       "source": "sampot/pg-microdungeon",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-microdungeon.png"
     },
     {
       "id": "pg-mines",
@@ -1284,7 +1287,8 @@
       "blurb": "側視一路打、夾擊與投技、關卡頭目。",
       "source": "sampot/pg-nightbrawl",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-nightbrawl.png"
     },
     {
       "id": "pg-nightmarket",
@@ -1434,7 +1438,8 @@
       "blurb": "橫向 2D 平台動作；5 個關卡收金幣、踩黏液、避尖刺；純前端輕量、mobile-first。",
       "source": "sampot/pg-pixelhop",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-pixelhop.png"
     },
     {
       "id": "pg-pondfarm",

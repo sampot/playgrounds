@@ -267,4 +267,5 @@
   - **DB（仿 D1 子集，適合多欄／查詢的複雜資料）**：走 `/api/db/…`（規格見 `playgrounds-host-api.md` 的 `env.DB`；遊戲類多數用不到，優先 KV）。
   - 需要跨欄位原子更新或更進階時，才考慮在 SAM 內自帶 `functions.js` 路由（仍以 `env.KV`／`env.DB` 為權威）。
 - **美術／音效／音樂：** 本機庫 [`game-assets/`](../game-assets/)（二進位不進 git）可用於開發遊戲；定稿拷進各 `pg-*`，勿當 runtime 路徑。**署名硬規則：** 依授權要求署名；**不要求署名也要署名**（見該目錄 README／`ATTRIBUTION.md`）。
+- **可選卡面封面：** 遊戲 repo 根目錄可放 `thumbnail.png`（真實遊玩畫面；建議 4:3、≤~50KB）。宿主同步為 go 靜態 `/covers/<id>.png` 後，型錄產物可帶 `cover`，推薦卡等替換系列 icon。**≠**離線就緒；**≠**每小品 `og:image`。見 [PG-GAME-AGENT-GUIDE §2.4](./PG-GAME-AGENT-GUIDE.md)、[PG-GO-CLIENT-PLAN §5.8](./PG-GO-CLIENT-PLAN.md)。
 - **Backlog 排序：** 以資源就緒度為主軸；台灣味優先但非硬限制。入庫新 pack 後重排對應列的就緒度。

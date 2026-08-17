@@ -1067,6 +1067,7 @@ html[data-theme="dark"] .err {
   content: "";
   position: absolute;
   inset: 3px;
+  z-index: 1;
   border: 1px solid color-mix(in oklab, rgb(var(--ink)) 35%, transparent);
   border-radius: 2px;
   pointer-events: none;

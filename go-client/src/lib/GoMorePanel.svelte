@@ -2,7 +2,7 @@
   import type { GoCatalogEntry } from "$lib/goCatalog";
   import { getGoCatalogEntry } from "$lib/goCatalog";
   import { goTheme } from "$lib/goTheme.svelte";
-  import GoSeriesIcon from "$lib/GoSeriesIcon.svelte";
+  import GoEntryCover from "$lib/GoEntryCover.svelte";
   import {
     clearAllGoSamOfflineCache,
   } from "$lib/goSamOfflineCache";
@@ -263,7 +263,11 @@
                     onclick={() => onPick(rec.id)}
                   >
                     <span class="go-more-btn-icon" aria-hidden="true">
-                      <GoSeriesIcon series={rec.series} size={20} />
+                      <GoEntryCover
+                        cover={rec.cover}
+                        series={rec.series}
+                        size={20}
+                      />
                     </span>
                     <span class="go-more-btn-label">{rec.title}</span>
                   </button>
@@ -605,9 +609,17 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    overflow: hidden;
+    border-radius: 2px;
     color: rgb(var(--gm-accent));
     font-size: 1.25rem;
     line-height: 1;
+  }
+  .go-more-btn-icon :global(.go-entry-cover--thumb) {
+    width: 1.5rem;
+    height: 1.5rem;
   }
   .go-more-btn-label {
     min-width: 0;

@@ -24,6 +24,7 @@ export type GoCatalogEntry = Pick<
   | "blurb"
   | "status"
   | "protocols"
+  | "cover"
 >;
 
 /**
@@ -98,6 +99,7 @@ function toGoEntry(e: GeneratedSamEntry): GoCatalogEntry {
     blurb: e.blurb,
     status: e.status ?? "listed",
     protocols: e.protocols,
+    ...(e.cover ? { cover: e.cover } : {}),
   };
 }
 

@@ -4,6 +4,8 @@
 #   listed   — public /sam/ browse + go resolve (default)
 #   unlisted — in catalog JSON／go `/s/<id>` resolve, hidden from /sam/＆推薦
 #   draft    — omitted from gen entirely
+# Do NOT add `cover` here — card art is synced static /covers/<id>.png
+# (game repo root thumbnail.png → host sync → catalog:gen optional cover path).
 
 title: 顯示名稱
 kind: toy # tool | agent | game | toy | media

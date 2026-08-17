@@ -1,6 +1,6 @@
 # Playgrounds 遊戲開發指南（Coding Agent）
 
-> **狀態：** Draft（2026-08-17；修訂：§1.1 殼／遊戲邊界、§3.5 生命週期、平台義務）  
+> **狀態：** Draft（2026-08-17；修訂：§1.1 殼／遊戲邊界、§3.5 生命週期、平台義務、§2.4 可選封面）  
 > **讀者：** Coding agent（次要：人類作者）  
 > **範圍：** 獨立 `pg-*` 遊戲 repo；產物須能在 **go 純玩**（`https://go.samkuo.me/s/<id>`）與 **play 畫布**同契約執行。  
 > **自足：** 開發遊戲時**只讀本檔**即可；不必讀宿主其它 SPEC／PLAN／源碼。上架型錄、改殼、加新 lib id **不在**本檔範圍。  
@@ -103,6 +103,7 @@ index.html
 app.js                 # 或 src/ 多檔，仍無 build：用 <script type="module">
 style.css
 assets/…               # 圖像／音效／字型（拷進本 repo）
+thumbnail.png          # 可選；go／型錄卡面封面（見 §2.4）
 tests/game.test.js     # 規則／純函式
 ATTRIBUTION.md
 README.md
@@ -119,6 +120,22 @@ functions.js
 | 禁止入庫 | `node_modules/`、bundler 產物、自帶的 Phaser／Pixi／Three 等大型 vendor |
 | SDK | **禁止** `<script src="/playgrounds/sdk.js">`（宿主已注入；再載會重複） |
 | 素材來源 | 開發期可從維護者本機素材庫拷貝；**定稿必須在遊戲 repo 內**；禁止 runtime 指到宿主 `game-assets/` 路徑 |
+
+### 2.4 可選封面 `thumbnail.png`
+
+遊戲 repo **根目錄**可放一張 **`thumbnail.png`**，供 go 首頁推薦卡、`/apps`、換片「試試這些」等**產品內卡面**替換預設系列圖示。屬**漸進增強**：沒有檔＝宿主繼續用系列 icon；**不是**交付硬門檻。
+
+| 項 | 規格 |
+| --- | --- |
+| **路徑** | 僅認 repo 根 `thumbnail.png`（勿改名、勿放 `assets/` 才當封面權威） |
+| **內容** | **真實遊玩畫面**（一幀可辨識玩法）；勿只放 logo／純字 title card |
+| **比例** | 優先 **4:3**（約 640×480 或 800×600），對齊 go 推薦卡 cover；若暫用正方形，宿主會 `object-fit: cover` 裁切——可接受但非首選 |
+| **格式／體積** | PNG；建議 **≤ ~50KB**（可損壓）；勿丟未壓縮大圖 |
+| **署名** | 畫面含第三方素材時，仍依 §8 在 `ATTRIBUTION.md`（及必要時 credits）署名；封面本身不另開授權例外 |
+| **語意（硬）** | 有 thumbnail **≠**「這台裝置可離線玩」。離線＝造訪後 cache（go `/apps`／「更多」已下載）；封面只負責「長什麼樣」 |
+| **如何進卡面** | 作者只負責把檔放進遊戲 repo。**宿主**建置／維護腳本把檔同步到 go（等）靜態 **`/covers/<catalog_id>.png`**，型錄產物可選帶 `cover` 路徑——見 [PG-GO-CLIENT-PLAN §5.8](./PG-GO-CLIENT-PLAN.md)、[PG-CATALOG-QUERY-PLAN](./PG-CATALOG-QUERY-PLAN.md)。**禁止**指望 go 首頁 runtime 去打 GitHub raw |
+
+**否決（遊戲側）：** 為封面引入 build／套件；把封面當 `og:image` 義務（社群預覽仍是 go 站級圖，見 go 計劃 §5.5.1）；用「有無 thumbnail」暗示離線就緒。
 
 `index.html` 開頭慣例：
 
@@ -626,7 +643,8 @@ npx vitest run
 - [ ] `ATTRIBUTION.md`（及必要時遊戲內 credits）齊  
 - [ ] `npx vitest run` 綠（有規則可測時）  
 - [ ] 無 go／play 特判；相對路徑資源正確  
-- [ ] 未發明殼級操控／獎盃 API；單機未依賴 Invite／`SESSION`
+- [ ] 未發明殼級操控／獎盃 API；單機未依賴 Invite／`SESSION`  
+- [ ] （建議）根目錄 `thumbnail.png` 符合 §2.4；無則可略  
 ---
 
 ## 12. 本指南不涵蓋（不要擅自擴 scope）
@@ -634,7 +652,7 @@ npx vitest run
 除非任務單**明文**要求，否則不要做：
 
 - 修改 Playgrounds 宿主、Service Worker、`pin.json`、新增 `PG.libs` id  
-- 撰寫／提交場型錄 YAML、上架／unlist 流程  
+- 撰寫／提交場型錄 YAML、上架／unlist 流程、宿主 `/covers/<id>.png` 同步  
 - Invite／WebRTC／多人对弈協定、`PG.SESSION` 座席邏輯  
 - Platform 登入、dash、點數、TURN  
 - 文件站、場殼 IDE、OPFS 編輯管線  

@@ -30,6 +30,7 @@ Reader-facing narrative stays personal／non-product (blog DEC-004).
 
 - `npm run dev` — local host (standalone paths: `/` + `/sam/` + `/canvas/`)
 - `npm run catalog:gen` — regenerate catalog typed module + `public/catalog/v1.json` from `catalog/**/*.yaml`
+- `npm run covers:sync` — copy `~/dev/sampot/<id>/thumbnail.png` → `go-client/static/covers/`＋`public/covers/`（then `catalog:gen` emits optional `cover`）
 - `npm test` — Vitest（runs `svelte-kit sync` + `catalog:gen` via pretest）
 - `npm run check` — `svelte-kit sync` + `svelte-check`
 - `npm run build` — `catalog:gen` + `check` + SvelteKit static build → `dist/`

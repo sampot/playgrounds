@@ -1035,6 +1035,7 @@
   - 勿要求接收者開 Safari／寫 OPFS 才能完成 go 快樂路徑（Invite 或 `/s/`）。
   - 勿承諾 Invite `/i/` 離線可玩或把短鏈當永久離線遊戲入口；離線／主畫面／本機分數快樂路徑僅 `/s/`（及為其服務的 `/`）。
   - 勿讓所有 `/s/<id>` 共用同一社群預覽 title；分享／`og:title` 須依小品 `entry.title`，且爬蟲可見。
+  - 勿把產品內卡面封面（`/covers/<id>.png`／型錄 `cover`）當成離線就緒訊號，或當成每小品 `og:image`；勿在首頁 runtime 向 GitHub 拉封面。
   - 勿把 Header「分享」做成僅 Web Share→複製而無現場 QR；勿把型錄傳閱 QR 與邀請 `/i/` QR 混成同一碼。
   - 勿以 NFC／Nearby／自建區網 discovery 當 `/s/` 現場主路徑；勿為 `/s/` 另鑄 Platform short。
   - 勿 fork 整份 `PlaygroundsApp`；抽共用 library（含 `goSamShareHref`／`shareOrCopy`／QR 編碼）。
@@ -1053,6 +1054,7 @@
 - **Revision（2026-08-08）：** go 頂列「山姆鍋遊樂場」→ `play…/sam/?kind=game`；mark 仍 → play `/`。
 - **Revision（2026-08-08）：** Header「更多」＝本機溢流（已下載／分層清除）；≠ 只有推薦；Invite 不露。
 - **Revision（2026-08-11）：** 登入（play 相容 `#pg_provision=`）＋ Header profile 見 **DEC-052**／[PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md)；`go` 仍為保留名，僅作為 **provision target** 例外放行。站群定位：**go＝玩家主場**（作者＝場 `play.samkuo.me`；兩 UI 共用同一份型錄）；後續玩家主場互邀＝**GO-INVITE**（見 DEC-052）。
+- **Revision（2026-08-17）：** 產品內卡面封面（計劃 §5.8）：repo `thumbnail.png` → 靜態 `/covers/<id>.png`＋型錄可選 `cover`；系列 icon 為 fallback；**≠**離線訊號；**≠**每小品 `og:image`；禁止首頁 runtime 打 GitHub。
 
 ### DEC-051: Playgrounds API scopes（環境能力準入）
 
