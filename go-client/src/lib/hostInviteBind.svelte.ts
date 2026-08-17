@@ -108,6 +108,7 @@ export function createHostInviteBind(opts: {
       channelName: null,
       inviteId: null,
       shortUrl: null,
+      inviteExpiresAt: null,
       hostRole: "host",
       guestRoles: protocol.roles.filter(r => r !== "host"),
       guestTarget: 0,

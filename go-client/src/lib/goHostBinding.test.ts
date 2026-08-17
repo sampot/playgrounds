@@ -35,6 +35,7 @@ function makeStatus(overrides: Partial<HostStatus> = {}): HostStatus {
     channelName: null,
     inviteId: null,
     shortUrl: null,
+    inviteExpiresAt: null,
     hostRole: "host",
     guestRoles: ["player"],
     guestTarget: 1,

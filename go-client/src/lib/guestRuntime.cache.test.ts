@@ -37,7 +37,8 @@ vi.mock("./goCanvasSupport", () => ({
 }));
 
 vi.mock("./goMemoryCanvas", () => ({
-  buildGoMemoryCanvas: (...args: unknown[]) => fixtures.buildMemory(...args),
+  buildGoMemoryCanvas: (...args: unknown[]) =>
+    fixtures.buildMemory(...(args as Parameters<typeof fixtures.buildMemory>)),
   installGoMemoryApiListener: vi.fn(() => () => {}),
   publishGoMemoryBroadcast: vi.fn(),
   revokeGoMemoryBlobs: vi.fn(),

@@ -1,6 +1,6 @@
 # Playgrounds 純玩版：廣告橫幅（go revenue）
 
-> **狀態：** Draft（2026-08-17）— 契約定案中；**未實作**  
+> **狀態：** Draft（2026-08-17）— 契約持續修訂；**Phase 1 已落地**  
 > **權威決策：** [DECISIONS.md](./DECISIONS.md) **DEC-054**（Proposed）— go shell 廣告版位；從屬 DEC-050  
 > **相關：** [PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)、[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（點數＝TURN 成本；與本流正交）、[PG-ANALYTICS-PLAN.md](./PG-ANALYTICS-PLAN.md)（自建 play 打點；勿混廣告）、DEC-004（敘事非產品／行銷腔）、DEC-007（勿預設塞追蹤）、`.cursor/rules/no-native-dialogs.mdc`、`.cursor/rules/mobile-first-ux.mdc`、[GLOSSARY.md](./GLOSSARY.md)
 
@@ -22,7 +22,7 @@
 - **營收面（近程）：** Phase 1 先用版位做**站內遊戲互推**（驗證尺寸／gate／載入生命週期）；Phase 2+ 再接聯盟變現。
 - **產品面：** 廣告＝**shell chrome** 能力；SAM 可攜契約不變（DEC-053）；不進 FileMap／`functions.js`。
 - **UX：** mobile-first；**IAB 形廣告尺寸槽**、無 CLS；**`/s/` 載入中為一級投放**；**`/apps` 列表中段一格**；玩中與 Invite／`/help` 不露。
-- **敘事：** 讀者用語偏「也玩玩看／本站小品」（house）或日後「贊助」；內部一律 `GoAdSlot`／provider。
+- **敘事：** 即使 house 內容是自家遊戲，仍是廣告；讀者面須明示「廣告・本站推薦」等標籤，日後聯盟可用「贊助」；內部一律 `GoAdSlot`／provider。
 - **可換供應商：** Phase 1＝**house**；Phase 2＝**EthicalAds／Carbon 類（A）**；槽尺寸預留聯盟 creative；勿做成「推薦卡第二排」。
 - **standalone：** 加主畫面／`display-mode: standalone` → **僅 house**（永不載聯盟腳本）。
 
@@ -78,8 +78,9 @@
 | **分頁** | 每頁最多 **10** 款（`APPS_PAGE_SIZE`）；`?page=` 可選；切開點以**當頁列數**為準，不是全庫 |
 | **位置** | **當頁**列表中間：前半之後、後半之前。切開點＝`floor(n/2)`（`n`＝當頁列數；`n=1` → 該則之後） |
 | **形狀** | 同一 `GoAdSlot`（320×100／寬 728×90）；**不是**列表列樣式複製品 |
+| **區隔** | 須有專屬廣告 surface／border、固定可見的「廣告」標籤與列表上下留白；不可只靠內容或尺寸猜測，亮／暗主題皆須一眼可辨 |
 | **內容** | house 自推其他 game（預設 `pickHouseGame()`） |
-| **語意** | 管理面中的站內互推；勿擋「開始／管理」熱區；換頁可收合展開的管理列 |
+| **語意** | 管理面中的站內廣告；勿擋「開始／管理」熱區；換頁可收合展開的管理列 |
 
 ### 5.2 `/s/` 載入等待面（硬；一級投放）
 
@@ -128,8 +129,9 @@
 4. **不擋玩／不擋載入：** 無素材、失敗 → 與今日相同可玩；載入面**不得**序列化或拖延 SAM fetch（§5.2）。
 5. **觸控：** 整格可點（house → `/s/<other>`）；勿擠壓 Header 主操作；熱區足夠。
 6. **禁止** `alert`／`confirm`／`prompt`。Phase 1 house **不需**追蹤同意；聯盟階段同意勿擋短暫載入。
-7. **用語（Phase 1 讀者）：** 「也玩玩看」「本站小品」等即可；**勿**假冒第三方廣告標（例如亂標「Ad」卻連自家）。若日後接聯盟再加「贊助」披露。
+7. **廣告識別（硬）：** house 自推仍屬廣告，固定明示「廣告・本站推薦」或同義短標；日後接聯盟可改「贊助」。標籤描述內容來源，不暗示第三方投放。
 8. **窄屏優先：** 預設槽 **320×100**；寬屏升 **728×90**（§6.1）。
+9. **視覺區隔（硬）：** 使用專屬廣告 surface／border，勿沿用一般內容卡片的完整配色；同時以標籤、框體與留白區隔，**不可只靠顏色**。`/apps` 中段在窄屏與亮／暗主題下都須與離線遊戲列清楚可辨。
 
 ### 6.1 版位尺寸（定案）
 
@@ -140,6 +142,7 @@
 | **否決（Phase 1）** | 任意高卡片牆、多格 carousel 冒充版位、全寬無上限長文 | 那是推薦 UI，不是 ad slot |
 
 - 槽內 house creative：**單則**（一遊戲）；圖＋短 title（可選一句）；點擊 → `go…/s/<catalog_id>`（同 origin）。
+- 槽內須保留固定可見的廣告標籤；house 建議「廣告・本站推薦」，不可只寫成一般推薦文案。
 - 視覺可吃既有 **`/covers/<id>.png`**（[PG-GO-CLIENT-PLAN §5.8](./PG-GO-CLIENT-PLAN.md)）或系列 icon——裁切進槽，**object-fit**；勿為 house 另開 runtime 打 GitHub。
 - 寬屏 house／聯盟皆填同一 **728×90** 外框（creative 需準備對應素材或置中裁切）。
 
@@ -240,7 +243,7 @@ go-client/src/lib/
 | Phase | 內容 | 完成定義 | 狀態 |
 | --- | --- | --- | --- |
 | **0. 契約** | 本文件＋**DEC-054**；面／尺寸／house／Phase 2＝A／standalone＝僅 house | 開問題清空 | **完成** |
-| **1. House 版位** | `GoAdSlot`（320×100／寬 728×90）＋house；`/` ＋ `/s/` 載入＋**`/apps` 中段**；boot 後收起 | 點進其他 `/s/<id>`；非迷你型錄；`/help`／`/i/`／玩中無 | **已落地**（含 `/apps`） |
+| **1. House 版位** | `GoAdSlot`（320×100／寬 728×90）＋house；`/` ＋ `/s/` 載入＋**`/apps` 中段**；boot 後收起 | 點進其他 `/s/<id>`；明示廣告且與內容卡區隔；非迷你型錄；`/help`／`/i/`／玩中無 | **已落地**（含 `/apps`） |
 | **2. EthicalAds／Carbon** | 同一槽換 A；CSP／env；失敗或 standalone → house | 分頁可出聯盟；standalone **僅** house；載入面不擋 boot | 未排程 |
 | **3. 同意／披露** | help＋必要時頁內同意（略過＝house） | 拒聯盟仍可玩 | 未排程 |
 | **4.（可選）** | chrome 展開薄條 | 另議 | — |
@@ -252,6 +255,9 @@ go-client/src/lib/
 - [x] 廣告僅 shell；SAM iframe／repo 無廣告 SDK
 - [x] **Phase 1：** 窄屏 **320×100**、寬屏 **728×90**；內容＝**其他** `kind: game`；點擊 → `/s/<id>`
 - [x] **不是**「試試這些」多卡／迷你型錄；**無** catalog `ads` 旗標
+- [x] house 固定明示「廣告・本站推薦」，不因內容來自本站而偽裝成一般推薦
+- [x] 廣告有專屬 surface／border 與結構標籤；`/apps` 有上下留白，不只靠顏色區分
+- [ ] 亮／暗主題與窄屏手測：不閱讀遊戲名稱也能區分廣告版位與離線遊戲列
 - [x] **`/s/` 載入中**露版位；**boot／`canvasActive` 後立即收起**（載入分支卸載）
 - [x] house 與 SAM fetch **並行**；**不**延長載入
 - [x] `/i/`、`/help` 與遊玩中無版位；**`/apps` 列表中段有一格**
@@ -301,3 +307,4 @@ go-client/src/lib/
 | 2026-08-17 | **Phase 1 落地：** `GoAdSlot`＋`pickHouseGame`；掛 `/` 與 `/s/` 載入／錯誤面；help 短述；`VITE_GO_ADS_ENABLED` |
 | 2026-08-17 | **修訂：** `/apps` **列表中段**加入 banner（撤回「/apps 不掛」）；`/help` 仍不掛 |
 | 2026-08-17 | **修訂：** `/apps` **每頁最多 10 款**；廣告切開點＝**當頁** `floor(n/2)` |
+| 2026-08-17 | **修訂：** house 仍明示為廣告；版位採專屬 surface／border、固定標籤與留白，避免 `/apps` 與離線遊戲列混淆 |

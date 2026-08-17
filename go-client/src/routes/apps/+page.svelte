@@ -530,8 +530,8 @@
   }
   .app-list-ad {
     list-style: none;
-    margin: 0.15rem 0;
-    padding: 0;
+    margin: 0.4rem 0;
+    padding: 0.35rem 0;
     display: flex;
     justify-content: center;
   }

@@ -55,7 +55,7 @@
 </script>
 
 {#if visible && entry}
-  <aside class="go-ad-slot" aria-label="本站小品推薦">
+  <aside class="go-ad-slot" aria-label="廣告：本站小品推薦">
     <a
       class="go-ad-slot-link"
       href={`/s/${encodeURIComponent(entry.id)}`}
@@ -70,7 +70,7 @@
         />
       </span>
       <span class="go-ad-slot-copy">
-        <span class="go-ad-slot-kicker">也玩玩看</span>
+        <span class="go-ad-slot-kicker">廣告・本站推薦</span>
         <span class="go-ad-slot-title">{entry.title}</span>
       </span>
     </a>
@@ -95,6 +95,16 @@
   }
 
   .go-ad-slot-link {
+    --go-ad-border: color-mix(
+      in oklab,
+      rgb(var(--gold)) 78%,
+      rgb(var(--ink))
+    );
+    --go-ad-surface: color-mix(
+      in oklab,
+      rgb(var(--gold-soft)) 24%,
+      rgb(var(--fill))
+    );
     display: grid;
     grid-template-columns: 88px minmax(0, 1fr);
     align-items: stretch;
@@ -105,10 +115,13 @@
     padding: 0.35rem 0.55rem 0.35rem 0.35rem;
     text-decoration: none;
     color: inherit;
-    border: var(--pixel-edge) solid rgb(var(--ink));
+    border: var(--pixel-edge) solid var(--go-ad-border);
     border-radius: var(--radius);
-    background: rgb(var(--card));
-    box-shadow: var(--pixel-shadow);
+    background: var(--go-ad-surface);
+    box-shadow:
+      inset 0 0 0 2px
+        color-mix(in oklab, rgb(var(--gold-soft)) 42%, transparent),
+      0 3px 0 0 var(--go-ad-border);
     overflow: hidden;
   }
 
@@ -132,9 +145,13 @@
     min-width: 0;
     min-height: 0;
     overflow: hidden;
-    border: 2px solid rgb(var(--ink));
+    border: 2px solid var(--go-ad-border);
     border-radius: 2px;
-    background: color-mix(in oklab, rgb(var(--fill)) 70%, rgb(var(--card)));
+    background: color-mix(
+      in oklab,
+      rgb(var(--gold-soft)) 18%,
+      rgb(var(--fill))
+    );
   }
 
   .go-ad-slot-copy {
@@ -146,10 +163,16 @@
   }
 
   .go-ad-slot-kicker {
+    align-self: flex-start;
+    padding: 0.16rem 0.32rem;
     font-family: var(--pixel);
-    font-size: 0.65rem;
+    font-size: 0.625rem;
+    font-weight: 700;
     letter-spacing: 0.04em;
-    color: rgb(var(--muted));
+    color: rgb(38 32 28);
+    border: 1px solid var(--go-ad-border);
+    border-radius: 2px;
+    background: rgb(var(--gold-soft));
     text-transform: none;
   }
 
