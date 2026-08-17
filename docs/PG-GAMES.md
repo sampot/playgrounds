@@ -71,10 +71,10 @@
 | `pg-straitwing` | 海峽空戰 | **unlisted（已重寫・待上架）**；俯視狗鬥任務鏈 |
 | `pg-templecleave` | 廟口斬陣 | **unlisted（已重寫・待上架）**；自由移動、技能冷卻、裝備掉落關卡 |
 | `pg-siegepush` | 攻城推波 | **unlisted（已重寫・待上架）**；組波次攻打 AI 基地 |
-| `pg-tidefort` | 潮汐要塞 | **unlisted（重做中）**；能力回流、地圖填圖 |
-| `pg-ghostmark` | 查哨夜行 | **unlisted（重做中）**；視線錐、警報等級、任務鏈 |
-| `pg-blackward` | 廢校夜勤 | **unlisted（重做中）**；資源稀缺、聲響、有限視野 |
-| `pg-backdoor` | 後門任務 | **unlisted（重做中）**；同一關多解（偷／騙／打／駭） |
+| `pg-tidefort` | 潮汐要塞 | **unlisted（已重寫・待上架）**；能力回流、地圖填圖 |
+| `pg-ghostmark` | 查哨夜行 | **unlisted（已重寫・待上架）**；視線錐、警報等級、任務鏈 |
+| `pg-blackward` | 廢校夜勤 | **unlisted（已重寫・待上架）**；資源稀缺、聲響、有限視野 |
+| `pg-backdoor` | 後門任務 | **unlisted（已重寫・待上架）**；同一關多解（偷／騙／打／駭） |
 | `pg-gatepair` | 對門實驗室 | **unlisted（已重寫・待上架）**；傳送門／動量關卡 |
 | `pg-nightsnake` | 燈籠蛇 | **unlisted（已重寫・待上架）**；關卡＋無盡雙模式 |
 | `pg-lighttrace` | 光跡對決 | **unlisted（已重寫・待上架）**；留跡包圍領地 |
@@ -123,7 +123,7 @@
 | `pg-casefile` | 陳年卷宗 | **unlisted（已重寫・待上架）**；場景熱點、道具組合、推理結案 |
 | `pg-township` | 鎮誌 | **unlisted（重做中）**；多日曆、好感、多結局 |
 | `pg-campusbond` | 社團心事 | **unlisted（重做中）**；行程配置＋關係線 |
-| `pg-seacast` | 港邊釣夢 | **unlisted（重做中）**；魚圖鑑、漁場天氣、裝備 |
+| `pg-seacast` | 港邊釣夢 | **unlisted（已重寫・待上架）**；魚圖鑑、漁場天氣、裝備 |
 | `pg-lockroom` | 密室一小時 | **unlisted（已重寫・待上架）**；多房間線索鏈、一局完整解謎 |
 | `pg-atticfind` | 頂樓尋物 | **unlisted（已重寫・待上架）**；場景搜尋＋故事章節 |
 | `pg-festcrowd` | 遶境人潮 | **unlisted（已重寫・待上架）**；指定動作疏導／救出走位 |
@@ -184,10 +184,10 @@
 | `pg-sketchtell` | 你畫我猜 | 一輪一畫家、其餘猜詞；預留 Invite |
 | `pg-chengyu` | 成語接龍 | 末字起頭接龍、挑戰計分與人機；對戰超時出局，預留 `chengyu.v1` |
 | `pg-holdem` | 德州撲克 | 六人桌 NLHE 對 AI；Sit & Go 盲注遞增、虛擬籌碼；純娛樂非博弈 |
-| `pg-cardbazaar` | 卡市爭鋒 | **unlisted（重做中）**；構築＋排位；≠傳統牌桌 |
+| `pg-cardbazaar` | 卡市爭鋒 | **unlisted（已重寫・待上架）**；構築＋排位；≠傳統牌桌 |
 | `pg-whodunit` | 誰是兇手 | **unlisted（已重寫・待上架）**；線索卡、指認；多人／人機 |
 | `pg-huntshade` | 追匿 | **unlisted（重做中）**；1 追捕 vs 多逃亡；Invite |
-| `pg-quizleague` | 搶答聯賽 | **unlisted（重做中）**；賽季題庫＋段位 |
+| `pg-quizleague` | 搶答聯賽 | **unlisted（已重寫・待上架）**；賽季題庫＋段位 |
 
 ### 策略（24 unlisted）
 
@@ -217,14 +217,14 @@
 | `pg-blockcity` | 街區建國 | **unlisted（已重寫・待上架）**；分區、交通、民怨長期平衡 |
 | `pg-porttycoon` | 港口大亨 | **unlisted（重做中）**；航線、倉儲、合約與對手 AI |
 | `pg-empirekitchen` | 總舖師傳奇 | **unlisted（重做中）**；菜單研發、員工、展店 |
-| `pg-nightmarket` | 夜盤 | **unlisted（重做中）**；多日價格、資訊差、對手 AI |
-| `pg-templeidle` | 香火放置 | **unlisted（重做中）**；香火累積、建築升級、離線收益 |
+| `pg-nightmarket` | 夜盤 | **unlisted（已重寫・待上架）**；多日價格、資訊差、對手 AI |
+| `pg-templeidle` | 香火放置 | **unlisted（已重寫・待上架）**；香火累積、建築升級、離線收益 |
 
 ---
 
 ## 打算實作（backlog）
 
-類型覆蓋 44 款曾全數為 scaffold（`getLegalActions` 按鈕空殼），已改回 `status: unlisted`。進度：**23** 款標 **unlisted（已重寫・待上架）**（仍未改 `listed`，待人工驗收）；其餘 **21** 款仍標 **unlisted（重做中）**。另有街機 `pg-foodcatch`／`pg-reacttap` 亦已重寫、同標待上架。逐款通過下方驗收標準後才重新上架。
+類型覆蓋 44 款曾全數為 scaffold（`getLegalActions` 按鈕空殼），已改回 `status: unlisted`。進度：**32** 款標 **unlisted（已重寫・待上架）**（仍未改 `listed`，待人工驗收）；其餘 **12** 款仍標 **unlisted（重做中）**。另有街機 `pg-foodcatch`／`pg-reacttap` 亦已重寫、同標待上架。逐款通過下方驗收標準後才重新上架。
 
 驗收標準（每款都要滿足才可改 `listed`）：
 
