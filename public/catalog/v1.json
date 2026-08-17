@@ -75,7 +75,8 @@
       "blurb": "3～5 能力解鎖過障、短圖回溯。",
       "source": "sampot/pg-abilitycave",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-abilitycave.png"
     },
     {
       "id": "pg-aimbeat",
@@ -85,7 +86,8 @@
       "blurb": "拍點出靶、換準星造型連擊；節拍準星小品。",
       "source": "sampot/pg-aimbeat",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-aimbeat.png"
     },
     {
       "id": "pg-airhockey",
@@ -95,7 +97,8 @@
       "blurb": "拖曳球拍彈盤進門、人機對戰先得七分；適配手機，自製音效。",
       "source": "sampot/pg-airhockey",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-airhockey.png"
     },
     {
       "id": "pg-alleybowl",
@@ -105,7 +108,8 @@
       "blurb": "球道物理＋桿數／關卡挑戰。",
       "source": "sampot/pg-alleybowl",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-alleybowl.png"
     },
     {
       "id": "pg-alleyclaim",
@@ -115,7 +119,8 @@
       "blurb": "同時下令佔街廓、搶地標、連線得分。",
       "source": "sampot/pg-alleyclaim",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-alleyclaim.png"
     },
     {
       "id": "pg-ascenddeck",
@@ -125,7 +130,8 @@
       "blurb": "路線地圖、遺物、可重複通關。",
       "source": "sampot/pg-ascenddeck",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-ascenddeck.png"
     },
     {
       "id": "pg-atticfind",
@@ -135,7 +141,8 @@
       "blurb": "場景搜尋＋故事章節。",
       "source": "sampot/pg-atticfind",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-atticfind.png"
     },
     {
       "id": "pg-autolegion",
@@ -145,7 +152,8 @@
       "blurb": "羈絆、經濟、站位、賽季排位。",
       "source": "sampot/pg-autolegion",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-autolegion.png"
     },
     {
       "id": "pg-backdoor",
@@ -155,7 +163,8 @@
       "blurb": "同一關多解（偷／騙／打／駭）。",
       "source": "sampot/pg-backdoor",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-backdoor.png"
     },
     {
       "id": "pg-bannerwar",
@@ -165,7 +174,8 @@
       "blurb": "戰役章、兵種相剋、陣亡後果。",
       "source": "sampot/pg-bannerwar",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-bannerwar.png"
     },
     {
       "id": "pg-banqi",
@@ -175,7 +185,8 @@
       "blurb": "翻子吃子，簡易人機；華語圈暗棋小品。",
       "source": "sampot/pg-banqi",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-banqi.png"
     },
     {
       "id": "pg-basecodec",
@@ -195,7 +206,8 @@
       "blurb": "四人出牌人機對戰：單對三條與五張牌型；適配手機，自製音效。",
       "source": "sampot/pg-big2",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-big2.png"
     },
     {
       "id": "pg-bikekan",
@@ -205,7 +217,8 @@
       "blurb": "兩張程式繪製同場景、點出所有差異；點錯扣時間、找完過關、難度遞增。",
       "source": "sampot/pg-bikekan",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-bikekan.png"
     },
     {
       "id": "pg-bingolite",
@@ -215,7 +228,8 @@
       "blurb": "五五賓果燈板：抽號亮格、連線結算；純娛樂。",
       "source": "sampot/pg-bingolite",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-bingolite.png"
     },
     {
       "id": "pg-blackjack",
@@ -225,7 +239,8 @@
       "blurb": "對莊家要牌／停牌／加倍、籌碼下注；莊家 S17、天然黑傑克 3:2。",
       "source": "sampot/pg-blackjack",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-blackjack.png"
     },
     {
       "id": "pg-blackout",
@@ -235,7 +250,8 @@
       "blurb": "手電筒視野找鑰匙／出口；停電密室短關。",
       "source": "sampot/pg-blackout",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-blackout.png"
     },
     {
       "id": "pg-blackward",
@@ -245,7 +261,8 @@
       "blurb": "資源稀缺、聲響、有限視野。",
       "source": "sampot/pg-blackward",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-blackward.png"
     },
     {
       "id": "pg-blockcity",
@@ -255,7 +272,8 @@
       "blurb": "分區、交通、民怨長期平衡。",
       "source": "sampot/pg-blockcity",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-blockcity.png"
     },
     {
       "id": "pg-blockfit",
@@ -265,7 +283,8 @@
       "blurb": "放置多聯骨牌清行／列；非下落俄羅斯。",
       "source": "sampot/pg-blockfit",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-blockfit.png"
     },
     {
       "id": "pg-bounceland",
@@ -285,7 +304,8 @@
       "blurb": "弓箭風阻距離瞄準；夜市射氣球的露營版。",
       "source": "sampot/pg-bowcamp",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-bowcamp.png"
     },
     {
       "id": "pg-breakout",
@@ -295,7 +315,8 @@
       "blurb": "擋板反彈清磚，過關加速；致敬打磚塊玩法類型。",
       "source": "sampot/pg-breakout",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-breakout.png"
     },
     {
       "id": "pg-buzzerquiz",
@@ -305,7 +326,8 @@
       "blurb": "同題搶拍計分；單人練習／多人房，預留 Invite。",
       "source": "sampot/pg-buzzerquiz",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-buzzerquiz.png"
     },
     {
       "id": "pg-campusbond",
@@ -315,7 +337,8 @@
       "blurb": "行程配置＋關係線。",
       "source": "sampot/pg-campusbond",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-campusbond.png"
     },
     {
       "id": "pg-candythrow",
@@ -325,7 +348,8 @@
       "blurb": "瞄準投擲糖果進桶，連擊積分。",
       "source": "sampot/pg-candythrow",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-candythrow.png"
     },
     {
       "id": "pg-cardbazaar",
@@ -335,7 +359,8 @@
       "blurb": "構築＋排位；≠傳統牌桌。",
       "source": "sampot/pg-cardbazaar",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-cardbazaar.png"
     },
     {
       "id": "pg-carjam",
@@ -345,7 +370,8 @@
       "blurb": "滑車讓目標車出路；交通堵塞解謎。",
       "source": "sampot/pg-carjam",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-carjam.png"
     },
     {
       "id": "pg-carrom",
@@ -355,7 +381,8 @@
       "blurb": "康樂球／彈珠桌：拖曳彈射自己的彈珠、碰撞推進對手棋子入口袋得點；簡化物理、回合制人機。",
       "source": "sampot/pg-carrom",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-carrom.png"
     },
     {
       "id": "pg-casefile",
@@ -365,7 +392,8 @@
       "blurb": "場景熱點、道具組合、推理結案。",
       "source": "sampot/pg-casefile",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-casefile.png"
     },
     {
       "id": "pg-caveline",
@@ -375,7 +403,8 @@
       "blurb": "廊道拼路／限步探路；洞穴路徑益智。",
       "source": "sampot/pg-caveline",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-caveline.png"
     },
     {
       "id": "pg-cellife",
@@ -395,7 +424,8 @@
       "blurb": "末字起頭接龍、挑戰計分與人機對戰；適配手機，自製音效。",
       "source": "sampot/pg-chengyu",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-chengyu.png"
     },
     {
       "id": "pg-chmod",
@@ -426,7 +456,8 @@
       "blurb": "搖爪落下夾取，差一點就夾到；致敬夾娃娃機玩法類型。",
       "source": "sampot/pg-clawgrab",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-clawgrab.png"
     },
     {
       "id": "pg-clubbudg",
@@ -436,7 +467,8 @@
       "blurb": "八週分配幹部工時、爭場地、辦活動拚期末評鑑。",
       "source": "sampot/pg-clubbudg",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-clubbudg.png"
     },
     {
       "id": "pg-coinpush",
@@ -446,7 +478,8 @@
       "blurb": "落幣堆疊、推板擠落得分；致敬推幣機玩法類型。",
       "source": "sampot/pg-coinpush",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-coinpush.png"
     },
     {
       "id": "pg-colorcast",
@@ -476,7 +509,8 @@
       "blurb": "同機／連線兩角色踩開關推箱過關；預留 Invite 合作。",
       "source": "sampot/pg-coopswitch",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-coopswitch.png"
     },
     {
       "id": "pg-cronread",
@@ -516,7 +550,8 @@
       "blurb": "短局翻牌或圖鑑收集；方塊寵物配對。",
       "source": "sampot/pg-cubematch",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-cubematch.png"
     },
     {
       "id": "pg-dancepad",
@@ -526,7 +561,8 @@
       "blurb": "四軌箭頭下落、踩拍判定連擊、合成 BGM；致敬跳舞機類型，適配手機踏墊。",
       "source": "sampot/pg-dancepad",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-dancepad.png"
     },
     {
       "id": "pg-dbtool",
@@ -546,7 +582,8 @@
       "blurb": "程序地城、飢餓／光照、死即重來。",
       "source": "sampot/pg-deepcatacomb",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-deepcatacomb.png"
     },
     {
       "id": "pg-deliver",
@@ -556,7 +593,8 @@
       "blurb": "限時送達、躲路錐；市區外送小品。",
       "source": "sampot/pg-deliver",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-deliver.png"
     },
     {
       "id": "pg-diabolo",
@@ -566,7 +604,8 @@
       "blurb": "扯鈴節奏連招：在節拍點按下對應鍵觸發抖鈴／拋鈴／接鈴，連招累加 combo、miss 斷 combo、難度遞增。",
       "source": "sampot/pg-diabolo",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-diabolo.png"
     },
     {
       "id": "pg-diaoshui",
@@ -576,7 +615,8 @@
       "blurb": "夜市釣水球：移動釣竿讓紙圈套住水球頸部撈起得分；限時制、釣到目標顆數過關。",
       "source": "sampot/pg-diaoshui",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-diaoshui.png"
     },
     {
       "id": "pg-diginet",
@@ -596,7 +636,8 @@
       "blurb": "雙六骨牌接點出牌、人機對戰；可換主題皮。",
       "source": "sampot/pg-domino",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-domino.png"
     },
     {
       "id": "pg-empirekitchen",
@@ -606,7 +647,8 @@
       "blurb": "菜單研發、員工、展店。",
       "source": "sampot/pg-empirekitchen",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-empirekitchen.png"
     },
     {
       "id": "pg-envkit",
@@ -626,7 +668,8 @@
       "blurb": "指定動作疏導／救出走位。",
       "source": "sampot/pg-festcrowd",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-festcrowd.png"
     },
     {
       "id": "pg-fishcab",
@@ -636,7 +679,8 @@
       "blurb": "竿線咬餌收線；機台魚群節奏；致敬釣魚機玩法類型。",
       "source": "sampot/pg-fishcab",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-fishcab.png"
     },
     {
       "id": "pg-flagquiz",
@@ -646,7 +690,8 @@
       "blurb": "限時認旗／配對計分（含台灣等）；練習與挑戰模式。",
       "source": "sampot/pg-flagquiz",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-flagquiz.png"
     },
     {
       "id": "pg-flutter",
@@ -656,7 +701,8 @@
       "blurb": "單鍵振翅穿越高低障礙、連續過門計分。",
       "source": "sampot/pg-flutter",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-flutter.png"
     },
     {
       "id": "pg-foodcatch",
@@ -677,7 +723,8 @@
       "blurb": "重力落子連四；人機／雙人，預留 Invite。",
       "source": "sampot/pg-fourline",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-fourline.png"
     },
     {
       "id": "pg-freecell",
@@ -687,7 +734,8 @@
       "blurb": "電腦課回憶；八列牌、四暫存、四回收，全數歸位即勝。",
       "source": "sampot/pg-freecell",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-freecell.png"
     },
     {
       "id": "pg-frogcross",
@@ -697,7 +745,8 @@
       "blurb": "過馬路躲車、踩木筏過河、進巢穴；適配手機方向鍵與滑動，自製 BGM／音效。",
       "source": "sampot/pg-frogcross",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-frogcross.png"
     },
     {
       "id": "pg-fruitcut",
@@ -707,7 +756,8 @@
       "blurb": "滑動切菜：連切特效、炸彈躲閃、限時三命；適配手機，自製音效。",
       "source": "sampot/pg-fruitcut",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-fruitcut.png"
     },
     {
       "id": "pg-fruitmerge",
@@ -717,7 +767,8 @@
       "blurb": "落下同階水果合併升級；杯滿出局。",
       "source": "sampot/pg-fruitmerge",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-fruitmerge.png"
     },
     {
       "id": "pg-gatecrowd",
@@ -727,7 +778,8 @@
       "blurb": "直線跑過加減門、終點比人數；短關。",
       "source": "sampot/pg-gatecrowd",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-gatecrowd.png"
     },
     {
       "id": "pg-gatepair",
@@ -737,7 +789,8 @@
       "blurb": "傳送門／動量關卡。",
       "source": "sampot/pg-gatepair",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-gatepair.png"
     },
     {
       "id": "pg-ghostmark",
@@ -747,7 +800,8 @@
       "blurb": "視線錐、警報等級、任務鏈。",
       "source": "sampot/pg-ghostmark",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-ghostmark.png"
     },
     {
       "id": "pg-git",
@@ -767,7 +821,8 @@
       "blurb": "定點射門進框、限時連射；致敬射門機玩法類型。",
       "source": "sampot/pg-goalshot",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-goalshot.png"
     },
     {
       "id": "pg-gomoku",
@@ -787,7 +842,8 @@
             "player"
           ]
         }
-      ]
+      ],
+      "cover": "/covers/pg-gomoku.png"
     },
     {
       "id": "pg-guaguale",
@@ -797,7 +853,8 @@
       "blurb": "夜市刮刮樂：刮開洞看中獎開關、集齊相同符號即中獎；純娛樂非博弈、刮層效果。",
       "source": "sampot/pg-guaguale",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-guaguale.png"
     },
     {
       "id": "pg-hashlab",
@@ -817,7 +874,8 @@
       "blurb": "六人桌無限制德州對 AI；Sit & Go 盲注遞增、虛擬籌碼；純娛樂非博弈。",
       "source": "sampot/pg-holdem",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-holdem.png"
     },
     {
       "id": "pg-hoopshot",
@@ -827,7 +885,8 @@
       "blurb": "限時投籃進框、連投計分換票感；致敬投籃機玩法類型。",
       "source": "sampot/pg-hoopshot",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-hoopshot.png"
     },
     {
       "id": "pg-hopkick",
@@ -837,7 +896,8 @@
       "blurb": "跳房子節拍點格與踢毽子連擊兩模式；適配手機觸控。",
       "source": "sampot/pg-hopkick",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-hopkick.png"
     },
     {
       "id": "pg-horselit",
@@ -847,7 +907,8 @@
       "blurb": "六軌燈光賽馬：押注、開跑、結算；純娛樂。",
       "source": "sampot/pg-horselit",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-horselit.png"
     },
     {
       "id": "pg-hotpotato",
@@ -857,7 +918,8 @@
       "blurb": "限時傳遞熱土豆、爆者出局；3～4 人／人機，預留 Invite。",
       "source": "sampot/pg-hotpotato",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-hotpotato.png"
     },
     {
       "id": "pg-htmlpreview",
@@ -897,7 +959,8 @@
       "blurb": "1 追捕 vs 多逃亡；Invite。",
       "source": "sampot/pg-huntshade",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-huntshade.png"
     },
     {
       "id": "pg-idmint",
@@ -947,7 +1010,8 @@
       "blurb": "限時塗地佔分對 AI；抽象色塊。",
       "source": "sampot/pg-inkskirmish",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-inkskirmish.png"
     },
     {
       "id": "pg-islandage",
@@ -957,7 +1021,8 @@
       "blurb": "探索／擴張／開發／征服；多小時一局。",
       "source": "sampot/pg-islandage",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-islandage.png"
     },
     {
       "id": "pg-islandloop",
@@ -967,7 +1032,8 @@
       "blurb": "多賽道盃、車輛改裝、計時榜。",
       "source": "sampot/pg-islandloop",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-islandloop.png"
     },
     {
       "id": "pg-islesupply",
@@ -977,7 +1043,8 @@
       "blurb": "排船期與庫存，迎風避颱維持七島十回合供應。",
       "source": "sampot/pg-islesupply",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-islesupply.png"
     },
     {
       "id": "pg-jsondiff",
@@ -1007,7 +1074,8 @@
       "blurb": "獸穴、陷阱、河界跳躍，簡易人機。",
       "source": "sampot/pg-jungle",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-jungle.png"
     },
     {
       "id": "pg-junqi",
@@ -1017,7 +1085,8 @@
       "blurb": "陸戰棋暗棋對 AI：行營鐵路、工兵掃雷、搶旗；適配手機，自製音效。",
       "source": "sampot/pg-junqi",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-junqi.png"
     },
     {
       "id": "pg-junzheng",
@@ -1027,7 +1096,8 @@
       "blurb": "三政令經營糧兵城防；攻城或守滿十二回合。",
       "source": "sampot/pg-junzheng",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-junzheng.png"
     },
     {
       "id": "pg-jwtpeek",
@@ -1047,7 +1117,8 @@
       "blurb": "短關平台跳躍：撿星、踩敵、抵達旗幟。",
       "source": "sampot/pg-leaptrail",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-leaptrail.png"
     },
     {
       "id": "pg-lianlian",
@@ -1057,7 +1128,8 @@
       "blurb": "點兩張相同牌，能用 ≤2 轉角的直線路徑相連即消除；四種難度依序解鎖、提示／洗牌。網咖世代經典、mobile-first。",
       "source": "sampot/pg-lianlian",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-lianlian.png"
     },
     {
       "id": "pg-liarsdice",
@@ -1067,7 +1139,8 @@
       "blurb": "每人五顆骰偷偷擲，輪流喊「N 個 X」、可加喊或抓；吹牛被抓就拔骰，骰子拔光出局。對決 AI、1 點萬能。",
       "source": "sampot/pg-liarsdice",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-liarsdice.png"
     },
     {
       "id": "pg-lightgun",
@@ -1077,7 +1150,8 @@
       "blurb": "鼠標瞄準射击、即時反擊，街機光槍射击 Web 版。",
       "source": "sampot/pg-lightgun",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-lightgun.png"
     },
     {
       "id": "pg-lighttrace",
@@ -1087,7 +1161,8 @@
       "blurb": "留跡包圍領地。",
       "source": "sampot/pg-lighttrace",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-lighttrace.png"
     },
     {
       "id": "pg-lixuan",
@@ -1097,7 +1172,8 @@
       "blurb": "四週配置拜訪、政見與志工，依議題爭取各鄰支持。",
       "source": "sampot/pg-lixuan",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-lixuan.png"
     },
     {
       "id": "pg-llm-agent",
@@ -1126,7 +1202,8 @@
       "blurb": "多房間線索鏈、一局完整解謎。",
       "source": "sampot/pg-lockroom",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-lockroom.png"
     },
     {
       "id": "pg-logigate",
@@ -1146,7 +1223,8 @@
       "blurb": "十六張常見可配家規：補花吃碰槓胡、正花拉莊搶槓、可託管人機。",
       "source": "sampot/pg-mahjong",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-mahjong.png"
     },
     {
       "id": "pg-mali",
@@ -1156,7 +1234,8 @@
       "blurb": "復古燈圈跑燈：押注、跑燈、結算；純娛樂。",
       "source": "sampot/pg-mali",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-mali.png"
     },
     {
       "id": "pg-marblecir",
@@ -1166,7 +1245,8 @@
       "blurb": "地上畫圈彈珠：圈內放目標珠、彈射自己的珠把圈內珠打出圈外得點；回合制物理；≠凹坑對撞。",
       "source": "sampot/pg-marblecir",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-marblecir.png"
     },
     {
       "id": "pg-marblepit",
@@ -1176,7 +1256,8 @@
       "blurb": "凹坑對撞彈珠、撥彈進洞比分；與沙盒／釘雨不同玩法，適配手機。",
       "source": "sampot/pg-marblepit",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-marblepit.png"
     },
     {
       "id": "pg-match3",
@@ -1186,7 +1267,8 @@
       "blurb": "三消對對碰：連消倍率、關卡目標、粒子特效；適配手機，自製音效。",
       "source": "sampot/pg-match3",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-match3.png"
     },
     {
       "id": "pg-mazeglow",
@@ -1196,7 +1278,8 @@
       "blurb": "迷宮撿光點、躲開或反制追逐者。",
       "source": "sampot/pg-mazeglow",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-mazeglow.png"
     },
     {
       "id": "pg-mdpreview",
@@ -1216,7 +1299,8 @@
       "blurb": "翻牌配對：先翻一張再翻第二張找相同配對，全部配對過關；可選牌數、計時步數、連對 combo。",
       "source": "sampot/pg-memory",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-memory.png"
     },
     {
       "id": "pg-merge2048",
@@ -1226,7 +1310,8 @@
       "blurb": "滑格同數合併挑戰 2048；本機最高分。",
       "source": "sampot/pg-merge2048",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-merge2048.png"
     },
     {
       "id": "pg-microdungeon",
@@ -1247,7 +1332,8 @@
       "blurb": "經典踩地雷：多難度盤面、開格 flood fill、旗標、計時、踩雷爆炸；電腦課經典、盤面程式繪製。",
       "source": "https://github.com/sampot/pg-mines",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-mines.png"
     },
     {
       "id": "pg-mockdata",
@@ -1267,7 +1353,8 @@
       "blurb": "夜市節奏敲擊，連擊加分；致敬打地鼠玩法類型。",
       "source": "sampot/pg-moletap",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-moletap.png"
     },
     {
       "id": "pg-netcid",
@@ -1298,7 +1385,8 @@
       "blurb": "多日價格、資訊差、對手 AI。",
       "source": "sampot/pg-nightmarket",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-nightmarket.png"
     },
     {
       "id": "pg-nightsnake",
@@ -1308,7 +1396,8 @@
       "blurb": "關卡＋無盡雙模式。",
       "source": "sampot/pg-nightsnake",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-nightsnake.png"
     },
     {
       "id": "pg-nightstall",
@@ -1318,7 +1407,8 @@
       "blurb": "十二夜看天氣進貨、定價、宣傳，與兩名 AI 搶客比淨資產。",
       "source": "sampot/pg-nightstall",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-nightstall.png"
     },
     {
       "id": "pg-notebook",
@@ -1348,7 +1438,8 @@
       "blurb": "殖民者需求、心情、生產鏈。",
       "source": "sampot/pg-outpost",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-outpost.png"
     },
     {
       "id": "pg-parkexam",
@@ -1358,7 +1449,8 @@
       "blurb": "俯視平行停車／S 彎考照小品。",
       "source": "sampot/pg-parkexam",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-parkexam.png"
     },
     {
       "id": "pg-partyquest",
@@ -1368,7 +1460,8 @@
       "blurb": "世界地圖、職業裝備、主線多章。",
       "source": "sampot/pg-partyquest",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-partyquest.png"
     },
     {
       "id": "pg-pempeek",
@@ -1388,7 +1481,8 @@
       "blurb": "管堆場、橋機與船期，以最少翻櫃完成合約。",
       "source": "sampot/pg-pierbox",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-pierbox.png"
     },
     {
       "id": "pg-pilgrim",
@@ -1398,7 +1492,8 @@
       "blurb": "時限內規劃必訪宮壇與回廟路線，兼顧香火與擾民。",
       "source": "sampot/pg-pilgrim",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-pilgrim.png"
     },
     {
       "id": "pg-pinball",
@@ -1408,7 +1503,8 @@
       "blurb": "扳機發射鋼珠、彈跳得分，經典彈珠台 Web 版。",
       "source": "sampot/pg-pinball",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-pinball.png"
     },
     {
       "id": "pg-pinfall",
@@ -1418,7 +1514,8 @@
       "blurb": "發射、撞釘、入洞得分；致敬小鋼珠玩法類型。",
       "source": "sampot/pg-pinfall",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-pinfall.png"
     },
     {
       "id": "pg-pitchduel",
@@ -1428,7 +1525,8 @@
       "blurb": "五人制足球場地規則、人機對戰。",
       "source": "sampot/pg-pitchduel",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-pitchduel.png"
     },
     {
       "id": "pg-pixelhop",
@@ -1449,7 +1547,8 @@
       "blurb": "一造管理密度、水質與颱風風險，抓時機收成。",
       "source": "sampot/pg-pondfarm",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-pondfarm.png"
     },
     {
       "id": "pg-popshot",
@@ -1459,7 +1558,8 @@
       "blurb": "夜市射靶破球，限彈連擊；致敬射氣球玩法類型。",
       "source": "sampot/pg-popshot",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-popshot.png"
     },
     {
       "id": "pg-porttycoon",
@@ -1469,7 +1569,8 @@
       "blurb": "航線、倉儲、合約與對手 AI。",
       "source": "sampot/pg-porttycoon",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-porttycoon.png"
     },
     {
       "id": "pg-prizewheel",
@@ -1479,7 +1580,8 @@
       "blurb": "轉盤停格兌虛擬獎券；純娛樂非博弈。",
       "source": "sampot/pg-prizewheel",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-prizewheel.png"
     },
     {
       "id": "pg-puffinhale",
@@ -1489,7 +1591,8 @@
       "blurb": "吸入敵人取得屬性再吐出清波；角色全自創。",
       "source": "sampot/pg-puffinhale",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-puffinhale.png"
     },
     {
       "id": "pg-punchpad",
@@ -1499,7 +1602,8 @@
       "blurb": "出拳打袋看力道分數；致敬測力拳玩法類型。",
       "source": "sampot/pg-punchpad",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-punchpad.png"
     },
     {
       "id": "pg-pyrun",
@@ -1529,7 +1633,8 @@
       "blurb": "賽季題庫＋段位。",
       "source": "sampot/pg-quizleague",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-quizleague.png"
     },
     {
       "id": "pg-railslot",
@@ -1539,7 +1644,8 @@
       "blurb": "排發車、停靠與待避，化解延誤並守住準點率。",
       "source": "sampot/pg-railslot",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-railslot.png"
     },
     {
       "id": "pg-reacttap",
@@ -1549,7 +1655,8 @@
       "blurb": "看表情種類、限時搶拍正確答案，連續答對 combo 加速；反應力對決、表情／語音素材。",
       "source": "sampot/pg-reacttap",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-reacttap.png"
     },
     {
       "id": "pg-redpick",
@@ -1559,7 +1666,8 @@
       "blurb": "對點數撿牌，連撿／清桌加成；四人人機、手機適配與自製音效。",
       "source": "sampot/pg-redpick",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-redpick.png"
     },
     {
       "id": "pg-regexlab",
@@ -1579,7 +1687,8 @@
       "blurb": "夜市拋環套瓶，遠近分值；致敬套圈玩法類型。",
       "source": "sampot/pg-ringtoss",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-ringtoss.png"
     },
     {
       "id": "pg-rivercross",
@@ -1589,7 +1698,8 @@
       "blurb": "跳格子避移動障礙，節奏過河闖關。",
       "source": "sampot/pg-rivercross",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-rivercross.png"
     },
     {
       "id": "pg-roofglide",
@@ -1599,7 +1709,8 @@
       "blurb": "路線計分、技名連段。",
       "source": "sampot/pg-roofglide",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-roofglide.png"
     },
     {
       "id": "pg-rooftumble",
@@ -1609,7 +1720,8 @@
       "blurb": "同機雙人平台碰撞擊飛出局；抽象人型。",
       "source": "sampot/pg-rooftumble",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-rooftumble.png"
     },
     {
       "id": "pg-roundtable",
@@ -1619,7 +1731,8 @@
       "blurb": "多勢力同時出價與條約；人機可。",
       "source": "sampot/pg-roundtable",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-roundtable.png"
     },
     {
       "id": "pg-rubik",
@@ -1629,7 +1742,8 @@
       "blurb": "3×3 立體方塊：拖曳轉看、轉層、打亂與計時；本機記錄最佳。適配手機。",
       "source": "sampot/pg-rubik",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-rubik.png"
     },
     {
       "id": "pg-sandrts",
@@ -1639,7 +1753,8 @@
       "blurb": "大地圖障礙繞行＋空襲飛行單位；指揮部被毀即出局；出擊交 AI。",
       "source": "sampot/pg-sandrts",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-sandrts.png"
     },
     {
       "id": "pg-screwout",
@@ -1649,7 +1764,8 @@
       "blurb": "依序拆釘解層級遮擋過關；純邏輯短關。",
       "source": "sampot/pg-screwout",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-screwout.png"
     },
     {
       "id": "pg-seabattle",
@@ -1659,7 +1775,8 @@
       "blurb": "佈艦後輪流點射；人機先、預留 Invite 1v1。",
       "source": "sampot/pg-seabattle",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-seabattle.png"
     },
     {
       "id": "pg-seacast",
@@ -1669,7 +1786,8 @@
       "blurb": "魚圖鑑、漁場天氣、裝備。",
       "source": "sampot/pg-seacast",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-seacast.png"
     },
     {
       "id": "pg-sealedbid",
@@ -1679,7 +1797,8 @@
       "blurb": "同時密封出價、揭示比價；3～4 人／人機，預留 Invite。",
       "source": "sampot/pg-sealedbid",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-sealedbid.png"
     },
     {
       "id": "pg-semver",
@@ -1699,7 +1818,8 @@
       "blurb": "疊層麻將配對消除：只選兩側與上方自由的牌，把成對相同牌一一消除清空全盤；四種難度、提示／洗牌。",
       "source": "sampot/pg-shanghaimj",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-shanghaimj.png"
     },
     {
       "id": "pg-shisan",
@@ -1709,7 +1829,8 @@
       "blurb": "十三張排前中後三墩、逐墩比牌；四人對戰、自動排列。",
       "source": "sampot/pg-shisan",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-shisan.png"
     },
     {
       "id": "pg-shrineclear",
@@ -1719,7 +1840,8 @@
       "blurb": "俯視清房、鑰匙開門、近戰短關。",
       "source": "sampot/pg-shrineclear",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-shrineclear.png"
     },
     {
       "id": "pg-siegepush",
@@ -1729,7 +1851,8 @@
       "blurb": "組波次攻打 AI 基地。",
       "source": "sampot/pg-siegepush",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-siegepush.png"
     },
     {
       "id": "pg-sisek",
@@ -1739,7 +1862,8 @@
       "blurb": "台灣四色牌（紅黃青白×7 種點數、共 112 張）撿紅點簡化：四人摸牌湊對出牌、比牌結算；牌面自繪。",
       "source": "sampot/pg-sisek",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-sisek.png"
     },
     {
       "id": "pg-skeeball",
@@ -1749,7 +1873,8 @@
       "blurb": "滾球上坡進分環；致敬 Skee-Ball 玩法類型。",
       "source": "sampot/pg-skeeball",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-skeeball.png"
     },
     {
       "id": "pg-sketchpad",
@@ -1769,7 +1894,8 @@
       "blurb": "一輪一畫家、其餘猜詞；先單機提示後多人，預留 Invite。",
       "source": "sampot/pg-sketchtell",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-sketchtell.png"
     },
     {
       "id": "pg-skyburst",
@@ -1779,7 +1905,8 @@
       "blurb": "垂直捲軸射擊：三戰區、武裝升級、爆散與首領彈幕。",
       "source": "sampot/pg-skyburst",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-skyburst.png"
     },
     {
       "id": "pg-skyrun",
@@ -1789,7 +1916,8 @@
       "blurb": "3D 環道飛行：收集能量環、管油量、閃岩柱，撞牆扣機體。",
       "source": "sampot/pg-skyrun",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-skyrun.png"
     },
     {
       "id": "pg-sokoban",
@@ -1799,7 +1927,8 @@
       "blurb": "十二關推箱子、復原一步、滑動操作；適配手機，自製音效。",
       "source": "sampot/pg-sokoban",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-sokoban.png"
     },
     {
       "id": "pg-solitaire",
@@ -1809,7 +1938,8 @@
       "blurb": "克朗代克接龍：7 列牌堆翻牌移動、A 到 K 建堆、暫存回收、計時步數、本機最佳。",
       "source": "sampot/pg-solitaire",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-solitaire.png"
     },
     {
       "id": "pg-spacepulse",
@@ -1819,7 +1949,8 @@
       "blurb": "節拍驅動的躲閃射擊：敵波只在拍點上推進、玩家拍點移動避開並吃到能量粒子；≠固定畫面波次。",
       "source": "sampot/pg-spacepulse",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-spacepulse.png"
     },
     {
       "id": "pg-sqlfmt",
@@ -1839,7 +1970,8 @@
       "blurb": "停燈對位堆方塊換獎；時機節奏；致敬疊疊機玩法類型。",
       "source": "sampot/pg-stacker",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-stacker.png"
     },
     {
       "id": "pg-stamppad",
@@ -1849,7 +1981,8 @@
       "blurb": "夜市戳戳樂：付代幣戳開格子看獎品／銘謝惠顧／再戳一次，收集獎品過關、統計戳板。",
       "source": "sampot/pg-stamppad",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-stamppad.png"
     },
     {
       "id": "pg-starshot",
@@ -1859,7 +1992,8 @@
       "blurb": "固定畫面太空射擊，幾何機體與波次敵人。",
       "source": "sampot/pg-starshot",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-starshot.png"
     },
     {
       "id": "pg-statue",
@@ -1869,7 +2003,8 @@
       "blurb": "移動／定格賽跑、簡易人機裁判回頭抓人；適配手機長按前進。",
       "source": "sampot/pg-statue",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-statue.png"
     },
     {
       "id": "pg-steward",
@@ -1889,7 +2024,8 @@
       "blurb": "俯視狗鬥任務鏈；≠戰車對決。",
       "source": "sampot/pg-straitwing",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-straitwing.png"
     },
     {
       "id": "pg-streetclash",
@@ -1899,7 +2035,8 @@
       "blurb": "多角色招式表、街機／對戰／修練。",
       "source": "sampot/pg-streetclash",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-streetclash.png"
     },
     {
       "id": "pg-stringbeat",
@@ -1909,7 +2046,8 @@
       "blurb": "軌道對應撥弦；≠踏墊四方向。",
       "source": "sampot/pg-stringbeat",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-stringbeat.png"
     },
     {
       "id": "pg-strongman",
@@ -1919,7 +2057,8 @@
       "blurb": "蓄力揮錘打鈴／分數帶；致敬力氣錘玩法類型。",
       "source": "sampot/pg-strongman",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-strongman.png"
     },
     {
       "id": "pg-sudoku",
@@ -1929,7 +2068,8 @@
       "blurb": "九宮填數：簡單／中等／困難、筆記與提示；適配手機，自製音效。",
       "source": "sampot/pg-sudoku",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-sudoku.png"
     },
     {
       "id": "pg-svglook",
@@ -1949,7 +2089,8 @@
       "blurb": "俯視坦克：人機或 AI 觀戰、履帶炮塔、重低音爆炸；適配手機搖桿，自製音效。",
       "source": "sampot/pg-tankduel",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-tankduel.png"
     },
     {
       "id": "pg-templecleave",
@@ -1959,7 +2100,8 @@
       "blurb": "自由移動、技能冷卻、裝備掉落關卡。",
       "source": "sampot/pg-templecleave",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-templecleave.png"
     },
     {
       "id": "pg-templeidle",
@@ -1969,7 +2111,8 @@
       "blurb": "香火累積、建築升級、離線收益。",
       "source": "sampot/pg-templeidle",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-templeidle.png"
     },
     {
       "id": "pg-tensum",
@@ -1979,7 +2122,8 @@
       "blurb": "框選相鄰數字加總＝10 消除；電腦課益智感。",
       "source": "sampot/pg-tensum",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-tensum.png"
     },
     {
       "id": "pg-tetris",
@@ -1989,7 +2133,8 @@
       "blurb": "輕量七種方塊、消行升級、幽靈影與觸控按鍵；適配手機，自製音效。",
       "source": "sampot/pg-tetris",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-tetris.png"
     },
     {
       "id": "pg-textdiff",
@@ -2019,7 +2164,8 @@
       "blurb": "投幣抓取彩球、組合獲獎，街機經典紅利系統 Web 版。",
       "source": "sampot/pg-ticketgrab",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-ticketgrab.png"
     },
     {
       "id": "pg-tictactoe",
@@ -2029,7 +2175,8 @@
       "blurb": "3×3 雙人、人機與 AI 對 AI（Minimax）。",
       "source": "sampot/pg-tictactoe",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-tictactoe.png"
     },
     {
       "id": "pg-tidefort",
@@ -2039,7 +2186,8 @@
       "blurb": "能力回流、地圖填圖。",
       "source": "sampot/pg-tidefort",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-tidefort.png"
     },
     {
       "id": "pg-tidewave",
@@ -2049,7 +2197,8 @@
       "blurb": "走位躲彈、自動射擊、局內三選一升級。",
       "source": "sampot/pg-tidewave",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-tidewave.png"
     },
     {
       "id": "pg-tinyfarm",
@@ -2059,7 +2208,8 @@
       "blurb": "短局翻土澆水收成賣箱；非長期養成。",
       "source": "sampot/pg-tinyfarm",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-tinyfarm.png"
     },
     {
       "id": "pg-tomlfmt",
@@ -2079,7 +2229,8 @@
       "blurb": "蓄力發射、轉速碰撞短局對戰；適配手機，自製音效。",
       "source": "sampot/pg-topduel",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-topduel.png"
     },
     {
       "id": "pg-towerdef",
@@ -2089,7 +2240,8 @@
       "blurb": "三地圖戰役星等、成就、新手引導、無盡模式；適配手機，自製音效。",
       "source": "sampot/pg-towerdef",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-towerdef.png"
     },
     {
       "id": "pg-township",
@@ -2099,7 +2251,8 @@
       "blurb": "多日曆、好感、多結局。",
       "source": "sampot/pg-township",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-township.png"
     },
     {
       "id": "pg-tubesort",
@@ -2109,7 +2262,8 @@
       "blurb": "倒色液／色球至同色滿管過關；多關卡與復原。",
       "source": "sampot/pg-tubesort",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-tubesort.png"
     },
     {
       "id": "pg-tugwar",
@@ -2119,7 +2273,8 @@
       "blurb": "時機點按比合力；人機／1v1，預留 Invite。",
       "source": "sampot/pg-tugwar",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-tugwar.png"
     },
     {
       "id": "pg-twland",
@@ -2129,7 +2284,8 @@
       "blurb": "台灣版紙本規則：買地蓋房、機會命運、熱座 2–4 人／AI 託管；忠孝東路等路名。",
       "source": "sampot/pg-twland",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-twland.png"
     },
     {
       "id": "pg-typestorm",
@@ -2139,7 +2295,8 @@
       "blurb": "打字殺敵／搶修台詞。",
       "source": "sampot/pg-typestorm",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-typestorm.png"
     },
     {
       "id": "pg-tzlook",
@@ -2159,7 +2316,8 @@
       "blurb": "多數同詞、少數異詞、輪流描述投票；4～6 人／人機，預留 Invite。",
       "source": "sampot/pg-undercover",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-undercover.png"
     },
     {
       "id": "pg-unilook",
@@ -2189,7 +2347,8 @@
       "blurb": "佈置災異與恩賜、引導聚落。",
       "source": "sampot/pg-villagewrath",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-villagewrath.png"
     },
     {
       "id": "pg-voicelab",
@@ -2209,7 +2368,8 @@
       "blurb": "俯視限時吞噬、體積越大可吃越大。",
       "source": "sampot/pg-voidnom",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-voidnom.png"
     },
     {
       "id": "pg-wanzai",
@@ -2219,7 +2379,8 @@
       "blurb": "拍尪仔標：選牌對拍、節奏力道、翻牌收穫；適配手機，自製音效。",
       "source": "sampot/pg-wanzai",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-wanzai.png"
     },
     {
       "id": "pg-wavepad",
@@ -2239,7 +2400,8 @@
       "blurb": "9×9 首刀圍棋：落子、氣、提子、禁著（打劫禁）、終局數子；棋子盤面自繪、熱座或簡易 AI。",
       "source": "sampot/pg-weiqi",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-weiqi.png"
     },
     {
       "id": "pg-wfedit",
@@ -2259,7 +2421,8 @@
       "blurb": "線索卡、指認；多人／人機。",
       "source": "sampot/pg-whodunit",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-whodunit.png"
     },
     {
       "id": "pg-wingrace",
@@ -2269,7 +2432,8 @@
       "blurb": "簡化飛行棋：擲骰起飛、撞回、終點跑道。",
       "source": "sampot/pg-wingrace",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-wingrace.png"
     },
     {
       "id": "pg-worddawn",
@@ -2279,7 +2443,8 @@
       "blurb": "每日＋無盡；≠成語接龍。",
       "source": "sampot/pg-worddawn",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-worddawn.png"
     },
     {
       "id": "pg-workflow",
@@ -2299,7 +2464,8 @@
       "blurb": "楚河漢界、將軍困斃；人機／雙人／AI 對 AI。",
       "source": "sampot/pg-xiangqi",
       "status": "listed",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-xiangqi.png"
     },
     {
       "id": "pg-xinzang",
@@ -2309,7 +2475,8 @@
       "blurb": "翻牌看到心臟病號碼就馬上拍下去，最慢的要收走整疊牌；反應力對決 AI 阿強、動態難度、合成音效。",
       "source": "sampot/pg-xinzang",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-xinzang.png"
     },
     {
       "id": "pg-yakyu",
@@ -2319,7 +2486,8 @@
       "blurb": "虛構青棒校隊生涯；打者揮棒或投手兩用投打、其餘快轉；短賽季拚紅土全國賽。",
       "source": "sampot/pg-yakyu",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-yakyu.png"
     },
     {
       "id": "pg-yamlfmt",
@@ -2339,7 +2507,8 @@
       "blurb": "先丟對子、再從別家盲抽，最後手裡剩下唯一一張烏龜牌的輸家出局。四人（你＋3 AI）童玩桌遊、mobile-first。",
       "source": "sampot/pg-zhuagui",
       "status": "unlisted",
-      "license": "MIT"
+      "license": "MIT",
+      "cover": "/covers/pg-zhuagui.png"
     }
   ]
 }

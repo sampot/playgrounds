@@ -79,6 +79,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-abilitycave",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-abilitycave.png",
   },
   {
     id: "pg-aimbeat",
@@ -89,6 +90,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-aimbeat",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-aimbeat.png",
   },
   {
     id: "pg-airhockey",
@@ -99,6 +101,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-airhockey",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-airhockey.png",
   },
   {
     id: "pg-alleybowl",
@@ -109,6 +112,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-alleybowl",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-alleybowl.png",
   },
   {
     id: "pg-alleyclaim",
@@ -119,6 +123,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-alleyclaim",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-alleyclaim.png",
   },
   {
     id: "pg-ascenddeck",
@@ -129,6 +134,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-ascenddeck",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-ascenddeck.png",
   },
   {
     id: "pg-atticfind",
@@ -139,6 +145,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-atticfind",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-atticfind.png",
   },
   {
     id: "pg-autolegion",
@@ -149,6 +156,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-autolegion",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-autolegion.png",
   },
   {
     id: "pg-backdoor",
@@ -159,6 +167,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-backdoor",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-backdoor.png",
   },
   {
     id: "pg-bannerwar",
@@ -169,6 +178,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-bannerwar",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-bannerwar.png",
   },
   {
     id: "pg-banqi",
@@ -179,6 +189,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-banqi",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-banqi.png",
   },
   {
     id: "pg-basecodec",
@@ -199,6 +210,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-big2",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-big2.png",
   },
   {
     id: "pg-bikekan",
@@ -209,6 +221,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-bikekan",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-bikekan.png",
   },
   {
     id: "pg-bingolite",
@@ -219,6 +232,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-bingolite",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-bingolite.png",
   },
   {
     id: "pg-blackjack",
@@ -229,6 +243,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-blackjack",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-blackjack.png",
   },
   {
     id: "pg-blackout",
@@ -239,6 +254,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-blackout",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-blackout.png",
   },
   {
     id: "pg-blackward",
@@ -249,6 +265,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-blackward",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-blackward.png",
   },
   {
     id: "pg-blockcity",
@@ -259,6 +276,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-blockcity",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-blockcity.png",
   },
   {
     id: "pg-blockfit",
@@ -269,6 +287,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-blockfit",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-blockfit.png",
   },
   {
     id: "pg-bounceland",
@@ -289,6 +308,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-bowcamp",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-bowcamp.png",
   },
   {
     id: "pg-breakout",
@@ -299,6 +319,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-breakout",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-breakout.png",
   },
   {
     id: "pg-buzzerquiz",
@@ -309,6 +330,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-buzzerquiz",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-buzzerquiz.png",
   },
   {
     id: "pg-campusbond",
@@ -319,6 +341,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-campusbond",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-campusbond.png",
   },
   {
     id: "pg-candythrow",
@@ -329,6 +352,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-candythrow",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-candythrow.png",
   },
   {
     id: "pg-cardbazaar",
@@ -339,6 +363,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-cardbazaar",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-cardbazaar.png",
   },
   {
     id: "pg-carjam",
@@ -349,6 +374,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-carjam",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-carjam.png",
   },
   {
     id: "pg-carrom",
@@ -359,6 +385,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-carrom",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-carrom.png",
   },
   {
     id: "pg-casefile",
@@ -369,6 +396,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-casefile",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-casefile.png",
   },
   {
     id: "pg-caveline",
@@ -379,6 +407,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-caveline",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-caveline.png",
   },
   {
     id: "pg-cellife",
@@ -399,6 +428,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-chengyu",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-chengyu.png",
   },
   {
     id: "pg-chmod",
@@ -430,6 +460,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-clawgrab",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-clawgrab.png",
   },
   {
     id: "pg-clubbudg",
@@ -440,6 +471,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-clubbudg",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-clubbudg.png",
   },
   {
     id: "pg-coinpush",
@@ -450,6 +482,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-coinpush",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-coinpush.png",
   },
   {
     id: "pg-colorcast",
@@ -480,6 +513,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-coopswitch",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-coopswitch.png",
   },
   {
     id: "pg-cronread",
@@ -520,6 +554,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-cubematch",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-cubematch.png",
   },
   {
     id: "pg-dancepad",
@@ -530,6 +565,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-dancepad",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-dancepad.png",
   },
   {
     id: "pg-dbtool",
@@ -550,6 +586,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-deepcatacomb",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-deepcatacomb.png",
   },
   {
     id: "pg-deliver",
@@ -560,6 +597,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-deliver",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-deliver.png",
   },
   {
     id: "pg-diabolo",
@@ -570,6 +608,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-diabolo",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-diabolo.png",
   },
   {
     id: "pg-diaoshui",
@@ -580,6 +619,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-diaoshui",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-diaoshui.png",
   },
   {
     id: "pg-diginet",
@@ -600,6 +640,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-domino",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-domino.png",
   },
   {
     id: "pg-empirekitchen",
@@ -610,6 +651,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-empirekitchen",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-empirekitchen.png",
   },
   {
     id: "pg-envkit",
@@ -630,6 +672,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-festcrowd",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-festcrowd.png",
   },
   {
     id: "pg-fishcab",
@@ -640,6 +683,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-fishcab",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-fishcab.png",
   },
   {
     id: "pg-flagquiz",
@@ -650,6 +694,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-flagquiz",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-flagquiz.png",
   },
   {
     id: "pg-flutter",
@@ -660,6 +705,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-flutter",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-flutter.png",
   },
   {
     id: "pg-foodcatch",
@@ -681,6 +727,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-fourline",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-fourline.png",
   },
   {
     id: "pg-freecell",
@@ -691,6 +738,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-freecell",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-freecell.png",
   },
   {
     id: "pg-frogcross",
@@ -701,6 +749,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-frogcross",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-frogcross.png",
   },
   {
     id: "pg-fruitcut",
@@ -711,6 +760,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-fruitcut",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-fruitcut.png",
   },
   {
     id: "pg-fruitmerge",
@@ -721,6 +771,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-fruitmerge",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-fruitmerge.png",
   },
   {
     id: "pg-gatecrowd",
@@ -731,6 +782,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-gatecrowd",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-gatecrowd.png",
   },
   {
     id: "pg-gatepair",
@@ -741,6 +793,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-gatepair",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-gatepair.png",
   },
   {
     id: "pg-ghostmark",
@@ -751,6 +804,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-ghostmark",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-ghostmark.png",
   },
   {
     id: "pg-git",
@@ -771,6 +825,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-goalshot",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-goalshot.png",
   },
   {
     id: "pg-gomoku",
@@ -782,6 +837,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     status: "listed",
     license: "MIT",
     protocols: [{"protocolId":"gomoku.v1","apiVersion":"1","roles":["host","player"]}],
+    cover: "/covers/pg-gomoku.png",
   },
   {
     id: "pg-guaguale",
@@ -792,6 +848,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-guaguale",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-guaguale.png",
   },
   {
     id: "pg-hashlab",
@@ -812,6 +869,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-holdem",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-holdem.png",
   },
   {
     id: "pg-hoopshot",
@@ -822,6 +880,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-hoopshot",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-hoopshot.png",
   },
   {
     id: "pg-hopkick",
@@ -832,6 +891,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-hopkick",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-hopkick.png",
   },
   {
     id: "pg-horselit",
@@ -842,6 +902,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-horselit",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-horselit.png",
   },
   {
     id: "pg-hotpotato",
@@ -852,6 +913,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-hotpotato",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-hotpotato.png",
   },
   {
     id: "pg-htmlpreview",
@@ -892,6 +954,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-huntshade",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-huntshade.png",
   },
   {
     id: "pg-idmint",
@@ -942,6 +1005,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-inkskirmish",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-inkskirmish.png",
   },
   {
     id: "pg-islandage",
@@ -952,6 +1016,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-islandage",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-islandage.png",
   },
   {
     id: "pg-islandloop",
@@ -962,6 +1027,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-islandloop",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-islandloop.png",
   },
   {
     id: "pg-islesupply",
@@ -972,6 +1038,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-islesupply",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-islesupply.png",
   },
   {
     id: "pg-jsondiff",
@@ -1002,6 +1069,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-jungle",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-jungle.png",
   },
   {
     id: "pg-junqi",
@@ -1012,6 +1080,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-junqi",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-junqi.png",
   },
   {
     id: "pg-junzheng",
@@ -1022,6 +1091,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-junzheng",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-junzheng.png",
   },
   {
     id: "pg-jwtpeek",
@@ -1042,6 +1112,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-leaptrail",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-leaptrail.png",
   },
   {
     id: "pg-lianlian",
@@ -1052,6 +1123,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-lianlian",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-lianlian.png",
   },
   {
     id: "pg-liarsdice",
@@ -1062,6 +1134,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-liarsdice",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-liarsdice.png",
   },
   {
     id: "pg-lightgun",
@@ -1072,6 +1145,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-lightgun",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-lightgun.png",
   },
   {
     id: "pg-lighttrace",
@@ -1082,6 +1156,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-lighttrace",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-lighttrace.png",
   },
   {
     id: "pg-lixuan",
@@ -1092,6 +1167,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-lixuan",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-lixuan.png",
   },
   {
     id: "pg-llm-agent",
@@ -1113,6 +1189,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-lockroom",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-lockroom.png",
   },
   {
     id: "pg-logigate",
@@ -1133,6 +1210,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-mahjong",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-mahjong.png",
   },
   {
     id: "pg-mali",
@@ -1143,6 +1221,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-mali",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-mali.png",
   },
   {
     id: "pg-marblecir",
@@ -1153,6 +1232,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-marblecir",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-marblecir.png",
   },
   {
     id: "pg-marblepit",
@@ -1163,6 +1243,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-marblepit",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-marblepit.png",
   },
   {
     id: "pg-match3",
@@ -1173,6 +1254,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-match3",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-match3.png",
   },
   {
     id: "pg-mazeglow",
@@ -1183,6 +1265,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-mazeglow",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-mazeglow.png",
   },
   {
     id: "pg-mdpreview",
@@ -1203,6 +1286,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-memory",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-memory.png",
   },
   {
     id: "pg-merge2048",
@@ -1213,6 +1297,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-merge2048",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-merge2048.png",
   },
   {
     id: "pg-microdungeon",
@@ -1234,6 +1319,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "https://github.com/sampot/pg-mines",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-mines.png",
   },
   {
     id: "pg-mockdata",
@@ -1254,6 +1340,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-moletap",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-moletap.png",
   },
   {
     id: "pg-netcid",
@@ -1285,6 +1372,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-nightmarket",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-nightmarket.png",
   },
   {
     id: "pg-nightsnake",
@@ -1295,6 +1383,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-nightsnake",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-nightsnake.png",
   },
   {
     id: "pg-nightstall",
@@ -1305,6 +1394,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-nightstall",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-nightstall.png",
   },
   {
     id: "pg-notebook",
@@ -1335,6 +1425,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-outpost",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-outpost.png",
   },
   {
     id: "pg-parkexam",
@@ -1345,6 +1436,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-parkexam",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-parkexam.png",
   },
   {
     id: "pg-partyquest",
@@ -1355,6 +1447,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-partyquest",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-partyquest.png",
   },
   {
     id: "pg-pempeek",
@@ -1375,6 +1468,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-pierbox",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-pierbox.png",
   },
   {
     id: "pg-pilgrim",
@@ -1385,6 +1479,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-pilgrim",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-pilgrim.png",
   },
   {
     id: "pg-pinball",
@@ -1395,6 +1490,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-pinball",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-pinball.png",
   },
   {
     id: "pg-pinfall",
@@ -1405,6 +1501,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-pinfall",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-pinfall.png",
   },
   {
     id: "pg-pitchduel",
@@ -1415,6 +1512,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-pitchduel",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-pitchduel.png",
   },
   {
     id: "pg-pixelhop",
@@ -1436,6 +1534,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-pondfarm",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-pondfarm.png",
   },
   {
     id: "pg-popshot",
@@ -1446,6 +1545,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-popshot",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-popshot.png",
   },
   {
     id: "pg-porttycoon",
@@ -1456,6 +1556,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-porttycoon",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-porttycoon.png",
   },
   {
     id: "pg-prizewheel",
@@ -1466,6 +1567,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-prizewheel",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-prizewheel.png",
   },
   {
     id: "pg-puffinhale",
@@ -1476,6 +1578,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-puffinhale",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-puffinhale.png",
   },
   {
     id: "pg-punchpad",
@@ -1486,6 +1589,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-punchpad",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-punchpad.png",
   },
   {
     id: "pg-pyrun",
@@ -1516,6 +1620,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-quizleague",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-quizleague.png",
   },
   {
     id: "pg-railslot",
@@ -1526,6 +1631,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-railslot",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-railslot.png",
   },
   {
     id: "pg-reacttap",
@@ -1536,6 +1642,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-reacttap",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-reacttap.png",
   },
   {
     id: "pg-redpick",
@@ -1546,6 +1653,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-redpick",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-redpick.png",
   },
   {
     id: "pg-regexlab",
@@ -1566,6 +1674,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-ringtoss",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-ringtoss.png",
   },
   {
     id: "pg-rivercross",
@@ -1576,6 +1685,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-rivercross",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-rivercross.png",
   },
   {
     id: "pg-roofglide",
@@ -1586,6 +1696,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-roofglide",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-roofglide.png",
   },
   {
     id: "pg-rooftumble",
@@ -1596,6 +1707,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-rooftumble",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-rooftumble.png",
   },
   {
     id: "pg-roundtable",
@@ -1606,6 +1718,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-roundtable",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-roundtable.png",
   },
   {
     id: "pg-rubik",
@@ -1616,6 +1729,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-rubik",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-rubik.png",
   },
   {
     id: "pg-sandrts",
@@ -1626,6 +1740,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-sandrts",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-sandrts.png",
   },
   {
     id: "pg-screwout",
@@ -1636,6 +1751,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-screwout",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-screwout.png",
   },
   {
     id: "pg-seabattle",
@@ -1646,6 +1762,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-seabattle",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-seabattle.png",
   },
   {
     id: "pg-seacast",
@@ -1656,6 +1773,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-seacast",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-seacast.png",
   },
   {
     id: "pg-sealedbid",
@@ -1666,6 +1784,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-sealedbid",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-sealedbid.png",
   },
   {
     id: "pg-semver",
@@ -1686,6 +1805,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-shanghaimj",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-shanghaimj.png",
   },
   {
     id: "pg-shisan",
@@ -1696,6 +1816,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-shisan",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-shisan.png",
   },
   {
     id: "pg-shrineclear",
@@ -1706,6 +1827,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-shrineclear",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-shrineclear.png",
   },
   {
     id: "pg-siegepush",
@@ -1716,6 +1838,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-siegepush",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-siegepush.png",
   },
   {
     id: "pg-sisek",
@@ -1726,6 +1849,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-sisek",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-sisek.png",
   },
   {
     id: "pg-skeeball",
@@ -1736,6 +1860,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-skeeball",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-skeeball.png",
   },
   {
     id: "pg-sketchpad",
@@ -1756,6 +1881,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-sketchtell",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-sketchtell.png",
   },
   {
     id: "pg-skyburst",
@@ -1766,6 +1892,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-skyburst",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-skyburst.png",
   },
   {
     id: "pg-skyrun",
@@ -1776,6 +1903,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-skyrun",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-skyrun.png",
   },
   {
     id: "pg-sokoban",
@@ -1786,6 +1914,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-sokoban",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-sokoban.png",
   },
   {
     id: "pg-solitaire",
@@ -1796,6 +1925,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-solitaire",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-solitaire.png",
   },
   {
     id: "pg-spacepulse",
@@ -1806,6 +1936,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-spacepulse",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-spacepulse.png",
   },
   {
     id: "pg-sqlfmt",
@@ -1826,6 +1957,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-stacker",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-stacker.png",
   },
   {
     id: "pg-stamppad",
@@ -1836,6 +1968,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-stamppad",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-stamppad.png",
   },
   {
     id: "pg-starshot",
@@ -1846,6 +1979,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-starshot",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-starshot.png",
   },
   {
     id: "pg-statue",
@@ -1856,6 +1990,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-statue",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-statue.png",
   },
   {
     id: "pg-steward",
@@ -1876,6 +2011,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-straitwing",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-straitwing.png",
   },
   {
     id: "pg-streetclash",
@@ -1886,6 +2022,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-streetclash",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-streetclash.png",
   },
   {
     id: "pg-stringbeat",
@@ -1896,6 +2033,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-stringbeat",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-stringbeat.png",
   },
   {
     id: "pg-strongman",
@@ -1906,6 +2044,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-strongman",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-strongman.png",
   },
   {
     id: "pg-sudoku",
@@ -1916,6 +2055,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-sudoku",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-sudoku.png",
   },
   {
     id: "pg-svglook",
@@ -1936,6 +2076,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-tankduel",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-tankduel.png",
   },
   {
     id: "pg-templecleave",
@@ -1946,6 +2087,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-templecleave",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-templecleave.png",
   },
   {
     id: "pg-templeidle",
@@ -1956,6 +2098,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-templeidle",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-templeidle.png",
   },
   {
     id: "pg-tensum",
@@ -1966,6 +2109,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-tensum",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-tensum.png",
   },
   {
     id: "pg-tetris",
@@ -1976,6 +2120,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-tetris",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-tetris.png",
   },
   {
     id: "pg-textdiff",
@@ -2006,6 +2151,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-ticketgrab",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-ticketgrab.png",
   },
   {
     id: "pg-tictactoe",
@@ -2016,6 +2162,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-tictactoe",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-tictactoe.png",
   },
   {
     id: "pg-tidefort",
@@ -2026,6 +2173,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-tidefort",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-tidefort.png",
   },
   {
     id: "pg-tidewave",
@@ -2036,6 +2184,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-tidewave",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-tidewave.png",
   },
   {
     id: "pg-tinyfarm",
@@ -2046,6 +2195,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-tinyfarm",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-tinyfarm.png",
   },
   {
     id: "pg-tomlfmt",
@@ -2066,6 +2216,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-topduel",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-topduel.png",
   },
   {
     id: "pg-towerdef",
@@ -2076,6 +2227,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-towerdef",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-towerdef.png",
   },
   {
     id: "pg-township",
@@ -2086,6 +2238,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-township",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-township.png",
   },
   {
     id: "pg-tubesort",
@@ -2096,6 +2249,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-tubesort",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-tubesort.png",
   },
   {
     id: "pg-tugwar",
@@ -2106,6 +2260,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-tugwar",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-tugwar.png",
   },
   {
     id: "pg-twland",
@@ -2116,6 +2271,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-twland",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-twland.png",
   },
   {
     id: "pg-typestorm",
@@ -2126,6 +2282,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-typestorm",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-typestorm.png",
   },
   {
     id: "pg-tzlook",
@@ -2146,6 +2303,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-undercover",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-undercover.png",
   },
   {
     id: "pg-unilook",
@@ -2176,6 +2334,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-villagewrath",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-villagewrath.png",
   },
   {
     id: "pg-voicelab",
@@ -2196,6 +2355,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-voidnom",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-voidnom.png",
   },
   {
     id: "pg-wanzai",
@@ -2206,6 +2366,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-wanzai",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-wanzai.png",
   },
   {
     id: "pg-wavepad",
@@ -2226,6 +2387,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-weiqi",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-weiqi.png",
   },
   {
     id: "pg-wfedit",
@@ -2246,6 +2408,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-whodunit",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-whodunit.png",
   },
   {
     id: "pg-wingrace",
@@ -2256,6 +2419,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-wingrace",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-wingrace.png",
   },
   {
     id: "pg-worddawn",
@@ -2266,6 +2430,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-worddawn",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-worddawn.png",
   },
   {
     id: "pg-workflow",
@@ -2286,6 +2451,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-xiangqi",
     status: "listed",
     license: "MIT",
+    cover: "/covers/pg-xiangqi.png",
   },
   {
     id: "pg-xinzang",
@@ -2296,6 +2462,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-xinzang",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-xinzang.png",
   },
   {
     id: "pg-yakyu",
@@ -2306,6 +2473,7 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-yakyu",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-yakyu.png",
   },
   {
     id: "pg-yamlfmt",
@@ -2326,5 +2494,6 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     source: "sampot/pg-zhuagui",
     status: "unlisted",
     license: "MIT",
+    cover: "/covers/pg-zhuagui.png",
   },
 ];
