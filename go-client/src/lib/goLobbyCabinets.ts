@@ -1,5 +1,5 @@
 import { LOBBY_CABINETS, type LobbyRect } from "./goLobbyLayout";
-import { pointInRect, distanceToRect } from "./goShopHotspots";
+import { pointInRect, distanceToRect, GO_LOBBY_INTERACT_RADIUS } from "./goShopHotspots";
 
 export const LOBBY_CABINET_SESSION_KEY = "pg_go_lobby_cabinets";
 
@@ -102,6 +102,18 @@ export function nearestLobbyCabinetIndex(
     }
   }
   return best;
+}
+
+export function nearLobbyCabinetIndex(
+  worldX: number,
+  worldY: number,
+  cabinets: readonly LobbyRect[] = LOBBY_CABINETS,
+  radius: number = GO_LOBBY_INTERACT_RADIUS
+): number | null {
+  const index = nearestLobbyCabinetIndex(worldX, worldY, cabinets);
+  if (index == null) return null;
+  if (distanceToRect(worldX, worldY, cabinets[index]!) > radius) return null;
+  return index;
 }
 
 export type CabinetHotspotAction =

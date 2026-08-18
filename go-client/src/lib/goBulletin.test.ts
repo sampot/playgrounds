@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   dismissBulletin,
   filterActiveBulletins,
+  GO_BULLETIN_FIXTURE,
   isBulletinActive,
   shouldShowBulletinStrip,
   type GoBulletin,
@@ -18,6 +19,17 @@ const sample: GoBulletin = {
 };
 
 describe("goBulletin", () => {
+  it("posts that members can invite connected play", () => {
+    const list = filterActiveBulletins(GO_BULLETIN_FIXTURE, {
+      now: new Date("2026-08-18T12:00:00Z"),
+    });
+    const invite = list.find((b) => b.id === "invite-play");
+    expect(invite?.title).toMatch(/會員/);
+    expect(invite?.body).toMatch(/邀請/);
+    expect(invite?.body).toMatch(/連線/);
+    expect(invite?.dismissible).toBe(false);
+  });
+
   it("filters active bulletins by time and dismiss", () => {
     const now = new Date("2026-08-18T12:00:00Z");
     expect(

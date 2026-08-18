@@ -35,6 +35,7 @@
   import {
     hitTestLobbyCabinetIndex,
     nearestLobbyCabinetIndex,
+    nearLobbyCabinetIndex,
     cabinetStandPoint,
     consumeLobbyReturnStand,
   } from "$lib/goLobbyCabinets";
@@ -42,6 +43,7 @@
   import {
     getLobbySfxPlayer,
     shouldPlayFootstep,
+    shouldPlayCabinetAttract,
     type LobbySfxPlayer,
   } from "$lib/goLobbySfx";
   import type { GoBulletin } from "$lib/goBulletin";
@@ -102,6 +104,7 @@
   let bumpContact: ShopHotspotId | null = null;
   let sfx: LobbySfxPlayer | null = null;
   let prevWalkFrame = 0;
+  let prevAttractCabinet: number | null = null;
 
   let overlayOpen = $derived(
     helpDeskOpen || cabinetOpen || bossOpen || bulletinOpen
@@ -129,6 +132,7 @@
     ctx.save();
     ctx.setTransform(layout.dpr * layout.scale, 0, 0, layout.dpr * layout.scale, 0, 0);
     const prompt = lobbyPromptHotspot({ avatar, hover: hoverHotspot });
+    const litCabinetIndex = nearLobbyCabinetIndex(avatar.x, avatar.y);
     drawLobbyFrame(ctx, {
       avatar,
       nearHotspot: prompt,
@@ -139,9 +143,11 @@
       sfxEnabled: sfx?.isEnabled() ?? true,
       nowMs: prefersReducedMotion ? 0 : attractNow,
       cabinetTitles,
+      cabinetSeries: floorGames.map((game) => game.series ?? ""),
       activeCabinetIndex:
         hoverCabinetIndex ??
         (prompt === "cabinet" ? nearestLobbyCabinetIndex(avatar.x, avatar.y) : null),
+      litCabinetIndex,
     });
     ctx.restore();
   }
@@ -205,6 +211,20 @@
       walkFrame = 0;
       prevWalkFrame = 0;
       bumpContact = null;
+    }
+    if (!overlayOpen) {
+      const nearCab = nearLobbyCabinetIndex(avatar.x, avatar.y);
+      if (
+        shouldPlayCabinetAttract({
+          prevIndex: prevAttractCabinet,
+          nextIndex: nearCab,
+          sfxEnabled: sfx?.isEnabled() ?? true,
+          reducedMotion: prefersReducedMotion,
+        })
+      ) {
+        sfx?.playAttract();
+      }
+      prevAttractCabinet = nearCab;
     }
     paint();
     raf = requestAnimationFrame(frame);

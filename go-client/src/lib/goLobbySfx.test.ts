@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   createLobbySfxPlayer,
+  lobbyCabinetAttractTones,
   lobbyInteractTones,
   lobbyStepTones,
   playTone,
+  shouldPlayCabinetAttract,
   shouldPlayFootstep,
   type MinimalAudioContext,
 } from "./goLobbySfx";
@@ -25,6 +27,50 @@ describe("shouldPlayFootstep", () => {
   });
 });
 
+describe("shouldPlayCabinetAttract", () => {
+  it("chirps once when walking up to a new machine", () => {
+    expect(
+      shouldPlayCabinetAttract({
+        prevIndex: null,
+        nextIndex: 1,
+        sfxEnabled: true,
+        reducedMotion: false,
+      })
+    ).toBe(true);
+    expect(
+      shouldPlayCabinetAttract({
+        prevIndex: 1,
+        nextIndex: 1,
+        sfxEnabled: true,
+        reducedMotion: false,
+      })
+    ).toBe(false);
+  });
+
+  it("stays quiet when muted, reduced-motion, or walking away", () => {
+    const approaching = {
+      prevIndex: null,
+      nextIndex: 0,
+      sfxEnabled: true,
+      reducedMotion: false,
+    };
+    expect(shouldPlayCabinetAttract({ ...approaching, sfxEnabled: false })).toBe(
+      false
+    );
+    expect(
+      shouldPlayCabinetAttract({ ...approaching, reducedMotion: true })
+    ).toBe(false);
+    expect(
+      shouldPlayCabinetAttract({
+        prevIndex: 0,
+        nextIndex: null,
+        sfxEnabled: true,
+        reducedMotion: false,
+      })
+    ).toBe(false);
+  });
+});
+
 describe("lobby tone recipes", () => {
   it("uses a short low step blip", () => {
     const tones = lobbyStepTones(0);
@@ -36,9 +82,11 @@ describe("lobby tone recipes", () => {
   it("gives each interactable a distinct pitch set", () => {
     const boss = lobbyInteractTones("boss").map((t) => t.freq).join(",");
     const cabinet = lobbyInteractTones("cabinet").map((t) => t.freq).join(",");
-    const help = lobbyInteractTones("help").map((t) => t.freq).join(",");
-    expect(new Set([boss, cabinet, help]).size).toBe(3);
+    const chat = lobbyInteractTones("chat").map((t) => t.freq).join(",");
+    expect(new Set([boss, cabinet, chat]).size).toBe(3);
     expect(lobbyInteractTones("cabinet").length).toBeGreaterThan(1);
+    const attract = lobbyCabinetAttractTones();
+    expect(Math.max(...attract.map((t) => t.gain))).toBeLessThan(0.05);
   });
 });
 
@@ -135,6 +183,7 @@ describe("createLobbySfxPlayer", () => {
     start.mockClear();
     player.playStep(0);
     player.playInteract("cabinet");
+    player.playAttract();
     expect(start).not.toHaveBeenCalled();
     expect(player.toggleEnabled()).toBe(true);
     expect(stored).toBe("on");

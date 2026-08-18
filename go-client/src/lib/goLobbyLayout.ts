@@ -15,8 +15,8 @@ export const LOBBY_BOSS: LobbyRect = { x: 16, y: 32, w: 80, h: 40 };
 /** Posters mounted on the back wall, left of the sign. */
 export const LOBBY_BULLETIN: LobbyRect = { x: 12, y: 3, w: 76, h: 18 };
 
-/** Small information kiosk beside the counter. */
-export const LOBBY_HELP: LobbyRect = { x: 112, y: 40, w: 36, h: 32 };
+/** Lounge table and chairs, east of the counter aisle. Approach from the south. */
+export const LOBBY_CHAT: LobbyRect = { x: 208, y: 40, w: 56, h: 36 };
 
 /** Neon board on the back-right wall. */
 export const LOBBY_AD: LobbyRect = { x: 228, y: 4, w: 76, h: 28 };
@@ -55,5 +55,5 @@ export const LOBBY_CABINET_ZONE: LobbyRect = unionRects(LOBBY_CABINETS);
 
 /** Solid props the avatar cannot walk through (wall posters sit in the wall band). */
 export function lobbyBlockingRects(): LobbyRect[] {
-  return [LOBBY_BOSS, LOBBY_HELP, LOBBY_STORAGE, ...LOBBY_CABINETS];
+  return [LOBBY_BOSS, LOBBY_CHAT, LOBBY_STORAGE, ...LOBBY_CABINETS];
 }

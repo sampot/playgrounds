@@ -7,10 +7,13 @@ import {
 } from "./goHelpDesk";
 
 describe("goHelpDesk", () => {
-  it("has ordered lines spoken at the desk", () => {
+  it("has ordered lines spoken by the boss", () => {
     expect(GO_HELP_DESK_LINES.length).toBeGreaterThan(3);
-    expect(GO_HELP_DESK_LINES[0]?.speaker).toBe("詢問處");
-    expect(GO_HELP_DESK_LINES[0]?.text.length).toBeGreaterThan(0);
+    expect(GO_HELP_DESK_LINES[0]?.speaker).toBe("老闆");
+    expect(GO_HELP_DESK_LINES[0]?.text).toMatch(/找我/);
+    expect(GO_HELP_DESK_LINES.some((line) => line.text.includes("詢問處"))).toBe(
+      false
+    );
   });
 
   it("advances one line at a time", () => {

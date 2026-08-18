@@ -7,6 +7,8 @@ describe("isEscapeHomePath", () => {
     expect(isEscapeHomePath("/help/")).toBe(true);
     expect(isEscapeHomePath("/apps")).toBe(true);
     expect(isEscapeHomePath("/apps/")).toBe(true);
+    expect(isEscapeHomePath("/chat")).toBe(true);
+    expect(isEscapeHomePath("/chat/")).toBe(true);
   });
 
   it("does not match home, play, or invite routes", () => {
@@ -20,6 +22,7 @@ describe("shouldEscapeToHome", () => {
   it("returns true for Escape on help and apps", () => {
     expect(shouldEscapeToHome({ key: "Escape", pathname: "/help" })).toBe(true);
     expect(shouldEscapeToHome({ key: "Escape", pathname: "/apps" })).toBe(true);
+    expect(shouldEscapeToHome({ key: "Escape", pathname: "/chat" })).toBe(true);
   });
 
   it("ignores other keys, other routes, modals, and text entry", () => {

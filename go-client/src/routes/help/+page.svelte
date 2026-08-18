@@ -22,7 +22,7 @@
     })
   );
   let backHref = $state("/");
-  let backLabel = $state("← 回純玩首頁");
+  let backLabel = $state("← 回遊樂場大廳");
 
   function isHelpPath(pathname: string): boolean {
     return pathname === "/help" || pathname.startsWith("/help/");
@@ -31,7 +31,7 @@
   function applyBack(pathWithSearch: string): void {
     const path = pathWithSearch || "/";
     backHref = path;
-    backLabel = path === "/" ? "← 回純玩首頁" : "← 回上一頁";
+    backLabel = path === "/" ? "← 回遊樂場大廳" : "← 回上一頁";
   }
 
   afterNavigate(({ from }) => {
@@ -93,7 +93,7 @@
     用 <strong>iPhone Safari</strong>（不是頁頂「分享」）：
   </p>
   <ol class="help-steps">
-    <li>開啟純玩首頁或任一遊戲頁。</li>
+    <li>開啟遊樂場大廳或任一遊戲頁。</li>
     <li>點 Safari <strong>底部分享鈕</strong>（方塊↑）。若看不到，可先按底欄「⋯」再選分享。</li>
     <li>向下捲動；必要時先按「檢視更多」。</li>
     <li>選「加入主畫面」，再按「加入」。</li>
@@ -133,7 +133,7 @@
 <section class="help-section pixel-frame" aria-labelledby="help-credits">
   <h2 id="help-credits">大廳美術</h2>
   <p>
-    大廳場景以 canvas 幾何繪製（地板、櫃檯、機台、詢問處），不載入 tiles／sprite 圖。
+    大廳場景以 canvas 幾何繪製（地板、櫃檯、機台、聊天區），不載入 tiles／sprite 圖。
   </p>
 </section>
 

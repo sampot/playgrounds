@@ -74,6 +74,24 @@ export function lobbyStepTone(stepIndex: number): OscTone {
   return lobbyStepTones(stepIndex)[0]!;
 }
 
+export function lobbyCabinetAttractTones(): OscTone[] {
+  return [
+    { type: "square", freq: 988, durationMs: 40, gain: 0.028 },
+    { type: "triangle", freq: 784, durationMs: 70, gain: 0.02, delayMs: 30 },
+  ];
+}
+
+export function shouldPlayCabinetAttract(args: {
+  prevIndex: number | null;
+  nextIndex: number | null;
+  sfxEnabled: boolean;
+  reducedMotion: boolean;
+}): boolean {
+  if (!args.sfxEnabled || args.reducedMotion) return false;
+  if (args.nextIndex == null) return false;
+  return args.nextIndex !== args.prevIndex;
+}
+
 export function lobbyInteractTones(id: ShopHotspotId): OscTone[] {
   switch (id) {
     case "boss":
@@ -86,10 +104,10 @@ export function lobbyInteractTones(id: ShopHotspotId): OscTone[] {
         { type: "square", freq: 880, durationMs: 70, gain: 0.07 },
         { type: "square", freq: 1320, durationMs: 90, gain: 0.045, delayMs: 55 },
       ];
-    case "help":
+    case "chat":
       return [
-        { type: "sine", freq: 523, durationMs: 120, gain: 0.055 },
-        { type: "sine", freq: 784, durationMs: 160, gain: 0.04, delayMs: 80 },
+        { type: "sine", freq: 440, durationMs: 90, gain: 0.05 },
+        { type: "triangle", freq: 660, durationMs: 130, gain: 0.035, delayMs: 70 },
       ];
     case "bulletin":
       return [{ type: "triangle", freq: 330, freqEnd: 220, durationMs: 80, gain: 0.05 }];
@@ -145,6 +163,7 @@ export type LobbySfxPlayer = {
   toggleEnabled: () => boolean;
   playStep: (stepIndex?: number) => void;
   playInteract: (id: ShopHotspotId) => void;
+  playAttract: () => void;
 };
 
 export function createLobbySfxPlayer(args: {
@@ -198,6 +217,10 @@ export function createLobbySfxPlayer(args: {
     playInteract(id: ShopHotspotId) {
       if (!enabled) return;
       playTones(lobbyInteractTones(id));
+    },
+    playAttract() {
+      if (!enabled || args.reducedMotion?.()) return;
+      playTones(lobbyCabinetAttractTones());
     },
   };
 }

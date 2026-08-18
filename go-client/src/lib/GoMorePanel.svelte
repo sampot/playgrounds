@@ -198,7 +198,7 @@
     }
     return {
       title: "清除全部本機遊戲資料",
-      body: "清除所有遊戲的進度／分數與已下載內容，並回到首頁。不會清除主題等偏好設定。無法復原。",
+      body: "清除所有遊戲的進度／分數與已下載內容，並回到遊樂場大廳。不會清除主題等偏好設定。無法復原。",
       ok: "全部清除",
     };
   });
@@ -370,6 +370,9 @@
           <h3 id="go-more-help-title" class="go-more-section-title">說明</h3>
           <a class="go-more-btn go-more-link" href="/help" onclick={onClose}>
             使用說明
+          </a>
+          <a class="go-more-btn go-more-link" href="/chat" onclick={onClose}>
+            聊天區
           </a>
         </section>
 

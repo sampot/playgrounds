@@ -57,7 +57,7 @@
         </button>
       </header>
       {#if bulletins.length === 0}
-        <p class="bulletin-board-empty">今日休息。有消息會貼在這裡。</p>
+        <p class="bulletin-board-empty">登入通行證後，會員可邀請朋友連線一起玩。</p>
       {:else}
         <ul class="bulletin-board-list">
           {#each bulletins as item (item.id)}
@@ -66,20 +66,22 @@
               {#if item.body}
                 <p class="bulletin-board-item-body">{item.body}</p>
               {/if}
-              <div class="bulletin-board-item-actions">
-                {#if item.href}
-                  <a class="pixel-btn" href={item.href}>{item.hrefLabel ?? "詳情"}</a>
-                {/if}
-                {#if item.dismissible}
-                  <button
-                    type="button"
-                    class="pixel-btn"
-                    onclick={() => onDismiss(item)}
-                  >
-                    關閉此則
-                  </button>
-                {/if}
-              </div>
+              {#if item.href || item.dismissible}
+                <div class="bulletin-board-item-actions">
+                  {#if item.href}
+                    <a class="pixel-btn" href={item.href}>{item.hrefLabel ?? "詳情"}</a>
+                  {/if}
+                  {#if item.dismissible}
+                    <button
+                      type="button"
+                      class="pixel-btn"
+                      onclick={() => onDismiss(item)}
+                    >
+                      關閉此則
+                    </button>
+                  {/if}
+                </div>
+              {/if}
             </li>
           {/each}
         </ul>

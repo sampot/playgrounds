@@ -16,7 +16,7 @@ import {
   LOBBY_AVATAR_RADIUS,
   LOBBY_WALK_FRAME_MS,
 } from "./goShopWalk";
-import { LOBBY_BOSS, LOBBY_CABINETS } from "./goLobbyLayout";
+import { LOBBY_BOSS, LOBBY_CABINETS, LOBBY_CHAT } from "./goLobbyLayout";
 import { cabinetStandPoint } from "./goLobbyCabinets";
 
 describe("lobby walk preference", () => {
@@ -139,9 +139,9 @@ describe("resolveLobbyTap", () => {
       resolveLobbyTap({
         walkEnabled: true,
         world,
-        tappedHotspot: "help",
+        tappedHotspot: "storage",
       })
-    ).toEqual({ type: "activate", id: "help" });
+    ).toEqual({ type: "activate", id: "storage" });
   });
 
   it("walks to a cabinet before playing when walking is on", () => {
@@ -194,9 +194,9 @@ describe("resolveLobbyTap", () => {
       resolveLobbyTap({
         walkEnabled: false,
         world: { x: 120, y: 130 },
-        tappedHotspot: "help",
+        tappedHotspot: "storage",
       })
-    ).toEqual({ type: "activate", id: "help" });
+    ).toEqual({ type: "activate", id: "storage" });
   });
 });
 
@@ -260,6 +260,21 @@ describe("resolveWalkBump", () => {
     });
     expect(held.activate).toBeNull();
     expect(held.contact).toBe("boss");
+  });
+
+  it("activates the chat lounge when walking into the table", () => {
+    const from = {
+      x: LOBBY_CHAT.x + LOBBY_CHAT.w / 2,
+      y: LOBBY_CHAT.y + LOBBY_CHAT.h + 8,
+    };
+    expect(
+      resolveWalkBump({
+        from,
+        input: up,
+        alreadyContact: null,
+        deltaSec: 0.05,
+      }).activate
+    ).toBe("chat");
   });
 
   it("activates a cabinet when walking into a machine", () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LOBBY_AD } from "./goLobbyLayout";
+import { LOBBY_AD, LOBBY_CHAT } from "./goLobbyLayout";
 import {
   GO_LOBBY_HOTSPOTS,
   getShopHotspot,
@@ -83,15 +83,18 @@ describe("nearestShopHotspotInRange", () => {
 });
 
 describe("resolveShopHotspotAction", () => {
-  it("maps help to in-page desk dialogue", () => {
-    expect(resolveShopHotspotAction("help")).toEqual({
-      type: "open-help-desk",
-    });
-  });
-
   it("maps cabinet to in-scene overlay", () => {
     expect(resolveShopHotspotAction("cabinet")).toEqual({
       type: "open-cabinets",
+    });
+  });
+
+  it("maps chat lounge to /chat", () => {
+    expect(hitTestShopHotspot(LOBBY_CHAT.x + 8, LOBBY_CHAT.y + 8)).toBe("chat");
+    expect(getShopHotspot("chat")?.label).toBe("聊天區");
+    expect(resolveShopHotspotAction("chat")).toEqual({
+      type: "navigate",
+      href: "/chat",
     });
   });
 });

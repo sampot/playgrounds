@@ -4,7 +4,7 @@ import {
   LOBBY_BULLETIN,
   LOBBY_CABINETS,
   LOBBY_CABINET_ZONE,
-  LOBBY_HELP,
+  LOBBY_CHAT,
   LOBBY_STORAGE,
   type LobbyRect,
 } from "./goLobbyLayout";
@@ -12,7 +12,7 @@ import {
 export type ShopHotspotId =
   | "boss"
   | "bulletin"
-  | "help"
+  | "chat"
   | "cabinet"
   | "storage"
   | "sfx";
@@ -38,7 +38,7 @@ export const GO_LOBBY_TILE = 16;
 export const GO_LOBBY_HOTSPOTS: readonly ShopHotspot[] = [
   { id: "boss", label: "櫃檯", ...LOBBY_BOSS },
   { id: "bulletin", label: "布告欄", ...LOBBY_BULLETIN },
-  { id: "help", label: "詢問處", ...LOBBY_HELP },
+  { id: "chat", label: "聊天區", ...LOBBY_CHAT },
   { id: "cabinet", label: "機台區", ...LOBBY_CABINET_ZONE },
   { id: "storage", label: "後場", ...LOBBY_STORAGE },
   { id: "sfx", label: "音效", ...LOBBY_AD },
@@ -150,7 +150,6 @@ export type LobbyHotspotAction =
   | { type: "boss-menu" }
   | { type: "open-cabinets" }
   | { type: "open-bulletin" }
-  | { type: "open-help-desk" }
   | { type: "navigate"; href: string }
   | { type: "toggle-sfx" };
 
@@ -162,8 +161,8 @@ export function resolveShopHotspotAction(id: ShopHotspotId): LobbyHotspotAction 
       return { type: "open-cabinets" };
     case "bulletin":
       return { type: "open-bulletin" };
-    case "help":
-      return { type: "open-help-desk" };
+    case "chat":
+      return { type: "navigate", href: "/chat" };
     case "storage":
       return { type: "navigate", href: "/apps" };
     case "sfx":

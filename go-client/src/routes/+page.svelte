@@ -205,9 +205,6 @@
         bossDialogOpen = false;
         bulletinBoardOpen = true;
         break;
-      case "open-help-desk":
-        openHelpDesk();
-        break;
       case "navigate":
         void goto(action.href);
         break;

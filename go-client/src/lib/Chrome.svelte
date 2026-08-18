@@ -425,7 +425,7 @@
     <a
       class="mark-link"
       href="/"
-      title="純玩首頁"
+      title="遊樂場大廳"
       onclick={onMarkClick}
     >
       <img
@@ -441,7 +441,7 @@
     <a
       class="play-link"
       href="/"
-      title="純玩首頁"
+      title="遊樂場大廳"
       onclick={() => {
         moreOpen = false;
         shareOpen = false;
@@ -481,7 +481,7 @@
       <button
         type="button"
         class="share-btn pixel-btn"
-        title={catalogId ? "分享此小品" : "分享純玩首頁"}
+        title={catalogId ? "分享此小品" : "分享遊樂場大廳"}
         onclick={openShare}
       >
         分享

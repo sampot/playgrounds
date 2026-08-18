@@ -74,7 +74,7 @@ export const GO_HOME_DOCUMENT_TITLE =
  * Keeps the bilingual tagline as a closing beat.
  */
 export const GO_HOME_DESCRIPTION =
-  `${GO_SITE_NAME} · 純玩是免安裝、無編輯器的玩家主場：從首頁搜尋或推薦挑一款瀏覽器小品打開就玩，造訪過的還能離線再開。Let's dash, go, and play!`;
+  `${GO_SITE_NAME} · 純玩是免安裝、無編輯器的玩家主場：從遊樂場大廳搜尋或推薦挑一款瀏覽器小品打開就玩，造訪過的還能離線再開。Let's dash, go, and play!`;
 
 /** On-page lead under h1 — shorter; brand lives in chrome. */
 export const GO_HOME_LEAD = "純玩 — Let's dash, go, and play!";
@@ -85,6 +85,10 @@ export const GO_INVITE_DESCRIPTION = `用邀請連結進入${GO_SITE_NAME}純玩
 export const GO_HELP_DOCUMENT_TITLE = `使用說明 · ${GO_SITE_NAME}`;
 export const GO_HELP_DESCRIPTION =
   `${GO_SITE_NAME} · 純玩｜如何加入主畫面，以及用 LINE 等 App 內建瀏覽器開啟時怎麼改用系統瀏覽器。`;
+
+export const GO_CHAT_DOCUMENT_TITLE = `聊天區 · ${GO_SITE_NAME}`;
+export const GO_CHAT_DESCRIPTION =
+  `${GO_SITE_NAME} · 純玩｜會員可邀請朋友線上對話、分享檔案。即將在大廳聊天區開放。`;
 
 export function goInviteCanonicalUrl(
   shortId: string,

@@ -46,7 +46,7 @@ export const LOBBY_STAMPS: readonly LobbyStamp[] = [
     ],
   },
   {
-    hotspot: "help",
+    hotspot: null,
     x: 160,
     y: 32,
     cells: [

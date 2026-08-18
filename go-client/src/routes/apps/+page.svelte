@@ -195,7 +195,7 @@
     }
     return {
       title: "清除全部本機遊戲資料",
-      body: "清除所有遊戲的進度／分數與已下載內容，並回到首頁。不會清除主題等偏好設定。無法復原。",
+      body: "清除所有遊戲的進度／分數與已下載內容，並回到遊樂場大廳。不會清除主題等偏好設定。無法復原。",
       ok: "全部清除",
     };
   });
@@ -240,7 +240,7 @@
 </svelte:head>
 
 <p class="back">
-  <a href="/">← 回純玩首頁</a>
+  <a href="/">← 回遊樂場大廳</a>
 </p>
 
 <header class="page-heading">
@@ -307,7 +307,7 @@
       <rect x="5" y="7" width="2" height="1" fill="rgb(var(--fill))" />
     </svg>
     <p>還沒有已下載的遊戲。連線玩過一次後就會出現在這裡。</p>
-    <a class="pixel-btn empty-cta" href="/">回首頁找遊戲</a>
+    <a class="pixel-btn empty-cta" href="/">回遊樂場大廳找遊戲</a>
   </div>
 {:else}
   {#if showPager}

@@ -3,8 +3,8 @@ import {
   LOBBY_BOSS,
   LOBBY_BULLETIN,
   LOBBY_CABINETS,
+  LOBBY_CHAT,
   LOBBY_ENTRANCE,
-  LOBBY_HELP,
   LOBBY_SIGN,
   LOBBY_STORAGE,
   LOBBY_WALL_BOTTOM,
@@ -61,10 +61,14 @@ export type LobbyDrawState = {
   sfxEnabled?: boolean;
   /** Attract-mode clock for cabinet demo screens (ms). Frozen at 0 when omitted. */
   nowMs?: number;
-  /** Marquee labels for the four cabinets (today's floor games). */
+  /** Full titles for the proximity prompt. */
   cabinetTitles?: readonly string[];
+  /** Catalog series for marquees and attract demos. */
+  cabinetSeries?: readonly string[];
   /** Which machine to outline／label when the cabinet hotspot is active. */
   activeCabinetIndex?: number | null;
+  /** Machine the avatar is standing by (screen glow, not hover). */
+  litCabinetIndex?: number | null;
 };
 
 export const LOBBY_ATTRACT_FRAME_MS = 160;
@@ -74,6 +78,38 @@ export const LOBBY_ATTRACT_FRAMES = 8;
 export function cabinetAttractTick(nowMs: number, cabinetIndex: number): number {
   const phase = Math.floor(Math.max(0, nowMs) / LOBBY_ATTRACT_FRAME_MS);
   return (phase + cabinetIndex * 2) % LOBBY_ATTRACT_FRAMES;
+}
+
+export type CabinetAttractStyle = "shmup" | "board" | "wheel" | "idle";
+
+/** Map catalog `series` onto a tiny attract demo. Unknown series share the shmup loop. */
+export function cabinetAttractStyle(
+  series: string | undefined | null
+): CabinetAttractStyle {
+  switch (series) {
+    case "街機":
+      return "shmup";
+    case "桌遊":
+    case "策略":
+      return "board";
+    case "機台":
+      return "wheel";
+    case "懷舊":
+    case "模擬":
+      return "idle";
+    default:
+      return "shmup";
+  }
+}
+
+export function cabinetMarqueeLabel(series: string | undefined | null): string {
+  const trimmed = series?.trim() ?? "";
+  if (!trimmed) return "INSERT";
+  return trimmed.length > 2 ? trimmed.slice(0, 2) : trimmed;
+}
+
+export function cabinetStickOffset(tick: number): number {
+  return (tick % 3) - 1;
 }
 
 export const BOSS_IDLE_CYCLE_MS = 8000;
@@ -450,21 +486,26 @@ function drawCounter(
   if (active) strokeActive(ctx, r);
 }
 
-function drawHelp(ctx: CanvasRenderingContext2D, colors: LobbyCanvasColors, active: boolean) {
-  const r = LOBBY_HELP;
-  px(ctx, "#2a3048", r.x + 4, r.y + r.h - 4, r.w - 8, 4);
-  px(ctx, "#4a6088", r.x + 2, r.y + 14, r.w - 4, r.h - 18);
-  px(ctx, "#5a78a0", r.x, r.y + 10, r.w, 8);
-  px(ctx, colors.accent, r.x + 2, r.y, r.w - 4, 12);
-  px(ctx, "#e8fbff", r.x + 4, r.y + 2, r.w - 8, 8);
-  ctx.fillStyle = "#1a4060";
-  ctx.font = "bold 11px monospace";
-  ctx.textAlign = "center";
-  ctx.fillText("i", r.x + r.w / 2, r.y + 10);
-  ctx.textAlign = "start";
-  px(ctx, "#f4efe4", r.x + 6, r.y + 20, 8, 6);
-  px(ctx, "#dfeaf4", r.x + 16, r.y + 20, 8, 6);
-  px(ctx, LINE, r.x + r.w / 2 - 1, r.y + 26, 2, 2);
+function drawChat(ctx: CanvasRenderingContext2D, colors: LobbyCanvasColors, active: boolean) {
+  const r = LOBBY_CHAT;
+  px(ctx, "#4a3c58", r.x, r.y + 6, r.w, r.h - 6);
+  px(ctx, "#5c4c68", r.x + 2, r.y + 8, r.w - 4, r.h - 10);
+  const tableX = r.x + r.w / 2 - 10;
+  const tableY = r.y + 12;
+  px(ctx, colors.wood, tableX, tableY, 20, 12);
+  px(ctx, "#9a7a58", tableX + 1, tableY + 1, 18, 3);
+  px(ctx, "#c45c5c", tableX + 4, tableY + 5, 3, 3);
+  px(ctx, colors.accent, tableX + 13, tableY + 5, 3, 3);
+  px(ctx, "#3a3048", r.x + 4, r.y + 16, 10, 10);
+  px(ctx, "#8a6a50", r.x + 5, r.y + 22, 8, 5);
+  px(ctx, "#3a3048", r.x + r.w - 14, r.y + 16, 10, 10);
+  px(ctx, "#8a6a50", r.x + r.w - 13, r.y + 22, 8, 5);
+  px(ctx, "#3a3048", r.x + r.w / 2 - 6, r.y + r.h - 12, 12, 10);
+  px(ctx, "#8a6a50", r.x + r.w / 2 - 5, r.y + r.h - 8, 10, 5);
+  px(ctx, "#efe6d8", r.x + r.w / 2 - 6, r.y, 12, 8);
+  px(ctx, LINE, r.x + r.w / 2 - 2, r.y + 3, 2, 2);
+  px(ctx, LINE, r.x + r.w / 2 + 1, r.y + 3, 2, 2);
+  px(ctx, "#efe6d8", r.x + r.w / 2 - 2, r.y + 7, 3, 2);
   if (active) strokeActive(ctx, r);
 }
 
@@ -474,11 +515,12 @@ function drawCabinetScreen(
   y: number,
   w: number,
   h: number,
-  kind: number,
-  tick: number
+  style: CabinetAttractStyle,
+  tick: number,
+  lit: boolean
 ) {
-  px(ctx, "#071018", x, y, w, h);
-  if (kind === 0) {
+  px(ctx, lit ? "#143048" : "#071018", x, y, w, h);
+  if (style === "shmup") {
     const shipX = 2 + Math.abs((tick % 8) - 4);
     const shotY = 2 + ((tick * 2) % Math.max(2, h - 5));
     px(ctx, "#fff", x + 3 + ((tick * 3) % (w - 5)), y + 2 + (tick % 4), 1, 1);
@@ -486,41 +528,44 @@ function drawCabinetScreen(
     px(ctx, "#c45c8a", x + 4 + (tick % 3), y + 3, 5, 3);
     px(ctx, "#f6c453", x + 8, y + shotY, 1, 2);
     px(ctx, "#3de0ff", x + shipX, y + h - 4, 4, 2);
-  } else if (kind === 1) {
+  } else if (style === "board") {
+    px(ctx, "#3a2818", x + 1, y + 1, w - 2, h - 2);
     for (let row = 0; row < 3; row += 1) {
-      const c = ["#c45c5c", "#f6c453", "#3de0ff"][row]!;
-      for (let col = 0; col < 4; col += 1) {
-        if (row === 0 && col === tick % 4) continue;
-        px(ctx, c, x + 2 + col * 4, y + 2 + row * 3, 3, 2);
+      for (let col = 0; col < 3; col += 1) {
+        const light = (row + col) % 2 === 0;
+        px(
+          ctx,
+          light ? "#d8c4a0" : "#6a4e32",
+          x + 2 + col * 4,
+          y + 2 + row * 3,
+          3,
+          2
+        );
       }
     }
-    const paddleX = 2 + Math.abs((tick % 8) - 4);
-    const ballX = 3 + ((tick * 2) % Math.max(2, w - 6));
-    const ballY = 6 + (tick % 4);
-    px(ctx, "#efe6d8", x + paddleX, y + h - 3, 5, 2);
-    px(ctx, "#fff", x + ballX, y + ballY, 1, 1);
-  } else if (kind === 2) {
-    px(ctx, "#1a3048", x + 1, y + 1, w - 2, 5);
-    px(ctx, "#3a2018", x + 1, y + 6, w - 2, h - 7);
-    const dashY = 6 + (tick % 4);
-    px(ctx, "#f6c453", x + w / 2 - 1, y + dashY, 2, 3);
-    px(ctx, "#f6c453", x + w / 2 - 1, y + ((dashY + 4) % (h - 2)), 2, 2);
-    const carX = w / 2 - 3 + ((tick % 4) - 1);
-    px(ctx, "#efe6d8", x + carX, y + h - 5, 6, 3);
+    const cursor = tick % 9;
+    px(
+      ctx,
+      "#c45c5c",
+      x + 2 + (cursor % 3) * 4,
+      y + 2 + Math.floor(cursor / 3) * 3,
+      3,
+      2
+    );
+  } else if (style === "wheel") {
+    px(ctx, "#3a2018", x + 1, y + 1, w - 2, h - 2);
+    const spoke = tick % 4;
+    px(ctx, "#e8b020", x + 3, y + 2 + spoke, w - 6, 2);
+    px(ctx, "#c45c5c", x + w / 2 - 1, y + 2, 2, h - 4);
+    px(ctx, "#efe6d8", x + 4 + spoke, y + h - 4, 4, 2);
   } else {
     px(ctx, "#143018", x + 1, y + 1, w - 2, h - 2);
     px(ctx, "#7ae0a6", x + 2, y + h - 4, w - 4, 2);
-    const dudeX = 2 + (tick % Math.max(2, w - 8));
     const bob = tick % 2;
-    px(ctx, "#efe6d8", x + dudeX, y + 4 + bob, 3, 5);
-    px(ctx, "#3de0ff", x + dudeX - 1, y + 9 + bob, 5, 3);
-    px(ctx, "#f6c453", x + w - 5, y + 3 + (tick % 3), 2, 2);
+    px(ctx, "#efe6d8", x + w / 2 - 2, y + 3 + bob, 3, 5);
+    px(ctx, "#3de0ff", x + w / 2 - 3, y + 8 + bob, 5, 3);
   }
-}
-
-function marqueeTitle(title: string | undefined): string {
-  if (!title) return "";
-  return title.length > 4 ? title.slice(0, 4) : title;
+  if (lit) px(ctx, "#fff8e0", x + 1, y + 1, w - 2, 1);
 }
 
 function drawCabinet(
@@ -528,10 +573,15 @@ function drawCabinet(
   colors: LobbyCanvasColors,
   r: { x: number; y: number; w: number; h: number },
   hue: string,
-  kind: number,
+  style: CabinetAttractStyle,
   tick: number,
-  title: string
+  title: string,
+  lit: boolean
 ) {
+  if (lit) {
+    px(ctx, colors.highlight, r.x - 2, r.y + r.h, r.w + 4, 3);
+    px(ctx, "#fff3a8", r.x + 2, r.y + r.h, r.w - 4, 2);
+  }
   px(ctx, LINE, r.x, r.y, r.w, r.h);
   px(ctx, "#2a2438", r.x + 1, r.y + 1, r.w - 2, r.h - 2);
   px(ctx, hue, r.x + 1, r.y + 1, r.w - 2, 8);
@@ -545,14 +595,16 @@ function drawCabinet(
   }
   px(ctx, LINE, r.x + 3, r.y + 9, r.w - 6, 1);
   px(ctx, "#12101a", r.x + 3, r.y + 10, r.w - 6, 16);
-  drawCabinetScreen(ctx, r.x + 5, r.y + 12, r.w - 10, 12, kind, tick);
+  drawCabinetScreen(ctx, r.x + 5, r.y + 12, r.w - 10, 12, style, tick, lit);
   px(ctx, "#3a3458", r.x + 2, r.y + 27, r.w - 4, 7);
   px(ctx, "#4a4468", r.x + 3, r.y + 28, r.w - 6, 2);
-  px(ctx, "#1c1828", r.x + 6, r.y + 30, 4, 4);
-  px(ctx, "#efe6d8", r.x + 7, r.y + 29, 2, 3);
-  px(ctx, "#c45c5c", r.x + r.w - 14, r.y + 30, 3, 3);
-  px(ctx, colors.highlight, r.x + r.w - 10, r.y + 30, 3, 3);
-  px(ctx, "#7ae0a6", r.x + r.w - 6, r.y + 30, 3, 3);
+  const stick = cabinetStickOffset(tick);
+  px(ctx, "#1c1828", r.x + 6 + stick, r.y + 30, 4, 4);
+  px(ctx, "#efe6d8", r.x + 7 + stick, r.y + 29, 2, 3);
+  const blink = lit && tick % 2 === 0;
+  px(ctx, blink ? "#ff8080" : "#c45c5c", r.x + r.w - 14, r.y + 30, 3, 3);
+  px(ctx, blink ? "#fff3a8" : colors.highlight, r.x + r.w - 10, r.y + 30, 3, 3);
+  px(ctx, blink ? "#b0ffd0" : "#7ae0a6", r.x + r.w - 6, r.y + 30, 3, 3);
   px(ctx, "#1a1624", r.x + 4, r.y + 35, r.w - 8, r.h - 36);
   px(ctx, "#0e0c14", r.x + r.w / 2 - 3, r.y + 37, 6, 4);
   px(ctx, colors.highlight, r.x + r.w / 2 - 1, r.y + 38, 2, 2);
@@ -563,20 +615,23 @@ function drawCabinets(
   colors: LobbyCanvasColors,
   active: boolean,
   nowMs: number,
-  titles: readonly string[],
+  series: readonly string[],
   avatar: Vec2,
-  activeCabinetIndex: number | null
+  activeCabinetIndex: number | null,
+  litCabinetIndex: number | null
 ) {
   const hues = ["#c45c8a", "#2cb8d8", "#e0a030", "#3aaa68"];
   LOBBY_CABINETS.forEach((r, i) => {
+    const tick = cabinetAttractTick(nowMs, i);
     drawCabinet(
       ctx,
       colors,
       r,
       hues[i % hues.length]!,
-      i,
-      cabinetAttractTick(nowMs, i),
-      marqueeTitle(titles[i])
+      cabinetAttractStyle(series[i]),
+      tick,
+      cabinetMarqueeLabel(series[i]),
+      litCabinetIndex === i
     );
   });
   if (active) {
@@ -651,15 +706,16 @@ export function drawLobbyFrame(
   drawBulletin(ctx, active === "bulletin");
   drawAd(ctx, colors, state.sfxEnabled === false, active === "sfx", nowMs);
   drawCounter(ctx, colors, active === "boss", nowMs);
-  drawHelp(ctx, colors, active === "help");
+  drawChat(ctx, colors, active === "chat");
   drawCabinets(
     ctx,
     colors,
     active === "cabinet",
     nowMs,
-    state.cabinetTitles ?? [],
+    state.cabinetSeries ?? [],
     state.avatar,
-    state.activeCabinetIndex ?? null
+    state.activeCabinetIndex ?? null,
+    state.litCabinetIndex ?? null
   );
   drawStorage(ctx, colors, active === "storage");
   drawAvatar(

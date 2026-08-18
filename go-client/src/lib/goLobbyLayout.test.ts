@@ -11,7 +11,7 @@ import {
   LOBBY_BULLETIN,
   LOBBY_CABINETS,
   LOBBY_CABINET_ZONE,
-  LOBBY_HELP,
+  LOBBY_CHAT,
   LOBBY_SIGN,
   LOBBY_SPAWN,
   LOBBY_STORAGE,
@@ -57,14 +57,30 @@ describe("goLobbyLayout", () => {
     expect(isCircleBlocked(standX, standY, 6, grid)).toBe(false);
   });
 
+  it("keeps a gap south of the chat lounge", () => {
+    expect(LOBBY_CHAT.y + LOBBY_CHAT.h).toBeLessThan(LOBBY_CABINETS[0]!.y - 12);
+    expect(rectsOverlap(LOBBY_CHAT, LOBBY_BOSS)).toBe(false);
+    expect(rectsOverlap(LOBBY_CHAT, LOBBY_STORAGE)).toBe(false);
+    const grid = createLobbyCollisionGrid();
+    expect(
+      isCircleBlocked(LOBBY_CHAT.x + LOBBY_CHAT.w / 2, LOBBY_CHAT.y + 8, 6, grid)
+    ).toBe(true);
+    expect(
+      isCircleBlocked(
+        LOBBY_CHAT.x + LOBBY_CHAT.w / 2,
+        LOBBY_CHAT.y + LOBBY_CHAT.h + 8,
+        6,
+        grid
+      )
+    ).toBe(false);
+  });
+
   it("blocks furniture, not a full-width counter slab", () => {
     const grid = createLobbyCollisionGrid();
     expect(isCircleBlocked(LOBBY_BOSS.x + 8, LOBBY_BOSS.y + 8, 6, grid)).toBe(
       true
     );
-    expect(isCircleBlocked(LOBBY_HELP.x + 8, LOBBY_HELP.y + 8, 6, grid)).toBe(
-      true
-    );
+    expect(isCircleBlocked(120, 52, 6, grid)).toBe(false);
     expect(
       isCircleBlocked(LOBBY_STORAGE.x + 8, LOBBY_STORAGE.y + 8, 6, grid)
     ).toBe(true);

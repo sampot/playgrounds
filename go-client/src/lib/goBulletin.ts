@@ -18,8 +18,19 @@ export const GO_BULLETIN_DISMISS_KEY = "pg_go_bulletin_dismissed";
 
 export const GO_BULLETIN_ACTIVE_CAP = 3;
 
-/** Phase B fixture — empty in production; tests inject samples. */
-export const GO_BULLETIN_FIXTURE: readonly GoBulletin[] = [];
+/** Standing house notice until Platform bulletins are live. */
+export const GO_BULLETIN_FIXTURE: readonly GoBulletin[] = [
+  {
+    id: "invite-play",
+    rev: 1,
+    severity: "info",
+    title: "會員可邀請連線",
+    body: "登入通行證後，可在遊戲裡邀請朋友開一場連線。未登入一樣能單機玩。",
+    startsAt: "2026-01-01T00:00:00Z",
+    dismissible: false,
+    audience: "all",
+  },
+];
 
 const SEVERITY_RANK: Record<GoBulletinSeverity, number> = {
   critical: 0,
@@ -119,5 +130,5 @@ export function shouldShowBulletinStrip(options: {
   if (path.startsWith("/i/")) {
     return options.severity === "critical";
   }
-  return path === "/" || path === "/apps" || path === "/help" || path.startsWith("/s/");
+  return path === "/" || path === "/apps" || path === "/help" || path === "/chat" || path.startsWith("/s/");
 }

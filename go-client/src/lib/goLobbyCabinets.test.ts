@@ -6,6 +6,7 @@ import {
   hitTestLobbyCabinetIndex,
   lobbyDayKey,
   nearestLobbyCabinetIndex,
+  nearLobbyCabinetIndex,
   parseLobbyCabinetIds,
   parseLobbyCabinetStore,
   resolveCabinetHotspotAction,
@@ -122,6 +123,14 @@ describe("nearestLobbyCabinetIndex", () => {
     expect(nearestLobbyCabinetIndex(cab.x + cab.w / 2, cab.y + cab.h + 8)).toBe(
       0
     );
+  });
+});
+
+describe("nearLobbyCabinetIndex", () => {
+  it("only counts a machine the avatar is standing by", () => {
+    const cab = LOBBY_CABINETS[0]!;
+    expect(nearLobbyCabinetIndex(cab.x + cab.w / 2, cab.y + cab.h + 8)).toBe(0);
+    expect(nearLobbyCabinetIndex(160, 168)).toBeNull();
   });
 });
 

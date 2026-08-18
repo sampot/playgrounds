@@ -154,9 +154,9 @@
   <h1 class="pixel-text">已取消</h1>
   <div class="pixel-status" role="status">
     <p class="pixel-status-title">已取消這次邀請</p>
-    <p class="pixel-status-body">若要重新加入，可再開此連結，或回首頁挑別的小品。</p>
+    <p class="pixel-status-body">若要重新加入，可再開此連結，或回遊樂場大廳挑別的小品。</p>
     <div class="actions">
-      <a class="pixel-btn pixel-btn--primary" href="/">回純玩首頁</a>
+      <a class="pixel-btn pixel-btn--primary" href="/">回遊樂場大廳</a>
       <button type="button" class="pixel-btn" onclick={onReopenInvite}>
         重新開啟此邀請
       </button>
@@ -166,9 +166,9 @@
   <h1 class="pixel-text">這一場已結束</h1>
   <div class="pixel-status" role="status">
     <p class="pixel-status-title">{status.error || "主持已結束這一場"}</p>
-    <p class="pixel-status-body">可請主持重新邀請，或回首頁挑別的小品。</p>
+    <p class="pixel-status-body">可請主持重新邀請，或回遊樂場大廳挑別的小品。</p>
     <div class="actions">
-      <a class="pixel-btn pixel-btn--primary" href="/">回純玩首頁</a>
+      <a class="pixel-btn pixel-btn--primary" href="/">回遊樂場大廳</a>
       <button type="button" class="pixel-btn" onclick={onReopenInvite}>
         重新開啟此邀請
       </button>
