@@ -2,7 +2,7 @@
 
 > **狀態：** Draft（2026-08-18）— 契約草案；未實作  
 > **權威決策：** 從屬 [DECISIONS.md](./DECISIONS.md) **DEC-050**（純玩版 `go.samkuo.me`）；**不另開 DEC**（營運讀寫走既有 Platform／dash admin 面，對齊 DEC-047）  
-> **相關：** [PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)、[PG-GO-BOSS-FLASH-PLAN.md](./PG-GO-BOSS-FLASH-PLAN.md)（老闆 flash——**勿混**）、[PG-GO-ADS-PLAN.md](./PG-GO-ADS-PLAN.md)（廣告版位——**勿混**）、[PG-GO-SESSION-CHAT-PLAN.md](./PG-GO-SESSION-CHAT-PLAN.md)（同 session 聊天——**勿混**）、[PG-GO-SHOP-LOBBY-PLAN.md](./PG-GO-SHOP-LOBBY-PLAN.md)（遊樂場大廳 Lobby；布告欄熱點入口）、[PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)、[PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md)（營運 tab）、[PG-ANALYTICS-PLAN.md](./PG-ANALYTICS-PLAN.md)（公開寫／admin 讀模式參考）、`.cursor/rules/no-native-dialogs.mdc`、`.cursor/rules/mobile-first-ux.mdc`、[GLOSSARY.md](./GLOSSARY.md)
+> **相關：** [PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)、[PG-GO-BOSS-FLASH-PLAN.md](./PG-GO-BOSS-FLASH-PLAN.md)（老闆 flash——**勿混**）、[PG-GO-ADS-PLAN.md](./PG-GO-ADS-PLAN.md)（廣告版位——**勿混**）、[PG-GO-SESSION-CHAT-PLAN.md](./PG-GO-SESSION-CHAT-PLAN.md)（同 session 聊天——**勿混**）、[PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)（包廂——**勿混**）、[PG-GO-SHOP-LOBBY-PLAN.md](./PG-GO-SHOP-LOBBY-PLAN.md)（遊樂場大廳 Lobby；布告欄熱點入口）、[PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)、[PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md)（營運 tab）、[PG-ANALYTICS-PLAN.md](./PG-ANALYTICS-PLAN.md)（公開寫／admin 讀模式參考）、`.cursor/rules/no-native-dialogs.mdc`、`.cursor/rules/mobile-first-ux.mdc`、[GLOSSARY.md](./GLOSSARY.md)
 
 一句話：在 **`go.samkuo.me` shell** 提供**全遊樂場布告**（維修／活動／站務）——頂部薄條＋可開的布告欄；**未登入可見**；權威在 Platform（admin 於 dash 發佈）；**不**進 SAM iframe、**不**佔用老闆 flash／廣告槽、**不**擋玩。
 
@@ -16,6 +16,7 @@
   - **廣告槽**＝互推／贊助（讀者不該把維修當廣告）。
   - **`/help`**＝靜態說明（改文靠部署；無未讀／關閉）。
   - **Session chat**＝同局 peer（不是全站）。
+  - **包廂**＝臨時隔間 peer（不是全站布告）。
 - 需要的是**布告欄**，不是 toast、不是論壇。
 
 ---
@@ -324,3 +325,4 @@ platform-api/dash/…                  # 營運「布告」子面
 | 日期 | 變更 |
 | --- | --- |
 | 2026-08-18 | 初版 Draft：全 go 布告；strip＋board；與 flash／ads／chat 切開；Phase B fixture → C–E Platform／dash；投放表與契約 |
+| 2026-08-18 | 與包廂 `/room` 切開（見 [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)） |

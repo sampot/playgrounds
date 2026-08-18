@@ -12,7 +12,7 @@ import {
 export type ShopHotspotId =
   | "boss"
   | "bulletin"
-  | "chat"
+  | "room"
   | "cabinet"
   | "storage"
   | "sfx";
@@ -38,7 +38,7 @@ export const GO_LOBBY_TILE = 16;
 export const GO_LOBBY_HOTSPOTS: readonly ShopHotspot[] = [
   { id: "boss", label: "櫃檯", ...LOBBY_BOSS },
   { id: "bulletin", label: "布告欄", ...LOBBY_BULLETIN },
-  { id: "chat", label: "聊天區", ...LOBBY_CHAT },
+  { id: "room", label: "包廂", ...LOBBY_CHAT },
   { id: "cabinet", label: "機台區", ...LOBBY_CABINET_ZONE },
   { id: "storage", label: "後場", ...LOBBY_STORAGE },
   { id: "sfx", label: "音效", ...LOBBY_AD },
@@ -161,8 +161,8 @@ export function resolveShopHotspotAction(id: ShopHotspotId): LobbyHotspotAction 
       return { type: "open-cabinets" };
     case "bulletin":
       return { type: "open-bulletin" };
-    case "chat":
-      return { type: "navigate", href: "/chat" };
+    case "room":
+      return { type: "navigate", href: "/room" };
     case "storage":
       return { type: "navigate", href: "/apps" };
     case "sfx":

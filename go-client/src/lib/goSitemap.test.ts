@@ -23,6 +23,7 @@ describe("go sitemap", () => {
     });
     expect(xml).toContain("<loc>https://go.samkuo.me/</loc>");
     expect(xml).toContain("<loc>https://go.samkuo.me/help</loc>");
+    expect(xml).toContain("<loc>https://go.samkuo.me/room</loc>");
     expect(xml).toContain("<loc>https://go.samkuo.me/s/pg-breakout</loc>");
     expect(xml).toContain("<lastmod>2026-08-15</lastmod>");
     expect(xml).not.toContain("/i/");

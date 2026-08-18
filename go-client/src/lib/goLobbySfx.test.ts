@@ -82,7 +82,7 @@ describe("lobby tone recipes", () => {
   it("gives each interactable a distinct pitch set", () => {
     const boss = lobbyInteractTones("boss").map((t) => t.freq).join(",");
     const cabinet = lobbyInteractTones("cabinet").map((t) => t.freq).join(",");
-    const chat = lobbyInteractTones("chat").map((t) => t.freq).join(",");
+    const chat = lobbyInteractTones("room").map((t) => t.freq).join(",");
     expect(new Set([boss, cabinet, chat]).size).toBe(3);
     expect(lobbyInteractTones("cabinet").length).toBeGreaterThan(1);
     const attract = lobbyCabinetAttractTones();

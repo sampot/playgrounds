@@ -23,7 +23,7 @@ import {
   type FieldMeProfile,
   type MintInviteResult,
 } from "./platformClient";
-import { stampComposeRelayPrefer } from "@pg/platform/platformCompose";
+import { INVITE_ROOM_KIND, stampComposeRelayPrefer } from "@pg/platform/platformCompose";
 import { chromeSession } from "./chromeSession.svelte";
 import { BOSS_FLASH } from "./goBossWelcome";
 
@@ -277,7 +277,10 @@ class GoAuth {
     return mintPlatformInvite({
       apiKey: key,
       kind: opts.kind,
-      intent: stampComposeRelayPrefer(opts.intent, this.#turnPrefer),
+      intent:
+        opts.kind === INVITE_ROOM_KIND
+          ? opts.intent
+          : stampComposeRelayPrefer(opts.intent, this.#turnPrefer),
       targetField: goOrigin(),
       ttlMs: opts.ttlMs,
     });

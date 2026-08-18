@@ -16,6 +16,11 @@ class ChromeSession {
   /** Monotonic signal for remounting the active solo game after an update. */
   gameReloadRequest = $state(0);
   flash = $state("");
+  /**
+   * When set, layout Escape-to-home asks first. Return false to swallow
+   * (包廂 in-page confirm).
+   */
+  escapeGuard: (() => boolean) | null = null;
 
   /** Solo `/s/` — share + same-kind swap. */
   setSolo(entry: GoCatalogEntry): void {

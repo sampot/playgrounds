@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  INVITE_ROOM_KIND,
+  buildInviteRoomIntent,
   composeWantsRelay,
+  isInviteRoomKind,
   stampComposeRelayPrefer,
+  wantsRosterSignal,
 } from "./platformCompose";
 
 describe("composeWantsRelay", () => {
@@ -55,5 +59,37 @@ describe("stampComposeRelayPrefer", () => {
       version: 1,
       transport: { roster: { signal: true, relay: true } },
     });
+  });
+});
+
+describe("invite.room", () => {
+  it("recognizes the room kind and always wants Roster signal", () => {
+    expect(isInviteRoomKind(INVITE_ROOM_KIND)).toBe(true);
+    expect(isInviteRoomKind("invite.compose")).toBe(false);
+    expect(wantsRosterSignal(INVITE_ROOM_KIND, {})).toBe(true);
+    expect(wantsRosterSignal(INVITE_ROOM_KIND, buildInviteRoomIntent())).toBe(
+      true
+    );
+  });
+
+  it("builds a SAM-less room intent with signaling on and relay off", () => {
+    const intent = buildInviteRoomIntent();
+    expect(intent).toEqual({
+      version: 1,
+      surface: "room",
+      consent: "always_ask",
+      transport: { roster: { signal: true } },
+    });
+    expect(composeWantsRelay(intent)).toBe(false);
+  });
+
+  it("never treats a room surface as compose TURN relay", () => {
+    expect(
+      composeWantsRelay({
+        version: 1,
+        surface: "room",
+        transport: { roster: { signal: true, relay: true } },
+      })
+    ).toBe(false);
   });
 });

@@ -30,6 +30,7 @@ vi.mock("@pg/platform/platformCompose", () => ({
   composeSessionProtocol: fixtures.composeProtocol,
   composeWantsRelay: fixtures.composeRelay,
   wantsRosterSignal: fixtures.wantsSignal,
+  isInviteRoomKind: (kind: string) => kind === "invite.room",
 }));
 
 vi.mock("./goCanvasSupport", () => ({

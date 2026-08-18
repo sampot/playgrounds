@@ -13,7 +13,7 @@ export const GO_HELP_DESK_LINES: readonly HelpDeskLine[] = [
   },
   {
     speaker: GO_HELP_DESK_SPEAKER,
-    text: "點機台或櫃檯就能互動。點地板走動。右邊那桌是聊天區，後場門放已下載的。",
+    text: "點機台或櫃檯就能互動。點地板走動。右邊那桌是包廂，後場門放已下載的。",
   },
   {
     speaker: GO_HELP_DESK_SPEAKER,

@@ -6,6 +6,7 @@
 
 import {
   acceptRosterOffer,
+  type RosterMediaMode,
   type RosterPeerHandlers,
   type RosterPeerSession,
 } from "../roster";
@@ -26,6 +27,8 @@ export function startPlatformHostAnswerLoop(opts: {
   lan?: boolean;
   /** Paid TURN relay is opt-in; omitted／false uses direct STUN connectivity. */
   useRelay?: boolean;
+  /** `ready` for 包廂 first SDP (empty A/V m-lines). Default none. */
+  media?: RosterMediaMode;
   localPresence: { agentId: string; name: string };
   /** Called before each accept so the panel can point handlers at the next PC. */
   prepareHandlers: () => {
@@ -84,6 +87,7 @@ export function startPlatformHostAnswerLoop(opts: {
           localPresence: opts.localPresence,
           handlers: prepared.handlers,
           iceServers,
+          media: opts.media,
         });
         prepared.attachSession(session);
         await putAnswer({

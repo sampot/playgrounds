@@ -133,7 +133,7 @@
 <section class="help-section pixel-frame" aria-labelledby="help-credits">
   <h2 id="help-credits">大廳美術</h2>
   <p>
-    大廳場景以 canvas 幾何繪製（地板、櫃檯、機台、聊天區），不載入 tiles／sprite 圖。
+    大廳場景以 canvas 幾何繪製（地板、櫃檯、機台、包廂），不載入 tiles／sprite 圖。
   </p>
 </section>
 

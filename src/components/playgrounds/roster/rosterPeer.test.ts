@@ -1,7 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   buildRosterRtcConfiguration,
   iceServersIncludeTurn,
+  reserveRosterMediaTransceivers,
+  sdpHasAvMediaLines,
   sdpHasIceCandidates,
 } from "./rosterPeer";
 
@@ -72,5 +74,32 @@ describe("buildRosterRtcConfiguration", () => {
     expect(buildRosterRtcConfiguration(false, servers)).toEqual({
       iceServers: servers,
     });
+  });
+});
+
+describe("reserveRosterMediaTransceivers", () => {
+  it("adds sendrecv audio and video transceivers", () => {
+    const addTransceiver = vi.fn();
+    reserveRosterMediaTransceivers({ addTransceiver });
+    expect(addTransceiver).toHaveBeenCalledWith("audio", {
+      direction: "sendrecv",
+    });
+    expect(addTransceiver).toHaveBeenCalledWith("video", {
+      direction: "sendrecv",
+    });
+  });
+});
+
+describe("sdpHasAvMediaLines", () => {
+  it("requires both audio and video m-lines", () => {
+    expect(sdpHasAvMediaLines("v=0\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\n")).toBe(
+      false
+    );
+    expect(
+      sdpHasAvMediaLines(
+        "v=0\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\nm=video 9 UDP/TLS/RTP/SAVPF 96\r\n"
+      )
+    ).toBe(true);
+    expect(sdpHasAvMediaLines(null)).toBe(false);
   });
 });

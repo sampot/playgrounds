@@ -6,11 +6,12 @@
     title: string;
     url: string;
     spoken?: string;
+    hint?: string;
     onClose: () => void;
     onFlash: (msg: string) => void;
   };
 
-  let { open, title, url, spoken = "", onClose, onFlash }: Props = $props();
+  let { open, title, url, spoken = "", hint, onClose, onFlash }: Props = $props();
 </script>
 
 <ShareSheet
@@ -18,6 +19,7 @@
   {title}
   {url}
   {spoken}
+  hint={hint}
   urlAsLink={false}
   {onClose}
   {onFlash}

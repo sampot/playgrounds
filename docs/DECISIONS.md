@@ -1195,6 +1195,7 @@
 | [PG-GO-SHOP-LOBBY-PLAN.md](./PG-GO-SHOP-LOBBY-PLAN.md) | 純玩版遊樂場大廳 Lobby（室內 canvas；Draft；從屬 DEC-050） |
 | [PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md) | 純玩版登入（play 相容協定）＋ Header profile（DEC-052 Proposed） |
 | [PG-GO-SESSION-CHAT-PLAN.md](./PG-GO-SESSION-CHAT-PLAN.md) | 純玩版同 session 輕量聊天（Draft；從屬 DEC-050／045 transport） |
+| [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md) | 純玩版包廂 `@/room`（Draft；Invite＋WebRTC 一般用途隔間；Phase 1＝文字／傳檔；從屬 DEC-050／045／047） |
 | [PG-STANDALONE-PLAN.md](./PG-STANDALONE-PLAN.md) | 場網／Workers／開源／舊場暫留（DEC-041／042） |
 | [PG-CATALOG-PLAN.md](./PG-CATALOG-PLAN.md) | 小品型錄 YAML／PR 投稿（`catalog/entries/`） |
 | [PG-CATALOG-QUERY-PLAN.md](./PG-CATALOG-QUERY-PLAN.md) | 型錄結構化 JSON＋Playgrounds 查詢／lazy install（DEC-046 Draft） |

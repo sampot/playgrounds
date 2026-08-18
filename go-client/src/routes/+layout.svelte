@@ -50,6 +50,10 @@
       ) {
         return;
       }
+      if (chromeSession.escapeGuard && !chromeSession.escapeGuard()) {
+        event.preventDefault();
+        return;
+      }
       event.preventDefault();
       void goto("/");
     }

@@ -22,6 +22,37 @@ export type InviteComposeIntentV1 = {
   };
 };
 
+export const INVITE_ROOM_KIND = "invite.room" as const;
+
+export type InviteRoomIntentV1 = {
+  version?: 1;
+  surface?: "room";
+  consent?: "always_ask";
+  transport?: {
+    roster?: { signal?: boolean; relay?: boolean };
+  };
+};
+
+export function isInviteRoomKind(kind: string): boolean {
+  return kind === INVITE_ROOM_KIND;
+}
+
+export function isInviteRoomIntent(
+  intent: unknown
+): intent is InviteRoomIntentV1 {
+  if (!intent || typeof intent !== "object") return false;
+  return (intent as InviteRoomIntentV1).surface === "room";
+}
+
+export function buildInviteRoomIntent(): InviteRoomIntentV1 {
+  return {
+    version: 1,
+    surface: "room",
+    consent: "always_ask",
+    transport: { roster: { signal: true } },
+  };
+}
+
 export function isInviteComposeIntent(
   intent: unknown
 ): intent is InviteComposeIntentV1 {
@@ -36,7 +67,7 @@ export function wantsRosterSignal(
   kind: string,
   intent: unknown
 ): boolean {
-  if (kind === "signal.handshake") return true;
+  if (kind === "signal.handshake" || isInviteRoomKind(kind)) return true;
   if (kind !== "invite.compose") return false;
   if (!isInviteComposeIntent(intent)) return true;
   return intent.transport?.roster?.signal !== false;
@@ -44,6 +75,7 @@ export function wantsRosterSignal(
 
 /** TURN is paid／privacy-sensitive transport and therefore explicit opt-in. */
 export function composeWantsRelay(intent: unknown): boolean {
+  if (isInviteRoomIntent(intent)) return false;
   return (
     isInviteComposeIntent(intent) &&
     intent.transport?.roster?.relay === true

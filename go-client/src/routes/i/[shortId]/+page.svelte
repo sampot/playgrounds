@@ -14,7 +14,8 @@
     goInviteCanonicalUrl,
     goOgMeta,
   } from "$lib/goShareMeta";
-  import { composeSamSource } from "@pg/platform/platformCompose";
+  import { composeSamSource, isInviteRoomKind } from "@pg/platform/platformCompose";
+  import GoRoomSurface from "$lib/GoRoomSurface.svelte";
   import {
     likelyInAppBrowser,
   } from "$lib/goCanvasSupport";
@@ -44,13 +45,19 @@
     samSource ? findGoCatalogBySource(samSource) ?? null : null
   );
 
+  const isRoom = $derived(
+    Boolean(status?.meta && isInviteRoomKind(status.meta.kind)) ||
+      status?.surface === "room"
+  );
+
   $effect(() => {
     const source = samSource;
     if (
       !status ||
       status.phase === "idle" ||
       status.phase === "cancelled" ||
-      status.phase === "ended"
+      status.phase === "ended" ||
+      isRoom
     ) {
       chromeSession.clear();
       return;
@@ -163,10 +170,10 @@
     </div>
   </div>
 {:else if status.phase === "ended"}
-  <h1 class="pixel-text">這一場已結束</h1>
+  <h1 class="pixel-text">{isRoom ? "這一間已結束" : "這一場已結束"}</h1>
   <div class="pixel-status" role="status">
-    <p class="pixel-status-title">{status.error || "主持已結束這一場"}</p>
-    <p class="pixel-status-body">可請主持重新邀請，或回遊樂場大廳挑別的小品。</p>
+    <p class="pixel-status-title">{status.error || (isRoom ? "主持已結束這一間" : "主持已結束這一場")}</p>
+    <p class="pixel-status-body">{isRoom ? "可請主持重新邀請，或回遊樂場大廳。" : "可請主持重新邀請，或回遊樂場大廳挑別的小品。"}</p>
     <div class="actions">
       <a class="pixel-btn pixel-btn--primary" href="/">回遊樂場大廳</a>
       <button type="button" class="pixel-btn" onclick={onReopenInvite}>
@@ -201,11 +208,13 @@
   <div class="pixel-frame invite-panel">
     {#if inAppHint}
       <p class="hint" role="note">
-        偵測到 App 內建瀏覽器。若加入後無法顯示遊戲畫面，請改用 Safari／Chrome 開啟本連結。
+        偵測到 App 內建瀏覽器。若加入後畫面不完整，請改用 Safari／Chrome 開啟本連結。
       </p>
     {/if}
     <p class="lead">
-      {#if inviteEntry?.title}
+      {#if isRoom}
+        邀請你進這間包廂
+      {:else if inviteEntry?.title}
         邀請你玩「{inviteEntry.title}」
       {:else}
         有人邀請你加入這一場
@@ -229,13 +238,24 @@
         disabled={busy}
         onclick={() => void onAccept()}
       >
-        {busy ? "處理中…" : "同意加入"}
+        {busy ? "處理中…" : isRoom ? "進這間包廂" : "同意加入"}
       </button>
       <button type="button" class="pixel-btn" disabled={busy} onclick={onDecline}>
         取消
       </button>
     </div>
   </div>
+{:else if isRoom && (status.phase === "connecting" || status.phase === "ready")}
+  <GoRoomSurface
+    role="guest"
+    phase={status.phase === "ready" ? "ready" : "connecting"}
+    message={status.message}
+    error={status.error}
+    shortUrl={null}
+    inviteExpiresAt={null}
+    peerName={null}
+    onEnd={() => runtime.decline()}
+  />
 {:else if showCanvas}
   <h1 class="sr-only">邀請</h1>
   <div class="stage stage--fill">

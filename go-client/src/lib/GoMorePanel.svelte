@@ -371,8 +371,8 @@
           <a class="go-more-btn go-more-link" href="/help" onclick={onClose}>
             使用說明
           </a>
-          <a class="go-more-btn go-more-link" href="/chat" onclick={onClose}>
-            聊天區
+          <a class="go-more-btn go-more-link" href="/room" onclick={onClose}>
+            包廂
           </a>
         </section>
 

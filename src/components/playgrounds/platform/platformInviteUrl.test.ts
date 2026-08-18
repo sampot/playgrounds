@@ -65,4 +65,8 @@ describe("platformCompose", () => {
   it("signal.handshake always wants signal", () => {
     expect(wantsRosterSignal("signal.handshake", {})).toBe(true);
   });
+
+  it("invite.room always wants signal", () => {
+    expect(wantsRosterSignal("invite.room", {})).toBe(true);
+  });
 });

@@ -86,9 +86,9 @@ export const GO_HELP_DOCUMENT_TITLE = `使用說明 · ${GO_SITE_NAME}`;
 export const GO_HELP_DESCRIPTION =
   `${GO_SITE_NAME} · 純玩｜如何加入主畫面，以及用 LINE 等 App 內建瀏覽器開啟時怎麼改用系統瀏覽器。`;
 
-export const GO_CHAT_DOCUMENT_TITLE = `聊天區 · ${GO_SITE_NAME}`;
-export const GO_CHAT_DESCRIPTION =
-  `${GO_SITE_NAME} · 純玩｜會員可邀請朋友線上對話、分享檔案。即將在大廳聊天區開放。`;
+export const GO_ROOM_DOCUMENT_TITLE = `包廂 · ${GO_SITE_NAME}`;
+export const GO_ROOM_DESCRIPTION =
+  `${GO_SITE_NAME} · 純玩｜會員可邀請朋友進包廂：連線對話、傳送檔案。對話與檔案只在雙方瀏覽器之間，不會存到伺服器。`;
 
 export function goInviteCanonicalUrl(
   shortId: string,

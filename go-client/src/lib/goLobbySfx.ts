@@ -104,7 +104,7 @@ export function lobbyInteractTones(id: ShopHotspotId): OscTone[] {
         { type: "square", freq: 880, durationMs: 70, gain: 0.07 },
         { type: "square", freq: 1320, durationMs: 90, gain: 0.045, delayMs: 55 },
       ];
-    case "chat":
+    case "room":
       return [
         { type: "sine", freq: 440, durationMs: 90, gain: 0.05 },
         { type: "triangle", freq: 660, durationMs: 130, gain: 0.035, delayMs: 70 },

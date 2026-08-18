@@ -706,7 +706,7 @@ export function drawLobbyFrame(
   drawBulletin(ctx, active === "bulletin");
   drawAd(ctx, colors, state.sfxEnabled === false, active === "sfx", nowMs);
   drawCounter(ctx, colors, active === "boss", nowMs);
-  drawChat(ctx, colors, active === "chat");
+  drawChat(ctx, colors, active === "room");
   drawCabinets(
     ctx,
     colors,

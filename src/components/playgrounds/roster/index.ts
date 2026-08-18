@@ -33,6 +33,8 @@ export {
   isAvatarRelayMessage,
   iceServersIncludeTurn,
   buildRosterRtcConfiguration,
+  reserveRosterMediaTransceivers,
+  sdpHasAvMediaLines,
 } from "./rosterPeer";
 export type {
   RosterPeerSession,
@@ -40,6 +42,7 @@ export type {
   RosterPresenceMsg,
   RosterAvatarRelayMsg,
   RosterWireTransport,
+  RosterMediaMode,
 } from "./rosterPeer";
 
 export { drawIdenticon, identiconDataUrl } from "./rosterIdenticon";
@@ -223,3 +226,24 @@ export type {
   SessionChatUiPhase,
   SessionChatRole,
 } from "./rosterSessionChat";
+
+export {
+  SESSION_FILE_TYPE,
+  SESSION_FILE_VERSION,
+  SESSION_FILE_MAX_BYTES,
+  SESSION_FILE_CHUNK_PAYLOAD_MAX,
+  isBlockedSessionFileName,
+  isSessionFileControl,
+  normalizeSessionFileOffer,
+  buildSessionFileControl,
+  sessionFileChunkCount,
+  encodeSessionFileChunk,
+  decodeSessionFileChunk,
+  assembleSessionFileChunks,
+  splitSessionFilePayload,
+} from "./rosterSessionFile";
+export type {
+  SessionFileOp,
+  SessionFileControl,
+  SessionFileChunk,
+} from "./rosterSessionFile";

@@ -2,7 +2,7 @@
 
 > **狀態：** Draft（2026-08-16）— GO-INVITE 實作落地（DEC-053 `env.HOST`）；Phase 5 手測進行中  
 > **權威決策：** 建議 [DECISIONS.md](./DECISIONS.md) **DEC-052**（§5.3 玩家主場互邀＝GO-INVITE；本文件實作之）  
-> **相關：** [PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md)（登入＋記憶體 field API key）、[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)（純玩版；玩家主場）、[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)（五子棋 `gomoku.v1`；**作者面** Host 鑄邀請）、[PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)、[GLOSSARY.md](./GLOSSARY.md)  
+> **相關：** [PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md)（登入＋記憶體 field API key）、[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)（純玩版；玩家主場）、[PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)（包廂＝`invite.room`，**不是**本刀 compose）、[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)（五子棋 `gomoku.v1`；**作者面** Host 鑄邀請）、[PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)、[GLOSSARY.md](./GLOSSARY.md)  
 > **載體 SAM：** 型錄 [`pg-gomoku`](../catalog/entries/pg-gomoku.yaml)（source [`sampot/pg-gomoku`](https://github.com/sampot/pg-gomoku)；`gomoku.v1`）
 
 一句話：**登入 go 的玩家（玩家主場，DEC-050）在遊戲中開一局、對另一位玩家發出邀請；對手開 `https://go.samkuo.me/i/<short_id>` 入座對弈。** play 與 go **都可**鑄邀請；go 以玩家記憶體 field API key 走 `invite.compose`，並以 `env.HOST`（`createGoHostBinding`）主持 session。

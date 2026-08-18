@@ -599,4 +599,6 @@
   />
 {/if}
 
-<GoSessionChatPanel />
+{#if goSessionChat.layout !== "page"}
+  <GoSessionChatPanel />
+{/if}

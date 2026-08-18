@@ -1,7 +1,7 @@
 /** Routes where Escape leaves the page for the lobby home. */
 export function isEscapeHomePath(pathname: string): boolean {
   const path = pathname.replace(/\/+$/, "") || "/";
-  return path === "/help" || path === "/apps" || path === "/chat";
+  return path === "/help" || path === "/apps" || path === "/chat" || path === "/room";
 }
 
 export function shouldEscapeToHome(args: {

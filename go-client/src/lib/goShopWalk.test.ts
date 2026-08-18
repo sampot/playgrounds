@@ -274,7 +274,7 @@ describe("resolveWalkBump", () => {
         alreadyContact: null,
         deltaSec: 0.05,
       }).activate
-    ).toBe("chat");
+    ).toBe("room");
   });
 
   it("activates a cabinet when walking into a machine", () => {

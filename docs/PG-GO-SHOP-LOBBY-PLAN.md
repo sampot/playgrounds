@@ -2,9 +2,9 @@
 
 > **狀態：** Draft（2026-08-18；修訂：里程碑含 **Phase B 輕量行走**；**大廳場景＝canvas**；**室內遊樂場**敘事）— Phase **A＋B** 已落地；布告欄 Phase B stub 已接線  
 > **權威決策：** 從屬 [DECISIONS.md](./DECISIONS.md) **DEC-050**（純玩版 `go.samkuo.me`）；**不另開 DEC**  
-> **相關：** [PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)、[PG-GO-BOSS-FLASH-PLAN.md](./PG-GO-BOSS-FLASH-PLAN.md)（老闆＝服務台）、[PG-GO-BULLETIN-PLAN.md](./PG-GO-BULLETIN-PLAN.md)（布告欄）、[PG-GO-ADS-PLAN.md](./PG-GO-ADS-PLAN.md)（廣告看板）、[PG-GO-UX-POLISH-PLAN.md](./PG-GO-UX-POLISH-PLAN.md)、[PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md)、`.cursor/rules/no-native-dialogs.mdc`、`.cursor/rules/mobile-first-ux.mdc`、`.cursor/rules/game-assets-attribution.mdc`、[GLOSSARY.md](./GLOSSARY.md)
+> **相關：** [PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)、[PG-GO-BOSS-FLASH-PLAN.md](./PG-GO-BOSS-FLASH-PLAN.md)（老闆＝服務台）、[PG-GO-BULLETIN-PLAN.md](./PG-GO-BULLETIN-PLAN.md)（布告欄）、[PG-GO-ADS-PLAN.md](./PG-GO-ADS-PLAN.md)（廣告看板）、[PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)（包廂 `/room`；大廳熱點入口）、[PG-GO-UX-POLISH-PLAN.md](./PG-GO-UX-POLISH-PLAN.md)、[PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md)、`.cursor/rules/no-native-dialogs.mdc`、`.cursor/rules/mobile-first-ux.mdc`、`.cursor/rules/game-assets-attribution.mdc`、[GLOSSARY.md](./GLOSSARY.md)
 
-一句話：把 go **首頁 `/`** 從「App 列表殼」升級成 **室內遊樂場大廳**（湯姆熊式：走進去、逛大廳、玩機台）——**單一 `<canvas>`** 繪製室內地圖／機台 sprite／avatar；玩家在大廳內**輕量行走**（並保 hit／清單捷徑）接觸布告欄、詢問處、老闆服務台、機台等；**殼是大廳、小品仍是小品**；深鏈 `/s/`／`/i/` **不經強制逛大廳**。
+一句話：把 go **首頁 `/`** 從「App 列表殼」升級成 **室內遊樂場大廳**（湯姆熊式：走進去、逛大廳、玩機台）——**單一 `<canvas>`** 繪製室內地圖／機台 sprite／avatar；玩家在大廳內**輕量行走**（並保 hit／清單捷徑）接觸布告欄、詢問處、老闆服務台、機台、**包廂門**等；**殼是大廳、小品仍是小品**；深鏈 `/s/`／`/i/`／進 **`/room`** **不經強制逛大廳**。
 
 > **程式識別：** 模組前綴可沿用 `GoShop*`／`goShop*`（Draft 檔名）；**讀者面**統一「遊樂場／大廳／機台」，勿譯成零售「店」。
 
@@ -75,7 +75,7 @@
 | 面 | 大廳 Lobby | 說明 |
 | --- | --- | --- |
 | **`/` 首頁** | ✅ 主場 | 大廳 canvas＋清單捷徑 |
-| **`/help`／`/apps`** | ❌ 不重做大廳 | 可從熱點進入；頁維持功能面 |
+| **`/help`／`/apps`／`/room`** | ❌ 不重做大廳 | 可從熱點進入；頁維持功能面 |
 | **`/s/<id>` 載入／錯誤** | ❌ | 可「回遊樂場」→ `/` |
 | **`canvasActive`** | ❌ | 大廳 canvas 不顯示、不接收輸入 |
 | **`/i/`** | ❌ | 不經大廳；critical 布告見 bulletin 計劃 |
@@ -91,6 +91,7 @@
 | **後場門** | 本機溢流 | → `/apps` | 雲庫 |
 | **廣告看板** | house／贊助 | canvas sprite；→ 下方 DOM `GoAdSlot` | 維修文案 |
 | **Session chat** | 同局 peer | **不**進大廳 | — |
+| **包廂** | 臨時隔間 `/room` | 熱點 **包廂門** → `/room` | 局內 overlay；公開聊天區 |
 
 ---
 
@@ -103,6 +104,7 @@
 | `help` | 詢問處 | 頁內 RPG 對話（一次一則） | `/help` 仍為清單／更多的靜態說明 |
 | `cabinet` | 機台區 | 清單 overlay（蓋在 canvas 上） | 開玩＝`/s/<id>`；canvas 可繪多台 sprite |
 | `storage` | 後場 | → `/apps` | 本機溢流 |
+| `room` | 包廂 | → `/room` | 契約 id；現況程式 `chat`／`/chat` 應遷過來。見 [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md) |
 | `ad` | （裝飾） | 無互動；後牆 PLAY 僅視覺 | 廣告在頁面 `GoAdSlot`，不進捷徑 |
 
 > **遷移：** 早期草案 `shelf`（試玩台）語意併入 **`cabinet`（機台）**；`door`→`play` 已移除（大廳不導場殼）。
@@ -139,6 +141,7 @@
 | --- | --- |
 | `/i/<short_id>` | 直接 Invite；**不**進大廳 |
 | `/s/<id>` | 直接載入；可「回遊樂場」→ `/` |
+| `/room` | 包廂殼面；**不**經大廳；見 [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md) |
 | `/` | 大廳 Lobby；可觸發老闆自動歡迎 |
 
 場景資產**懶載**，不阻塞 `/s/`／`/i/`。
@@ -302,7 +305,7 @@ go-client/ATTRIBUTION.md
 | --- | --- |
 | 遊樂場、大廳、機台、服務台、老闆 | 零售店、道具店、戶外全園、theme park |
 | Lobby canvas、hit-test、清單模式 | DOM 地圖、把大廳當 SAM |
-| 後場、詢問處、布告欄 | 儀表板、通知中心 |
+| 後場、詢問處、布告欄、包廂門 | 儀表板、通知中心、大廳公開聊天室 |
 | 深鏈 bypass | 掃碼先逛大廳 |
 | 湯姆熊式（內部錨點；對外勿商標） | 對外寫競品名 |
 
@@ -322,3 +325,4 @@ go-client/ATTRIBUTION.md
 | 2026-08-18 | 詢問處改頁內 RPG 對話（一次一則；`/help` 仍為靜態說明） |
 | 2026-08-18 | 機台區／詢問處對話改 canvas overlay（不在頁面下方展開） |
 | 2026-08-18 | 大廳改程序化繪製（不載入 tiles／sprite）；版面對齊櫃檯／機台列／南向走道 |
+| 2026-08-18 | 熱點 **包廂** → `/room`（契約 `room`；見 [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)） |

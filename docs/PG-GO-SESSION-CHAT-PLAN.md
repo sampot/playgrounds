@@ -2,7 +2,7 @@
 
 > **狀態：** Draft（2026-08-16）— **P0–P2 程式已落地**（手測／P3 多人待）；§10 決策已凍結  
 > **權威決策：** 從屬 [DECISIONS.md](./DECISIONS.md) **DEC-050**（純玩版）、**DEC-045**（Roster transport；**非** Avatars 產品面）；不另開 DEC  
-> **相關：** [PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)（chrome／Invite／§6.4 自動收起）、[PG-GO-HOST-INVITE-PLAN.md](./PG-GO-HOST-INVITE-PLAN.md)（GO-INVITE）、[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)（五子棋；鎖 1 Guest）、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)（**已取消**側欄名冊——本刀**勿**復辟）、[PG-GO-UX-POLISH-PLAN.md](./PG-GO-UX-POLISH-PLAN.md)、[PG-GO-BOSS-FLASH-PLAN.md](./PG-GO-BOSS-FLASH-PLAN.md)（氣泡家族；**勿**與老闆台詞混為一談）、`.cursor/rules/no-native-dialogs.mdc`、`.cursor/rules/mobile-first-ux.mdc`、[GLOSSARY.md](./GLOSSARY.md)
+> **相關：** [PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)（chrome／Invite／§6.4 自動收起）、[PG-GO-HOST-INVITE-PLAN.md](./PG-GO-HOST-INVITE-PLAN.md)（GO-INVITE）、[PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)（包廂 `/room`＝一般用途隔間；**不是**本 overlay）、[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)（五子棋；鎖 1 Guest）、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)（**已取消**側欄名冊——本刀**勿**復辟）、[PG-GO-UX-POLISH-PLAN.md](./PG-GO-UX-POLISH-PLAN.md)、[PG-GO-BOSS-FLASH-PLAN.md](./PG-GO-BOSS-FLASH-PLAN.md)（氣泡家族；**勿**與老闆台詞混為一談）、`.cursor/rules/no-native-dialogs.mdc`、`.cursor/rules/mobile-first-ux.mdc`、[GLOSSARY.md](./GLOSSARY.md)
 
 一句話：已連上**同一 Invite／session** 的玩家之間，由殼提供**預設收合**的輕量對話（自由文字預設開、遊戲可建議關；＋可選快捷語）；入口＝**右緣中段把手**（與左側 `GoGameDrawer` 對稱）；訊息＝獨立 DataChannel `type: "session_chat"`、**peer fanout**；**go ⊂ play** 同約共用；**不**經 Platform、**不**進 session 權威、**不**做成常駐側欄名冊。
 
@@ -33,8 +33,8 @@
 - 把聊天寫進 `gomoku.v1`（或任一 game）session protocol／`act` 權威狀態。
 - `/s/` 單機純玩聊天（無 peer）。
 - 為 go **另造**一套與 play 不相容的 chat wire／殼 API（見 §7.5）。
-- 語音、貼圖包、檔案傳送、已讀回條產品化、審核／檢舉後台。
-- 觀戰席專用聊天產品化、多房間、大廳配對（fanout＝**同 session 座位**，不是跨場大廳）。
+- 語音、貼圖包、檔案傳送、已讀回條產品化、審核／檢舉後台（**僅本 overlay**；包廂傳檔／預留音視訊見 [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)）。
+- 觀戰席專用聊天產品化、大廳配對（fanout＝**同 session 座位**，不是跨場大廳；**不是** go 包廂 `/room`）。
 
 ---
 
@@ -294,7 +294,7 @@ type SessionChatHints = {
 | 右側邊緣把手、與 GameDrawer 對稱 | 右下浮動鈕、bottom sheet 主入口 |
 | fanout／同場廣播 | 私訊頻道、送對手（寫死雙人 API） |
 | 共用契約、go ⊂ play | go 專用協定、play 另一套 wire |
-| 臨時、這一局 | 雲端紀錄、好友聊天 |
+| 臨時、這一局 | 雲端紀錄、好友聊天、把 overlay 叫做包廂 |
 | 殼層入口；遊戲**建議** | 每款遊戲自建聊天 UI（作為主路徑） |
 
 ---
@@ -346,3 +346,4 @@ type SessionChatHints = {
 | 2026-08-16 | **P2 落地（程式）：** 殼預設快捷語；`playgrounds-session-chat-hints` listener；guest 自 session event 推 uiPhase；sdk.d.ts 合約註解 |
 | 2026-08-16 | **聊天面板打磨：** 快捷訊息預設收起、點選展開、送出後收起；訊息改 RPG 像素對話 bubble |
 | 2026-08-16 | **Host 標記：** wire 可選 `role:"host"`；顯示名「主持」＋金色「主持」tag；不再用「玩家 A」 |
+| 2026-08-18 | 與 [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md) 切開：overlay 非目標的傳檔／語音**不**禁止包廂；用語勿把 overlay 叫包廂 |

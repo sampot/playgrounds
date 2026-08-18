@@ -130,5 +130,5 @@ export function shouldShowBulletinStrip(options: {
   if (path.startsWith("/i/")) {
     return options.severity === "critical";
   }
-  return path === "/" || path === "/apps" || path === "/help" || path === "/chat" || path.startsWith("/s/");
+  return path === "/" || path === "/apps" || path === "/help" || path === "/chat" || path === "/room" || path.startsWith("/s/");
 }

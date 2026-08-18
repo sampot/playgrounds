@@ -89,12 +89,12 @@ describe("resolveShopHotspotAction", () => {
     });
   });
 
-  it("maps chat lounge to /chat", () => {
-    expect(hitTestShopHotspot(LOBBY_CHAT.x + 8, LOBBY_CHAT.y + 8)).toBe("chat");
-    expect(getShopHotspot("chat")?.label).toBe("聊天區");
-    expect(resolveShopHotspotAction("chat")).toEqual({
+  it("maps 包廂 lounge to /room", () => {
+    expect(hitTestShopHotspot(LOBBY_CHAT.x + 8, LOBBY_CHAT.y + 8)).toBe("room");
+    expect(getShopHotspot("room")?.label).toBe("包廂");
+    expect(resolveShopHotspotAction("room")).toEqual({
       type: "navigate",
-      href: "/chat",
+      href: "/room",
     });
   });
 });

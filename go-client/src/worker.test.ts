@@ -18,6 +18,17 @@ describe("go static asset router", () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
+  it("redirects legacy /chat to /room", async () => {
+    const fetch = vi.fn();
+    const response = await worker.fetch(
+      new Request("https://go.samkuo.me/chat"),
+      { ASSETS: { fetch } }
+    );
+    expect(response.status).toBe(308);
+    expect(response.headers.get("location")).toBe("https://go.samkuo.me/room");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it("passes non-invite requests to the original asset URL", async () => {
     const fetch = vi.fn(async (request: Request) => {
       return new Response(new URL(request.url).pathname);

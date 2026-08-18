@@ -14,6 +14,7 @@ import {
   composeSamSource,
   composeSessionProtocol,
   composeWantsRelay,
+  isInviteRoomKind,
   wantsRosterSignal,
 } from "@pg/platform/platformCompose";
 import type { FileMap } from "@pg/projectTypes";
@@ -40,7 +41,10 @@ import {
   sessionChatPhaseFromEvent,
 } from "@pg/roster/rosterSessionChat";
 import { goSessionChat } from "./goSessionChat.svelte";
+import { goRoomFiles } from "./goRoomFiles.svelte";
+import { GO_ROOM_QUICK_REPLIES } from "./goRoom";
 import { chromeSession } from "./chromeSession.svelte";
+import { isSessionFileControl } from "@pg/roster/rosterSessionFile";
 import {
   SESSION_INVITE_ACCEPT_KIND,
   SESSION_INVITE_REJECT_KIND,
@@ -104,6 +108,8 @@ export type GuestStatus = {
   displayName: string;
   /** File download progress while `phase === "loading_sam"`. */
   loadProgress: GoLoadProgress | null;
+  /** `room` skips SAM／canvas; `sam` is the game invite path. */
+  surface: "sam" | "room" | null;
 };
 
 type Listener = (s: GuestStatus) => void;
@@ -144,6 +150,7 @@ export function createGuestRuntime() {
     canvasGeneration: 0,
     displayName: "對手",
     loadProgress: null,
+    surface: null,
   };
   const listeners = new Set<Listener>();
   let localAgentId = newAgentId();
@@ -223,6 +230,7 @@ export function createGuestRuntime() {
     composeProtocolId = null;
     accepted = false;
     goSessionChat.detach();
+    goRoomFiles.detach();
     try {
       peerSession?.close();
     } catch {
@@ -241,6 +249,7 @@ export function createGuestRuntime() {
       canvasMode: null,
       canvasGeneration: 0,
       loadProgress: null,
+      surface: null,
     });
   }
 
@@ -447,6 +456,135 @@ export function createGuestRuntime() {
     }
   }
 
+  function sendRoomBinary(buf: ArrayBuffer): void {
+    const ch = peerSession?.getChannel();
+    if (!ch || ch.readyState !== "open") return;
+    ch.send(buf);
+  }
+
+  async function connectRoom(name: string, meta: InviteMeta): Promise<void> {
+    set({
+      phase: "connecting",
+      message: "正在進包廂…",
+      surface: "room",
+      canvasUrl: null,
+      canvasSrcdoc: null,
+      canvasMode: null,
+    });
+    try {
+      localAgentId = newAgentId();
+      const join = await createJoin(meta.secret, platformApiOrigin());
+      const slot: { s: RosterPeerSession | null; attached: boolean } = {
+        s: null,
+        attached: false,
+      };
+
+      const attachRoomChannels = () => {
+        const sess = slot.s;
+        if (!sess || slot.attached) return;
+        slot.attached = true;
+        goSessionChat.attach({
+          localAgentId,
+          localName: status.displayName,
+          localRole: "guest",
+          layout: "page",
+          peers: [sess],
+          broadcast: (msg) => broadcastSessionChat([sess], msg),
+        });
+        goSessionChat.setHints({
+          freeText: true,
+          quickReplies: [...GO_ROOM_QUICK_REPLIES],
+        });
+        goSessionChat.setUiPhase("active");
+        goRoomFiles.attach({
+          sendJson: (msg) => {
+            try {
+              sess.send(msg);
+            } catch {
+              /* ignore */
+            }
+          },
+          sendBinary: (buf) => sendRoomBinary(buf),
+        });
+        set({
+          phase: "ready",
+          surface: "room",
+          message: "已連線",
+          error: null,
+        });
+      };
+
+      const result = await createRosterOffer({
+        transport: "signal",
+        media: "ready",
+        localPresence: {
+          agentId: localAgentId,
+          name,
+        },
+        handlers: {
+          onMessage: (data: unknown) => {
+            if (isPresenceMessage(data)) {
+              peerAgentId = data.agentId;
+            } else if (isSessionChatMessage(data)) {
+              goSessionChat.onIncoming(data);
+            } else if (isSessionFileControl(data)) {
+              goRoomFiles.onControl(data);
+            }
+          },
+          onBinary: (buf) => goRoomFiles.onBinary(buf),
+          onChannelOpen: () => attachRoomChannels(),
+          onChannelClose: () => {
+            goSessionChat.detach();
+            goRoomFiles.detach();
+            markHostEnded("主持已結束連線");
+          },
+          onConnectionState: (state: RTCPeerConnectionState) => {
+            if (
+              state === "failed" ||
+              state === "disconnected" ||
+              state === "closed"
+            ) {
+              markHostEnded("主持已結束連線");
+            }
+          },
+          onError: (err: Error) => {
+            set({
+              phase: "error",
+              error: friendlyInviteError(err, "連線失敗"),
+              message: "",
+            });
+          },
+        },
+      });
+      slot.s = result.session;
+      peerSession = result.session;
+      if (result.session.getChannel()?.readyState === "open") {
+        attachRoomChannels();
+      }
+
+      const answered = await postOfferAndWaitAnswer({
+        inviteId: meta.inviteId,
+        joinCap: join.join_cap,
+        offerWire: result.wire,
+        origin: platformApiOrigin(),
+      });
+      await applyRosterAnswer(result.session, answered.answer);
+      if (status.phase === "connecting") {
+        set({
+          phase: "connecting",
+          surface: "room",
+          message: "握手完成，等待通道開啟…",
+        });
+      }
+    } catch (e) {
+      set({
+        phase: "error",
+        error: friendlyInviteError(e, "連線失敗"),
+        message: "",
+      });
+    }
+  }
+
   async function consentAndPlay(displayName: string): Promise<void> {
     const meta = status.meta;
     if (!meta) {
@@ -460,6 +598,11 @@ export function createGuestRuntime() {
       /* ignore */
     }
     set({ displayName: name, error: null });
+
+    if (isInviteRoomKind(meta.kind)) {
+      await connectRoom(name, meta);
+      return;
+    }
 
     const source = composeSamSource(meta.intent);
     if (!source) {
@@ -479,6 +622,7 @@ export function createGuestRuntime() {
       phase: "loading_sam",
       message: "正在檢查小品版本…",
       loadProgress: { ratio: null, detail: "檢查遊戲版本…" },
+      surface: "sam",
     });
     try {
       // Invite：入座前檢查 tip；沒包或 tipRev 過期才全量下載。
@@ -689,6 +833,7 @@ export function createGuestRuntime() {
 
   function decline(): void {
     goSessionChat.detach();
+    goRoomFiles.detach();
     peerSession?.close();
     peerSession = null;
     samFiles = null;
@@ -705,6 +850,7 @@ export function createGuestRuntime() {
       canvasMode: null,
       canvasGeneration: 0,
       loadProgress: null,
+      surface: null,
     });
   }
 

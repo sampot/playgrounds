@@ -90,6 +90,28 @@ describe("goSessionChat", () => {
     expect(goSessionChat.messages).toHaveLength(1);
   });
 
+  it("page layout skips unread toasts and resets on detach", () => {
+    goSessionChat.attach({
+      localAgentId: "me",
+      peers: [{ send: () => {} }],
+      layout: "page",
+    });
+    expect(goSessionChat.layout).toBe("page");
+    expect(
+      goSessionChat.onIncoming({
+        type: "session_chat",
+        id: "p1",
+        from: "them",
+        text: "在嗎",
+        ts: 1,
+        v: 1,
+      })
+    ).toBeNull();
+    expect(goSessionChat.unread).toBe(0);
+    goSessionChat.detach();
+    expect(goSessionChat.layout).toBe("rail");
+  });
+
   it("detaches clears timeline and connected", () => {
     goSessionChat.attach({
       localAgentId: "me",

@@ -38,6 +38,8 @@ class GoSessionChat {
   /** Session UI phase for freeText gating (active vs waiting). */
   uiPhase = $state<SessionChatUiPhase>("waiting");
   hints = $state<SessionChatHints>({});
+  /** `page` = 包廂 full-page timeline (hide right-rail overlay). */
+  layout = $state<"rail" | "page">("rail");
 
   #broadcast: BroadcastFn | null = null;
   #seenIds = new Set<string>();
@@ -57,12 +59,14 @@ class GoSessionChat {
     localName?: string;
     localRole?: SessionChatRole;
     peers: readonly SessionChatSendTarget[];
+    layout?: "rail" | "page";
     /** Optional custom fanout (e.g. live peer map). Default: broadcast opts.peers. */
     broadcast?: BroadcastFn;
   }): void {
     this.localAgentId = opts.localAgentId;
     this.localName = opts.localName?.trim() || "";
     this.localRole = opts.localRole ?? null;
+    this.layout = opts.layout ?? "rail";
     const peers = opts.peers;
     this.#broadcast =
       opts.broadcast ||
@@ -103,6 +107,7 @@ class GoSessionChat {
     this.localRole = null;
     this.uiPhase = "waiting";
     this.hints = {};
+    this.layout = "rail";
     this.#broadcast = null;
     this.#seenIds.clear();
     this.#lastSendAt = 0;
@@ -131,7 +136,7 @@ class GoSessionChat {
       ...this.messages,
       { ...raw, local: false },
     ]);
-    if (this.panelOpen) {
+    if (this.layout === "page" || this.panelOpen) {
       this.unread = 0;
       return null;
     }

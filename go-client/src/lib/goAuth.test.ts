@@ -189,6 +189,45 @@ describe("goAuth.mintPlatformInvite (GO-INVITE)", () => {
     });
   });
 
+  it("does not stamp relay for invite.room even when Host prefers TURN", async () => {
+    goAuth.__setApiKeyForTests("pg_sk_test");
+    goAuth.__setTurnPreferForTests(true);
+    let body: Record<string, unknown> = {};
+    vi.stubGlobal(
+      "fetch",
+      async (_input: RequestInfo | URL, init?: RequestInit) => {
+        body = JSON.parse(String(init?.body) || "{}");
+        return new Response(
+          JSON.stringify({
+            invite_id: "inv_room",
+            kind: "invite.room",
+            expires_at: 1780000000000,
+            short_url: "https://go.samkuo.me/i/room1",
+            deep_link: "https://go.samkuo.me/i/room1",
+            secret: "sec",
+          }),
+          { status: 200, headers: { "content-type": "application/json" } }
+        );
+      }
+    );
+
+    await goAuth.mintPlatformInvite({
+      kind: "invite.room",
+      intent: {
+        version: 1,
+        surface: "room",
+        transport: { roster: { signal: true } },
+      },
+    });
+
+    expect(body.kind).toBe("invite.room");
+    expect(body.intent).toEqual({
+      version: 1,
+      surface: "room",
+      transport: { roster: { signal: true } },
+    });
+  });
+
   it("gives not_provisioned without a key", async () => {
     goAuth.__setApiKeyForTests(null);
     await expect(

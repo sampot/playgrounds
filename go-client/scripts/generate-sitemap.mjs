@@ -1,6 +1,6 @@
 /**
  * Build go-client/static/sitemap.xml for search engines.
- * Indexable: `/`, `/help`, listed `/s/<id>` only (not `/i/`, not unlisted).
+ * Indexable: `/`, `/help`, `/room`, listed `/s/<id>` only (not `/i/`, not unlisted).
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -45,6 +45,7 @@ export function buildSitemapXml(
   const urls = [
     `${base}/`,
     `${base}/help`,
+    `${base}/room`,
     ...catalogIds.map(id => `${base}/s/${encodeURIComponent(id)}`),
   ];
   const body = urls

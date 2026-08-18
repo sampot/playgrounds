@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   GO_HELP_DOCUMENT_TITLE,
-  GO_CHAT_DOCUMENT_TITLE,
-  GO_CHAT_DESCRIPTION,
+  GO_ROOM_DOCUMENT_TITLE,
+  GO_ROOM_DESCRIPTION,
   GO_HOME_DESCRIPTION,
   GO_HOME_DOCUMENT_TITLE,
   GO_HOME_LEAD,
@@ -76,10 +76,10 @@ describe("goShareMeta", () => {
     expect(GO_HELP_DOCUMENT_TITLE).toBe("使用說明 · 山姆鍋遊樂場");
   });
 
-  it("brands chat document title", () => {
-    expect(GO_CHAT_DOCUMENT_TITLE).toBe("聊天區 · 山姆鍋遊樂場");
-    expect(GO_CHAT_DESCRIPTION).toMatch(/邀請/);
-    expect(GO_CHAT_DESCRIPTION).toMatch(/對話/);
+  it("brands 包廂 document title", () => {
+    expect(GO_ROOM_DOCUMENT_TITLE).toBe("包廂 · 山姆鍋遊樂場");
+    expect(GO_ROOM_DESCRIPTION).toMatch(/邀請/);
+    expect(GO_ROOM_DESCRIPTION).toMatch(/包廂/);
   });
 
   it("builds og meta fields with site og:image and alt", () => {

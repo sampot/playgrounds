@@ -312,6 +312,8 @@ function isShellCacheablePath(pathname) {
     pathname.startsWith("/help/") ||
     pathname === "/chat" ||
     pathname.startsWith("/chat/") ||
+    pathname === "/room" ||
+    pathname.startsWith("/room/") ||
     pathname.startsWith("/s/")
   ) {
     return true;
@@ -389,6 +391,8 @@ async function networkFirstShell(request) {
             url.pathname.startsWith("/help/") ||
             url.pathname === "/chat" ||
             url.pathname.startsWith("/chat/") ||
+            url.pathname === "/room" ||
+            url.pathname.startsWith("/room/") ||
             url.pathname.startsWith("/s/"))
         ) {
           try {

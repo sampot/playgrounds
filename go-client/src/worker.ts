@@ -10,9 +10,18 @@ function isInvitePath(pathname: string): boolean {
   return pathname === "/i" || pathname.startsWith("/i/");
 }
 
+function isLegacyChatPath(pathname: string): boolean {
+  return pathname === "/chat" || pathname.startsWith("/chat/");
+}
+
 export default {
   async fetch(request: Request, env: GoWorkerEnv): Promise<Response> {
     const url = new URL(request.url);
+    if (isLegacyChatPath(url.pathname)) {
+      const dest = new URL("/room", url);
+      dest.search = url.search;
+      return Response.redirect(dest, 308);
+    }
     if (!isInvitePath(url.pathname)) {
       return env.ASSETS.fetch(request);
     }

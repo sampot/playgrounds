@@ -48,6 +48,8 @@ export type RosterPeerHandlers = {
   onChannelClose?: () => void;
   onConnectionState?: (state: RTCPeerConnectionState) => void;
   onMessage?: (data: unknown) => void;
+  /** Raw DataChannel binary frames (session_file chunks). */
+  onBinary?: (data: ArrayBuffer) => void;
   onError?: (err: Error) => void;
 };
 
@@ -145,6 +147,17 @@ function sendPresence(
   );
 }
 
+function asArrayBuffer(data: unknown): ArrayBuffer | null {
+  if (data instanceof ArrayBuffer) return data;
+  if (ArrayBuffer.isView(data)) {
+    const view = data as ArrayBufferView;
+    const copy = new Uint8Array(view.byteLength);
+    copy.set(new Uint8Array(view.buffer, view.byteOffset, view.byteLength));
+    return copy.buffer;
+  }
+  return null;
+}
+
 function attachChannel(
   channel: RTCDataChannel,
   handlers: RosterPeerHandlers,
@@ -164,11 +177,18 @@ function attachChannel(
   channel.addEventListener("close", () => handlers.onChannelClose?.());
   channel.addEventListener("message", ev => {
     try {
-      const text =
-        typeof ev.data === "string"
-          ? ev.data
-          : new TextDecoder().decode(ev.data as ArrayBuffer);
-      handlers.onMessage?.(JSON.parse(text));
+      if (typeof ev.data === "string") {
+        handlers.onMessage?.(JSON.parse(ev.data));
+        return;
+      }
+      const buf = asArrayBuffer(ev.data);
+      if (buf && handlers.onBinary) {
+        handlers.onBinary(buf);
+        return;
+      }
+      if (buf) {
+        handlers.onMessage?.(JSON.parse(new TextDecoder().decode(buf)));
+      }
     } catch (e) {
       handlers.onError?.(e instanceof Error ? e : new Error(String(e)));
     }
@@ -176,6 +196,24 @@ function attachChannel(
 }
 
 /** True when iceServers include at least one `turn:`／`turns:` URL. */
+export function sdpHasAvMediaLines(sdp: string | undefined | null): boolean {
+  if (!sdp) return false;
+  return /(?:^|\r?\n)m=audio /m.test(sdp) && /(?:^|\r?\n)m=video /m.test(sdp);
+}
+
+/** Reserve empty audio／video transceivers so later replaceTrack needs no renegotiation. */
+export function reserveRosterMediaTransceivers(pc: {
+  addTransceiver: (
+    kind: string,
+    init?: RTCRtpTransceiverInit
+  ) => unknown;
+}): void {
+  pc.addTransceiver("audio", { direction: "sendrecv" });
+  pc.addTransceiver("video", { direction: "sendrecv" });
+}
+
+export type RosterMediaMode = "none" | "ready";
+
 export function iceServersIncludeTurn(
   iceServers?: RTCIceServer[]
 ): boolean {
@@ -283,10 +321,13 @@ export async function createRosterOffer(opts: {
   /** Optional ICE servers (STUN＋official TURN). Omitted → default STUN.
    *  When TURN urls are present, PeerConnection is **relay-only**. */
   iceServers?: RTCIceServer[];
+  /** `ready` reserves empty A/V transceivers in the first SDP (包廂). */
+  media?: RosterMediaMode;
 }): Promise<{ session: RosterPeerSession; wire: string }> {
   const lan = Boolean(opts.lan);
   const handlers = opts.handlers ?? {};
   const pc = createPc(lan, opts.iceServers);
+  if (opts.media === "ready") reserveRosterMediaTransceivers(pc);
   const channel = pc.createDataChannel("roster", { ordered: true });
   attachChannel(channel, handlers, opts.localPresence);
 
@@ -319,6 +360,8 @@ export async function acceptRosterOffer(opts: {
   presence?: { agentId: string; name: string };
   localPresence?: { agentId: string; name: string };
   iceServers?: RTCIceServer[];
+  /** `ready` reserves empty A/V transceivers if the offer omitted them. */
+  media?: RosterMediaMode;
 }): Promise<{ session: RosterPeerSession; wire: string }> {
   const handlers = opts.handlers ?? {};
   const localPresence = opts.localPresence ?? opts.presence;
@@ -328,6 +371,9 @@ export async function acceptRosterOffer(opts: {
   }
   const lan = opts.lan ?? decoded.lan;
   const pc = createPc(lan, opts.iceServers);
+  if (opts.media === "ready" && !sdpHasAvMediaLines(decoded.sdp)) {
+    reserveRosterMediaTransceivers(pc);
+  }
   let channel: RTCDataChannel | null = null;
 
   pc.addEventListener("datachannel", ev => {
