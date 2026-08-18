@@ -74,11 +74,14 @@ describe("roomRuntime", () => {
     }));
   });
 
-  it("opens the booth UI before anyone joins and keeps answering", async () => {
+  it("opens the booth UI before anyone joins without minting a door", async () => {
     const { createRoomRuntime } = await import("./roomRuntime");
     const rt = createRoomRuntime();
     await rt.openBooth();
     expect(rt.getStatus().phase).toBe("open");
+    expect(rt.getStatus().shortUrl).toBeNull();
+    expect(rt.getStatus().inviteDoor).toBe("none");
+    expect(rt.getStatus().message).toMatch(/就你一個人/);
     expect(fixtures.chatAttach).toHaveBeenCalledWith(
       expect.objectContaining({
         layout: "page",
@@ -87,6 +90,15 @@ describe("roomRuntime", () => {
       })
     );
     expect(fixtures.filesAttach).toHaveBeenCalled();
+    expect(fixtures.mint).not.toHaveBeenCalled();
+    expect(fixtures.startLoop).not.toHaveBeenCalled();
+  });
+
+  it("mints a live door only when asked to invite", async () => {
+    const { createRoomRuntime } = await import("./roomRuntime");
+    const rt = createRoomRuntime();
+    await rt.openBooth();
+    await rt.mintInviteAndAnswer();
     expect(fixtures.mint).toHaveBeenCalledWith({
       kind: "invite.room",
       intent: expect.objectContaining({
@@ -103,6 +115,17 @@ describe("roomRuntime", () => {
         localPresence: expect.objectContaining({ name: "太郎" }),
       })
     );
+    expect(rt.getStatus().inviteDoor).toBe("live");
+    expect(rt.getStatus().shortUrl).toBe("https://go.samkuo.me/i/abc123");
+  });
+
+  it("does not remint while the door is still live", async () => {
+    const { createRoomRuntime } = await import("./roomRuntime");
+    const rt = createRoomRuntime();
+    await rt.openBooth();
+    await rt.mintInviteAndAnswer();
+    await rt.mintInviteAndAnswer();
+    expect(fixtures.mint).toHaveBeenCalledTimes(1);
   });
 
   it("fans out to a second guest without ending the first connection", async () => {
@@ -119,6 +142,7 @@ describe("roomRuntime", () => {
     const { createRoomRuntime } = await import("./roomRuntime");
     const rt = createRoomRuntime();
     await rt.openBooth();
+    await rt.mintInviteAndAnswer();
     const a = mockSession();
     const b = mockSession();
     loopOpts!.prepareHandlers().attachSession(a);
@@ -148,6 +172,7 @@ describe("roomRuntime", () => {
     const { createRoomRuntime } = await import("./roomRuntime");
     const rt = createRoomRuntime();
     await rt.openBooth();
+    await rt.mintInviteAndAnswer();
     const first = loopOpts!.prepareHandlers();
     first.attachSession(mockSession());
     const second = loopOpts!.prepareHandlers();
@@ -172,7 +197,7 @@ describe("roomRuntime", () => {
     expect(rt.getStatus().phase).not.toBe("open");
   });
 
-  it("does not mint twice when openBooth overlaps", async () => {
+  it("does not mint twice when mint overlaps", async () => {
     let release: (v: unknown) => void = () => {};
     fixtures.mint.mockImplementation(
       () =>
@@ -182,8 +207,9 @@ describe("roomRuntime", () => {
     );
     const { createRoomRuntime } = await import("./roomRuntime");
     const rt = createRoomRuntime();
-    const first = rt.openBooth();
-    const second = rt.openBooth();
+    await rt.openBooth();
+    const first = rt.mintInviteAndAnswer();
+    const second = rt.mintInviteAndAnswer();
     release({
       invite_id: "inv-room",
       short_url: "https://go.samkuo.me/i/abc123",
@@ -191,5 +217,34 @@ describe("roomRuntime", () => {
     });
     await Promise.all([first, second]);
     expect(fixtures.mint).toHaveBeenCalledTimes(1);
+  });
+
+  it("expires the door without closing the booth or sharing the old URL", async () => {
+    vi.useFakeTimers();
+    try {
+      const stop = vi.fn();
+      fixtures.startLoop.mockImplementation((opts: { inviteId: string }) => ({
+        stop,
+        inviteId: opts.inviteId,
+      }));
+      fixtures.mint.mockResolvedValue({
+        invite_id: "inv-room",
+        short_url: "https://go.samkuo.me/i/abc123",
+        expires_at: Date.now() + 1000,
+      });
+      const { createRoomRuntime } = await import("./roomRuntime");
+      const rt = createRoomRuntime();
+      await rt.openBooth();
+      await rt.mintInviteAndAnswer();
+      await vi.advanceTimersByTimeAsync(1500);
+      expect(rt.getStatus().phase).toBe("open");
+      expect(rt.getStatus().inviteDoor).toBe("expired");
+      expect(rt.getStatus().shortUrl).toBeNull();
+      expect(rt.getStatus().message).toMatch(/就你一個人/);
+      expect(stop).toHaveBeenCalled();
+      expect(fixtures.revoke).toHaveBeenCalledWith("inv-room");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

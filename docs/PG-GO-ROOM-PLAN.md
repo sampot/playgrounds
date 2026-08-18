@@ -1,10 +1,10 @@
 # Playgrounds 純玩版：包廂（go `/room`）
 
-> **狀態：** Draft（2026-08-18）— Phase 1：進門即主面、不鎖 1:1  
+> **狀態：** Draft（2026-08-18）— Phase 1：進門即主面、不鎖 1:1；**包廂＝主持 `/room` 畫面，過期的是門牌**  
 > **權威決策：** 從屬 [DECISIONS.md](./DECISIONS.md) **DEC-050**（純玩版）、**DEC-045**（Roster／薄 signaling；**非** Avatars 產品面）、**DEC-047**（Platform Invite）；**不另開 DEC**  
 > **相關：** [PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)、[PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md)（登入＋記憶體 field API key）、[PG-GO-HOST-INVITE-PLAN.md](./PG-GO-HOST-INVITE-PLAN.md)（GO-INVITE＝遊戲 compose；**勿混**）、[PG-GO-SESSION-CHAT-PLAN.md](./PG-GO-SESSION-CHAT-PLAN.md)（局內 overlay 對話——**勿混**）、[PG-GO-SHOP-LOBBY-PLAN.md](./PG-GO-SHOP-LOBBY-PLAN.md)（大廳熱點入口）、[PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)、[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（官方 TURN；包廂 ICE **與**遊戲邀請分開）、`.cursor/rules/no-native-dialogs.mdc`、`.cursor/rules/mobile-first-ux.mdc`、[GLOSSARY.md](./GLOSSARY.md)
 
-一句話：已登入會員進 **`/room` 就是這一間包廂**（主面立刻出現；**不必先請人**）；用既有 Platform Invite 短鏈把人請進來。連上之後資料只走 WebRTC（**不**經 Platform 中繼、**不**雲存）。人數**對齊遊戲 session**：同一門牌可多人加入，**不鎖 1:1**。**第一階段產品**＝文字＋傳檔；**契約不把包廂定成聊天室**——同一條連線預留給音視訊、桌機投放、日後在包廂裡開一局等。
+一句話：已登入會員進 **`/room` 就是這一間包廂**（主面立刻出現；**不必先請人**）。**包廂活著＝主持這個畫面還開著；過期的是邀請碼，不是這一間。** 用既有 Platform Invite 短鏈把人請進來。連上之後資料只走 WebRTC（**不**經 Platform 中繼、**不**雲存）。人數**對齊遊戲 session**：同一張有效門牌可多人加入，**不鎖 1:1**。**第一階段產品**＝文字＋傳檔；**契約不把包廂定成聊天室**——同一條連線預留給音視訊、桌機投放、日後在包廂裡開一局等。
 
 ---
 
@@ -21,9 +21,10 @@
 
 - **包廂＝一般用途 peer 隔間（硬）：** 產品面是「這一間」；裡面做什麼由階段遞增，**禁止**把 API／UI 契約寫死成「只能聊天」。
 - **進門即主面（硬）：** 已登入會員開 `/room`＝已經在包廂裡（時間線／輸入／這一間）。邀請是**面內動作**（請人進來），**不是**進門條件。一個人在也是這一間。
-- **人數對齊遊戲 session（硬）：** **不鎖 1:1**。同一 Invite 短鏈可多人 join；**文字**對已連線 peer **fanout**；**檔案目錄** fanout、**檔案內容**只在點下載時 Owner→Requester（對齊 [session-chat](./PG-GO-SESSION-CHAT-PLAN.md) 終態的「多人」而非「全員收 bytes」）。API／UI 勿寫成雙人專用。
-- **第一階段可交付：** 會員進 `/room` 即包廂 UI；可請人進來；Guest 開 `/i/<short>` 同意進同一間 → DataChannel 文字＋傳檔；有人連上即「已連線」。
-- **同一套邀請門牌：** 短鏈 canonical 仍是 `https://go.samkuo.me/i/<short_id>`（QR／分享面）；Host 主面是 `/room`。
+- **兩個時鐘（硬）：** 包廂壽命＝主持 `/room` 這份文件還在；門牌壽命＝該張 `invite.room` 的 TTL（預設 5m）。門牌過期只擋**新人**；主面與已入座連線不受影響。**按「請人進來」才鑄門牌**（同一時間最多一張有效）。見 §6.4。
+- **人數對齊遊戲 session（硬）：** **不鎖 1:1**。同一張**有效** Invite 短鏈可多人 join；**文字**對已連線 peer **fanout**；**檔案目錄** fanout、**檔案內容**只在點下載時 Owner→Requester（對齊 [session-chat](./PG-GO-SESSION-CHAT-PLAN.md) 終態的「多人」而非「全員收 bytes」）。API／UI 勿寫成雙人專用。
+- **第一階段可交付：** 會員進 `/room` 即包廂 UI（可先不請人）；可請人進來；Guest 開 `/i/<short>` 同意進同一間 → DataChannel 文字＋傳檔；有人連上即「已連線」。
+- **同一套邀請門牌：** 短鏈 canonical 仍是 `https://go.samkuo.me/i/<short_id>`（QR／分享面）；Host 主面是 `/room`。Guest 進門後**留在** `/i/`（**禁止**改寫成 `/room`）。
 - **資料不落雲端：** 正文、檔案 bytes、（預留）音視訊 RTP **不**經 signaling／Invite API／物件儲存。文字時間線只在頁面生命週期；檔案內容**不**暫存在分頁——見 §8.2。
 - **開這一間要登入、被請進來不必**（對齊 GO-INVITE／遊戲 Guest）。
 - **Mobile-first；禁原生 `alert`／`confirm`／`prompt`。**
@@ -38,7 +39,7 @@
 - Platform 中繼文字／檔案／媒體；雲端聊天室；把包廂做成 SAM（型錄小品）。
 - 第二套邀請網址（`/room/<id>` 當 short map）；為包廂另建邀請庫。
 - 把局內右緣 overlay 改成全頁包廂，或在 `/s/` 單機無 peer 時假裝可傳。
-- 完美斷線重連、預約房、可收藏的「我的包廂 3 號」、長 TTL 站樁房間。
+- 完美斷線重連、預約房、可收藏的「我的包廂 3 號」、長 TTL 站樁房間（**不是**因為包廂 5 分鐘就散——散場只因主持離開 `/room`；不做的是雲端房間／可收藏房號）。
 - 對讀者揭露直連 vs TURN／relay（DEC-004／點數計劃）。
 - 使用者自備 TURN（DEC-045／047 否決）。
 - 以包廂繞過受保護串流（DRM 畫面變黑不是要修的功能）。
@@ -56,11 +57,12 @@
 3. **薄 signaling** — Platform 只做 Invite／join／一次 O／A（DEC-045）。已連線則重用 PC；**禁止**經 Platform renegotiation。
 4. **第一次 SDP 就為媒體留門** — 包廂 peer 在 `createOffer` 前加上 audio＋video transceiver（軌可空）。Phase 1 **不**開相機、**不**送 RTP；後期 `replaceTrack` 不必第二輪 Platform O／A。Signal 交換用 **`av1`（原始 SDP）**，不可壓成遊戲用的 `dc1`（只重建 DataChannel）——否則對端 `setRemoteDescription` 的 m-line 對不上，Guest 會看到「連線失敗」。
 5. **遊戲邀請與包廂邀請分開** — 遊戲繼續 `invite.compose`＋（可選）relay-only。包廂 `invite.room` **不**因 Host `turn_prefer` 自動改成 relay-only（見 §7.3）。
-6. **臨時** — 短鏈 TTL（預設 5m）＝門牌有效；已入座不受短鏈過期影響。散場＝關 PC、丟時間線與 Blob。
+6. **兩個時鐘** — 短鏈 TTL（預設 5m）＝**這一張門牌**還能不能請新人，**不是**包廂租期。已入座且**不斷線**不受門牌過期影響。包廂散場＝主持離開 `/room`（結束／回大廳／關分頁／重整）→ 關 PC、丟時間線與目錄。Guest「離開」只斷自己。
 7. **go ⊂ play（wire）** — 文字重用 `session_chat`；檔案新獨立 `type` 放共用 roster 模組。Play 可晚掛 UI。
 8. **同時一 SAM 仍成立** — 包廂不是 SAM；進 `/s/`／遊戲 `/i/` 則離開包廂（破壞性，頁內確認）。
-9. **進門即這一間** — 已登入開 `/room` 就是包廂主面。鑄 Invite 可進門後自動做或按「請人進來」再做；**禁止**用「尚未邀請」另做一套非包廂畫面當主流程。
+9. **進門即這一間** — 已登入開 `/room` 就是包廂主面。**沒按「請人進來」就不鑄 Invite、不倒數。** **禁止**用「尚未邀請」另做一套非包廂畫面當主流程；也禁止進門自動鑄門牌，讓 TTL 變成「房間快到期」的氛圍。
 10. **不鎖雙人** — Host answer loop **持續作答**（對齊遊戲 compose 多 join；勿 `maxAnswers: 1`）。文字／**檔案目錄** fanout；內容按下載路由。函式名勿叫 `sendToOpponent`。
+11. **主面 ≠ 分享面** — 主面只回答「誰在這一間」；QR／TTL／再發一張只出現在「請人進來」分享面（寬屏側欄最多門牌**小狀態**，不常駐大 QR）。
 
 ---
 
@@ -70,7 +72,7 @@
 
 ```text
 大廳 `/`  ──熱點「包廂」──►  `/room`（已登入＝這一間主面；可請人進來）
-Guest 掃碼 `/i/<short>`  ──kind=invite.room──►  同意 → 同一包廂主面
+Guest 掃碼 `/i/<short>`  ──kind=invite.room──►  同意 → 同一包廂主面（**網址仍 /i/**）
 深鏈 `/s/`／遊戲 `/i/`  ──bypass──►  不經包廂
 ```
 
@@ -82,9 +84,9 @@ Guest 掃碼 `/i/<short>`  ──kind=invite.room──►  同意 → 同一包
 
 | 用 | 不用 |
 | --- | --- |
-| 包廂、進包廂、請人進來、結束這一間、投放、檔案分享區、下載、撤回 | 聊天區、聊天室、房間、Room、Lounge、Lobby（對讀者）；「先邀請才能進包廂」；附加檔、傳給對方、接收附件 |
-| 已連線、N 人在 | 直連、P2P、DataChannel、TURN、視訊會議 SaaS 腔；把包廂說成 1 對 1 |
-| URL `/room`（與 `/help`／`/apps` 同：路徑英文、chrome 中文） | 把 `/chat` 當產品 canonical |
+| 包廂、進包廂、請人進來、**結束這一間**（主持）、**離開這一間**（Guest）、再發一張邀請、投放、檔案分享區、下載、撤回 | 聊天區、聊天室、房間、Room、Lounge、Lobby（對讀者）；「先邀請才能進包廂」；附加檔、傳給對方、接收附件；Guest 說「結束這一間」 |
+| 已連線、N 人在、就你、這一間還在、把這頁開著 | 直連、P2P、DataChannel、TURN、視訊會議 SaaS 腔；把包廂說成 1 對 1；**包廂倒數／房間即將過期／租期** |
+| URL `/room`（與 `/help`／`/apps` 同：路徑英文、chrome 中文）；門牌／邀請（主持 UI 可說「門牌」） | 把 `/chat` 當產品 canonical；對 Guest／分享 title 說「門牌」當產品名 |
 
 局內 overlay 仍叫 **對話**（[PG-GO-SESSION-CHAT-PLAN.md](./PG-GO-SESSION-CHAT-PLAN.md)），不要改名包廂。
 
@@ -96,13 +98,14 @@ Guest 掃碼 `/i/<short>`  ──kind=invite.room──►  同意 → 同一包
 
 | 誰 | URL | 語意 |
 | --- | --- | --- |
-| Host 主面 | **`https://go.samkuo.me/room`** | 包廂 UI（已登入即進；邀請為面內動作） |
-| Guest 門牌 | **`https://go.samkuo.me/i/<short_id>`** | 解 kind → 包廂 consent（**不**下載 SAM） |
+| Host 主面 | **`https://go.samkuo.me/room`** | 包廂 UI（已登入即進；邀請為面內動作）。**不是**房間 ID，重整＝新的空一間 |
+| Guest 門牌 | **`https://go.samkuo.me/i/<short_id>`** | 解 kind → 包廂 consent（**不**下載 SAM）；同意後**仍是這個網址** |
 | 舊占位 | `/chat` | **導向 `/room`**（相容；勿兩套產品面） |
 
 - `/room` 可 prerender／進 sitemap（與 `/help` 同）；**不**把 secret 放進公開 HTML。
 - `/i/` 維持 `noindex`／robots Disallow。
-- Guest 同意後可 `replaceState` 成 `/room`（網址較乾淨）；**分享／QR 永遠是 `/i/`**。
+- Guest 同意後**維持** `/i/<short>`；**禁止** `replaceState` 成 `/room`（Guest 重整 `/room` 會走主持開間；已登入甚至會鑄新邀請）。
+- **分享／QR 永遠是 `/i/`**。
 - Invite OG 維持中性「接受邀請 · 山姆鍋遊樂場」；**禁止**預設寫「對弈」。包廂邀請 title（分享面）＝「邀請你進包廂」。
 
 ### 6.2 Kind：`invite.room`
@@ -127,30 +130,77 @@ intent:
 
 ```text
 未登入 `/room` → 仍是包廂殼（時間線空態）＋主 CTA「登入後開包廂」（goAuth.login；不擋回大廳、不擋 `/s/`）
-已登入 → **直接包廂主面**（時間線／輸入／這一間）
-  → 可「請人進來」：mintPlatformInvite({ kind: "invite.room", intent, targetField: goOrigin() })
-     （實作可進門後先鑄好門牌，讓 QR 就緒；不可因此換成「等待邀請」專用主畫面）
-  → GoShareSheet（QR／複製／系統分享；url＝/i/<short>）
-  → Host answer loop **持續作答**（連線 only；不開 SAM session；不因第一位 Guest 停）
+已登入 → **直接包廂主面**（時間線／輸入／這一間；門牌＝尚未發出，不倒數）
+  →「請人進來」且尚無有效門牌：
+       mintPlatformInvite({ kind: "invite.room", intent, targetField: goOrigin() })
+       → 開 GoShareSheet（QR／複製／系統分享；url＝/i/<short>）
+       → Host answer loop **持續作答**（連線 only；不開 SAM session；不因第一位 Guest 停）
+  →「請人進來」且門牌仍有效：只開同一分享面（同一張 QR）
+  →「請人進來」且門牌已過期：鑄新的、撤舊的、開分享面（禁止再分享過期 QR）
   → 有人 DataChannel open → 時間線文字 fanout；檔案目錄同步
-  →「結束這一間」→ 關所有 PC、可撤 Invite
+  →「結束這一間」／回大廳／Esc → 頁內確認 → 關所有 PC、撤 Invite
 ```
 
 **Guest**
 
 ```text
 開 /i/<short> → preview
+  → 過期／撤銷／主持不在 → 進不去（頁內錯誤；請對方再發一張）
   → kind=invite.room（或 intent.surface=room）→ consent「進這間包廂」（可改臨時顯示名；無棋規／SAM 摘要）
   → join_cap → offer → answer → DataChannel
-  → 包廂 UI（跳過 loading_sam）
+  → 包廂 UI（跳過 loading_sam）；網址仍是 /i/<short>
+  →「離開這一間」→ 頁內確認 → 只斷自己；主持與其他人還在；自己掛的檔 unshare
 拒絕 → 不佔成功 handshake
 ```
 
 現況 `guestRuntime.consentAndPlay` 無 `sam.source` 即失敗——包廂必須**分流**，不可走 compose 下載管線。Guest 認 `invite.room` **或** `intent.surface === "room"`（kind 可能被預設成 `signal.handshake`）。
 
-TTL 預設 **5 分鐘**（門牌，非租期）。過期 → Host「再發一張」；**已連線 peer 續用**。同一短鏈在門牌有效期間可多人加入（對齊遊戲 Invite；Platform 握手仍串行，做完接下一個）。
+同一短鏈在**門牌有效期間**可多人加入（對齊遊戲 Invite；Platform 握手仍串行，做完接下一個）。生命週期細節見 **§6.4**。
 
-離開 `/room` 或重整＝散場。對還在線的對方是破壞性 → **頁內確認**。
+### 6.4 生命週期（兩個時鐘）（硬）
+
+| 物件 | 活著的條件 | 死法 | 對人怎麼說 |
+| --- | --- | --- | --- |
+| **包廂** | 主持的 `/room` 這份文件還在（未關、未重整、未離開路由） | 主持按「結束這一間」、回大廳、關分頁、重整 | 「這一間」 |
+| **門牌** | 這一張 `invite.room` 未過期、未撤銷，且主持還在作答 | TTL 5 分鐘、再發一張時撤舊的、散場時撤 | 「邀請／門牌」 |
+| **在座連線** | 該 peer 的 DataChannel 還開著 | 對方離開、ICE 死、主持散場 | 「N 人在／已斷線」 |
+
+**推論**
+
+1. **一個人在也是這一間。** 沒人連上、門牌過期或尚未發出，包廂都還在。
+2. **門牌過期 ≠ 散場。** 已入座且不斷線的人繼續；新人掃舊碼進不來。主持再發一張即可。
+3. **`/room` 不是房間 ID。** 沒有「包廂 3 號」。主持重整＝新的空包廂；舊 peer 回不去（對齊 §3 不做完美重連）。
+4. **Guest 網址不是 `/room`。** 見 §6.1。
+5. **同一時間最多一張有效門牌。** 再請人而舊的已過期＝鑄新、撤舊；舊 QR 立刻作廢。有效期間再按「請人進來」＝同一張，不另鑄。
+6. **按需鑄（硬）。** 沒按「請人進來」就不 `mint`、不開始 TTL、分享面沒有短鏈。禁止進門自動鑄來「讓 QR 就緒」。
+7. **「已入座不受短鏈過期影響」只保護不斷線的人。** Guest 重整＝重新 join，需要**當下仍有效**的門牌；過期則進不去，即使主持還在。
+8. **切去別的 App／螢幕關閉 ≠ 主動散場**，但系統可能殺掉連線；對人只顯示已斷線，不教 ICE。
+9. **關分頁／重整**無法走頁內確認則直接散場；Guest 看到主持已離開。應用內離開（Esc／回大廳／結束）必須頁內確認。
+
+遊戲 `/i/` 的 5 分鐘很像「這一局約戰結束」。包廂不要沿用那個比喻：**短鏈只是門鈴；屋子是主持那一個畫面。**
+
+**主持狀態**
+
+```text
+idle（未登入）
+open（已登入、這一間）
+  門牌：none | live（含 TTL）| expired
+  在場：主持 ＋ 0..N Guest
+ended（明示結束或離路由）→「再開一間」＝同一 /room 開一間空的（新時間線，不是重連舊 peer）
+```
+
+門牌從 `live` → `expired`：**不停**包廂、**不**改寫人數主狀態、**停** answer loop、**禁止**繼續分享該 `shortUrl`。
+
+**Guest 狀態**
+
+```text
+consent → connecting → 在這一間
+自己離開 → 斷自己的線
+主持散場／關頁 →「主持已關掉這一間」；回大廳
+進不去（過期／撤銷／主持不在／ICE 失敗）→ 頁內錯誤
+```
+
+主持已離開時，主 CTA＝回大廳；次要＝「請對方再發邀請」。**不要**把「重新開啟此邀請」當主 CTA（舊碼多半已撤）。
 
 ---
 
@@ -197,7 +247,7 @@ pc.createDataChannel("roster", { ordered: true });
 
 跨網連不上：頁內錯誤／請靠近同一網路或請對方再試；**不**教 ICE。官方 TURN 作包廂「可 fallback、非 relay-only」是否開放，**另段**（牽涉點數與 `buildRosterRtcConfiguration`）；不阻塞 Phase 1。
 
-對人只顯示：等待／已連線／已斷線／傳送中。
+對人只顯示：等待／已連線／已斷線／傳送中。人數與門牌 TTL **分開呈現**（見 §10）；不要用「邀請還有 N 分鐘」當包廂主狀態。
 
 ---
 
@@ -209,11 +259,12 @@ pc.createDataChannel("roster", { ordered: true });
 
 - 永遠自由文字（無 SAM `SessionChatHints`；無對弈 `active` 閘）
 - 全頁時間線（**不是**右緣把手；沒有遊戲畫布要讓路）
-- 對「同包廂已連線 peer」**fanout**（對齊 session-chat；一人在時送出可留本機時間線或頁內提示還沒有人——**不要**因此藏起輸入列／主面）
+- 對「同包廂已連線 peer」**fanout**（對齊 session-chat；一人在時送出可留本機時間線，可加一句低調「對方還看不到——這間目前只有你」——**不要**因此藏起輸入列／主面）
 - 快捷語可留少數（在嗎／等一下／收到／謝謝）；預設收起
 - 單則上限可沿用 200 字，或包廂略放寬並寫進測試；時間線記憶體上限建議 200 則
 - 斷線清空；無雲端歷史
 - Bubble 視覺可與 overlay 同族（本機右、遠端左；**顯示登入名**＋金色「主持」標記，名不是「主持」）
+- 空態只說還沒有訊息；**不要**用空態當「請人進來」等待室（請人已在頂列／側欄）
 
 ### 8.2 傳檔（分享區＋串流落盤）
 
@@ -308,22 +359,68 @@ DataChannel `open` ＝「已連線」。可選 ping。不把「先連包廂再�
 
 ## 10. UX（Phase 1）
 
-窄屏（預設）：
+隱喻：網咖包廂——坐進去燈就亮；要加人再開門貼一張限時通行證。QR 是門上的便條，不是房間本身。
 
-1. **包廂主面**（已登入一進來就這面；未登入見同殼＋登入 CTA）
-2. 狀態列：這一間／N 人在／已斷線；可「請人進來」「結束這一間」
-3. 時間線（**只有文字**；空態可接受）
-4. **檔案分享區**（獨立區塊；選檔／drop；目錄；下載／撤回）。**不要**做成輸入列「附加檔」、**不要**檔案氣泡混進時間線、**不要**「對方想傳檔過來／接收／拒絕」
-5. 輸入列：文字＋快捷語；熱區 ≥44×44px（**主面就有**，不要等第一位 Guest 才出現）
-6. 「請人進來」→ 分享面：QR＋口誦 `go.samkuo.me/i/…`（現場主路徑）；系統分享／複製
+**主面永遠回答「誰在這一間」；分享面才回答「這張邀請還能不能用」。**
 
-寬屏（`min-width` 遞增）：左時間線＋其下分享區、右「這一間」卡片（人數、QR／請人進來、門牌倒數、狀態）。**禁止**桌面先做再 `max-width` 縮小。**禁止**把大 QR 等待面當成已登入會員的預設首屏。分享區在窄屏同樣是主面一塊（可 drop），不要藏進 overflow-only。
+### 10.1 誰看見什麼
 
-未登入：說明開這一間要通行證；不擋回大廳、不擋 `/s/`。沒有通行證仍可被請進來。
+| | 主持 | Guest |
+| --- | --- | --- |
+| 時間線／輸入／分享區 | 進門即有 | 連上才有（connecting 用短狀態，不要空殼裝成已在） |
+| 請人進來／門牌／TTL | 有 | **無** |
+| 在場名單 | 有 | 有 |
+| 結束這一間 | 有（散場） | 改 **離開這一間** |
+| 再開一間 | 僅 ended | 無 |
+| 網址 | `/room` | `/i/<short>` |
 
-`/room` 不是對弈 canvas：頂列**不必** 3s 自動收起。Esc 回大廳（現況 `goEscapeHome` 含 `/chat` → 改 `/room`）。
+### 10.2 窄屏（預設）
 
-分享面開啟、確認散場期間：對齊既有 sheet 焦點與取消。
+1. **頂列（不自動藏）**  
+   左：包廂。右：人數膠囊（「就你」／「3 人在」）＋主動作。  
+   主持：`請人進來`（主）／`結束`（次、危險描邊）。Guest：只有 `離開`。熱區 ≥44×44px。
+2. **一句狀態（live 區）**  
+   只講在場與連線，**不講 TTL**。  
+   例：`就你一個人 · 把這頁開著，這一間才還在`；有人：`3 人在`（可加顯示名）。斷一人可短暫 `小明已離開`，再回到人數。門牌過期**不**取代這一行（用 flash 或分享面）。
+3. **時間線（主體，flex 吃剩餘高度）**  
+   只有文字。空態：`還沒有訊息。先打字也可以。` **不要**寫「或請人進來」。
+4. **檔案分享區＝可收合條**  
+   預設一行：`檔案分享區 · 尚未掛檔`／`檔案分享區 · 2`。展開才有 drop／選檔／目錄／下載。說明縮成展開後一句。窄屏不要跟時間線搶固定 50vh。  
+   **不要**做成輸入列「附加檔」、**不要**檔案氣泡混進時間線、**不要**「對方想傳檔過來／接收／拒絕」。
+5. **輸入列 sticky 底**  
+   主持一進來就有；不要等第一位 Guest。快捷語預設收起。
+6. **請人進來 → 分享面（唯一放大 QR 的地方）**  
+   - 有效：QR、口誦 `go.samkuo.me/i/…`、複製／系統分享、一句 `這張邀請約 N 分鐘內有效；過期後再發一張即可，這一間不會因此關掉。`  
+   - 過期：**不要**再畫死 QR；主 CTA `再發一張邀請`。  
+   - 尚未鑄：按請人進來再鑄再開分享面。
+7. **確認（頁內，非原生 dialog）**  
+   - 主持結束／Esc／回大廳：`關掉後在場的人會斷線，目錄會沒了。已存到硬碟的檔不受影響。`  
+   - Guest 離開／Esc／回大廳：`離開後你會斷線；其他人還在。你掛上的檔會從分享區拿掉。`
+
+### 10.3 寬屏（`min-width` 遞增）
+
+左：時間線＋（可較開的）分享區＋輸入。  
+右「這一間」卡片：
+
+- 在場名單（主持金色標記＋顯示名）
+- 一句：`這一間只在這個畫面開著的時候存在。`
+- 門牌列：**小狀態**，不是英雄 QR  
+  - 尚未請人：`還沒發邀請`＋「請人進來」  
+  - 有效：`邀請有效 · 還有 4:32`＋「顯示邀請」（開同一分享面）  
+  - 過期：`邀請已過期`＋「再發一張」
+- `結束這一間`
+
+**禁止**桌面先做再 `max-width` 縮小。**禁止**把大 QR 等待面當成已登入會員的預設首屏（寬屏也不常駐 240px QR）。現場掃碼是分享面的工作。
+
+### 10.4 未登入／結束後／Guest 進不去
+
+未登入：說明開這一間要通行證；不擋回大廳、不擋 `/s/`。補一句：`被請進來的人不必有通行證；開這一間的人要留在這個畫面。`
+
+結束後：`這一間已結束`＋主持「再開一間」＋回大廳。**不要**在結束面留舊 QR。
+
+Guest 主持已離開：主 CTA 回大廳；次要「請對方再發邀請」。
+
+`/room` 不是對弈 canvas：頂列**不必** 3s 自動收起。Esc 回大廳（現況 `goEscapeHome` 含 `/chat` → 改 `/room`）。分享面開啟、確認散場期間：對齊既有 sheet 焦點與取消。
 
 ---
 
@@ -340,7 +437,7 @@ DataChannel `open` ＝「已連線」。可選 ping。不把「先連包廂再�
 | 分析 | 若打點，只計「鑄了包廂邀請／握手成功」之類；不記正文、檔名可選不記 |
 | 離線 | 包廂**不能**離線加入（與 `/i/` 同） |
 
-對讀者可寫：**對話只在在場者的瀏覽器之間；檔案點下載才存到你選的位置，不會存到遊樂場伺服器。** 關分頁則目錄沒了。
+對讀者可寫：**對話只在在場者的瀏覽器之間；檔案點下載才存到你選的位置，不會存到遊樂場伺服器。** 主持把這個畫面關掉，這一間就散了；目錄沒了，已存到硬碟的檔不受影響。
 
 ---
 
@@ -349,8 +446,8 @@ DataChannel `open` ＝「已連線」。可選 ping。不把「先連包廂再�
 | 層 | 建議 |
 | --- | --- |
 | Invite | `wantsRosterSignal` 認 `invite.room`；**不要**對 room stamp 遊戲用 `relay: true` |
-| Host | 新 `roomRuntime`（或從 `hostRuntime` 抽出 answer loop＋**peer map**）；**不** `open` SAM session；進 `/room` 即主面；answer loop **持續作答** |
-| Guest | `guestRuntime`／`/i/` 依 kind **或** `intent.surface` 分流；room 不 `resolveGoSamFiles` |
+| Host | `roomRuntime`：進 `/room` 即主面；**按需** mint（勿 `openBooth` 自動鑄）；answer loop **持續作答**；門牌過期停 loop、清／作廢可分享的 shortUrl、**不**把 phase 打成 ended；**不** `open` SAM session |
+| Guest | `guestRuntime`／`/i/` 依 kind **或** `intent.surface` 分流；room 不 `resolveGoSamFiles`；同意後**不** `replaceState` `/room`；離開 ≠ 主持散場 |
 | 文字 | `goSessionChat` 加全頁模式，或包廂自用同一 store |
 | 檔案 | 共用 `rosterSessionFile.ts`（目錄＋`transferId` 分塊／上限）＋單測；Host **按 transfer 路由** binary，禁止全員 fanout；`goRoomFileTransfer` 串流 `slice`／writable，禁止組 Blob |
 | Peer | 包廂工廠：transceiver＋DC；遊戲 `createRosterOffer` 可暫不動 |
@@ -359,7 +456,7 @@ DataChannel `open` ＝「已連線」。可選 ping。不把「先連包廂再�
 | 大廳 | hotspot `room` → `/room`；label「包廂」 |
 | chrome | 「更多」連到 `/room`；Esc／bulletin 路徑表 |
 
-TDD：進門即主面、kind／surface 分流、無 SAM Guest、持續作答（非 1 Guest）、SDP 含 A/V m-line、`share` 不上 chunk、`request` 前已有 writable、chunk RAM≤一幀、第三者收不到 transfer、無 SW／OPFS／Blob 後備、fanout 目錄、斷線 `unshare`。純文件本刀不寫程式。
+TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest、持續作答（非 1 Guest）、SDP 含 A/V m-line、`share` 不上 chunk、`request` 前已有 writable、chunk RAM≤一幀、第三者收不到 transfer、無 SW／OPFS／Blob 後備、fanout 目錄、斷線 `unshare`、門牌過期包廂仍 open、過期後禁止分享舊 shortUrl、Guest 離開人數 -1。純文件本刀不寫程式。
 
 ---
 
@@ -367,8 +464,8 @@ TDD：進門即主面、kind／surface 分流、無 SAM Guest、持續作答（�
 
 | Phase | 內容 | 完成定義 | 狀態 |
 | --- | --- | --- | --- |
-| **0. 契約** | 本文件；GLOSSARY／交叉引用 | 包廂≠overlay≠compose；能力開放寫死；進門即主面；不鎖 1:1 | **本刀** |
-| **1. 文字＋傳檔** | 進 `/room` 即主面；mint `invite.room`、`/i/` consent、DC、`session_chat` fanout、`session_file` **分享區＋串流落盤**；SDP 已含 A/V m-line；answer loop 持續作答 | 會員不必先邀請就見包廂 UI；同一短鏈 ≥2 Guest 與 Host 互傳文字；分享區可掛檔、點下載才寫入另存檔；無 Save picker 則頁內說明、不組 Blob；Platform 無正文／無檔 bytes；未登入不能開這一間；`/chat`→`/room` | **已對齊進門即主面／多人；傳檔改契約待實作** |
+| **0. 契約** | 本文件；GLOSSARY／交叉引用 | 包廂≠overlay≠compose；能力開放寫死；進門即主面；不鎖 1:1；**兩個時鐘；按需鑄；Guest 留 `/i/`** | **本刀** |
+| **1. 文字＋傳檔** | 進 `/room` 即主面；按需 mint `invite.room`、`/i/` consent、DC、`session_chat` fanout、`session_file` **分享區＋串流落盤**；SDP 已含 A/V m-line；answer loop 持續作答 | 會員不必先邀請就見包廂 UI（無 TTL）；同一短鏈 ≥2 Guest 與 Host 互傳文字；分享區可掛檔、點下載才寫入另存檔；無 Save picker 則頁內說明、不組 Blob；Platform 無正文／無檔 bytes；未登入不能開這一間；`/chat`→`/room`；門牌過期包廂仍在 | **按需鑄／兩個時鐘已落地；多人傳檔 e2e 手測仍待** |
 | **2. 音視訊** | 開／關麥與鏡頭；`replaceTrack` | 不經第二輪 Platform O／A | 預留 |
 | **2b. 投放** | 桌機本機影片 → 手機收看 | 片源不出雲 | 預留 |
 | **3. 重用 peer 開局** | 包廂已連 → SAM session | 不必再掃一次（可選） | 預留 |
@@ -391,7 +488,11 @@ TDD：進門即主面、kind／surface 分流、無 SAM Guest、持續作答（�
 | 8 | 登入 | 開這一間要；被請進來不要 |
 | 9 | 雲 | 無；散場丟 |
 | 10 | 進門 | **已登入開 `/room`＝包廂主面**；邀請是面內動作 |
-| 11 | 人數 | **不鎖 1:1**；同一 Invite 多 join；文字／檔案**目錄** fanout；內容按 transfer 路由 |
+| 11 | 人數 | **不鎖 1:1**；同一張**有效** Invite 多 join；文字／檔案**目錄** fanout；內容按 transfer 路由 |
+| 12 | 兩個時鐘 | 包廂壽命＝主持 `/room` 文件；門牌 TTL 只管請新人；過期 ≠ 散場 |
+| 13 | 按需鑄 | **沒按「請人進來」就不 mint**；同一時間最多一張有效門牌；過期後禁止分享舊 QR |
+| 14 | Guest URL | 同意後**留在** `/i/<short>`；**禁止** `replaceState` `/room` |
+| 15 | 角色 CTA | 主持「結束這一間」；Guest「離開這一間」；主面不把 TTL 當包廂狀態 |
 
 ---
 
@@ -399,7 +500,7 @@ TDD：進門即主面、kind／surface 分流、無 SAM Guest、持續作答（�
 
 | 流 | 是 | 不是 |
 | --- | --- | --- |
-| **包廂 `/room`** | 臨時隔間；進門即主面；Invite 請人（可多人） | 大廳公開桌、局內 overlay、型錄 SAM、必須先邀請才看得到 UI、1:1 專用 |
+| **包廂 `/room`** | 臨時隔間；進門即主面；Invite 請人（可多人）；**活著＝主持畫面開著** | 大廳公開桌、局內 overlay、型錄 SAM、必須先邀請才看得到 UI、1:1 專用、5 分鐘租期的雲端房間 |
 | **Session chat** | 已在遊戲 session 裡的附屬對話 | 包廂主面 |
 | **GO-INVITE** | `invite.compose` 開指定 SAM | 包廂 kind |
 | **布告** | 全站營運公告 | peer 對話 |
@@ -415,18 +516,22 @@ TDD：進門即主面、kind／surface 分流、無 SAM Guest、持續作答（�
 - [x] GLOSSARY「包廂」；大廳熱點／主計劃交叉引用
 - [x] **進門即主面：** 已登入開 `/room` 即時間線／輸入，不必先按邀請
 - [x] **不鎖 1:1：** 同一短鏈多人可進；時間線 fanout；檔案目錄同步（內容不全員推送）
+- [x] **兩個時鐘：** 包廂＝Host document；門牌 TTL 分開；按需鑄；Guest 留 `/i/`
 
 **Phase 1（實作後）**
 
 - [x] 已登入可鑄 `invite.room`；`short_url`＝`go…/i/…`；分享面 QR／複製
+- [x] 進 `/room` 不按請人：主面在、**沒有** TTL、**沒有**可分享短鏈
 - [x] 未登入不能開這一間；導向登入；不擋 `/s/`
-- [x] Guest 無帳號、不下載 SAM，同意後進入包廂 UI
+- [x] Guest 無帳號、不下載 SAM，同意後進入包廂 UI（網址仍 `/i/`）
 - [ ] 同一短鏈 ≥2 Guest 與 Host 互傳≥1 則文字；分享區掛檔後第二人 Save picker 下載成功（≤上限）；無 picker 則說明且零 binary；超限／可執行檔拒
 - [x] 訊息不經 Platform；檔 bytes 不經 Platform；散場丟目錄（已存檔不刪）
 - [x] 包廂 offer SDP 含 `m=audio`、`m=video`
 - [x] `/chat` 進 `/room`；大廳／更多文案為「包廂」
 - [x] 無 `alert`／`confirm`／`prompt`；窄屏可請人進來、可傳、可結束（結束有頁內確認）
-- [x] 斷網／短鏈過期：未入座頁內錯誤；已連線不受短鏈失效影響
+- [x] 門牌過期：未入座進不去；已連線續用；主狀態仍是人數；舊 QR 不可再分享；「再發一張」鑄新撤舊
+- [x] Guest「離開」：主持人數 -1、包廂仍 open；確認文案不是散場
+- [x] 主持重整：Guest 斷線；主持看到空的新一間
 
 ---
 
@@ -437,3 +542,5 @@ TDD：進門即主面、kind／surface 分流、無 SAM Guest、持續作答（�
 | 2026-08-18 | 初版 Draft：`/room` 包廂；Phase 1＝文字＋傳檔；契約預留音視訊／投放／開局；`invite.room`；SDP 預留 m-line；ICE 與遊戲邀請切開；資料不落雲端 |
 | 2026-08-18 | **進門即主面：** 已登入開 `/room`＝包廂 UI，邀請為面內動作。**不鎖 1:1：** 對齊遊戲 session（多 join、fanout）；撤 P0「1 Guest」與 Phase 4 多人預留 |
 | 2026-08-18 | **傳檔改分享區＋串流落盤：** 掛檔只授權、點下載才向分享者拉流；寫入 `showSaveFilePicker`；禁止 SW、OPFS、整檔 Blob／`<a download>`；Host 只按 transfer 轉幀 |
+| 2026-08-18 | **兩個時鐘＋UX：** 包廂＝主持 `/room` 畫面，過期的是門牌；按需鑄（撤進門自動鑄）；Guest 禁止 `replaceState` `/room`；主面＝在場、分享面＝邀請；主持結束／Guest 離開分開；§10 窄屏收合分享區、寬屏不常駐大 QR |
+| 2026-08-18 | **Phase 1 實作跟上：** 進門不鑄；門牌過期停作答、撤碼、主狀態仍是人數；Guest `leaveRoom`；主面頂列請人／結束，QR 只在分享面 |

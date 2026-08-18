@@ -57,6 +57,7 @@
       status.phase === "idle" ||
       status.phase === "cancelled" ||
       status.phase === "ended" ||
+      status.phase === "left" ||
       isRoom
     ) {
       chromeSession.clear();
@@ -169,16 +170,27 @@
       </button>
     </div>
   </div>
+{:else if status.phase === "left"}
+  <h1 class="pixel-text">已離開這一間</h1>
+  <div class="pixel-status" role="status">
+    <p class="pixel-status-title">已離開這一間</p>
+    <p class="pixel-status-body">其他人還在。若要再進，請對方再發一次邀請。</p>
+    <div class="actions">
+      <a class="pixel-btn pixel-btn--primary" href="/">回遊樂場大廳</a>
+    </div>
+  </div>
 {:else if status.phase === "ended"}
   <h1 class="pixel-text">{isRoom ? "這一間已結束" : "這一場已結束"}</h1>
   <div class="pixel-status" role="status">
-    <p class="pixel-status-title">{status.error || (isRoom ? "主持已結束這一間" : "主持已結束這一場")}</p>
-    <p class="pixel-status-body">{isRoom ? "可請主持重新邀請，或回遊樂場大廳。" : "可請主持重新邀請，或回遊樂場大廳挑別的小品。"}</p>
+    <p class="pixel-status-title">{status.error || (isRoom ? "主持已關掉這一間" : "主持已結束這一場")}</p>
+    <p class="pixel-status-body">{isRoom ? "請對方再發一次邀請，或回遊樂場大廳。" : "可請主持重新邀請，或回遊樂場大廳挑別的小品。"}</p>
     <div class="actions">
       <a class="pixel-btn pixel-btn--primary" href="/">回遊樂場大廳</a>
-      <button type="button" class="pixel-btn" onclick={onReopenInvite}>
-        重新開啟此邀請
-      </button>
+      {#if !isRoom}
+        <button type="button" class="pixel-btn" onclick={onReopenInvite}>
+          重新開啟此邀請
+        </button>
+      {/if}
     </div>
   </div>
 {:else if status.phase === "error"}
@@ -254,7 +266,7 @@
     shortUrl={null}
     inviteExpiresAt={null}
     peerName={null}
-    onEnd={() => runtime.decline()}
+    onEnd={() => runtime.leaveRoom()}
   />
 {:else if showCanvas}
   <h1 class="sr-only">邀請</h1>

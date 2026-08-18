@@ -87,6 +87,7 @@ export type GuestPhase =
   | "seating"
   | "ready"
   | "ended"
+  | "left"
   | "cancelled"
   | "error";
 
@@ -167,6 +168,7 @@ export function createGuestRuntime() {
   let unlistenApi: (() => void) | null = null;
   let homeSandboxByInvite = new Map<string, string>();
   let tunnelChannelBySession = new Map<string, string>();
+  let leavingSelf = false;
 
   function clearMemoryBlobs() {
     if (!memoryBlobUrls?.length) return;
@@ -221,6 +223,7 @@ export function createGuestRuntime() {
   function markHostEnded(message: string): void {
     if (
       status.phase === "ended" ||
+      status.phase === "left" ||
       status.phase === "cancelled" ||
       status.phase === "idle"
     ) {
@@ -412,6 +415,7 @@ export function createGuestRuntime() {
   }
 
   async function bootFromShortId(shortId: string): Promise<void> {
+    leavingSelf = false;
     set({
       phase: "resolving",
       shortId,
@@ -537,17 +541,19 @@ export function createGuestRuntime() {
           onBinary: (buf) => goRoomFiles.onBinary(buf),
           onChannelOpen: () => attachRoomChannels(),
           onChannelClose: () => {
+            if (leavingSelf) return;
             goSessionChat.detach();
             goRoomFiles.detach();
-            markHostEnded("主持已結束連線");
+            markHostEnded("主持已關掉這一間");
           },
           onConnectionState: (state: RTCPeerConnectionState) => {
+            if (leavingSelf) return;
             if (
               state === "failed" ||
               state === "disconnected" ||
               state === "closed"
             ) {
-              markHostEnded("主持已結束連線");
+              markHostEnded("主持已關掉這一間");
             }
           },
           onError: (err: Error) => {
@@ -857,6 +863,39 @@ export function createGuestRuntime() {
     });
   }
 
+  function leaveRoom(): void {
+    if (
+      status.phase === "left" ||
+      status.phase === "ended" ||
+      status.phase === "cancelled" ||
+      status.phase === "idle"
+    ) {
+      return;
+    }
+    leavingSelf = true;
+    goSessionChat.detach();
+    goRoomFiles.detach();
+    try {
+      peerSession?.close();
+    } catch {
+      /* ignore */
+    }
+    peerSession = null;
+    unlistenApi?.();
+    unlistenApi = null;
+    set({
+      phase: "left",
+      message: "已離開這一間",
+      error: null,
+      canvasUrl: null,
+      canvasSrcdoc: null,
+      canvasMode: null,
+      canvasGeneration: 0,
+      loadProgress: null,
+      surface: "room",
+    });
+  }
+
   function subscribe(listener: Listener): () => void {
     listeners.add(listener);
     listener({ ...status });
@@ -873,6 +912,7 @@ export function createGuestRuntime() {
     bootFromShortId,
     consentAndPlay,
     decline,
+    leaveRoom,
     setDisplayName(name: string) {
       set({ displayName: name });
       goSessionChat.setLocalName(name);

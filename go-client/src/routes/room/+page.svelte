@@ -87,8 +87,10 @@
   loggedIn={goAuth.loggedIn}
   shortUrl={status?.shortUrl ?? null}
   inviteExpiresAt={status?.inviteExpiresAt ?? null}
+  inviteDoor={status?.inviteDoor ?? "none"}
   peerName={status?.peerName ?? null}
   guestCount={status?.guestCount ?? 0}
+  occupantNames={status?.occupantNames ?? []}
   onLogin={() => goAuth.login()}
   onInvite={() => void mint()}
   onEnd={() => runtime.close()}

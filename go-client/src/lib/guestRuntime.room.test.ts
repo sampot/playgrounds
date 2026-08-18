@@ -165,4 +165,16 @@ describe("guestRuntime invite.room", () => {
     expect(rt.getStatus().surface).toBe("room");
     expect(rt.getStatus().error).toBeNull();
   });
+
+  it("leaveRoom from 包廂 is not host-ended and keeps others' booth", async () => {
+    const { createGuestRuntime } = await import("./guestRuntime");
+    const rt = createGuestRuntime();
+    await rt.bootFromShortId("room1");
+    await rt.consentAndPlay("訪客甲");
+    rt.leaveRoom();
+    expect(rt.getStatus().phase).toBe("left");
+    expect(rt.getStatus().message).toBe("已離開這一間");
+    expect(rt.getStatus().surface).toBe("room");
+    expect(rt.getStatus().error).toBeNull();
+  });
 });

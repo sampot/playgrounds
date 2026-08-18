@@ -1,7 +1,6 @@
 <script lang="ts">
   import { tick } from "svelte";
   import { goto } from "$app/navigation";
-  import { encodeRosterQrPngDataUrl } from "@pg/roster/rosterQr";
   import {
     SESSION_CHAT_MAX_TEXT_CHARS,
     isSessionChatHostMessage,
@@ -12,11 +11,19 @@
   import GoShareSheet from "$lib/GoShareSheet.svelte";
   import { chromeSession } from "$lib/chromeSession.svelte";
   import {
+    GO_ROOM_EMPTY_TIMELINE,
+    GO_ROOM_END_CONFIRM_HOST,
+    GO_ROOM_KEEP_OPEN,
+    GO_ROOM_LEAVE_CONFIRM_GUEST,
+    GO_ROOM_LOGIN_HINT,
     GO_ROOM_SHARE_HINT,
     GO_ROOM_SHARE_TITLE,
+    isRoomInviteShareable,
     roomChatWhoLabel,
+    roomInviteRemainLabel,
     roomOccupantSummary,
     takePickedFiles,
+    type RoomInviteDoor,
   } from "$lib/goRoom";
 
   type RoomUiPhase = "idle" | "open" | "ended" | "error" | "connecting" | "ready";
@@ -29,8 +36,10 @@
     loggedIn?: boolean;
     shortUrl: string | null;
     inviteExpiresAt: number | null;
+    inviteDoor?: RoomInviteDoor;
     peerName: string | null;
     guestCount?: number;
+    occupantNames?: string[];
     onLogin?: () => void;
     onInvite?: () => void;
     onEnd?: () => void | Promise<void>;
@@ -45,8 +54,10 @@
     loggedIn = false,
     shortUrl = null,
     inviteExpiresAt = null,
+    inviteDoor = "none",
     peerName = null,
     guestCount = 0,
+    occupantNames = [],
     onLogin,
     onInvite,
     onEnd,
@@ -57,13 +68,14 @@
   let listEl = $state<HTMLDivElement | null>(null);
   let quickOpen = $state(false);
   let shareOpen = $state(false);
-  let qrUrl = $state<string | null>(null);
   let confirmEnd = $state(false);
   let leaveAfterEnd = $state(false);
   let confirmDialog = $state<HTMLDialogElement | null>(null);
   let fileInput = $state<HTMLInputElement | null>(null);
   let fileError = $state("");
   let now = $state(Date.now());
+  let filesOpen = $state(false);
+  let pendingShare = $state(false);
 
   const messages = $derived(goSessionChat.messages);
   const connected = $derived(goSessionChat.connected);
@@ -82,14 +94,17 @@
     }
   });
 
-  const remainLabel = $derived.by(() => {
-    if (!inviteExpiresAt) return "";
-    const ms = inviteExpiresAt - now;
-    if (ms <= 0) return "門牌已過期";
-    const s = Math.ceil(ms / 1000);
-    const m = Math.floor(s / 60);
-    const r = s % 60;
-    return `門牌還有 ${m}:${String(r).padStart(2, "0")}`;
+  const remainLabel = $derived(
+    roomInviteRemainLabel(inviteExpiresAt, now)
+  );
+  const shareable = $derived(
+    isRoomInviteShareable({ shortUrl, expiresAt: inviteExpiresAt, now })
+  );
+  const door = $derived.by((): RoomInviteDoor => {
+    if (inviteDoor === "expired" || inviteDoor === "live" || inviteDoor === "none") {
+      return inviteDoor;
+    }
+    return shareable ? "live" : "none";
   });
 
   const inBooth = $derived(
@@ -124,23 +139,10 @@
   });
 
   $effect(() => {
-    const url = shortUrl;
-    if (!url) {
-      qrUrl = null;
-      return;
+    if (pendingShare && shareable && shortUrl) {
+      shareOpen = true;
+      pendingShare = false;
     }
-    let cancelled = false;
-    void encodeRosterQrPngDataUrl(url, { scale: 6, border: 2 }).then(
-      (data) => {
-        if (!cancelled) qrUrl = data;
-      },
-      () => {
-        if (!cancelled) qrUrl = null;
-      }
-    );
-    return () => {
-      cancelled = true;
-    };
   });
 
   $effect(() => {
@@ -238,10 +240,11 @@
   }
 
   function inviteInBooth() {
-    if (shortUrl) {
+    if (door === "live" && shareable && shortUrl) {
       shareOpen = true;
       return;
     }
+    pendingShare = true;
     onInvite?.();
   }
 
@@ -261,7 +264,25 @@
 </p>
 
 <header class="room-head">
-  <h1 class="pixel-text">包廂</h1>
+  <div class="room-head-row">
+    <h1 class="pixel-text">包廂</h1>
+    {#if inBooth}
+      <div class="room-head-actions">
+        {#if role === "host"}
+          <button
+            type="button"
+            class="pixel-btn pixel-btn--primary"
+            onclick={() => inviteInBooth()}
+          >
+            {door === "expired" ? "再發一張" : "請人進來"}
+          </button>
+        {/if}
+        <button type="button" class="pixel-btn pixel-btn--danger-outline" onclick={() => askEnd()}>
+          {role === "host" ? "結束" : "離開"}
+        </button>
+      </div>
+    {/if}
+  </div>
   <p class="room-status" role="status">{statusLabel || "臨時隔間：對話只在在場者之間；檔案點下載才存到你選的位置。"}</p>
 </header>
 
@@ -273,7 +294,7 @@
     <button type="button" class="pixel-btn pixel-btn--primary" onclick={() => onLogin?.()}>
       登入後開包廂
     </button>
-    <p class="muted">沒有通行證也能被請進來。單機小品不受影響。</p>
+    <p class="muted">{GO_ROOM_LOGIN_HINT} 單機小品不受影響。</p>
   </section>
 {/if}
 
@@ -313,7 +334,7 @@
     <div class="room-col">
     <div class="room-timeline pixel-frame" bind:this={listEl} role="log" aria-label="包廂時間線">
       {#if messages.length === 0}
-        <p class="muted">還沒有訊息。可以先打字，或請人進來。</p>
+        <p class="muted">{GO_ROOM_EMPTY_TIMELINE}</p>
       {/if}
       {#each messages as m (m.id)}
         <div
@@ -345,16 +366,32 @@
       ondragover={(e) => {
         e.preventDefault();
         dropping = true;
+        filesOpen = true;
       }}
       ondragleave={() => (dropping = false)}
       ondrop={(e) => {
         e.preventDefault();
         dropping = false;
+        filesOpen = true;
         const list = e.dataTransfer?.files;
         if (list) void shareFiles(list);
       }}
     >
-      <h2 id="room-files-title" class="side-title">檔案分享區</h2>
+      <button
+        type="button"
+        id="room-files-title"
+        class="file-toggle"
+        aria-expanded={filesOpen}
+        onclick={() => (filesOpen = !filesOpen)}
+      >
+        {filesOpen ? "▾" : "▸"} 檔案分享區
+        {#if files.length > 0}
+          · {files.length}
+        {:else}
+          · 尚未掛檔
+        {/if}
+      </button>
+      {#if filesOpen}
       <p class="muted">
         檔案還在分享者這台裝置上。點下載才會存到你選的位置。關包廂，目錄就沒了。
       </p>
@@ -376,7 +413,7 @@
         選擇檔案
       </button>
       {#if files.length === 0}
-        <p class="muted">把檔案拖到這裡，或按選擇檔案。還沒有人掛檔。</p>
+        <p class="muted">把檔案拖到這裡，或按選擇檔案。</p>
       {/if}
       <ul class="file-list">
         {#each files as f (f.id)}
@@ -411,6 +448,7 @@
           </li>
         {/each}
       </ul>
+      {/if}
     </section>
   {/if}
     </div>
@@ -418,25 +456,31 @@
       <p class="side-title">這一間</p>
       <p class="room-status">{statusLabel}</p>
       {#if role === "host"}
-        {#if qrUrl}
-          <img class="room-qr" src={qrUrl} alt="包廂邀請 QR" width="240" height="240" />
+        <p class="muted">{GO_ROOM_KEEP_OPEN}</p>
+        {#if occupantNames.length > 0}
+          <ul class="occupant-list">
+            {#each occupantNames as n (n)}
+              <li>{n}</li>
+            {/each}
+          </ul>
         {/if}
-        {#if spoken}
-          <p class="room-spoken">{spoken}</p>
-        {/if}
-        {#if remainLabel}
-          <p class="muted">{remainLabel}</p>
+        {#if door === "none"}
+          <p class="muted">還沒發邀請</p>
+        {:else if door === "live"}
+          <p class="muted">邀請有效{remainLabel ? ` · ${remainLabel}` : ""}</p>
+        {:else}
+          <p class="muted">邀請已過期</p>
         {/if}
         <button
           type="button"
           class="pixel-btn pixel-btn--primary"
           onclick={() => inviteInBooth()}
         >
-          請人進來
+          {door === "expired" ? "再發一張邀請" : "請人進來"}
         </button>
       {/if}
       <button type="button" class="pixel-btn pixel-btn--danger-outline" onclick={() => askEnd()}>
-        結束這一間
+        {role === "host" ? "結束這一間" : "離開這一間"}
       </button>
     </aside>
   </div>
@@ -489,18 +533,22 @@
   }}
 >
   <div class="confirm pixel-frame">
-    <h2 id="room-end-title" class="confirm-title">結束這一間？</h2>
-    <p class="confirm-body">結束後目錄會沒了，在場的人也會斷線。已存到你硬碟的檔不受影響。</p>
+    <h2 id="room-end-title" class="confirm-title">
+      {role === "host" ? "結束這一間？" : "離開這一間？"}
+    </h2>
+    <p class="confirm-body">
+      {role === "host" ? GO_ROOM_END_CONFIRM_HOST : GO_ROOM_LEAVE_CONFIRM_GUEST}
+    </p>
     <div class="confirm-actions">
       <button type="button" class="pixel-btn" onclick={() => (confirmEnd = false)}>取消</button>
       <button type="button" class="pixel-btn pixel-btn--danger" onclick={() => void confirmEndNow()}>
-        結束
+        {role === "host" ? "結束" : "離開"}
       </button>
     </div>
   </div>
 </dialog>
 
-{#if shortUrl}
+{#if shareable && shortUrl}
   <GoShareSheet
     open={shareOpen}
     title={GO_ROOM_SHARE_TITLE}
@@ -533,6 +581,24 @@
   }
   .room-head {
     margin: 0 0 1rem;
+  }
+  .room-head-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    justify-content: space-between;
+  }
+  .room-head-row h1 {
+    margin: 0;
+  }
+  .room-head-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+  .room-head-actions .pixel-btn {
+    min-height: 44px;
   }
   .room-status {
     margin: 0.35rem 0 0;
@@ -632,7 +698,19 @@
   }
   .file-tray {
     margin: 0;
-    min-height: 7rem;
+    min-height: 0;
+  }
+  .file-toggle {
+    min-height: 44px;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    font-weight: 700;
+    font-family: var(--pixel);
+    cursor: pointer;
   }
   .file-tray--drop {
     outline: 2px dashed rgb(var(--ink));
@@ -672,14 +750,12 @@
     font-family: var(--pixel);
     font-weight: 700;
   }
-  .room-side .pixel-btn {
-    margin-top: 0.5rem;
-    min-height: 44px;
-    width: 100%;
-  }
-  .room-side .room-qr,
-  .room-side .room-spoken {
+  .room-side {
     display: none;
+  }
+  .occupant-list {
+    margin: 0.35rem 0 0.5rem;
+    padding-left: 1.1rem;
   }
   .quick-toggle {
     min-height: 44px;
@@ -757,12 +833,17 @@
       flex: 1 1 auto;
       max-height: min(50vh, 28rem);
     }
+    .room-head-actions {
+      display: none;
+    }
     .room-side {
+      display: block;
       flex: 0 0 16rem;
     }
-    .room-side .room-qr,
-    .room-side .room-spoken {
-      display: block;
+    .room-side .pixel-btn {
+      margin-top: 0.5rem;
+      min-height: 44px;
+      width: 100%;
     }
     .room-actions,
     .confirm-actions {

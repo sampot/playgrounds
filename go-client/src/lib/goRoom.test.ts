@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  isRoomInviteShareable,
   roomChatWhoLabel,
   roomHostDisplayName,
+  roomInviteDoor,
+  roomInviteRemainLabel,
   roomOccupantSummary,
   takePickedFiles,
 } from "./goRoom";
@@ -33,12 +36,58 @@ function liveFileInput(initial: File[]) {
 
 describe("roomOccupantSummary", () => {
   it("treats the Host alone as already in the booth", () => {
-    expect(roomOccupantSummary({ guestCount: 0 })).toBe("這一間");
+    expect(roomOccupantSummary({ guestCount: 0 })).toBe(
+      "就你一個人 · 把這頁開著，這一間才還在"
+    );
   });
 
   it("counts Host plus guests, not 1:1", () => {
-    expect(roomOccupantSummary({ guestCount: 1 })).toBe("這一間 · 2 人在");
-    expect(roomOccupantSummary({ guestCount: 2 })).toBe("這一間 · 3 人在");
+    expect(roomOccupantSummary({ guestCount: 1 })).toBe("2 人在");
+    expect(roomOccupantSummary({ guestCount: 2 })).toBe("3 人在");
+  });
+});
+
+describe("roomInviteDoor", () => {
+  it("is none until a live short URL exists", () => {
+    expect(
+      roomInviteDoor({ shortUrl: null, expiresAt: null, expired: false })
+    ).toBe("none");
+  });
+
+  it("is live only while the short URL is unexpired", () => {
+    expect(
+      roomInviteDoor({
+        shortUrl: "https://go.samkuo.me/i/abc",
+        expiresAt: Date.now() + 60_000,
+        expired: false,
+      })
+    ).toBe("live");
+  });
+
+  it("is expired after TTL even if a stale URL is still held", () => {
+    expect(
+      roomInviteDoor({
+        shortUrl: "https://go.samkuo.me/i/abc",
+        expiresAt: Date.now() - 1,
+        expired: true,
+      })
+    ).toBe("expired");
+    expect(
+      isRoomInviteShareable({
+        shortUrl: "https://go.samkuo.me/i/abc",
+        expiresAt: Date.now() - 1,
+      })
+    ).toBe(false);
+  });
+});
+
+describe("roomInviteRemainLabel", () => {
+  it("counts down a live door without calling it the booth", () => {
+    expect(roomInviteRemainLabel(Date.now() + 65_000, Date.now())).toBe(
+      "還有 1:05"
+    );
+    expect(roomInviteRemainLabel(Date.now() - 1, Date.now())).toBe("已過期");
+    expect(roomInviteRemainLabel(null)).toBe("");
   });
 });
 

@@ -27,6 +27,7 @@ import {
   GO_ROOM_QUICK_REPLIES,
   roomHostDisplayName,
   roomOccupantSummary,
+  type RoomInviteDoor,
 } from "./goRoom";
 import {
   DEFAULT_INVITE_TTL_MS,
@@ -42,8 +43,10 @@ export type RoomStatus = {
   inviteId: string | null;
   shortUrl: string | null;
   inviteExpiresAt: number | null;
+  inviteDoor: RoomInviteDoor;
   peerName: string | null;
   guestCount: number;
+  occupantNames: string[];
 };
 
 type Listener = (s: RoomStatus) => void;
@@ -70,8 +73,10 @@ export function createRoomRuntime() {
     inviteId: null,
     shortUrl: null,
     inviteExpiresAt: null,
+    inviteDoor: "none",
     peerName: null,
     guestCount: 0,
+    occupantNames: [],
   };
   const listeners = new Set<Listener>();
   let loop: ReturnType<typeof startPlatformHostAnswerLoop> | null = null;
@@ -81,6 +86,10 @@ export function createRoomRuntime() {
   let surfaceAttached = false;
   let closing = false;
   let opening = false;
+  let mintInflight: Promise<{
+    inviteId: string;
+    shortUrl: string;
+  } | null> | null = null;
   let fileHub: RoomFileStarHub | null = null;
 
   function emit() {
@@ -115,6 +124,7 @@ export function createRoomRuntime() {
     set({
       guestCount: live.length,
       peerName: names[0] ?? null,
+      occupantNames: names,
       message: roomOccupantSummary({ guestCount: live.length }),
     });
   }
@@ -241,6 +251,35 @@ export function createRoomRuntime() {
     };
   }
 
+  function occupancyMessage(): string {
+    return roomOccupantSummary({ guestCount: liveGuestCount() });
+  }
+
+  function doorIsLive(): boolean {
+    return (
+      status.inviteDoor === "live" &&
+      Boolean(status.inviteId) &&
+      Boolean(status.shortUrl) &&
+      isInviteUnexpired(status.inviteExpiresAt) &&
+      Boolean(loop)
+    );
+  }
+
+  function expireDoor(inviteId: string): void {
+    if (status.inviteId !== inviteId) return;
+    loop?.stop();
+    loop = null;
+    const toRevoke = status.inviteId;
+    set({
+      inviteDoor: "expired",
+      shortUrl: null,
+      inviteId: null,
+      inviteExpiresAt: null,
+      message: occupancyMessage(),
+    });
+    if (toRevoke) void goAuth.revokePlatformInvite(toRevoke);
+  }
+
   function clearInviteExpiryTimer() {
     if (inviteExpiryTimer) {
       clearTimeout(inviteExpiryTimer);
@@ -252,17 +291,25 @@ export function createRoomRuntime() {
     clearInviteExpiryTimer();
     const delay = Math.max(0, expiresAt - Date.now());
     inviteExpiryTimer = setTimeout(() => {
-      if (status.inviteId !== inviteId) return;
-      loop?.stop();
-      loop = null;
-      set({
-        message: "門牌已過期，可再請人進來",
-        inviteExpiresAt: expiresAt,
-      });
+      expireDoor(inviteId);
     }, delay);
   }
 
   async function mintInviteAndAnswer(): Promise<{
+    inviteId: string;
+    shortUrl: string;
+  } | null> {
+    if (doorIsLive() && status.inviteId && status.shortUrl) {
+      return { inviteId: status.inviteId, shortUrl: status.shortUrl };
+    }
+    if (mintInflight) return mintInflight;
+    mintInflight = mintInviteAndAnswerInner().finally(() => {
+      mintInflight = null;
+    });
+    return mintInflight;
+  }
+
+  async function mintInviteAndAnswerInner(): Promise<{
     inviteId: string;
     shortUrl: string;
   } | null> {
@@ -304,8 +351,9 @@ export function createRoomRuntime() {
         inviteId: created.invite_id,
         shortUrl: created.short_url,
         inviteExpiresAt: expiresAt,
+        inviteDoor: "live",
         error: null,
-        message: roomOccupantSummary({ guestCount: liveGuestCount() }),
+        message: occupancyMessage(),
       });
       scheduleInviteExpiry(created.invite_id, expiresAt);
       loop = startPlatformHostAnswerLoop({
@@ -334,9 +382,7 @@ export function createRoomRuntime() {
                 set({
                   phase: "open",
                   error: null,
-                  message: roomOccupantSummary({
-                    guestCount: liveGuestCount(),
-                  }),
+                  message: occupancyMessage(),
                 });
               }
             },
@@ -368,16 +414,7 @@ export function createRoomRuntime() {
   async function openBooth(opts?: { afterEnd?: boolean }): Promise<void> {
     if (opening) return;
     if (status.phase === "ended" && !opts?.afterEnd) return;
-    if (
-      !opts?.afterEnd &&
-      status.phase === "open" &&
-      loop &&
-      status.inviteId &&
-      status.shortUrl &&
-      isInviteUnexpired(status.inviteExpiresAt ?? 0)
-    ) {
-      return;
-    }
+    if (!opts?.afterEnd && status.phase === "open") return;
     opening = true;
     try {
       if (opts?.afterEnd || status.phase === "ended") {
@@ -389,8 +426,10 @@ export function createRoomRuntime() {
           inviteId: null,
           shortUrl: null,
           inviteExpiresAt: null,
+          inviteDoor: "none",
           peerName: null,
           guestCount: 0,
+          occupantNames: [],
         });
       }
       closing = false;
@@ -398,21 +437,9 @@ export function createRoomRuntime() {
       set({
         phase: "open",
         error: null,
-        message: roomOccupantSummary({ guestCount: liveGuestCount() }),
+        inviteDoor: status.inviteDoor === "live" ? "live" : "none",
+        message: occupancyMessage(),
       });
-      if (
-        status.inviteId &&
-        status.shortUrl &&
-        isInviteUnexpired(status.inviteExpiresAt ?? 0) &&
-        loop
-      ) {
-        return;
-      }
-      try {
-        await mintInviteAndAnswer();
-      } catch {
-        /* stay in the booth */
-      }
     } finally {
       opening = false;
     }
@@ -453,8 +480,10 @@ export function createRoomRuntime() {
       inviteId: null,
       shortUrl: null,
       inviteExpiresAt: null,
+      inviteDoor: "none",
       peerName: null,
       guestCount: 0,
+      occupantNames: [],
     });
     closing = false;
   }
