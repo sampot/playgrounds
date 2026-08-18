@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { goto } from "$app/navigation";
   import {
     GO_HOME_DESCRIPTION,
     GO_HOME_DOCUMENT_TITLE,
@@ -15,22 +16,34 @@
   } from "$lib/goBossWelcome";
   import { chromeSession } from "$lib/chromeSession.svelte";
   import { goAuth } from "$lib/goAuth.svelte";
-  import { recommendHome, searchGoCatalog, type GoCatalogEntry } from "$lib/goCatalog";
-  import GoEntryCover from "$lib/GoEntryCover.svelte";
   import GoAdSlot from "$lib/GoAdSlot.svelte";
+  import GoShopLobby from "$lib/GoShopLobby.svelte";
+  import GoShopHotspotNav from "$lib/GoShopHotspotNav.svelte";
+  import GoShopDialog from "$lib/GoShopDialog.svelte";
+  import GoBulletinBoard from "$lib/GoBulletinBoard.svelte";
+  import {
+    dismissBulletin,
+    filterActiveBulletins,
+    GO_BULLETIN_FIXTURE,
+    readDismissedBulletins,
+  } from "$lib/goBulletin";
+  import {
+    resolveShopHotspotAction,
+    type ShopHotspotId,
+  } from "$lib/goShopHotspots";
   import { formatGoBuildStamp, GO_BUILD_ISO } from "$lib/goBuildStamp";
   import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
 
   const buildStamp = formatGoBuildStamp(GO_BUILD_ISO);
 
-  let input = $state("");
-  // 推薦池只在瀏覽器產生：prerender／SSR 若呼叫 recommendHome，會把建置當下
-  // 的封面寫進靜態 HTML，hydration 後標題換了圖卻仍卡在那四張。
-  let pool = $state<GoCatalogEntry[]>([]);
-  let recCount = $state(4);
-  let recs = $state<GoCatalogEntry[]>([]);
-  let recsReady = $state(false);
-  let isSearching = $state(false);
+  let bossDialogOpen = $state(false);
+  let helpDeskOpen = $state(false);
+  let cabinetOpen = $state(false);
+  let bulletinBoardOpen = $state(false);
+  let dismissedBulletins = $state<Record<string, number>>({});
+  let activeBulletins = $derived(
+    filterActiveBulletins(GO_BULLETIN_FIXTURE, { dismissed: dismissedBulletins })
+  );
   const og = goOgMeta({
     title: GO_HOME_DOCUMENT_TITLE,
     description: GO_HOME_DESCRIPTION,
@@ -39,7 +52,7 @@
   const websiteLd = goWebsiteJsonLd();
   const websiteLdJson = JSON.stringify(websiteLd);
   onMount(() => {
-    applyFreshPool();
+    dismissedBulletins = readDismissedBulletins(localStorage);
 
     let authChecks = 0;
     let timer: ReturnType<typeof setTimeout>;
@@ -76,58 +89,56 @@
     return () => clearTimeout(timer);
   });
 
-  // 首頁推薦：單列顯示，數量依螢幕寬度 2/3/4（手機→平板→寬螢幕）。
-  function homeRecCount(): number {
-    if (typeof window === "undefined" || !window.matchMedia) return 4;
-    if (window.matchMedia("(min-width: 48rem)").matches) return 4;
-    if (window.matchMedia("(min-width: 30rem)").matches) return 3;
-    return 2;
+  function showBossBanter() {
+    const line = pickBossWelcome({
+      recentIndices: readRecentBossWelcomes(localStorage),
+      offline: navigator.onLine === false,
+      signedIn: goAuth.loggedIn,
+    });
+    rememberBossWelcome(localStorage, line.index);
+    chromeSession.setFlash(line.text, 3800);
   }
 
-  function applyFreshPool() {
-    pool = recommendHome(4);
-    recCount = homeRecCount();
-    recs = pool.slice(0, recCount);
-    isSearching = false;
-    recsReady = true;
+  function openCabinets() {
+    helpDeskOpen = false;
+    cabinetOpen = true;
   }
 
-  // 只在跨越斷點時調整「顯示數量」，從穩定池中切片——不重新洗牌。
-  function syncCount() {
-    const n = homeRecCount();
-    if (n === recCount) return;
-    recCount = n;
-    if (!isSearching) recs = pool.slice(0, recCount);
+  function openHelpDesk() {
+    cabinetOpen = false;
+    helpDeskOpen = true;
   }
 
-  function reshuffle() {
-    input = "";
-    applyFreshPool();
-  }
-
-  function handleSearch(event: Event) {
-    const target = event.target as HTMLInputElement;
-    input = target.value.trim();
-
-    if (input.length === 0) {
-      recCount = homeRecCount();
-      recs = pool.slice(0, recCount);
-      isSearching = false;
-    } else {
-      recs = searchGoCatalog(input, 3);
-      isSearching = true;
+  function handleHotspot(id: ShopHotspotId) {
+    const action = resolveShopHotspotAction(id);
+    switch (action.type) {
+      case "boss-menu":
+        bossDialogOpen = true;
+        break;
+      case "open-cabinets":
+        openCabinets();
+        break;
+      case "open-bulletin":
+        bulletinBoardOpen = true;
+        break;
+      case "open-help-desk":
+        openHelpDesk();
+        break;
+      case "navigate":
+        void goto(action.href);
+        break;
     }
   }
 
-  // 視窗寬度變化時只調整顯示數量（非搜尋態）；手機網址列收合觸發的
-  // resize 不會跨越斷點，因此推薦內容保持不變。
-  $effect(() => {
-    function update() {
-      syncCount();
-    }
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  });
+  function handleBossMenu(choice: "banter" | "cabinets" | "help") {
+    if (choice === "banter") showBossBanter();
+    else if (choice === "cabinets") openCabinets();
+    else openHelpDesk();
+  }
+
+  function handleBulletinDismiss(bulletin: (typeof activeBulletins)[number]) {
+    dismissedBulletins = dismissBulletin(localStorage, bulletin);
+  }
 </script>
 
 <svelte:head>
@@ -155,68 +166,20 @@
 
 <h1 class="pixel-text">純玩</h1>
 <p class="lead">{GO_HOME_LEAD}</p>
-<p class="status home-tagline">
-  <span class="pixel-tag">多款小品</span>
-  <span>選一個遊戲直接玩。造訪過的離線也能再開。</span>
-</p>
-<p class="home-help">
-  <a href="/apps">已下載的遊戲</a>
-  <span class="home-help-sep" aria-hidden="true">·</span>
-  <a href="/help">使用說明 · 加入主畫面</a>
-</p>
 
-<section class="home-rec" aria-label="推薦試試">
-  <h2 class="home-rec-title">推薦試試</h2>
-  
-  <div class="search-box">
-    <input
-      type="text"
-      class="search-input pixel-input"
-      placeholder="搜尋遊戲名稱或 id（例如：打磚塊）"
-      value={input}
-      oninput={handleSearch}
-    />
-  </div>
-  
-  {#if recs.length}
-    <ul class="home-grid">
-      {#each recs as entry (entry.id)}
-        <li>
-          <a class="home-grid-card" href={`/s/${encodeURIComponent(entry.id)}`}>
-            <span class="home-grid-cover" aria-hidden="true">
-              {#key `${entry.id}:${entry.cover ?? ""}`}
-                <GoEntryCover
-                  cover={entry.cover}
-                  series={entry.series}
-                  variant="fill"
-                  size={34}
-                />
-              {/key}
-            </span>
-            <span class="home-grid-name">{entry.title}</span>
-            {#if entry.blurb}
-              <span class="home-grid-blurb">{entry.blurb}</span>
-            {/if}
-          </a>
-        </li>
-      {/each}
-    </ul>
-  {:else if isSearching}
-    <p class="search-no-results">沒有找到符合的遊戲</p>
-  {:else if !recsReady}
-    <p class="search-placeholder-text">正在挑選推薦…</p>
-  {:else}
-    <p class="search-placeholder-text">搜尋遊戲名稱或 id，或點「再次推薦」隨機選取</p>
-  {/if}
-</section>
+<GoShopLobby onHotspot={handleHotspot} bind:helpDeskOpen bind:cabinetOpen />
+<GoShopHotspotNav onSelect={handleHotspot} />
 
-<div class="home-ad">
+<div class="home-ad" id="go-home-ad">
   <GoAdSlot />
 </div>
 
-<button type="button" class="home-reshuffle pixel-btn pixel-btn--primary" onclick={reshuffle}>
-  再次推薦
-</button>
+<GoShopDialog bind:open={bossDialogOpen} onChoose={handleBossMenu} />
+<GoBulletinBoard
+  bind:open={bulletinBoardOpen}
+  bulletins={activeBulletins}
+  onDismiss={handleBulletinDismiss}
+/>
 
 <footer class="home-footer">
   <p>
@@ -226,38 +189,6 @@
 </footer>
 
 <style>
-  .home-tagline {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.5rem 0.65rem;
-    margin: 0 0 0.55rem;
-  }
-  .home-help {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.35rem 0.5rem;
-    margin: 0 0 1.1rem;
-    font-size: 0.85rem;
-  }
-  .home-help-sep {
-    color: color-mix(in oklab, rgb(var(--ink)) 42%, transparent);
-  }
-  .home-help a {
-    font-weight: 600;
-    text-decoration: none;
-    color: color-mix(in oklab, rgb(var(--ink)) 78%, transparent);
-  }
-  .home-help a:hover,
-  .home-help a:focus-visible {
-    color: rgb(var(--accent));
-    text-decoration: underline;
-    outline: none;
-  }
-  .home-rec {
-    margin: 0 0 1rem;
-  }
   .home-ad {
     margin: 0;
   }
@@ -266,11 +197,6 @@
   }
   .home-ad :global(.go-ad-slot) {
     margin-top: 0;
-  }
-  .home-reshuffle {
-    display: block;
-    width: fit-content;
-    margin: 0 auto;
   }
   .home-footer {
     margin: 1.75rem 0 0;
@@ -287,26 +213,5 @@
   }
   .home-footer time {
     font-variant-numeric: tabular-nums;
-  }
-  .home-rec-title {
-    margin: 0 0 0.65rem;
-    font-family: var(--pixel);
-    font-size: 0.95rem;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-  }
-  .search-box {
-    margin-bottom: 0.65rem;
-  }
-  .search-no-results,
-  .search-placeholder-text {
-    font-size: 0.9rem;
-    color: rgb(var(--muted));
-    text-align: center;
-    padding: 1rem;
-    border: var(--pixel-edge) solid rgb(var(--ink));
-    border-radius: var(--radius);
-    background: rgb(var(--card));
-    box-shadow: var(--pixel-shadow);
   }
 </style>

@@ -50,3 +50,7 @@ Search indexing: `robots.txt` allows `/`、`/help`、`/s/` and disallows `/i/`�
 2. Guest opens short link → resolve secret → consent → memory-load SAM → WebRTC → play
 3. Catalog share → `go…/s/<id>` with that SAM’s title；go Header share sheet = system share / QR / copy + link preview
 4. On `/s/<id>` for hostable protocols（e.g. `pg-gomoku`）， logged-in Host can invite from the SAM UI（`env.HOST.createPlatformInvite`）→ same Guest `/i/` path
+
+## Credits
+
+大廳 tiles／spritesheet 由 Gemini 像素圖裁切（見 [`ATTRIBUTION.md`](./ATTRIBUTION.md) 與 `static/lobby/`）。

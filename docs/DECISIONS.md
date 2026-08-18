@@ -1191,6 +1191,8 @@
 | [PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md) | 純玩版客戶端＠`go.samkuo.me`（短網址 canonical；DEC-050） |
 | [PG-GO-SAM-MANIFEST-PLAN.md](./PG-GO-SAM-MANIFEST-PLAN.md) | 遊戲 `sam-manifest.json` 下載清單（廢 go Trees 列檔；無 Worker） |
 | [PG-GO-ADS-PLAN.md](./PG-GO-ADS-PLAN.md) | 純玩版 shell 廣告版位（**DEC-054**；house／EthicalAds 類） |
+| [PG-GO-BULLETIN-PLAN.md](./PG-GO-BULLETIN-PLAN.md) | 純玩版全遊樂場布告／布告欄（Draft；從屬 DEC-050；Platform admin） |
+| [PG-GO-SHOP-LOBBY-PLAN.md](./PG-GO-SHOP-LOBBY-PLAN.md) | 純玩版遊樂場大廳 Lobby（室內 canvas；Draft；從屬 DEC-050） |
 | [PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md) | 純玩版登入（play 相容協定）＋ Header profile（DEC-052 Proposed） |
 | [PG-GO-SESSION-CHAT-PLAN.md](./PG-GO-SESSION-CHAT-PLAN.md) | 純玩版同 session 輕量聊天（Draft；從屬 DEC-050／045 transport） |
 | [PG-STANDALONE-PLAN.md](./PG-STANDALONE-PLAN.md) | 場網／Workers／開源／舊場暫留（DEC-041／042） |

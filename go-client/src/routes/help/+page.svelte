@@ -130,6 +130,13 @@
   </p>
 </section>
 
+<section class="help-section pixel-frame" aria-labelledby="help-credits">
+  <h2 id="help-credits">大廳美術</h2>
+  <p>
+    大廳場景以 canvas 幾何繪製（地板、櫃檯、機台、詢問處），不載入 tiles／sprite 圖。
+  </p>
+</section>
+
 <style>
   .help-back {
     margin: 0 0 1rem;

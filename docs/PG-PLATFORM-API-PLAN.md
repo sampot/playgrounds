@@ -280,6 +280,11 @@ Auth：`Authorization: Bearer <access_token|api_key|join_cap|…>`（依端點�
 | `GET` | `/invites/:id/signal/pending` | **API key**（host／場殼） | 取隊列頭 pending offer（或 long-poll 等下一個） |
 | `PUT` | `/invites/:id/signal/answer` | **API key**（host／場殼） | 對當前頭寫 answer；喚醒對應 offer long-poll |
 | `DELETE` | `/invites/:id` | **API key**（場殼） | 撤銷 Invite（短連結失效） |
+| `GET` | `/bulletins` | 無（公開；限流） | go 全站布告 active 列表（≤3；見 [PG-GO-BULLETIN-PLAN.md](./PG-GO-BULLETIN-PLAN.md)；**後段**） |
+| `GET` | `/admin/bulletins` | access token＋admin | 布告管理列表（含未開始／已下架；**後段**） |
+| `POST` | `/admin/bulletins` | access token＋admin | 建立布告（**後段**） |
+| `PATCH` | `/admin/bulletins/:id` | access token＋admin | 更新布告（bump `rev`；**後段**） |
+| `POST` | `/admin/bulletins/:id/archive` | access token＋admin | 下架布告（**後段**） |
 
 錯誤：`401`／`403`／`404`／`408`／`410`／`429`；隊列滿可視情況 `503`＋稍後自動重試（仍排隊語意）。
 
@@ -364,3 +369,4 @@ Auth：`Authorization: Bearer <access_token|api_key|join_cap|…>`（依端點�
 | 2026-08-06 | 移除後台 API key 登入（`/v1/auth/token`） |
 | 2026-08-07 | **Host provision：** dash「登入我的遊樂場」→ 短命 token → 場殼記憶體 API key；∉ SecretStore；單席輪替；預設場網址；不做場內 SSO |
 | 2026-08-07 | 場 Invite 短連結 canonical → **`go.samkuo.me/i/…`**（DEC-050）；api `/i/` 改 302→go |
+| 2026-08-18 | HTTP 大綱預留 **`/bulletins`**／admin 布告 CRUD（後段；見 [PG-GO-BULLETIN-PLAN.md](./PG-GO-BULLETIN-PLAN.md)） |

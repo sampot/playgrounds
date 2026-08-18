@@ -2,7 +2,7 @@
 
 > **狀態：** Draft（2026-08-15）— **階段 A–D 已落地**；瀏覽器手測待勾  
 > **權威決策：** 從屬 [DECISIONS.md](./DECISIONS.md) **DEC-050**（純玩版 `go.samkuo.me`）；不另開 DEC  
-> **相關：** [PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)、[PG-GO-UX-POLISH-PLAN.md](./PG-GO-UX-POLISH-PLAN.md)、[PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md)、`.cursor/rules/no-native-dialogs.mdc`、`.cursor/rules/mobile-first-ux.mdc`、[GLOSSARY.md](./GLOSSARY.md)
+> **相關：** [PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)、[PG-GO-UX-POLISH-PLAN.md](./PG-GO-UX-POLISH-PLAN.md)、[PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md)、[PG-GO-SHOP-LOBBY-PLAN.md](./PG-GO-SHOP-LOBBY-PLAN.md)（遊樂場大廳；老闆＝服務台熱點）、`.cursor/rules/no-native-dialogs.mdc`、`.cursor/rules/mobile-first-ux.mdc`、[GLOSSARY.md](./GLOSSARY.md)
 
 一句話：**Header 左上角 mark＝遊樂場老闆**；頁內 flash 以 **RPG 對話氣泡**呈現。玩家**同一瀏覽器 session**（`sessionStorage`）**首次進入首頁 `/`** 時，從文案池抽一句歡迎一次；池夠大並跨 session 避開剛講過的。階段 D 補子池、說話微動畫、登入口吻、首頁點 mark 碎念。
 
