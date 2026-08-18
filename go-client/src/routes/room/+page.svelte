@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { browser } from "$app/environment";
   import { goAuth } from "$lib/goAuth.svelte";
   import GoRoomSurface from "$lib/GoRoomSurface.svelte";
   import {
@@ -34,10 +35,16 @@
     const unsub = runtime.subscribe((s) => {
       status = s;
     });
+    if (goAuth.loggedIn) void runtime.openBooth();
     return () => {
       unsub();
       void runtime.close();
     };
+  });
+
+  $effect(() => {
+    if (!browser) return;
+    if (goAuth.loggedIn) void runtime.openBooth();
   });
 
   async function mint() {
@@ -81,8 +88,9 @@
   shortUrl={status?.shortUrl ?? null}
   inviteExpiresAt={status?.inviteExpiresAt ?? null}
   peerName={status?.peerName ?? null}
+  guestCount={status?.guestCount ?? 0}
   onLogin={() => goAuth.login()}
   onInvite={() => void mint()}
   onEnd={() => runtime.close()}
-  onReissue={() => void mint()}
+  onReissue={() => void runtime.openBooth({ afterEnd: true })}
 />

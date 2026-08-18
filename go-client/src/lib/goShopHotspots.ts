@@ -4,7 +4,7 @@ import {
   LOBBY_BULLETIN,
   LOBBY_CABINETS,
   LOBBY_CABINET_ZONE,
-  LOBBY_CHAT,
+  LOBBY_ROOM,
   LOBBY_STORAGE,
   type LobbyRect,
 } from "./goLobbyLayout";
@@ -38,7 +38,7 @@ export const GO_LOBBY_TILE = 16;
 export const GO_LOBBY_HOTSPOTS: readonly ShopHotspot[] = [
   { id: "boss", label: "櫃檯", ...LOBBY_BOSS },
   { id: "bulletin", label: "布告欄", ...LOBBY_BULLETIN },
-  { id: "room", label: "包廂", ...LOBBY_CHAT },
+  { id: "room", label: "包廂", ...LOBBY_ROOM },
   { id: "cabinet", label: "機台區", ...LOBBY_CABINET_ZONE },
   { id: "storage", label: "後場", ...LOBBY_STORAGE },
   { id: "sfx", label: "音效", ...LOBBY_AD },

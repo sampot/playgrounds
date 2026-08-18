@@ -159,6 +159,29 @@ export function shortUrl(id: string, origin: string = DEFAULT_GO_ORIGIN): string
   return `${origin.replace(/\/$/, "")}/i/${id}`;
 }
 
+/** Loopback targetField (go:dev) keeps short_url on that origin; else official go. */
+export function inviteShortUrlOrigin(
+  targetField: string,
+  goOrigin: string = DEFAULT_GO_ORIGIN
+): string {
+  const field = normalizeFieldOrigin(targetField);
+  if (field) {
+    try {
+      const host = new URL(field).hostname.toLowerCase();
+      if (
+        host === "localhost" ||
+        host === "127.0.0.1" ||
+        host.endsWith(".localhost")
+      ) {
+        return field;
+      }
+    } catch {
+      /* fall through */
+    }
+  }
+  return goOrigin.replace(/\/$/, "");
+}
+
 /** Resolve go public origin from env (wrangler vars) or default. */
 export function goPublicOrigin(env?: {
   GO_PUBLIC_ORIGIN?: string;

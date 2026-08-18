@@ -141,4 +141,28 @@ describe("guestRuntime invite.room", () => {
     );
     expect(fixtures.filesAttach).toHaveBeenCalled();
   });
+
+  it("opens 包廂 when preview kind is not invite.room but intent.surface is room", async () => {
+    fixtures.preview.mockResolvedValue({
+      secret: "inv_secret_room",
+      inviteId: "inv-room",
+      kind: "signal.handshake",
+      intent: {
+        version: 1,
+        surface: "room",
+        consent: "always_ask",
+        transport: { roster: { signal: true } },
+      },
+      open: true,
+      revoked: false,
+    });
+    const { createGuestRuntime } = await import("./guestRuntime");
+    const rt = createGuestRuntime();
+    await rt.bootFromShortId("room1");
+    await rt.consentAndPlay("訪客甲");
+    expect(fixtures.resolve).not.toHaveBeenCalled();
+    expect(rt.getStatus().phase).toBe("ready");
+    expect(rt.getStatus().surface).toBe("room");
+    expect(rt.getStatus().error).toBeNull();
+  });
 });

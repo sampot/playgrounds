@@ -1,11 +1,14 @@
 export {
   ROSTER_SDP_TPL,
+  ROSTER_SDP_TPL_AV,
   extractSdpFields,
   prepareFieldsForExchange,
   rebuildSdpFromFields,
   filterCandidatesForLan,
+  filterSdpCandidateLines,
   isLanCandidateAddress,
   isLanCandidateIp,
+  sdpHasAvMediaLines,
   RosterSdpError,
 } from "./rosterSdpCodec";
 export type {
@@ -20,6 +23,7 @@ export {
   ROSTER_WIRE_MAX_CHARS_SIGNAL,
   encodeSdpToRosterWire,
   encodeFieldsToRosterWire,
+  encodeSessionSdpToRosterWire,
   decodeRosterWire,
   decodeRosterWireToSdp,
   RosterWireError,
@@ -34,7 +38,6 @@ export {
   iceServersIncludeTurn,
   buildRosterRtcConfiguration,
   reserveRosterMediaTransceivers,
-  sdpHasAvMediaLines,
 } from "./rosterPeer";
 export type {
   RosterPeerSession,
@@ -230,20 +233,21 @@ export type {
 export {
   SESSION_FILE_TYPE,
   SESSION_FILE_VERSION,
+  SESSION_FILE_CATALOG_ID,
   SESSION_FILE_MAX_BYTES,
   SESSION_FILE_CHUNK_PAYLOAD_MAX,
   isBlockedSessionFileName,
   isSessionFileControl,
-  normalizeSessionFileOffer,
+  isSessionFileBroadcastOp,
+  normalizeSessionFileShare,
   buildSessionFileControl,
   sessionFileChunkCount,
   encodeSessionFileChunk,
   decodeSessionFileChunk,
-  assembleSessionFileChunks,
-  splitSessionFilePayload,
 } from "./rosterSessionFile";
 export type {
   SessionFileOp,
   SessionFileControl,
   SessionFileChunk,
+  SessionFileShareItem,
 } from "./rosterSessionFile";

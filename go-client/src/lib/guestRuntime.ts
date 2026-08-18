@@ -14,7 +14,7 @@ import {
   composeSamSource,
   composeSessionProtocol,
   composeWantsRelay,
-  isInviteRoomKind,
+  isRoomInvite,
   wantsRosterSignal,
 } from "@pg/platform/platformCompose";
 import type { FileMap } from "@pg/projectTypes";
@@ -497,6 +497,8 @@ export function createGuestRuntime() {
         });
         goSessionChat.setUiPhase("active");
         goRoomFiles.attach({
+          localAgentId,
+          localName: name,
           sendJson: (msg) => {
             try {
               sess.send(msg);
@@ -505,6 +507,7 @@ export function createGuestRuntime() {
             }
           },
           sendBinary: (buf) => sendRoomBinary(buf),
+          bufferedAmount: () => peerSession?.getChannel()?.bufferedAmount ?? 0,
         });
         set({
           phase: "ready",
@@ -599,7 +602,7 @@ export function createGuestRuntime() {
     }
     set({ displayName: name, error: null });
 
-    if (isInviteRoomKind(meta.kind)) {
+    if (isRoomInvite(meta.kind, meta.intent)) {
       await connectRoom(name, meta);
       return;
     }

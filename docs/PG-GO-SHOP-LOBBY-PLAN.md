@@ -104,7 +104,7 @@
 | `help` | 詢問處 | 頁內 RPG 對話（一次一則） | `/help` 仍為清單／更多的靜態說明 |
 | `cabinet` | 機台區 | 清單 overlay（蓋在 canvas 上） | 開玩＝`/s/<id>`；canvas 可繪多台 sprite |
 | `storage` | 後場 | → `/apps` | 本機溢流 |
-| `room` | 包廂 | → `/room` | 契約 id；現況程式 `chat`／`/chat` 應遷過來。見 [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md) |
+| `room` | 包廂 | → `/room` | 大廳畫成南向包廂門（隔間入口）。見 [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md) |
 | `ad` | （裝飾） | 無互動；後牆 PLAY 僅視覺 | 廣告在頁面 `GoAdSlot`，不進捷徑 |
 
 > **遷移：** 早期草案 `shelf`（試玩台）語意併入 **`cabinet`（機台）**；`door`→`play` 已移除（大廳不導場殼）。

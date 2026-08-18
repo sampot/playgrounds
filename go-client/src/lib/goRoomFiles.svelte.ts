@@ -1,29 +1,33 @@
 /**
- * 包廂 file-transfer UI state — attach from guest/host room runtimes.
+ * 包廂 file-share UI state — attach from guest/host room runtimes.
  */
 
 import {
   createRoomFileTransfer,
   type RoomFileEntry,
+  type RoomFilePickSave,
   type RoomFileTransfer,
 } from "./goRoomFileTransfer";
-import type { SessionFileControl } from "@pg/roster/rosterSessionFile";
+import type { SessionFileControl, SessionFileShareItem } from "@pg/roster/rosterSessionFile";
 
 class GoRoomFiles {
   entries = $state<RoomFileEntry[]>([]);
-  pendingIncoming = $state<RoomFileEntry | null>(null);
+  busy = $state(false);
   #xfer: RoomFileTransfer | null = null;
   #unsub: (() => void) | null = null;
 
   attach(opts: {
+    localAgentId: string;
+    localName: string;
     sendJson: (msg: SessionFileControl) => void;
     sendBinary: (buf: ArrayBuffer) => void;
+    bufferedAmount?: () => number;
   }): void {
     this.detach();
     this.#xfer = createRoomFileTransfer(opts);
     this.#unsub = this.#xfer.subscribe((s) => {
       this.entries = s.entries;
-      this.pendingIncoming = s.pendingIncoming;
+      this.busy = s.busy;
     });
   }
 
@@ -33,22 +37,38 @@ class GoRoomFiles {
     this.#xfer?.dispose();
     this.#xfer = null;
     this.entries = [];
-    this.pendingIncoming = null;
+    this.busy = false;
   }
 
-  offerLocalFile(file: File) {
+  shareLocalFile(file: File) {
     return (
-      this.#xfer?.offerLocalFile(file) ??
+      this.#xfer?.shareLocalFile(file) ??
       Promise.resolve({ ok: false as const, error: "尚未連線" })
     );
   }
 
-  acceptIncoming(id: string): boolean {
-    return this.#xfer?.acceptIncoming(id) ?? false;
+  unshareLocal(id: string): boolean {
+    return this.#xfer?.unshareLocal(id) ?? false;
   }
 
-  rejectIncoming(id: string): boolean {
-    return this.#xfer?.rejectIncoming(id) ?? false;
+  download(id: string, pickSave: RoomFilePickSave) {
+    return (
+      this.#xfer?.download(id, pickSave) ??
+      Promise.resolve({ ok: false as const, error: "尚未連線" })
+    );
+  }
+
+  catalogItems(): SessionFileShareItem[] {
+    return this.#xfer?.catalogItems() ?? [];
+  }
+
+  listingOwner(fileId: string): string | null {
+    const e = this.#xfer?.getState().entries.find((x) => x.id === fileId);
+    return e?.ownerId ?? null;
+  }
+
+  forgetOwner(ownerId: string): string[] {
+    return this.#xfer?.forgetOwner(ownerId) ?? [];
   }
 
   onControl(data: unknown): void {

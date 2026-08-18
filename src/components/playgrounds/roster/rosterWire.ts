@@ -4,12 +4,15 @@
 
 import {
   ROSTER_SDP_TPL,
+  ROSTER_SDP_TPL_AV,
   type RosterIceCandidate,
   type RosterSdpFields,
   type RosterSdpRole,
   RosterSdpError,
+  filterSdpCandidateLines,
   prepareFieldsForExchange,
   rebuildSdpFromFields,
+  sdpHasAvMediaLines,
 } from "./rosterSdpCodec";
 
 export const ROSTER_WIRE_VERSION = 1 as const;
@@ -26,7 +29,7 @@ export const ROSTER_WIRE_MAX_CHARS = 1200;
  */
 export const ROSTER_WIRE_MAX_CHARS_SIGNAL = 16_384;
 
-export type RosterWirePayload = {
+export type RosterWirePayloadDc = {
   v: typeof ROSTER_WIRE_VERSION;
   role: RosterSdpRole;
   tpl: typeof ROSTER_SDP_TPL;
@@ -50,6 +53,17 @@ export type RosterWirePayload = {
     | [string, number, string, number, string, number, string, string]
   >;
 };
+
+/** Signal-path 包廂：承載原始 SDP（含空 A/V m-line）. */
+export type RosterWirePayloadAv = {
+  v: typeof ROSTER_WIRE_VERSION;
+  role: RosterSdpRole;
+  tpl: typeof ROSTER_SDP_TPL_AV;
+  lan?: boolean;
+  sdp: string;
+};
+
+export type RosterWirePayload = RosterWirePayloadDc | RosterWirePayloadAv;
 
 export class RosterWireError extends Error {
   constructor(
@@ -93,7 +107,7 @@ function utf8Decode(bytes: Uint8Array): string {
 
 function candidateToTuple(
   c: RosterIceCandidate
-): RosterWirePayload["c"][number] {
+): RosterWirePayloadDc["c"][number] {
   if (c.rest) {
     return [
       c.foundation,
@@ -118,7 +132,7 @@ function candidateToTuple(
 }
 
 function tupleToCandidate(
-  t: RosterWirePayload["c"][number]
+  t: RosterWirePayloadDc["c"][number]
 ): RosterIceCandidate {
   return {
     foundation: String(t[0]),
@@ -135,8 +149,8 @@ function tupleToCandidate(
 export function fieldsToWirePayload(
   fields: RosterSdpFields,
   opts: { role: RosterSdpRole; lan?: boolean }
-): RosterWirePayload {
-  const payload: RosterWirePayload = {
+): RosterWirePayloadDc {
+  const payload: RosterWirePayloadDc = {
     v: ROSTER_WIRE_VERSION,
     role: opts.role,
     tpl: ROSTER_SDP_TPL,
@@ -154,7 +168,7 @@ export function fieldsToWirePayload(
   return payload;
 }
 
-export function wirePayloadToFields(payload: RosterWirePayload): RosterSdpFields {
+export function wirePayloadToFields(payload: RosterWirePayloadDc): RosterSdpFields {
   const fpRaw = payload.f.includes(":")
     ? payload.f
     : payload.f.replace(/(.{2})(?=.)/g, "$1:");
@@ -178,7 +192,7 @@ export function encodeRosterWire(
   if (payload.v !== ROSTER_WIRE_VERSION) {
     throw new RosterWireError("bad_version", `不支援的 wire 版本：${payload.v}`);
   }
-  if (payload.tpl !== ROSTER_SDP_TPL) {
+  if (payload.tpl !== ROSTER_SDP_TPL && payload.tpl !== ROSTER_SDP_TPL_AV) {
     throw new RosterWireError("bad_tpl", `不支援的樣板：${payload.tpl}`);
   }
   const maxChars = opts?.maxChars ?? ROSTER_WIRE_MAX_CHARS;
@@ -221,23 +235,36 @@ export function decodeRosterWire(wire: string): RosterWirePayload {
   if (!parsed || typeof parsed !== "object") {
     throw new RosterWireError("bad_shape", "交換 payload 格式錯誤");
   }
-  const p = parsed as Partial<RosterWirePayload>;
+  const p = parsed as Partial<RosterWirePayload> & { sdp?: unknown };
   if (p.v !== ROSTER_WIRE_VERSION) {
     throw new RosterWireError("bad_version", `不支援的 wire 版本：${p.v}`);
   }
-  if (p.tpl !== ROSTER_SDP_TPL) {
+  if (p.tpl !== ROSTER_SDP_TPL && p.tpl !== ROSTER_SDP_TPL_AV) {
     throw new RosterWireError("bad_tpl", `不支援的樣板：${p.tpl}`);
   }
   if (p.role !== "offer" && p.role !== "answer") {
     throw new RosterWireError("bad_role", "role 必須為 offer 或 answer");
   }
-  if (typeof p.u !== "string" || typeof p.p !== "string" || typeof p.f !== "string") {
+  if (p.tpl === ROSTER_SDP_TPL_AV) {
+    if (typeof p.sdp !== "string" || !p.sdp.trim()) {
+      throw new RosterWireError("incomplete", "缺少 sdp");
+    }
+    return {
+      v: ROSTER_WIRE_VERSION,
+      role: p.role,
+      tpl: ROSTER_SDP_TPL_AV,
+      sdp: p.sdp,
+      ...(p.lan ? { lan: true } : {}),
+    };
+  }
+  const dc = p as Partial<RosterWirePayloadDc>;
+  if (typeof dc.u !== "string" || typeof dc.p !== "string" || typeof dc.f !== "string") {
     throw new RosterWireError("incomplete", "缺少 u／p／f");
   }
-  if (!Array.isArray(p.c)) {
+  if (!Array.isArray(dc.c)) {
     throw new RosterWireError("incomplete", "缺少 candidates");
   }
-  return p as RosterWirePayload;
+  return p as RosterWirePayloadDc;
 }
 
 export function encodeSdpToRosterWire(
@@ -260,6 +287,38 @@ export function encodeFieldsToRosterWire(
   });
 }
 
+/**
+ * Encode a localDescription SDP for OOB（dc1）or 包廂 signal（av1 passthrough）.
+ * dc1 rebuilds DataChannel-only SDP; av1 keeps audio／video m-lines so
+ * setRemoteDescription matches the peer that called setLocalDescription.
+ */
+export function encodeSessionSdpToRosterWire(
+  sdp: string,
+  opts: {
+    role: RosterSdpRole;
+    lan?: boolean;
+    keepRelay?: boolean;
+    maxChars?: number;
+  }
+): string {
+  const fields = prepareFieldsForExchange(sdp, {
+    lan: opts.lan,
+    keepRelay: opts.keepRelay,
+  });
+  if (!sdpHasAvMediaLines(sdp)) {
+    return encodeFieldsToRosterWire(fields, opts);
+  }
+  const filtered = filterSdpCandidateLines(sdp, fields.candidates);
+  const payload: RosterWirePayloadAv = {
+    v: ROSTER_WIRE_VERSION,
+    role: opts.role,
+    tpl: ROSTER_SDP_TPL_AV,
+    sdp: filtered,
+  };
+  if (opts.lan) payload.lan = true;
+  return encodeRosterWire(payload, { maxChars: opts.maxChars });
+}
+
 export function decodeRosterWireToSdp(wire: string): {
   role: RosterSdpRole;
   lan: boolean;
@@ -267,6 +326,20 @@ export function decodeRosterWireToSdp(wire: string): {
   payload: RosterWirePayload;
 } {
   const payload = decodeRosterWire(wire);
+  if (payload.tpl === ROSTER_SDP_TPL_AV) {
+    const sdp = payload.sdp.includes("\r\n")
+      ? payload.sdp
+      : payload.sdp.replace(/\n/g, "\r\n");
+    if (!/(?:^|\r?\n)a=candidate:/m.test(sdp)) {
+      throw new RosterSdpError("no_candidates", "交換字串沒有 ICE candidates");
+    }
+    return {
+      role: payload.role,
+      lan: Boolean(payload.lan),
+      sdp,
+      payload,
+    };
+  }
   const fields = wirePayloadToFields(payload);
   if (fields.candidates.length === 0) {
     throw new RosterSdpError("no_candidates", "交換字串沒有 ICE candidates");

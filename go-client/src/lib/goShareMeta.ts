@@ -88,7 +88,7 @@ export const GO_HELP_DESCRIPTION =
 
 export const GO_ROOM_DOCUMENT_TITLE = `包廂 · ${GO_SITE_NAME}`;
 export const GO_ROOM_DESCRIPTION =
-  `${GO_SITE_NAME} · 純玩｜會員可邀請朋友進包廂：連線對話、傳送檔案。對話與檔案只在雙方瀏覽器之間，不會存到伺服器。`;
+  `${GO_SITE_NAME} · 純玩｜會員可邀請朋友進包廂：連線對話、傳送檔案。對話與檔案只在在場者的瀏覽器之間，不會存到伺服器。`;
 
 export function goInviteCanonicalUrl(
   shortId: string,

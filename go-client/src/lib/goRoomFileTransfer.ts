@@ -1,55 +1,59 @@
 /**
- * In-memory session_file transfer for 包廂 (Phase 1).
- * Control JSON + binary chunks; no OPFS／IndexedDB／cloud.
+ * 包廂檔案分享區：目錄 metadata ＋ 按需串流。
+ * 分享者只留 File handle；下載先取得 writable 再 request；RAM 最多一個 chunk。
  */
 
 import {
+  SESSION_FILE_CHUNK_PAYLOAD_MAX,
   SESSION_FILE_MAX_BYTES,
-  assembleSessionFileChunks,
   buildSessionFileControl,
   decodeSessionFileChunk,
   encodeSessionFileChunk,
   isBlockedSessionFileName,
   isSessionFileControl,
-  normalizeSessionFileOffer,
-  splitSessionFilePayload,
-  type SessionFileChunk,
+  normalizeSessionFileShare,
   type SessionFileControl,
+  type SessionFileShareItem,
 } from "@pg/roster/rosterSessionFile";
+import { ROOM_FILE_SAVE_UNSUPPORTED } from "./goRoomFileSave";
+import type { RoomFileWritable } from "./goRoomFileSave";
 
-export type RoomFileStatus =
-  | "offering"
-  | "pending"
-  | "transferring"
-  | "done"
-  | "rejected"
-  | "cancelled"
-  | "error";
+export type { RoomFileWritable };
+
+export type RoomFilePickSave = (opts: {
+  suggestedName: string;
+}) => Promise<RoomFileWritable | null>;
+
+export type RoomFileStatus = "listed" | "transferring" | "error";
 
 export type RoomFileEntry = {
   id: string;
-  direction: "out" | "in";
   name: string;
   size: number;
   mime?: string;
+  ownerId: string;
+  ownerName: string;
+  mine: boolean;
   status: RoomFileStatus;
-  error?: string;
-  blobUrl?: string;
   received: number;
+  error?: string;
 };
 
 export type RoomFileState = {
   entries: RoomFileEntry[];
-  pendingIncoming: RoomFileEntry | null;
+  busy: boolean;
 };
 
+export type RoomFileResult =
+  | { ok: true; id?: string }
+  | { ok: false; error: string; cancelled?: boolean };
+
 export type RoomFileTransfer = {
-  offerLocalFile(
-    file: File
-  ): Promise<{ ok: true; id: string } | { ok: false; error: string }>;
-  acceptIncoming(id: string): boolean;
-  rejectIncoming(id: string): boolean;
-  cancel(id: string): void;
+  shareLocalFile(file: File): Promise<RoomFileResult>;
+  unshareLocal(id: string): boolean;
+  download(id: string, pickSave: RoomFilePickSave): Promise<RoomFileResult>;
+  catalogItems(): SessionFileShareItem[];
+  forgetOwner(ownerId: string): string[];
   onControl(data: unknown): void;
   onBinary(buf: ArrayBuffer | Uint8Array): void;
   dispose(): void;
@@ -57,35 +61,29 @@ export type RoomFileTransfer = {
   subscribe(listener: (s: RoomFileState) => void): () => void;
 };
 
-type Deps = {
+export type RoomFileTransferDeps = {
+  localAgentId: string;
+  localName: string;
   sendJson: (msg: SessionFileControl) => void;
   sendBinary: (buf: ArrayBuffer) => void;
-  createObjectUrl?: (blob: Blob) => string;
-  revokeObjectUrl?: (url: string) => void;
+  bufferedAmount?: () => number;
   newId?: () => string;
 };
 
-function busyStatuses(status: RoomFileStatus): boolean {
-  return (
-    status === "offering" ||
-    status === "pending" ||
-    status === "transferring"
-  );
-}
+const BUFFER_HIGH = 64 * 1024;
 
-export function createRoomFileTransfer(deps: Deps): RoomFileTransfer {
-  const createObjectUrl =
-    deps.createObjectUrl ??
-    ((blob: Blob) => URL.createObjectURL(blob));
-  const revokeObjectUrl =
-    deps.revokeObjectUrl ??
-    ((url: string) => {
-      try {
-        URL.revokeObjectURL(url);
-      } catch {
-        /* ignore */
-      }
-    });
+type Inbound = {
+  fileId: string;
+  transferId: string;
+  writable: RoomFileWritable;
+  received: number;
+  size: number;
+  writes: Promise<void>;
+};
+
+export function createRoomFileTransfer(
+  deps: RoomFileTransferDeps
+): RoomFileTransfer {
   const newId =
     deps.newId ??
     (() => `sf-${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`);
@@ -93,26 +91,29 @@ export function createRoomFileTransfer(deps: Deps): RoomFileTransfer {
   let entries: RoomFileEntry[] = [];
   const listeners = new Set<(s: RoomFileState) => void>();
   const outboundFiles = new Map<string, File>();
-  const inboundChunks = new Map<string, SessionFileChunk[]>();
+  let inbound: Inbound | null = null;
+  let outboundTransferId: string | null = null;
+  let pumpAbort = false;
+
+  function busy(): boolean {
+    return inbound != null || outboundTransferId != null;
+  }
+
+  function snap(): RoomFileState {
+    return {
+      entries: entries.map((e) => ({ ...e })),
+      busy: busy(),
+    };
+  }
 
   function emit() {
-    const pendingIncoming =
-      entries.find((e) => e.direction === "in" && e.status === "pending") ??
-      null;
-    const snap: RoomFileState = {
-      entries: entries.map((e) => ({ ...e })),
-      pendingIncoming: pendingIncoming ? { ...pendingIncoming } : null,
-    };
-    for (const l of listeners) l(snap);
+    const s = snap();
+    for (const l of listeners) l(s);
   }
 
   function patch(id: string, partial: Partial<RoomFileEntry>): void {
     entries = entries.map((e) => (e.id === id ? { ...e, ...partial } : e));
     emit();
-  }
-
-  function hasBusy(): boolean {
-    return entries.some((e) => busyStatuses(e.status));
   }
 
   function sendSafe(msg: SessionFileControl): void {
@@ -123,36 +124,76 @@ export function createRoomFileTransfer(deps: Deps): RoomFileTransfer {
     }
   }
 
-  async function pumpOutbound(id: string, file: File): Promise<void> {
-    patch(id, { status: "transferring" });
-    try {
-      const buf = new Uint8Array(await file.arrayBuffer());
-      const parts = splitSessionFilePayload(buf);
-      for (let seq = 0; seq < parts.length; seq += 1) {
-        deps.sendBinary(
-          encodeSessionFileChunk({ id, seq, payload: parts[seq]! })
-        );
-      }
-      sendSafe(buildSessionFileControl({ op: "done", id, name: file.name }));
-      patch(id, { status: "done", received: file.size });
-    } catch (e) {
-      patch(id, {
-        status: "error",
-        error: e instanceof Error ? e.message : "傳送失敗",
-      });
+  async function waitDrain(): Promise<void> {
+    const get = deps.bufferedAmount ?? (() => 0);
+    while (get() > BUFFER_HIGH) {
+      await new Promise((r) => setTimeout(r, 16));
     }
   }
 
-  async function offerLocalFile(file: File) {
+  async function pumpOutbound(
+    fileId: string,
+    file: File,
+    transferId: string
+  ): Promise<void> {
+    outboundTransferId = transferId;
+    pumpAbort = false;
+    patch(fileId, { status: "transferring", received: 0, error: undefined });
+    try {
+      let offset = 0;
+      let seq = 0;
+      while (offset < file.size) {
+        if (pumpAbort) return;
+        await waitDrain();
+        if (pumpAbort) return;
+        const end = Math.min(offset + SESSION_FILE_CHUNK_PAYLOAD_MAX, file.size);
+        const slice = file.slice(offset, end);
+        const buf = new Uint8Array(await slice.arrayBuffer());
+        deps.sendBinary(
+          encodeSessionFileChunk({
+            transferId,
+            seq,
+            payload: buf,
+          })
+        );
+        offset += buf.byteLength;
+        seq += 1;
+        patch(fileId, { received: offset });
+      }
+      if (pumpAbort) return;
+      sendSafe(
+        buildSessionFileControl({
+          op: "done",
+          id: fileId,
+          transferId,
+        })
+      );
+      patch(fileId, { status: "listed", received: file.size });
+    } catch (e) {
+      patch(fileId, {
+        status: "error",
+        error: e instanceof Error ? e.message : "傳送失敗",
+      });
+      sendSafe(
+        buildSessionFileControl({
+          op: "cancel",
+          id: fileId,
+          transferId,
+        })
+      );
+    } finally {
+      outboundTransferId = null;
+      emit();
+    }
+  }
+
+  async function shareLocalFile(file: File): Promise<RoomFileResult> {
     const name = file.name.trim() || "file";
     if (isBlockedSessionFileName(name)) {
-      return { ok: false as const, error: "這個檔案類型不能傳送" };
+      return { ok: false, error: "這個檔案類型不能分享" };
     }
     if (!file.size || file.size > SESSION_FILE_MAX_BYTES) {
-      return { ok: false as const, error: "檔案太大或是空的（上限 32 MB）" };
-    }
-    if (hasBusy()) {
-      return { ok: false as const, error: "一次只能傳一個檔" };
+      return { ok: false, error: "檔案太大或是空的（上限 32 MB）" };
     }
     const id = newId();
     const mime = file.type || undefined;
@@ -161,188 +202,294 @@ export function createRoomFileTransfer(deps: Deps): RoomFileTransfer {
       ...entries,
       {
         id,
-        direction: "out",
         name,
         size: file.size,
         mime,
-        status: "offering",
+        ownerId: deps.localAgentId,
+        ownerName: deps.localName,
+        mine: true,
+        status: "listed",
         received: 0,
       },
     ];
     emit();
     sendSafe(
       buildSessionFileControl({
-        op: "offer",
+        op: "share",
         id,
         name,
         size: file.size,
         mime,
+        owner: deps.localAgentId,
+        ownerName: deps.localName,
       })
     );
-    return { ok: true as const, id };
+    return { ok: true, id };
   }
 
-  function acceptIncoming(id: string): boolean {
-    const entry = entries.find((e) => e.id === id && e.direction === "in");
-    if (!entry || entry.status !== "pending") return false;
-    inboundChunks.set(id, []);
-    patch(id, { status: "transferring" });
-    sendSafe(buildSessionFileControl({ op: "accept", id }));
-    return true;
-  }
-
-  function rejectIncoming(id: string): boolean {
-    const entry = entries.find((e) => e.id === id && e.direction === "in");
-    if (!entry || entry.status !== "pending") return false;
-    patch(id, { status: "rejected" });
-    sendSafe(buildSessionFileControl({ op: "reject", id }));
-    return true;
-  }
-
-  function cancel(id: string): void {
-    const entry = entries.find((e) => e.id === id);
-    if (!entry || !busyStatuses(entry.status)) return;
+  function unshareLocal(id: string): boolean {
+    const entry = entries.find((e) => e.id === id && e.mine);
+    if (!entry) return false;
     outboundFiles.delete(id);
-    inboundChunks.delete(id);
-    patch(id, { status: "cancelled" });
-    sendSafe(buildSessionFileControl({ op: "cancel", id }));
+    if (outboundTransferId) pumpAbort = true;
+    entries = entries.filter((e) => e.id !== id);
+    emit();
+    sendSafe(buildSessionFileControl({ op: "unshare", id }));
+    return true;
   }
 
-  function finishInbound(id: string): void {
+  async function download(
+    id: string,
+    pickSave: RoomFilePickSave
+  ): Promise<RoomFileResult> {
     const entry = entries.find((e) => e.id === id);
-    const chunks = inboundChunks.get(id) ?? [];
-    inboundChunks.delete(id);
-    if (!entry) return;
+    if (!entry || entry.mine) {
+      return { ok: false, error: "找不到這個檔" };
+    }
+    if (busy()) {
+      return { ok: false, error: "一次只能傳一個檔" };
+    }
+    let writable: RoomFileWritable | null;
     try {
-      const assembled = assembleSessionFileChunks(chunks);
-      if (assembled.byteLength !== entry.size) {
-        patch(id, { status: "error", error: "檔案不完整" });
-        return;
-      }
-      const blob = new Blob([new Uint8Array(assembled)], {
-        type: entry.mime || "application/octet-stream",
-      });
-      const blobUrl = createObjectUrl(blob);
-      patch(id, {
-        status: "done",
-        blobUrl,
-        received: assembled.byteLength,
-      });
+      writable = await pickSave({ suggestedName: entry.name });
     } catch (e) {
-      patch(id, {
+      const msg = e instanceof Error ? e.message : ROOM_FILE_SAVE_UNSUPPORTED;
+      return { ok: false, error: msg };
+    }
+    if (!writable) {
+      return { ok: false, error: "已取消", cancelled: true };
+    }
+    const transferId = newId();
+    inbound = {
+      fileId: id,
+      transferId,
+      writable,
+      received: 0,
+      size: entry.size,
+      writes: Promise.resolve(),
+    };
+    patch(id, { status: "transferring", received: 0, error: undefined });
+    sendSafe(
+      buildSessionFileControl({
+        op: "request",
+        id,
+        transferId,
+        from: deps.localAgentId,
+      })
+    );
+    return { ok: true, id };
+  }
+
+  function catalogItems(): SessionFileShareItem[] {
+    return entries.map((e) => ({
+      id: e.id,
+      name: e.name,
+      size: e.size,
+      mime: e.mime,
+      owner: e.ownerId,
+      ownerName: e.ownerName,
+    }));
+  }
+
+  function forgetOwner(ownerId: string): string[] {
+    const gone = entries.filter((e) => e.ownerId === ownerId);
+    if (gone.length === 0) return [];
+    const ids = gone.map((e) => e.id);
+    if (inbound && ids.includes(inbound.fileId)) {
+      void inbound.writable.abort?.();
+      inbound = null;
+    }
+    entries = entries.filter((e) => e.ownerId !== ownerId);
+    emit();
+    return ids;
+  }
+
+  async function closeInbound(ok: boolean, error?: string): Promise<void> {
+    const cur = inbound;
+    inbound = null;
+    if (!cur) return;
+    try {
+      await cur.writes;
+      if (ok) await cur.writable.close();
+      else await cur.writable.abort?.();
+    } catch {
+      /* ignore close errors */
+    }
+    if (ok) {
+      patch(cur.fileId, {
+        status: "listed",
+        received: cur.size,
+        error: undefined,
+      });
+    } else {
+      patch(cur.fileId, {
         status: "error",
-        error: e instanceof Error ? e.message : "組裝失敗",
+        error: error || "下載失敗",
       });
     }
   }
 
   function onControl(data: unknown): void {
     if (!isSessionFileControl(data)) return;
-    if (data.op === "offer") {
-      const offer = normalizeSessionFileOffer(data);
-      if (!offer || !offer.name || offer.size == null) {
-        sendSafe(buildSessionFileControl({ op: "reject", id: data.id }));
-        return;
-      }
-      if (hasBusy()) {
-        sendSafe(buildSessionFileControl({ op: "reject", id: offer.id }));
-        return;
-      }
+    if (data.op === "share") {
+      const share = normalizeSessionFileShare(data);
+      if (!share || !share.name || share.size == null || !share.owner) return;
+      if (share.owner === deps.localAgentId) return;
+      if (entries.some((e) => e.id === share.id)) return;
       entries = [
         ...entries,
         {
-          id: offer.id,
-          direction: "in",
-          name: offer.name,
-          size: offer.size,
-          mime: offer.mime,
-          status: "pending",
+          id: share.id,
+          name: share.name,
+          size: share.size,
+          mime: share.mime,
+          ownerId: share.owner,
+          ownerName: share.ownerName?.trim() || share.owner,
+          mine: false,
+          status: "listed",
           received: 0,
         },
       ];
       emit();
       return;
     }
-    if (data.op === "accept") {
-      const file = outboundFiles.get(data.id);
-      const entry = entries.find((e) => e.id === data.id && e.direction === "out");
-      if (!file || !entry || entry.status !== "offering") return;
-      void pumpOutbound(data.id, file);
-      return;
-    }
-    if (data.op === "reject") {
-      outboundFiles.delete(data.id);
-      const entry = entries.find((e) => e.id === data.id);
-      if (entry && busyStatuses(entry.status)) {
-        patch(data.id, { status: "rejected" });
+    if (data.op === "unshare") {
+      if (inbound?.fileId === data.id) {
+        sendSafe(
+          buildSessionFileControl({
+            op: "cancel",
+            id: data.id,
+            transferId: inbound.transferId,
+          })
+        );
+        void closeInbound(false, "對方已撤回");
       }
+      entries = entries.filter((e) => e.id !== data.id);
+      emit();
       return;
     }
-    if (data.op === "cancel") {
-      outboundFiles.delete(data.id);
-      inboundChunks.delete(data.id);
-      const entry = entries.find((e) => e.id === data.id);
-      if (entry && busyStatuses(entry.status)) {
-        patch(data.id, { status: "cancelled" });
+    if (data.op === "catalog") {
+      const items = data.items ?? [];
+      const mine = entries.filter((e) => e.mine);
+      const remote: RoomFileEntry[] = [];
+      for (const item of items) {
+        if (item.owner === deps.localAgentId) continue;
+        if (mine.some((m) => m.id === item.id)) continue;
+        remote.push({
+          id: item.id,
+          name: item.name,
+          size: item.size,
+          mime: item.mime,
+          ownerId: item.owner,
+          ownerName: item.ownerName?.trim() || item.owner,
+          mine: false,
+          status: "listed",
+          received: 0,
+        });
+      }
+      entries = [...mine, ...remote];
+      emit();
+      return;
+    }
+    if (data.op === "request") {
+      const file = outboundFiles.get(data.id);
+      const transferId = data.transferId;
+      if (!file || !transferId) {
+        if (transferId) {
+          sendSafe(
+            buildSessionFileControl({
+              op: "reject",
+              id: data.id,
+              transferId,
+            })
+          );
+        }
+        return;
+      }
+      if (busy() && outboundTransferId !== transferId) {
+        sendSafe(
+          buildSessionFileControl({
+            op: "reject",
+            id: data.id,
+            transferId,
+          })
+        );
+        return;
+      }
+      void pumpOutbound(data.id, file, transferId);
+      return;
+    }
+    if (data.op === "reject" || data.op === "cancel") {
+      if (data.transferId && inbound?.transferId === data.transferId) {
+        void closeInbound(false, data.op === "reject" ? "現在傳不了" : "已取消");
+      }
+      if (data.transferId && outboundTransferId === data.transferId) {
+        pumpAbort = true;
       }
       return;
     }
     if (data.op === "done") {
-      const entry = entries.find((e) => e.id === data.id && e.direction === "in");
-      if (entry && entry.status === "transferring") finishInbound(data.id);
+      if (data.transferId && inbound?.transferId === data.transferId) {
+        const cur = inbound;
+        void cur.writes.then(() => {
+          if (inbound !== cur) return;
+          if (cur.received !== cur.size) {
+            void closeInbound(false, "檔案不完整");
+            return;
+          }
+          void closeInbound(true);
+        });
+      }
     }
   }
 
   function onBinary(buf: ArrayBuffer | Uint8Array): void {
     const chunk = decodeSessionFileChunk(buf);
-    if (!chunk) return;
-    const entry = entries.find((e) => e.id === chunk.id && e.direction === "in");
-    if (!entry || entry.status !== "transferring") return;
-    const list = inboundChunks.get(chunk.id) ?? [];
-    list.push(chunk);
-    inboundChunks.set(chunk.id, list);
-    const received = list.reduce((n, c) => n + c.payload.byteLength, 0);
-    if (received > entry.size) {
-      inboundChunks.delete(chunk.id);
-      patch(chunk.id, { status: "error", error: "檔案超過宣告大小" });
-      sendSafe(buildSessionFileControl({ op: "cancel", id: chunk.id }));
+    if (!chunk || !inbound) return;
+    if (chunk.transferId !== inbound.transferId) return;
+    const next = inbound.received + chunk.payload.byteLength;
+    if (next > inbound.size) {
+      void closeInbound(false, "檔案超過宣告大小");
+      sendSafe(
+        buildSessionFileControl({
+          op: "cancel",
+          id: inbound.fileId,
+          transferId: inbound.transferId,
+        })
+      );
       return;
     }
-    patch(chunk.id, { received });
+    const payload = chunk.payload;
+    inbound.received = next;
+    inbound.writes = inbound.writes.then(async () => {
+      await inbound?.writable.write(payload);
+    });
+    patch(inbound.fileId, { received: next });
   }
 
   function dispose(): void {
-    for (const e of entries) {
-      if (e.blobUrl) revokeObjectUrl(e.blobUrl);
-    }
-    entries = [];
+    pumpAbort = true;
+    if (inbound) void inbound.writable.abort?.();
+    inbound = null;
     outboundFiles.clear();
-    inboundChunks.clear();
+    entries = [];
+    outboundTransferId = null;
     emit();
   }
 
   return {
-    offerLocalFile,
-    acceptIncoming,
-    rejectIncoming,
-    cancel,
+    shareLocalFile,
+    unshareLocal,
+    download,
+    catalogItems,
+    forgetOwner,
     onControl,
     onBinary,
     dispose,
-    getState: () => ({
-      entries: entries.map((e) => ({ ...e })),
-      pendingIncoming:
-        entries.find((e) => e.direction === "in" && e.status === "pending") ??
-        null,
-    }),
+    getState: snap,
     subscribe(listener) {
       listeners.add(listener);
-      listener({
-        entries: entries.map((e) => ({ ...e })),
-        pendingIncoming:
-          entries.find((e) => e.direction === "in" && e.status === "pending") ??
-          null,
-      });
+      listener(snap());
       return () => listeners.delete(listener);
     },
   };

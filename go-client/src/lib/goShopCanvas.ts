@@ -3,7 +3,7 @@ import {
   LOBBY_BOSS,
   LOBBY_BULLETIN,
   LOBBY_CABINETS,
-  LOBBY_CHAT,
+  LOBBY_ROOM,
   LOBBY_ENTRANCE,
   LOBBY_SIGN,
   LOBBY_STORAGE,
@@ -486,26 +486,23 @@ function drawCounter(
   if (active) strokeActive(ctx, r);
 }
 
-function drawChat(ctx: CanvasRenderingContext2D, colors: LobbyCanvasColors, active: boolean) {
-  const r = LOBBY_CHAT;
-  px(ctx, "#4a3c58", r.x, r.y + 6, r.w, r.h - 6);
-  px(ctx, "#5c4c68", r.x + 2, r.y + 8, r.w - 4, r.h - 10);
-  const tableX = r.x + r.w / 2 - 10;
-  const tableY = r.y + 12;
-  px(ctx, colors.wood, tableX, tableY, 20, 12);
-  px(ctx, "#9a7a58", tableX + 1, tableY + 1, 18, 3);
-  px(ctx, "#c45c5c", tableX + 4, tableY + 5, 3, 3);
-  px(ctx, colors.accent, tableX + 13, tableY + 5, 3, 3);
-  px(ctx, "#3a3048", r.x + 4, r.y + 16, 10, 10);
-  px(ctx, "#8a6a50", r.x + 5, r.y + 22, 8, 5);
-  px(ctx, "#3a3048", r.x + r.w - 14, r.y + 16, 10, 10);
-  px(ctx, "#8a6a50", r.x + r.w - 13, r.y + 22, 8, 5);
-  px(ctx, "#3a3048", r.x + r.w / 2 - 6, r.y + r.h - 12, 12, 10);
-  px(ctx, "#8a6a50", r.x + r.w / 2 - 5, r.y + r.h - 8, 10, 5);
-  px(ctx, "#efe6d8", r.x + r.w / 2 - 6, r.y, 12, 8);
-  px(ctx, LINE, r.x + r.w / 2 - 2, r.y + 3, 2, 2);
-  px(ctx, LINE, r.x + r.w / 2 + 1, r.y + 3, 2, 2);
-  px(ctx, "#efe6d8", r.x + r.w / 2 - 2, r.y + 7, 3, 2);
+function drawBooth(ctx: CanvasRenderingContext2D, colors: LobbyCanvasColors, active: boolean) {
+  const r = LOBBY_ROOM;
+  px(ctx, colors.wallDark, r.x, r.y, r.w, r.h);
+  px(ctx, "#3a2a1c", r.x + 2, r.y + 4, r.w - 4, r.h - 8);
+  px(ctx, colors.wood, r.x + 4, r.y + 6, r.w - 8, r.h - 12);
+  px(ctx, "#5a4030", r.x + r.w / 2 - 1, r.y + 6, 2, r.h - 12);
+  const glow = active ? "#ffe08a" : "#c4a060";
+  px(ctx, glow, r.x + 7, r.y + 10, r.w - 16, 10);
+  px(ctx, "#fff3a8", r.x + 8, r.y + 11, 6, 4);
+  px(ctx, "#1a2430", r.x + 6, r.y + 22, r.w - 12, 8);
+  ctx.fillStyle = colors.ink;
+  ctx.font = "6px monospace";
+  ctx.textAlign = "center";
+  ctx.fillText("包廂", r.x + r.w / 2, r.y + 28);
+  ctx.textAlign = "start";
+  px(ctx, "#2a2018", r.x + r.w - 11, r.y + 34, 5, 8);
+  px(ctx, colors.highlight, r.x + r.w - 10, r.y + 36, 2, 3);
   if (active) strokeActive(ctx, r);
 }
 
@@ -706,7 +703,7 @@ export function drawLobbyFrame(
   drawBulletin(ctx, active === "bulletin");
   drawAd(ctx, colors, state.sfxEnabled === false, active === "sfx", nowMs);
   drawCounter(ctx, colors, active === "boss", nowMs);
-  drawChat(ctx, colors, active === "room");
+  drawBooth(ctx, colors, active === "room");
   drawCabinets(
     ctx,
     colors,

@@ -4,6 +4,10 @@
  */
 
 export const ROSTER_SDP_TPL = "dc1" as const;
+/** Signal-path 包廂：保留 audio／video／datachannel m-line（dc1 只重建 DC）. */
+export const ROSTER_SDP_TPL_AV = "av1" as const;
+
+export type RosterSdpTpl = typeof ROSTER_SDP_TPL | typeof ROSTER_SDP_TPL_AV;
 
 export type RosterSdpRole = "offer" | "answer";
 
@@ -71,6 +75,33 @@ export function filterCandidatesForLan(
   // Prefer private / .local addresses; if browser only emitted other host forms, keep all UDP host.
   const preferred = udpHost.filter(c => isLanCandidateAddress(c.ip));
   return preferred.length > 0 ? preferred : udpHost;
+}
+
+export function sdpHasAvMediaLines(sdp: string | undefined | null): boolean {
+  if (!sdp) return false;
+  return /(?:^|\r?\n)m=audio /m.test(sdp) && /(?:^|\r?\n)m=video /m.test(sdp);
+}
+
+export function candidateIdentity(c: RosterIceCandidate): string {
+  return `${c.foundation}|${c.component}|${c.protocol.toLowerCase()}|${c.ip}|${c.port}|${c.type}`;
+}
+
+/** Drop a=candidate lines that are not in `keep` (relay／LAN filters). */
+export function filterSdpCandidateLines(
+  sdp: string,
+  keep: RosterIceCandidate[]
+): string {
+  const allowed = new Set(keep.map(candidateIdentity));
+  const nl = sdp.includes("\r\n") ? "\r\n" : "\n";
+  const lines = sdp.replace(/\r\n/g, "\n").split("\n");
+  const out = lines.filter(raw => {
+    const line = raw.trim();
+    if (!line.startsWith("a=candidate:")) return true;
+    const c = parseCandidateLine(line);
+    if (!c) return false;
+    return allowed.has(candidateIdentity(c));
+  });
+  return out.join(nl);
 }
 
 function parseCandidateLine(line: string): RosterIceCandidate | null {

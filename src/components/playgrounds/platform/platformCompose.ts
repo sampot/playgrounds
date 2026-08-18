@@ -33,8 +33,8 @@ export type InviteRoomIntentV1 = {
   };
 };
 
-export function isInviteRoomKind(kind: string): boolean {
-  return kind === INVITE_ROOM_KIND;
+export function isInviteRoomKind(kind: unknown): boolean {
+  return typeof kind === "string" && kind.trim() === INVITE_ROOM_KIND;
 }
 
 export function isInviteRoomIntent(
@@ -42,6 +42,14 @@ export function isInviteRoomIntent(
 ): intent is InviteRoomIntentV1 {
   if (!intent || typeof intent !== "object") return false;
   return (intent as InviteRoomIntentV1).surface === "room";
+}
+
+/** Kind or intent.surface — preview may omit／default kind (PG-GO-ROOM-PLAN §6.2). */
+export function isRoomInvite(
+  kind: unknown,
+  intent: unknown
+): boolean {
+  return isInviteRoomKind(kind) || isInviteRoomIntent(intent);
 }
 
 export function buildInviteRoomIntent(): InviteRoomIntentV1 {
@@ -57,6 +65,7 @@ export function isInviteComposeIntent(
   intent: unknown
 ): intent is InviteComposeIntentV1 {
   if (!intent || typeof intent !== "object") return false;
+  if (isInviteRoomIntent(intent)) return false;
   const o = intent as InviteComposeIntentV1;
   if (o.sam && typeof o.sam.source !== "string") return false;
   if (o.session && o.session.protocol == null) return false;
@@ -67,7 +76,7 @@ export function wantsRosterSignal(
   kind: string,
   intent: unknown
 ): boolean {
-  if (kind === "signal.handshake" || isInviteRoomKind(kind)) return true;
+  if (kind === "signal.handshake" || isRoomInvite(kind, intent)) return true;
   if (kind !== "invite.compose") return false;
   if (!isInviteComposeIntent(intent)) return true;
   return intent.transport?.roster?.signal !== false;

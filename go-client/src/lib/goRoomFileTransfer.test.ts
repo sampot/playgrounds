@@ -2,138 +2,162 @@ import { describe, expect, it, vi } from "vitest";
 import {
   SESSION_FILE_MAX_BYTES,
   SESSION_FILE_TYPE,
-  decodeSessionFileChunk,
 } from "@pg/roster/rosterSessionFile";
 import { createRoomFileTransfer } from "./goRoomFileTransfer";
+import type { RoomFileWritable } from "./goRoomFileSave";
 
 function fileOf(name: string, bytes: number, type = "text/plain"): File {
   return new File([new Uint8Array(bytes).fill(7)], name, { type });
 }
 
+function mockWritable() {
+  const chunks: Uint8Array[] = [];
+  let closed = false;
+  const writable: RoomFileWritable = {
+    write: (data) => {
+      if (data instanceof Uint8Array) {
+        chunks.push(new Uint8Array(data));
+        return;
+      }
+      if (data instanceof ArrayBuffer) {
+        chunks.push(new Uint8Array(data));
+        return;
+      }
+      const view = data as ArrayBufferView;
+      chunks.push(
+        new Uint8Array(view.buffer, view.byteOffset, view.byteLength)
+      );
+    },
+    close: () => {
+      closed = true;
+    },
+    abort: () => {
+      closed = true;
+    },
+  };
+  return { writable, chunks, isClosed: () => closed };
+}
+
 describe("createRoomFileTransfer", () => {
-  it("rejects blocked, empty, oversized, and concurrent local offers", async () => {
+  it("shares metadata only and allows a second listing", async () => {
     const json: unknown[] = [];
+    const bins: ArrayBuffer[] = [];
+    let n = 0;
     const xfer = createRoomFileTransfer({
+      localAgentId: "host-1",
+      localName: "太郎",
       sendJson: (m) => json.push(m),
-      sendBinary: () => {},
-      newId: () => "id-1",
+      sendBinary: (b) => bins.push(b),
+      newId: () => `id-${++n}`,
     });
-    expect((await xfer.offerLocalFile(fileOf("Setup.exe", 10))).ok).toBe(false);
-    expect((await xfer.offerLocalFile(fileOf("a.txt", 0))).ok).toBe(false);
+    expect((await xfer.shareLocalFile(fileOf("Setup.exe", 10))).ok).toBe(false);
+    expect((await xfer.shareLocalFile(fileOf("a.txt", 0))).ok).toBe(false);
     expect(
-      (await xfer.offerLocalFile(fileOf("a.bin", SESSION_FILE_MAX_BYTES + 1))).ok
+      (await xfer.shareLocalFile(fileOf("a.bin", SESSION_FILE_MAX_BYTES + 1))).ok
     ).toBe(false);
 
-    const ok = await xfer.offerLocalFile(fileOf("note.txt", 4));
+    const ok = await xfer.shareLocalFile(fileOf("note.txt", 4));
     expect(ok).toEqual({ ok: true, id: "id-1" });
+    expect(bins).toHaveLength(0);
     expect(json[0]).toMatchObject({
       type: SESSION_FILE_TYPE,
-      op: "offer",
+      op: "share",
       name: "note.txt",
       size: 4,
+      owner: "host-1",
+      ownerName: "太郎",
     });
-    expect((await xfer.offerLocalFile(fileOf("b.txt", 2))).ok).toBe(false);
+    expect((await xfer.shareLocalFile(fileOf("b.txt", 2))).ok).toBe(true);
+    expect(xfer.getState().entries).toHaveLength(2);
   });
 
-  it("does not send chunks until the peer accepts", async () => {
+  it("does not request when the save picker is cancelled", async () => {
     const json: unknown[] = [];
-    const bins: ArrayBuffer[] = [];
-    const xfer = createRoomFileTransfer({
-      sendJson: (m) => json.push(m),
-      sendBinary: (b) => bins.push(b),
-      newId: () => "xfer-a",
-    });
-    await xfer.offerLocalFile(fileOf("clip.txt", 3));
-    expect(bins).toHaveLength(0);
-    xfer.onControl({
-      type: SESSION_FILE_TYPE,
-      v: 1,
-      op: "accept",
-      id: "xfer-a",
-    });
-    await vi.waitFor(() => {
-      expect(xfer.getState().entries[0]?.status).toBe("done");
-    });
-    expect(bins.length).toBeGreaterThan(0);
-    expect(decodeSessionFileChunk(bins[0]!)?.id).toBe("xfer-a");
-    expect(json.some((m) => (m as { op?: string }).op === "done")).toBe(true);
-  });
-
-  it("stops outbound when the peer rejects", async () => {
-    const bins: ArrayBuffer[] = [];
-    const xfer = createRoomFileTransfer({
-      sendJson: () => {},
-      sendBinary: (b) => bins.push(b),
-      newId: () => "xfer-b",
-    });
-    await xfer.offerLocalFile(fileOf("clip.txt", 8));
-    xfer.onControl({
-      type: SESSION_FILE_TYPE,
-      v: 1,
-      op: "reject",
-      id: "xfer-b",
-    });
-    expect(xfer.getState().entries[0]?.status).toBe("rejected");
-    expect(bins).toHaveLength(0);
-  });
-
-  it("holds incoming until accept, then assembles a blob", async () => {
-    const json: unknown[] = [];
-    const urls: string[] = [];
-    const xfer = createRoomFileTransfer({
+    const guest = createRoomFileTransfer({
+      localAgentId: "g",
+      localName: "訪客",
       sendJson: (m) => json.push(m),
       sendBinary: () => {},
-      createObjectUrl: (blob) => {
-        urls.push(`blob:${blob.size}`);
-        return `blob:${blob.size}`;
-      },
-      revokeObjectUrl: () => {},
     });
-    const payload = new Uint8Array([9, 8, 7]);
-    xfer.onControl({
+    guest.onControl({
       type: SESSION_FILE_TYPE,
       v: 1,
-      op: "offer",
-      id: "in-1",
-      name: "pic.png",
+      op: "share",
+      id: "file-a",
+      name: "clip.txt",
       size: 3,
-      mime: "image/png",
+      owner: "h",
+      ownerName: "太郎",
     });
-    expect(xfer.getState().pendingIncoming?.name).toBe("pic.png");
-    expect(xfer.acceptIncoming("in-1")).toBe(true);
-    expect(json.some((m) => (m as { op?: string }).op === "accept")).toBe(true);
-
-    const { encodeSessionFileChunk } = await import(
-      "@pg/roster/rosterSessionFile"
+    const out = await guest.download("file-a", async () => null);
+    expect(out).toMatchObject({ ok: false, cancelled: true });
+    expect(json.some((m) => (m as { op?: string }).op === "request")).toBe(
+      false
     );
-    xfer.onBinary(encodeSessionFileChunk({ id: "in-1", seq: 0, payload }));
-    xfer.onControl({
-      type: SESSION_FILE_TYPE,
-      v: 1,
-      op: "done",
-      id: "in-1",
-    });
-    const done = xfer.getState().entries[0];
-    expect(done?.status).toBe("done");
-    expect(done?.blobUrl).toBe("blob:3");
-    expect(urls).toEqual(["blob:3"]);
   });
 
-  it("rejects a malformed incoming offer without storing it", () => {
-    const json: unknown[] = [];
-    const xfer = createRoomFileTransfer({
-      sendJson: (m) => json.push(m),
-      sendBinary: () => {},
+  it("streams slices to a writable after request, without assembling a blob", async () => {
+    let guest!: ReturnType<typeof createRoomFileTransfer>;
+    const owner = createRoomFileTransfer({
+      localAgentId: "h",
+      localName: "太郎",
+      sendJson: (m) => guest.onControl(m),
+      sendBinary: (b) => guest.onBinary(b),
+      newId: () => "file-1",
     });
-    xfer.onControl({
+    guest = createRoomFileTransfer({
+      localAgentId: "g",
+      localName: "訪客",
+      sendJson: (m) => owner.onControl(m),
+      sendBinary: () => {},
+      newId: () => "tr-1",
+    });
+
+    await owner.shareLocalFile(fileOf("clip.txt", 3));
+    expect(guest.getState().entries[0]?.name).toBe("clip.txt");
+
+    const sink = mockWritable();
+    const started = await guest.download("file-1", async () => sink.writable);
+    expect(started.ok).toBe(true);
+
+    await vi.waitFor(() => {
+      expect(sink.isClosed()).toBe(true);
+    });
+    const received = sink.chunks.reduce((n, c) => n + c.byteLength, 0);
+    expect(received).toBe(3);
+    expect(guest.getState().entries[0]).not.toHaveProperty("blobUrl");
+  });
+
+  it("rejects a second download while a transfer is in flight", async () => {
+    const guest = createRoomFileTransfer({
+      localAgentId: "g",
+      localName: "訪客",
+      sendJson: () => {},
+      sendBinary: () => {},
+      newId: () => "tr-1",
+    });
+    guest.onControl({
       type: SESSION_FILE_TYPE,
       v: 1,
-      op: "offer",
-      id: "bad",
-      name: "virus.exe",
-      size: 12,
+      op: "share",
+      id: "a",
+      name: "a.txt",
+      size: 8,
+      owner: "h",
     });
-    expect(xfer.getState().entries).toHaveLength(0);
-    expect(json[0]).toMatchObject({ op: "reject", id: "bad" });
+    guest.onControl({
+      type: SESSION_FILE_TYPE,
+      v: 1,
+      op: "share",
+      id: "b",
+      name: "b.txt",
+      size: 8,
+      owner: "h",
+    });
+    const sink = mockWritable();
+    expect((await guest.download("a", async () => sink.writable)).ok).toBe(true);
+    expect((await guest.download("b", async () => sink.writable)).ok).toBe(
+      false
+    );
   });
 });

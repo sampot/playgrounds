@@ -2,8 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   INVITE_ROOM_KIND,
   buildInviteRoomIntent,
+  composeSamSource,
   composeWantsRelay,
+  isInviteComposeIntent,
   isInviteRoomKind,
+  isRoomInvite,
   stampComposeRelayPrefer,
   wantsRosterSignal,
 } from "./platformCompose";
@@ -91,5 +94,26 @@ describe("invite.room", () => {
         transport: { roster: { signal: true, relay: true } },
       })
     ).toBe(false);
+  });
+
+  it("treats intent.surface=room as a 包廂 invite when kind is not invite.room", () => {
+    const intent = buildInviteRoomIntent();
+    expect(isRoomInvite("signal.handshake", intent)).toBe(true);
+    expect(isRoomInvite(undefined, intent)).toBe(true);
+    expect(isRoomInvite("invite.compose", intent)).toBe(true);
+    expect(isInviteComposeIntent(intent)).toBe(false);
+    expect(composeSamSource(intent)).toBeNull();
+    expect(wantsRosterSignal("signal.handshake", intent)).toBe(true);
+  });
+
+  it("does not steal a game compose invite that has a SAM source", () => {
+    const intent = {
+      version: 1 as const,
+      sam: { source: "pg-gomoku" },
+      transport: { roster: { signal: true } },
+    };
+    expect(isRoomInvite("invite.compose", intent)).toBe(false);
+    expect(isInviteComposeIntent(intent)).toBe(true);
+    expect(composeSamSource(intent)).toBe("pg-gomoku");
   });
 });

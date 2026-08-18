@@ -124,6 +124,17 @@ describe("drawLobbyFrame", () => {
     expect(b.fillRect.mock.calls).not.toEqual(c.fillRect.mock.calls);
   });
 
+  it("paints a 包廂 wall door next to 後場", () => {
+    const { ctx, fillText } = mockCtx();
+    drawLobbyFrame(ctx, {
+      avatar: { x: 160, y: 168 },
+      nearHotspot: null,
+      hoverHotspot: null,
+    });
+    expect(fillText.mock.calls.some((c) => c[0] === "包廂")).toBe(true);
+    expect(fillText.mock.calls.some((c) => c[0] === "後場")).toBe(true);
+  });
+
   it("labels the PLAY neon MUTE when sound is off", () => {
     const on = mockCtx();
     drawLobbyFrame(on.ctx, {

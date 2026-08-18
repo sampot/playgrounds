@@ -3,15 +3,17 @@
  */
 
 import {
-  prepareFieldsForExchange,
+  sdpHasAvMediaLines,
   type RosterSdpRole,
 } from "./rosterSdpCodec";
 import {
   ROSTER_WIRE_MAX_CHARS,
   ROSTER_WIRE_MAX_CHARS_SIGNAL,
-  encodeFieldsToRosterWire,
+  encodeSessionSdpToRosterWire,
   decodeRosterWireToSdp,
 } from "./rosterWire";
+
+export { sdpHasAvMediaLines };
 
 const DEFAULT_STUN: RTCIceServer[] = [
   { urls: "stun:stun.cloudflare.com:3478" },
@@ -195,12 +197,6 @@ function attachChannel(
   });
 }
 
-/** True when iceServers include at least one `turn:`／`turns:` URL. */
-export function sdpHasAvMediaLines(sdp: string | undefined | null): boolean {
-  if (!sdp) return false;
-  return /(?:^|\r?\n)m=audio /m.test(sdp) && /(?:^|\r?\n)m=video /m.test(sdp);
-}
-
 /** Reserve empty audio／video transceivers so later replaceTrack needs no renegotiation. */
 export function reserveRosterMediaTransceivers(pc: {
   addTransceiver: (
@@ -336,13 +332,10 @@ export async function createRosterOffer(opts: {
   await waitIceComplete(pc, iceWaitOpts(opts.iceServers));
   const local = pc.localDescription?.sdp;
   if (!local) throw new Error("缺少 local SDP");
-  const fields = prepareFieldsForExchange(local, {
-    lan,
-    keepRelay: shouldKeepRelay(opts.iceServers),
-  });
-  const wire = encodeFieldsToRosterWire(fields, {
+  const wire = encodeSessionSdpToRosterWire(local, {
     role: "offer",
     lan,
+    keepRelay: shouldKeepRelay(opts.iceServers),
     maxChars: wireMaxChars(opts.transport),
   });
   const session = wrapSession(pc, "host", () => channel, handlers);
@@ -387,13 +380,10 @@ export async function acceptRosterOffer(opts: {
   await waitIceComplete(pc, iceWaitOpts(opts.iceServers));
   const local = pc.localDescription?.sdp;
   if (!local) throw new Error("缺少 local SDP");
-  const fields = prepareFieldsForExchange(local, {
-    lan,
-    keepRelay: shouldKeepRelay(opts.iceServers),
-  });
-  const wire = encodeFieldsToRosterWire(fields, {
+  const wire = encodeSessionSdpToRosterWire(local, {
     role: "answer" satisfies RosterSdpRole,
     lan,
+    keepRelay: shouldKeepRelay(opts.iceServers),
     maxChars: wireMaxChars(opts.transport),
   });
   const session = wrapSession(pc, "guest", () => channel, handlers);

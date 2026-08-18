@@ -14,7 +14,7 @@
     goInviteCanonicalUrl,
     goOgMeta,
   } from "$lib/goShareMeta";
-  import { composeSamSource, isInviteRoomKind } from "@pg/platform/platformCompose";
+  import { composeSamSource, isRoomInvite } from "@pg/platform/platformCompose";
   import GoRoomSurface from "$lib/GoRoomSurface.svelte";
   import {
     likelyInAppBrowser,
@@ -46,7 +46,7 @@
   );
 
   const isRoom = $derived(
-    Boolean(status?.meta && isInviteRoomKind(status.meta.kind)) ||
+    Boolean(status?.meta && isRoomInvite(status.meta.kind, status.meta.intent)) ||
       status?.surface === "room"
   );
 

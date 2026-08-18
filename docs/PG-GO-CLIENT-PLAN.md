@@ -558,7 +558,7 @@ dash provision → 場殼記憶體 API key
 | **6b. 「更多」本機溢流** | Header「更多」＝已下載列表＋分層清除；試試這些可選第二段；Invite 不露（§6.6） | `/`／`/s/` 可開已下載面板；清除分層＋頁內確認；`/i/` 無本機選單；非迷你型錄 | **已落地**（`GoMorePanel`） |
 | **6c. 登入＋Header profile（DEC-052）** | go consume `#pg_provision=`（redeem→記憶體 key→`/v1/field/me`）；Header profile icon/avatar＋身分面板；Platform 放行 go＋`/v1/field/me` | dash 可登入 go；「已登入」avatar 顯示、可登出；key 關頁即失；未登入不阻玩（見 [PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md)） | 未排程（auth plan 本刀） |
 | **6d. 玩家主場互邀（GO-INVITE）** | 已登入玩家在單局內邀另一位玩家（回 `go/i/<short>`）；用同一把記憶體 field API key 走 `invite.compose`；**不**等同 author session | 玩家 A 在 go 開一局→邀玩家 B→B 入座對戰；A／B 不需作者面 | 未排程（後續；見 auth plan §5.3） |
-| **6e. 包廂（`/room`）** | 已登入玩家鑄 `invite.room`；Guest `/i/` 進臨時隔間；Phase 1＝文字＋傳檔（契約不把包廂定成聊天室） | 見 [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md) | Phase 1 已實作 |
+| **6e. 包廂（`/room`）** | 已登入進 `/room` **即包廂 UI**（邀請為面內動作）；Guest `/i/` 進同一間；**不鎖 1:1**；Phase 1＝文字＋傳檔（契約不把包廂定成聊天室） | 見 [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md) | Phase 1 已對齊進門即主面／多人 |
 | **7.（可選）** | short 不進 hash（B）；文件站導讀；場殼 `#pg=`／`view=canvas` 標「進階／除錯」或汰除 | 另議 | — |
 
 ---
@@ -687,3 +687,4 @@ dash provision → 場殼記憶體 API key
 | 2026-08-18 | 相關：[PG-GO-SHOP-LOBBY-PLAN.md](./PG-GO-SHOP-LOBBY-PLAN.md)（遊樂場大廳 Lobby／室內 canvas Draft；未實作） |
 | 2026-08-18 | [PG-GO-SHOP-LOBBY-PLAN.md](./PG-GO-SHOP-LOBBY-PLAN.md) 敘事修訂：室內遊樂場大廳（機台／服務台） |
 | 2026-08-18 | 相關：[PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)（包廂 `/room`；Phase 1＝文字／傳檔；契約不把包廂定成聊天室）；主計劃 Phase **6e** |
+| 2026-08-18 | 包廂契約修訂：已登入進 `/room` 即主面（邀請為面內動作）；**不鎖 1:1**（對齊遊戲 session） |

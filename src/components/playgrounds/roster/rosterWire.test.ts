@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { prepareFieldsForExchange } from "./rosterSdpCodec";
+import { prepareFieldsForExchange, ROSTER_SDP_TPL_AV } from "./rosterSdpCodec";
 import {
   ROSTER_WIRE_MAX_CHARS,
   ROSTER_WIRE_MAX_CHARS_SIGNAL,
@@ -7,6 +7,7 @@ import {
   decodeRosterWireToSdp,
   encodeFieldsToRosterWire,
   encodeRosterWire,
+  encodeSessionSdpToRosterWire,
   fieldsToWirePayload,
 } from "./rosterWire";
 
@@ -69,4 +70,77 @@ describe("rosterWire", () => {
   it("rejects bad wire", () => {
     expect(() => decodeRosterWire("@@@")).toThrow();
   });
+
+  it("dc1 rebuild drops audio／video m-lines (game path)", () => {
+    const fields = prepareFieldsForExchange(SAMPLE_AV_OFFER, {});
+    const wire = encodeFieldsToRosterWire(fields, {
+      role: "offer",
+      maxChars: ROSTER_WIRE_MAX_CHARS_SIGNAL,
+    });
+    const decoded = decodeRosterWireToSdp(wire);
+    expect(decoded.payload.tpl).toBe("dc1");
+    expect(decoded.sdp).not.toMatch(/^m=audio /m);
+    expect(decoded.sdp).not.toMatch(/^m=video /m);
+    expect(decoded.sdp).toContain("m=application");
+  });
+
+  it("signal session wire for DataChannel-only SDP stays on dc1", () => {
+    const wire = encodeSessionSdpToRosterWire(SAMPLE_OFFER, {
+      role: "offer",
+    });
+    expect(decodeRosterWireToSdp(wire).payload.tpl).toBe("dc1");
+  });
+
+  it("signal session wire keeps audio＋video＋datachannel m-lines for 包廂", () => {
+    const wire = encodeSessionSdpToRosterWire(SAMPLE_AV_OFFER, {
+      role: "offer",
+      maxChars: ROSTER_WIRE_MAX_CHARS_SIGNAL,
+    });
+    expect(wire.length).toBeLessThanOrEqual(ROSTER_WIRE_MAX_CHARS_SIGNAL);
+    const decoded = decodeRosterWireToSdp(wire);
+    expect(decoded.payload.tpl).toBe(ROSTER_SDP_TPL_AV);
+    expect(decoded.role).toBe("offer");
+    expect(decoded.sdp).toMatch(/^m=audio /m);
+    expect(decoded.sdp).toMatch(/^m=video /m);
+    expect(decoded.sdp).toContain("m=application");
+    expect(decoded.sdp).toContain("a=mid:2");
+    expect(decoded.sdp).toContain("192.168.1.10");
+    expect(decoded.sdp).not.toContain("typ relay");
+  });
 });
+
+const SAMPLE_AV_OFFER = [
+  "v=0",
+  "o=- 1 2 IN IP4 127.0.0.1",
+  "s=-",
+  "t=0 0",
+  "a=group:BUNDLE 0 1 2",
+  "m=audio 9 UDP/TLS/RTP/SAVPF 111",
+  "c=IN IP4 0.0.0.0",
+  "a=ice-ufrag:AbCd",
+  "a=ice-pwd:abcdefghijklmnopqrstuvwx",
+  "a=fingerprint:sha-256 11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00",
+  "a=setup:actpass",
+  "a=mid:0",
+  "a=rtpmap:111 opus/48000/2",
+  "a=candidate:1 1 udp 2122260223 192.168.1.10 54321 typ host generation 0",
+  "a=candidate:3 1 udp 41819903 198.51.100.1 9 typ relay raddr 203.0.113.5 rport 54322 generation 0",
+  "m=video 9 UDP/TLS/RTP/SAVPF 96",
+  "c=IN IP4 0.0.0.0",
+  "a=ice-ufrag:AbCd",
+  "a=ice-pwd:abcdefghijklmnopqrstuvwx",
+  "a=fingerprint:sha-256 11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00",
+  "a=setup:actpass",
+  "a=mid:1",
+  "a=rtpmap:96 VP8/90000",
+  "m=application 9 UDP/DTLS/SCTP webrtc-datachannel",
+  "c=IN IP4 0.0.0.0",
+  "a=ice-ufrag:AbCd",
+  "a=ice-pwd:abcdefghijklmnopqrstuvwx",
+  "a=fingerprint:sha-256 11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00",
+  "a=setup:actpass",
+  "a=mid:2",
+  "a=sctp-port:5000",
+  "a=max-message-size:262144",
+  "",
+].join("\r\n");

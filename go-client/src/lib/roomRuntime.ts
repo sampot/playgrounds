@@ -1,6 +1,6 @@
 /**
  * Pure-play 包廂 Host runtime (DEC-050 / PG-GO-ROOM-PLAN).
- * Mint invite.room → answer loop (no SAM) → session_chat + session_file.
+ * Enter `/room` → booth UI; invite is in-booth; multi-peer fanout (no 1:1 lock).
  */
 
 import {
@@ -11,7 +11,6 @@ import {
 import {
   broadcastSessionChat,
   isSessionChatMessage,
-  SESSION_CHAT_HOST_DISPLAY_NAME,
 } from "@pg/roster/rosterSessionChat";
 import { isSessionFileControl } from "@pg/roster/rosterSessionFile";
 import { startPlatformHostAnswerLoop } from "@pg/platform/platformHostLoop";
@@ -23,13 +22,18 @@ import { goAuth } from "./goAuth.svelte";
 import { chromeSession } from "./chromeSession.svelte";
 import { goSessionChat } from "./goSessionChat.svelte";
 import { goRoomFiles } from "./goRoomFiles.svelte";
-import { GO_ROOM_QUICK_REPLIES } from "./goRoom";
+import { createRoomFileStarHub, type RoomFileStarHub } from "./goRoomFileStar";
+import {
+  GO_ROOM_QUICK_REPLIES,
+  roomHostDisplayName,
+  roomOccupantSummary,
+} from "./goRoom";
 import {
   DEFAULT_INVITE_TTL_MS,
   isInviteUnexpired,
 } from "./hostRuntime";
 
-export type RoomPhase = "idle" | "waiting" | "ready" | "ended" | "error";
+export type RoomPhase = "idle" | "open" | "ended" | "error";
 
 export type RoomStatus = {
   phase: RoomPhase;
@@ -39,6 +43,7 @@ export type RoomStatus = {
   shortUrl: string | null;
   inviteExpiresAt: number | null;
   peerName: string | null;
+  guestCount: number;
 };
 
 type Listener = (s: RoomStatus) => void;
@@ -47,6 +52,8 @@ type PeerSlot = {
   peerId: string | null;
   session: RosterPeerSession | null;
   displayName: string | null;
+  lost?: boolean;
+  fileRouted?: boolean;
 };
 
 function sendBinary(session: RosterPeerSession | null, buf: ArrayBuffer): void {
@@ -64,13 +71,17 @@ export function createRoomRuntime() {
     shortUrl: null,
     inviteExpiresAt: null,
     peerName: null,
+    guestCount: 0,
   };
   const listeners = new Set<Listener>();
   let loop: ReturnType<typeof startPlatformHostAnswerLoop> | null = null;
   let inviteExpiryTimer: ReturnType<typeof setTimeout> | null = null;
   const localAgentId = `go-room-${crypto.randomUUID().slice(0, 8)}`;
-  const slot: PeerSlot = { peerId: null, session: null, displayName: null };
+  const slots: PeerSlot[] = [];
+  let surfaceAttached = false;
   let closing = false;
+  let opening = false;
+  let fileHub: RoomFileStarHub | null = null;
 
   function emit() {
     for (const l of listeners) l({ ...status });
@@ -78,6 +89,156 @@ export function createRoomRuntime() {
   function set(partial: Partial<RoomStatus>) {
     status = { ...status, ...partial };
     emit();
+  }
+
+  function liveSessions(): RosterPeerSession[] {
+    const out: RosterPeerSession[] = [];
+    for (const s of slots) {
+      if (!s.lost && s.session) out.push(s.session);
+    }
+    return out;
+  }
+
+  function liveGuestCount(): number {
+    return liveSessions().length;
+  }
+
+  function otherSessions(except: PeerSlot): RosterPeerSession[] {
+    return liveSessions().filter((s) => s !== except.session);
+  }
+
+  function refreshGuestSummary(): void {
+    const live = slots.filter((s) => !s.lost && s.session);
+    const names = live
+      .map((s) => s.displayName?.trim())
+      .filter((n): n is string => Boolean(n));
+    set({
+      guestCount: live.length,
+      peerName: names[0] ?? null,
+      message: roomOccupantSummary({ guestCount: live.length }),
+    });
+  }
+
+  function hostName(): string {
+    return roomHostDisplayName(goAuth.profile);
+  }
+
+  function ensureLocalSurface(): void {
+    if (surfaceAttached) return;
+    surfaceAttached = true;
+    goSessionChat.attach({
+      localAgentId,
+      localName: hostName(),
+      localRole: "host",
+      layout: "page",
+      peers: [],
+      broadcast: (msg) => broadcastSessionChat(liveSessions(), msg),
+    });
+    goSessionChat.setHints({
+      freeText: true,
+      quickReplies: [...GO_ROOM_QUICK_REPLIES],
+    });
+    goSessionChat.setUiPhase("active");
+    fileHub = createRoomFileStarHub({
+      localAgentId,
+      listingOwner: (id) => goRoomFiles.listingOwner(id),
+      catalogItems: () => goRoomFiles.catalogItems(),
+      applyControl: (data) => goRoomFiles.onControl(data),
+      applyBinary: (buf) => goRoomFiles.onBinary(buf),
+      forgetOwner: (ownerId) => goRoomFiles.forgetOwner(ownerId),
+    });
+    const hub = fileHub;
+    goRoomFiles.attach({
+      localAgentId,
+      localName: hostName(),
+      sendJson: (msg) => hub.outboundControl(msg),
+      sendBinary: (buf) => hub.outboundBinary(buf),
+      bufferedAmount: () => hub.requesterBufferedAmount(),
+    });
+  }
+
+  function routeFilePeer(slot: PeerSlot): void {
+    if (!fileHub || !slot.peerId || !slot.session || slot.fileRouted) return;
+    slot.fileRouted = true;
+    const sess = slot.session;
+    const peerId = slot.peerId;
+    fileHub.addPeer({
+      peerId,
+      sendJson: (msg) => {
+        try {
+          sess.send(msg);
+        } catch {
+          /* ignore */
+        }
+      },
+      sendBinary: (buf) => sendBinary(sess, buf),
+      bufferedAmount: () => sess.getChannel()?.bufferedAmount ?? 0,
+    });
+  }
+
+  function dropPeer(slot: PeerSlot): void {
+    if (slot.lost) return;
+    slot.lost = true;
+    if (slot.peerId && fileHub) fileHub.removePeer(slot.peerId);
+    const sess = slot.session;
+    slot.session = null;
+    if (sess) {
+      try {
+        sess.close();
+      } catch {
+        /* ignore */
+      }
+    }
+    refreshGuestSummary();
+  }
+
+  function handlers(slot: PeerSlot): RosterPeerHandlers {
+    return {
+      onMessage: (data: unknown) => {
+        if (isPresenceMessage(data)) {
+          slot.peerId = data.agentId;
+          slot.displayName = data.name;
+          routeFilePeer(slot);
+          refreshGuestSummary();
+        } else if (isSessionChatMessage(data)) {
+          const toast = goSessionChat.onIncoming(data);
+          if (toast) chromeSession.setFlash(toast, 2800);
+          broadcastSessionChat(otherSessions(slot), data);
+        } else if (isSessionFileControl(data)) {
+          if (!slot.peerId && data.owner) slot.peerId = data.owner;
+          if (!slot.peerId && data.from) slot.peerId = data.from;
+          routeFilePeer(slot);
+          if (slot.peerId && fileHub) fileHub.onPeerControl(slot.peerId, data);
+        }
+      },
+      onBinary: (buf) => {
+        if (slot.peerId && fileHub) fileHub.onPeerBinary(slot.peerId, buf);
+      },
+      onChannelOpen: () => {
+        if (status.phase !== "ended") {
+          set({
+            phase: "open",
+            error: null,
+            message: roomOccupantSummary({ guestCount: liveGuestCount() }),
+          });
+        }
+      },
+      onChannelClose: () => {
+        dropPeer(slot);
+      },
+      onConnectionState: (state) => {
+        if (
+          state === "failed" ||
+          state === "disconnected" ||
+          state === "closed"
+        ) {
+          dropPeer(slot);
+        }
+      },
+      onError: (err) => {
+        set({ error: err.message });
+      },
+    };
   }
 
   function clearInviteExpiryTimer() {
@@ -92,82 +253,13 @@ export function createRoomRuntime() {
     const delay = Math.max(0, expiresAt - Date.now());
     inviteExpiryTimer = setTimeout(() => {
       if (status.inviteId !== inviteId) return;
-      if (status.phase === "ready") return;
+      loop?.stop();
+      loop = null;
       set({
-        message: "門牌已過期，請再發一張",
+        message: "門牌已過期，可再請人進來",
         inviteExpiresAt: expiresAt,
       });
     }, delay);
-  }
-
-  function attachChatAndFiles(session: RosterPeerSession) {
-    goSessionChat.attach({
-      localAgentId,
-      localName: SESSION_CHAT_HOST_DISPLAY_NAME,
-      localRole: "host",
-      layout: "page",
-      peers: [session],
-      broadcast: (msg) => broadcastSessionChat([session], msg),
-    });
-    goSessionChat.setHints({
-      freeText: true,
-      quickReplies: [...GO_ROOM_QUICK_REPLIES],
-    });
-    goSessionChat.setUiPhase("active");
-    goRoomFiles.attach({
-      sendJson: (msg) => {
-        try {
-          session.send(msg);
-        } catch {
-          /* ignore */
-        }
-      },
-      sendBinary: (buf) => sendBinary(session, buf),
-    });
-  }
-
-  function handlers(): RosterPeerHandlers {
-    return {
-      onMessage: (data: unknown) => {
-        if (isPresenceMessage(data)) {
-          slot.peerId = data.agentId;
-          slot.displayName = data.name;
-          if (slot.session) {
-            /* already attached */
-          }
-          set({ peerName: data.name || null });
-        } else if (isSessionChatMessage(data)) {
-          const toast = goSessionChat.onIncoming(data);
-          if (toast) chromeSession.setFlash(toast, 2800);
-        } else if (isSessionFileControl(data)) {
-          goRoomFiles.onControl(data);
-        }
-      },
-      onBinary: (buf) => goRoomFiles.onBinary(buf),
-      onChannelOpen: () => {
-        if (slot.session) attachChatAndFiles(slot.session);
-        if (status.phase !== "ended") {
-          set({ phase: "ready", message: "已連線", error: null });
-        }
-      },
-      onChannelClose: () => {
-        void close({ message: "對方已離開" });
-      },
-      onConnectionState: (state) => {
-        if (
-          state === "failed" ||
-          state === "disconnected" ||
-          state === "closed"
-        ) {
-          if (status.phase === "ready" || status.phase === "waiting") {
-            void close({ message: "連線已中斷" });
-          }
-        }
-      },
-      onError: (err) => {
-        set({ phase: "error", error: err.message, message: "" });
-      },
-    };
   }
 
   async function mintInviteAndAnswer(): Promise<{
@@ -186,30 +278,34 @@ export function createRoomRuntime() {
           ? created.expires_at
           : Date.now() + DEFAULT_INVITE_TTL_MS;
       if (!isInviteUnexpired(expiresAt)) {
-        set({
-          phase: "error",
-          error: "邀請已過期，請重新邀請",
-          message: "",
-        });
+        const err = "邀請已過期，請重新邀請";
+        if (status.phase === "open") {
+          set({ error: err });
+          return null;
+        }
+        set({ phase: "error", error: err, message: "" });
         return null;
       }
       const apiKey = goAuth.getPlatformApiKeyForHostLoop();
       if (!apiKey) {
-        set({ phase: "error", error: "通行證已失效，請重新登入", message: "" });
+        const err = "通行證已失效，請重新登入";
+        if (status.phase === "open") {
+          set({ error: err });
+          return null;
+        }
+        set({ phase: "error", error: err, message: "" });
         return null;
       }
+      const previousId = status.inviteId;
       loop?.stop();
-      slot.peerId = null;
-      slot.session = null;
-      slot.displayName = null;
+      ensureLocalSurface();
       set({
-        phase: "waiting",
+        phase: "open",
         inviteId: created.invite_id,
         shortUrl: created.short_url,
         inviteExpiresAt: expiresAt,
         error: null,
-        message: "等待對方進來",
-        peerName: null,
+        message: roomOccupantSummary({ guestCount: liveGuestCount() }),
       });
       scheduleInviteExpiry(created.invite_id, expiresAt);
       loop = startPlatformHostAnswerLoop({
@@ -217,30 +313,40 @@ export function createRoomRuntime() {
         apiKey,
         useRelay: false,
         media: "ready",
-        maxAnswers: 1,
+        maxAnswers: 0,
         localPresence: {
           agentId: localAgentId,
-          name: SESSION_CHAT_HOST_DISPLAY_NAME,
+          name: hostName(),
         },
-        prepareHandlers: () => ({
-          handlers: handlers(),
-          attachSession: (sess: RosterPeerSession) => {
-            slot.session = sess;
-            if (sess.getChannel()?.readyState === "open") {
-              attachChatAndFiles(sess);
-              set({ phase: "ready", message: "已連線", error: null });
-            }
-          },
-        }),
-        onStatus: (msg) => set({ message: msg }),
-        onError: (msg) => set({ error: msg, message: "" }),
-        onAnswered: async () => {
-          set({ message: "握手完成，等待通道開啟…" });
+        prepareHandlers: () => {
+          const slot: PeerSlot = {
+            peerId: null,
+            session: null,
+            displayName: null,
+          };
+          slots.push(slot);
+          return {
+            handlers: handlers(slot),
+            attachSession: (sess: RosterPeerSession) => {
+              slot.session = sess;
+              refreshGuestSummary();
+              if (sess.getChannel()?.readyState === "open") {
+                set({
+                  phase: "open",
+                  error: null,
+                  message: roomOccupantSummary({
+                    guestCount: liveGuestCount(),
+                  }),
+                });
+              }
+            },
+          };
         },
-        onDone: () => {
-          set({ message: "對方已連上", error: null });
-        },
+        onError: (msg) => set({ error: msg }),
       });
+      if (previousId && previousId !== created.invite_id) {
+        void goAuth.revokePlatformInvite(previousId);
+      }
       return { inviteId: created.invite_id, shortUrl: created.short_url };
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
@@ -250,8 +356,65 @@ export function createRoomRuntime() {
           : /通行證|登入|not_provisioned/i.test(message)
             ? "not_provisioned"
             : "error";
+      if (status.phase === "open") {
+        set({ error: message });
+        return null;
+      }
       set({ phase: "error", error: message, message: "" });
       throw Object.assign(new Error(message), { code });
+    }
+  }
+
+  async function openBooth(opts?: { afterEnd?: boolean }): Promise<void> {
+    if (opening) return;
+    if (status.phase === "ended" && !opts?.afterEnd) return;
+    if (
+      !opts?.afterEnd &&
+      status.phase === "open" &&
+      loop &&
+      status.inviteId &&
+      status.shortUrl &&
+      isInviteUnexpired(status.inviteExpiresAt ?? 0)
+    ) {
+      return;
+    }
+    opening = true;
+    try {
+      if (opts?.afterEnd || status.phase === "ended") {
+        closing = false;
+        set({
+          phase: "idle",
+          error: null,
+          message: "",
+          inviteId: null,
+          shortUrl: null,
+          inviteExpiresAt: null,
+          peerName: null,
+          guestCount: 0,
+        });
+      }
+      closing = false;
+      ensureLocalSurface();
+      set({
+        phase: "open",
+        error: null,
+        message: roomOccupantSummary({ guestCount: liveGuestCount() }),
+      });
+      if (
+        status.inviteId &&
+        status.shortUrl &&
+        isInviteUnexpired(status.inviteExpiresAt ?? 0) &&
+        loop
+      ) {
+        return;
+      }
+      try {
+        await mintInviteAndAnswer();
+      } catch {
+        /* stay in the booth */
+      }
+    } finally {
+      opening = false;
     }
   }
 
@@ -263,12 +426,18 @@ export function createRoomRuntime() {
     loop = null;
     goSessionChat.detach();
     goRoomFiles.detach();
-    try {
-      slot.session?.close();
-    } catch {
-      /* ignore */
+    fileHub = null;
+    surfaceAttached = false;
+    for (const slot of slots) {
+      slot.lost = true;
+      try {
+        slot.session?.close();
+      } catch {
+        /* ignore */
+      }
+      slot.session = null;
     }
-    slot.session = null;
+    slots.length = 0;
     const inviteId = status.inviteId;
     if (inviteId) {
       try {
@@ -285,6 +454,7 @@ export function createRoomRuntime() {
       shortUrl: null,
       inviteExpiresAt: null,
       peerName: null,
+      guestCount: 0,
     });
     closing = false;
   }
@@ -298,6 +468,7 @@ export function createRoomRuntime() {
     getStatus(): RoomStatus {
       return { ...status };
     },
+    openBooth,
     mintInviteAndAnswer,
     close,
   };

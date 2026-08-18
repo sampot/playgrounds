@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   extractSdpFields,
   filterCandidatesForLan,
+  filterSdpCandidateLines,
   isLanCandidateIp,
   prepareFieldsForExchange,
   rebuildSdpFromFields,
@@ -70,5 +71,13 @@ describe("rosterSdpCodec", () => {
   it("keepRelay retains relay candidates for Platform TURN path", () => {
     const kept = prepareFieldsForExchange(SAMPLE_OFFER, { keepRelay: true });
     expect(kept.candidates.some(c => c.type === "relay")).toBe(true);
+  });
+
+  it("filterSdpCandidateLines drops relay while keeping media sections", () => {
+    const fields = prepareFieldsForExchange(SAMPLE_OFFER, {});
+    const filtered = filterSdpCandidateLines(SAMPLE_OFFER, fields.candidates);
+    expect(filtered).toContain("m=application");
+    expect(filtered).toContain("typ host");
+    expect(filtered).not.toContain("typ relay");
   });
 });

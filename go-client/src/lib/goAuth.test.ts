@@ -153,6 +153,40 @@ describe("goAuth.mintPlatformInvite (GO-INVITE)", () => {
     expect(body.intent).toEqual({ version: 1 });
   });
 
+  it("rewrites short_url onto localhost when minting from go:dev", async () => {
+    goAuth.__setApiKeyForTests("pg_sk_test");
+    vi.stubGlobal("location", {
+      origin: "http://localhost:5174",
+      hostname: "localhost",
+    });
+    let body: Record<string, unknown> = {};
+    vi.stubGlobal(
+      "fetch",
+      async (_input: RequestInfo | URL, init?: RequestInit) => {
+        body = JSON.parse(String(init?.body) || "{}");
+        return new Response(
+          JSON.stringify({
+            invite_id: "inv_local",
+            kind: "invite.room",
+            expires_at: 1780000000000,
+            short_url: "https://go.samkuo.me/i/abc_12",
+            deep_link: "http://localhost:5174/#pg=sec",
+            secret: "sec",
+          }),
+          { status: 200, headers: { "content-type": "application/json" } }
+        );
+      }
+    );
+
+    const out = await goAuth.mintPlatformInvite({
+      kind: "invite.room",
+      intent: { version: 1, surface: "room" },
+    });
+
+    expect(body.targetField).toBe("http://localhost:5174");
+    expect(out.short_url).toBe("http://localhost:5174/i/abc_12");
+  });
+
   it("stamps transport.roster.relay when Host prefers TURN", async () => {
     goAuth.__setApiKeyForTests("pg_sk_test");
     goAuth.__setTurnPreferForTests(true);

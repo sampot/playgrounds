@@ -6,6 +6,7 @@ import {
   keyPrefix,
   sha256Hex,
   shortUrl,
+  inviteShortUrlOrigin,
 } from "./ids.js";
 import {
   deleteApiKey,
@@ -84,6 +85,15 @@ describe("ids", () => {
     expect(shortUrl("abc", "http://localhost:5174")).toBe(
       "http://localhost:5174/i/abc"
     );
+    expect(
+      inviteShortUrlOrigin("http://localhost:5174", "https://go.samkuo.me")
+    ).toBe("http://localhost:5174");
+    expect(
+      inviteShortUrlOrigin("https://go.samkuo.me", "https://go.samkuo.me")
+    ).toBe("https://go.samkuo.me");
+    expect(
+      inviteShortUrlOrigin("https://play.samkuo.me", "https://go.samkuo.me")
+    ).toBe("https://go.samkuo.me");
   });
 
   it("default invite TTL is 5 minutes", () => {

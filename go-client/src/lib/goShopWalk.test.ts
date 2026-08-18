@@ -16,7 +16,7 @@ import {
   LOBBY_AVATAR_RADIUS,
   LOBBY_WALK_FRAME_MS,
 } from "./goShopWalk";
-import { LOBBY_BOSS, LOBBY_CABINETS, LOBBY_CHAT } from "./goLobbyLayout";
+import { LOBBY_BOSS, LOBBY_CABINETS, LOBBY_ROOM } from "./goLobbyLayout";
 import { cabinetStandPoint } from "./goLobbyCabinets";
 
 describe("lobby walk preference", () => {
@@ -262,15 +262,16 @@ describe("resolveWalkBump", () => {
     expect(held.contact).toBe("boss");
   });
 
-  it("activates the chat lounge when walking into the table", () => {
+  it("activates the 包廂 door when walking into it from the aisle", () => {
+    const right = { up: false, down: false, left: false, right: true };
     const from = {
-      x: LOBBY_CHAT.x + LOBBY_CHAT.w / 2,
-      y: LOBBY_CHAT.y + LOBBY_CHAT.h + 8,
+      x: LOBBY_ROOM.x - 8,
+      y: LOBBY_ROOM.y + LOBBY_ROOM.h / 2,
     };
     expect(
       resolveWalkBump({
         from,
-        input: up,
+        input: right,
         alreadyContact: null,
         deltaSec: 0.05,
       }).activate

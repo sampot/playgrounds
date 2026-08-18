@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LOBBY_AD, LOBBY_CHAT } from "./goLobbyLayout";
+import { LOBBY_AD, LOBBY_ROOM } from "./goLobbyLayout";
 import {
   GO_LOBBY_HOTSPOTS,
   getShopHotspot,
@@ -89,8 +89,8 @@ describe("resolveShopHotspotAction", () => {
     });
   });
 
-  it("maps 包廂 lounge to /room", () => {
-    expect(hitTestShopHotspot(LOBBY_CHAT.x + 8, LOBBY_CHAT.y + 8)).toBe("room");
+  it("maps the 包廂 door to /room", () => {
+    expect(hitTestShopHotspot(LOBBY_ROOM.x + 8, LOBBY_ROOM.y + 8)).toBe("room");
     expect(getShopHotspot("room")?.label).toBe("包廂");
     expect(resolveShopHotspotAction("room")).toEqual({
       type: "navigate",

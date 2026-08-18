@@ -24,6 +24,7 @@ import {
   type MintInviteResult,
 } from "./platformClient";
 import { INVITE_ROOM_KIND, stampComposeRelayPrefer } from "@pg/platform/platformCompose";
+import { goPageOrigin, localizeInviteShortUrl } from "./goOrigin";
 import { chromeSession } from "./chromeSession.svelte";
 import { BOSS_FLASH } from "./goBossWelcome";
 
@@ -112,13 +113,7 @@ function clearPageUrl(): string {
 }
 
 function goOrigin(): string {
-  if (typeof location !== "undefined" && location.origin) {
-    const host = location.hostname;
-    if (host === "localhost" || host === "127.0.0.1" || host.endsWith(".localhost")) {
-      return location.origin;
-    }
-  }
-  return "https://go.samkuo.me";
+  return goPageOrigin();
 }
 
 class GoAuth {
@@ -274,7 +269,7 @@ class GoAuth {
       err.code = "not_provisioned";
       throw err;
     }
-    return mintPlatformInvite({
+    const created = await mintPlatformInvite({
       apiKey: key,
       kind: opts.kind,
       intent:
@@ -284,6 +279,11 @@ class GoAuth {
       targetField: goOrigin(),
       ttlMs: opts.ttlMs,
     });
+    const page = goOrigin();
+    return {
+      ...created,
+      short_url: localizeInviteShortUrl(created.short_url, page),
+    };
   }
 
   /**

@@ -94,6 +94,7 @@ import {
   shortId,
   goPublicOrigin,
   shortUrl,
+  inviteShortUrlOrigin,
 } from "./ids.js";
 import { InviteDurableObject } from "./inviteDo.js";
 
@@ -1368,7 +1369,10 @@ async function route(
       invite_id: inviteId,
       kind,
       expires_at: created.expiresAt,
-      short_url: shortUrl(sid, goPublicOrigin(env)),
+      short_url: shortUrl(
+        sid,
+        inviteShortUrlOrigin(targetField, goPublicOrigin(env))
+      ),
       deep_link: fieldDeepLink(targetField, secret),
       secret,
     });
