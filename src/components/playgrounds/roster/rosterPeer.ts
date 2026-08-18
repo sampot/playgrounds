@@ -4,6 +4,7 @@
 
 import {
   sdpHasAvMediaLines,
+  sdpHasBoothMediaLines,
   type RosterSdpRole,
 } from "./rosterSdpCodec";
 import {
@@ -13,7 +14,7 @@ import {
   decodeRosterWireToSdp,
 } from "./rosterWire";
 
-export { sdpHasAvMediaLines };
+export { sdpHasAvMediaLines, sdpHasBoothMediaLines };
 
 const DEFAULT_STUN: RTCIceServer[] = [
   { urls: "stun:stun.cloudflare.com:3478" },
@@ -197,13 +198,26 @@ function attachChannel(
   });
 }
 
-/** Reserve empty audio／video transceivers so later replaceTrack needs no renegotiation. */
-export function reserveRosterMediaTransceivers(pc: {
+type AddTransceiverPc = {
   addTransceiver: (
     kind: string,
     init?: RTCRtpTransceiverInit
   ) => unknown;
-}): void {
+};
+
+/** Reserve empty audio／video transceivers so later replaceTrack needs no renegotiation. */
+export function reserveRosterMediaTransceivers(pc: AddTransceiverPc): void {
+  pc.addTransceiver("audio", { direction: "sendrecv" });
+  pc.addTransceiver("video", { direction: "sendrecv" });
+}
+
+/**
+ * 包廂進門／mesh 邊：在場音視＋節目音視，順序凍結。
+ * 遊戲 compose 繼續用 DC-only，不要改成呼叫這個。
+ */
+export function reserveBoothMediaTransceivers(pc: AddTransceiverPc): void {
+  pc.addTransceiver("audio", { direction: "sendrecv" });
+  pc.addTransceiver("video", { direction: "sendrecv" });
   pc.addTransceiver("audio", { direction: "sendrecv" });
   pc.addTransceiver("video", { direction: "sendrecv" });
 }
@@ -317,13 +331,13 @@ export async function createRosterOffer(opts: {
   /** Optional ICE servers (STUN＋official TURN). Omitted → default STUN.
    *  When TURN urls are present, PeerConnection is **relay-only**. */
   iceServers?: RTCIceServer[];
-  /** `ready` reserves empty A/V transceivers in the first SDP (包廂). */
+  /** `ready` reserves empty 2+2 A/V transceivers in the first SDP (包廂). */
   media?: RosterMediaMode;
 }): Promise<{ session: RosterPeerSession; wire: string }> {
   const lan = Boolean(opts.lan);
   const handlers = opts.handlers ?? {};
   const pc = createPc(lan, opts.iceServers);
-  if (opts.media === "ready") reserveRosterMediaTransceivers(pc);
+  if (opts.media === "ready") reserveBoothMediaTransceivers(pc);
   const channel = pc.createDataChannel("roster", { ordered: true });
   attachChannel(channel, handlers, opts.localPresence);
 
@@ -353,7 +367,7 @@ export async function acceptRosterOffer(opts: {
   presence?: { agentId: string; name: string };
   localPresence?: { agentId: string; name: string };
   iceServers?: RTCIceServer[];
-  /** `ready` reserves empty A/V transceivers if the offer omitted them. */
+  /** `ready` reserves empty 2+2 A/V transceivers if the offer omitted them. */
   media?: RosterMediaMode;
 }): Promise<{ session: RosterPeerSession; wire: string }> {
   const handlers = opts.handlers ?? {};
@@ -364,8 +378,10 @@ export async function acceptRosterOffer(opts: {
   }
   const lan = opts.lan ?? decoded.lan;
   const pc = createPc(lan, opts.iceServers);
-  if (opts.media === "ready" && !sdpHasAvMediaLines(decoded.sdp)) {
-    reserveRosterMediaTransceivers(pc);
+  if (opts.media === "ready" && !sdpHasBoothMediaLines(decoded.sdp)) {
+    if (!sdpHasAvMediaLines(decoded.sdp)) {
+      reserveBoothMediaTransceivers(pc);
+    }
   }
   let channel: RTCDataChannel | null = null;
 

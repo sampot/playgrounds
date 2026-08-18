@@ -1,10 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
+  GO_ROOM_CAMERA_PAIR_ONLY,
+  GO_ROOM_END_CONFIRM_HOST,
+  GO_ROOM_LOGIN_HINT,
+  GO_ROOM_MEDIA_OFF,
+  GO_ROOM_SHARE_HINT,
   isRoomInviteShareable,
+  roomCameraAllowed,
   roomChatWhoLabel,
   roomHostDisplayName,
   roomInviteDoor,
   roomInviteRemainLabel,
+  roomMediaSummary,
+  roomOccupantCount,
   roomOccupantSummary,
   takePickedFiles,
 } from "./goRoom";
@@ -44,6 +52,42 @@ describe("roomOccupantSummary", () => {
   it("counts Host plus guests, not 1:1", () => {
     expect(roomOccupantSummary({ guestCount: 1 })).toBe("2 人在");
     expect(roomOccupantSummary({ guestCount: 2 })).toBe("3 人在");
+  });
+});
+
+describe("room camera occupancy", () => {
+  it("allows the camera only when exactly two people are in", () => {
+    expect(roomOccupantCount(0)).toBe(1);
+    expect(roomOccupantCount(1)).toBe(2);
+    expect(roomCameraAllowed(1)).toBe(false);
+    expect(roomCameraAllowed(2)).toBe(true);
+    expect(roomCameraAllowed(3)).toBe(false);
+  });
+});
+
+describe("roomMediaSummary", () => {
+  it("prefers the program name over camera, and uses the off line when idle", () => {
+    expect(
+      roomMediaSummary({ camera: true, mic: true, programName: "片.mp4" })
+    ).toBe("正在播出 · 片.mp4");
+    expect(
+      roomMediaSummary({ camera: true, mic: false, programName: null })
+    ).toBe("鏡頭已開 · 等對方收看");
+    expect(
+      roomMediaSummary({
+        camera: false,
+        mic: false,
+        programName: null,
+        watching: true,
+      })
+    ).toBe("正在收看鏡頭");
+    expect(
+      roomMediaSummary({ camera: false, mic: true, programName: null })
+    ).toBe("麥克風開著");
+    expect(
+      roomMediaSummary({ camera: false, mic: false, programName: null })
+    ).toBe(GO_ROOM_MEDIA_OFF);
+    expect(GO_ROOM_CAMERA_PAIR_ONLY).toBe("鏡頭只在兩人時");
   });
 });
 
@@ -124,6 +168,21 @@ describe("roomChatWhoLabel", () => {
       roomChatWhoLabel({ local: false, host: false, name: "小明" })
     ).toBe("小明");
     expect(roomChatWhoLabel({ local: false, host: false })).toBe("對方");
+  });
+});
+
+describe("booth copy", () => {
+  it("tells a second device to scan the live invite instead of opening /room", () => {
+    expect(GO_ROOM_SHARE_HINT).toContain(
+      "另一台裝置請掃這張邀請進來，不要再開一間包廂。"
+    );
+    expect(GO_ROOM_LOGIN_HINT).toContain("另一台裝置請掃邀請進來。");
+  });
+
+  it("warns that camera and cast stop when the Host ends the booth", () => {
+    expect(GO_ROOM_END_CONFIRM_HOST).toBe(
+      "關掉後在場的人會斷線，目錄會沒了，鏡頭與投放會停。已存到硬碟的檔不受影響。"
+    );
   });
 });
 

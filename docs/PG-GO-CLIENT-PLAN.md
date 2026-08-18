@@ -558,7 +558,7 @@ dash provision → 場殼記憶體 API key
 | **6b. 「更多」本機溢流** | Header「更多」＝已下載列表＋分層清除；試試這些可選第二段；Invite 不露（§6.6） | `/`／`/s/` 可開已下載面板；清除分層＋頁內確認；`/i/` 無本機選單；非迷你型錄 | **已落地**（`GoMorePanel`） |
 | **6c. 登入＋Header profile（DEC-052）** | go consume `#pg_provision=`（redeem→記憶體 key→`/v1/field/me`）；Header profile icon/avatar＋身分面板；Platform 放行 go＋`/v1/field/me` | dash 可登入 go；「已登入」avatar 顯示、可登出；key 關頁即失；未登入不阻玩（見 [PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md)） | 未排程（auth plan 本刀） |
 | **6d. 玩家主場互邀（GO-INVITE）** | 已登入玩家在單局內邀另一位玩家（回 `go/i/<short>`）；用同一把記憶體 field API key 走 `invite.compose`；**不**等同 author session | 玩家 A 在 go 開一局→邀玩家 B→B 入座對戰；A／B 不需作者面 | 未排程（後續；見 auth plan §5.3） |
-| **6e. 包廂（`/room`）** | 已登入進 `/room` **即包廂 UI**（邀請為面內、**按需鑄**）；Guest `/i/` 進同一間且**留在 `/i/`**；**不鎖 1:1**；包廂活著＝主持畫面開著，TTL 只管門牌；Phase 1＝文字＋傳檔（契約不把包廂定成聊天室） | 見 [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md) | 按需鑄／兩個時鐘已落地；多人傳檔 e2e 手測仍待 |
+| **6e. 包廂（`/room`）** | 已登入進 `/room` **即包廂 UI**（邀請為面內、**按需鑄**）；Guest `/i/` 進同一間且**留在 `/i/`**（含自己的另一台）；**入座不鎖 1:1**；**鏡頭僅 1:1**；**檔與音視訊直連優先**（Host DC signaling）；包廂活著＝主持畫面開著，TTL 只管門牌；**說／掛／播**（Phase 1＝文字＋傳檔；播出 UI 分階段，SDP 凍在場＋節目 2+2） | 見 [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md) | 按需鑄／兩個時鐘已落地；多人傳檔 e2e 手測仍待；SDP 現況 1+1，契約已改 2+2 |
 | **7.（可選）** | short 不進 hash（B）；文件站導讀；場殼 `#pg=`／`view=canvas` 標「進階／除錯」或汰除 | 另議 | — |
 
 ---
@@ -641,7 +641,7 @@ dash provision → 場殼記憶體 API key
 | 換片、下一個、試試這些（**僅 game**） | go 上「型錄」「逛小品」「換一個任意類」；對 tool 推換片 |
 | 一鍵開（場／作者）vs 分享（go／接收者） | 兩者混成同一深鏈 |
 | 山姆鍋 mark（→ play `/`）、「山姆鍋遊樂場」（→ `/sam/?kind=game`）；副標＝`play.samkuo.me` | 無標匿名 lobby；Playgrounds 當對外品牌名；副標寫 `/sam/…` |
-| 包廂（`/room`；臨時隔間；**活著＝主持畫面開著**；門牌仍 `/i/`、TTL 只管請新人） | 聊天室、房間、把局內 overlay 叫包廂；`/chat` 當 canonical；5 分鐘租期的雲端房間 |
+| 包廂（`/room`；臨時隔間；**活著＝主持畫面開著**；門牌仍 `/i/`、TTL 只管請新人；說／掛／播；第二台掃碼；鏡頭僅兩人；檔與音視訊直連優先） | 聊天室、房間、視訊會議格子牆、把局內 overlay 叫包廂；`/chat` 當 canonical；5 分鐘租期的雲端房間；再開 `/room` 當連上既有這一間 |
 | 請 Host 重新邀請 | 教 Guest 開 Safari 才能玩（go 快樂路徑）；教把邀請短鏈釘主畫面當永久遊戲 |
 
 ---
@@ -689,3 +689,6 @@ dash provision → 場殼記憶體 API key
 | 2026-08-18 | 相關：[PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)（包廂 `/room`；Phase 1＝文字／傳檔；契約不把包廂定成聊天室）；主計劃 Phase **6e** |
 | 2026-08-18 | 包廂契約修訂：已登入進 `/room` 即主面（邀請為面內動作）；**不鎖 1:1**（對齊遊戲 session） |
 | 2026-08-18 | 包廂契約：**兩個時鐘**（包廂＝主持 `/room` 畫面；過期的是門牌）；按需鑄；Guest 留 `/i/` |
+| 2026-08-18 | 包廂契約：**說／掛／播**；自己的另一台掃門牌；在場＋節目 SDP 2+2；見 [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md) |
+| 2026-08-18 | 包廂：**在場視訊僅 1:1**；傳檔 **允許 mesh**（Host DC signaling；不經 Platform 第二輪） |
+| 2026-08-18 | 包廂：檔 **與音視訊**皆直連優先（mesh 邊＝2+2＋DC；star 備援） |

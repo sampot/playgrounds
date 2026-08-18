@@ -266,6 +266,7 @@
     shortUrl={null}
     inviteExpiresAt={null}
     peerName={null}
+    guestCount={status.guestCount ?? 0}
     onEnd={() => runtime.leaveRoom()}
   />
 {:else if showCanvas}

@@ -13,6 +13,10 @@ import {
   isSessionChatMessage,
 } from "@pg/roster/rosterSessionChat";
 import { isSessionFileControl } from "@pg/roster/rosterSessionFile";
+import { isSessionMeshMessage } from "@pg/roster/rosterSessionMesh";
+import { isSessionCastMessage } from "@pg/roster/rosterSessionCast";
+import { isSessionCameraMessage } from "@pg/roster/rosterSessionCamera";
+import { createRoomMeshBroker } from "./goRoomMeshBroker";
 import { startPlatformHostAnswerLoop } from "@pg/platform/platformHostLoop";
 import {
   buildInviteRoomIntent,
@@ -22,6 +26,7 @@ import { goAuth } from "./goAuth.svelte";
 import { chromeSession } from "./chromeSession.svelte";
 import { goSessionChat } from "./goSessionChat.svelte";
 import { goRoomFiles } from "./goRoomFiles.svelte";
+import { goRoomMedia } from "./goRoomMedia.svelte";
 import { createRoomFileStarHub, type RoomFileStarHub } from "./goRoomFileStar";
 import {
   GO_ROOM_QUICK_REPLIES,
@@ -91,6 +96,18 @@ export function createRoomRuntime() {
     shortUrl: string;
   } | null> | null = null;
   let fileHub: RoomFileStarHub | null = null;
+  const meshBroker = createRoomMeshBroker({
+    sendTo(peerId, msg) {
+      const slot = slots.find(
+        (s) => !s.lost && s.peerId === peerId && s.session
+      );
+      try {
+        slot?.session?.send(msg);
+      } catch {
+        /* ignore */
+      }
+    },
+  });
 
   function emit() {
     for (const l of listeners) l({ ...status });
@@ -127,6 +144,7 @@ export function createRoomRuntime() {
       occupantNames: names,
       message: roomOccupantSummary({ guestCount: live.length }),
     });
+    void goRoomMedia.refresh();
   }
 
   function hostName(): string {
@@ -165,6 +183,28 @@ export function createRoomRuntime() {
       sendBinary: (buf) => hub.outboundBinary(buf),
       bufferedAmount: () => hub.requesterBufferedAmount(),
     });
+    goRoomMedia.attach({
+      localAgentId,
+      occupantCount: () => liveGuestCount() + 1,
+      peers: () =>
+        slots
+          .filter((s) => !s.lost && s.session)
+          .map((s) => ({
+            peerId: s.peerId || "",
+            pc: s.session!.pc,
+            via: "entrance" as const,
+          })),
+      sendJson: (msg) => {
+        for (const sess of liveSessions()) {
+          try {
+            sess.send(msg);
+          } catch {
+            /* ignore */
+          }
+        }
+      },
+      forward: true,
+    });
   }
 
   function routeFilePeer(slot: PeerSlot): void {
@@ -190,6 +230,7 @@ export function createRoomRuntime() {
     if (slot.lost) return;
     slot.lost = true;
     if (slot.peerId && fileHub) fileHub.removePeer(slot.peerId);
+    if (slot.peerId) meshBroker.removePeer(slot.peerId);
     const sess = slot.session;
     slot.session = null;
     if (sess) {
@@ -209,6 +250,8 @@ export function createRoomRuntime() {
           slot.peerId = data.agentId;
           slot.displayName = data.name;
           routeFilePeer(slot);
+          meshBroker.addPeer(data.agentId);
+          meshBroker.introduce(data.agentId);
           refreshGuestSummary();
         } else if (isSessionChatMessage(data)) {
           const toast = goSessionChat.onIncoming(data);
@@ -219,6 +262,20 @@ export function createRoomRuntime() {
           if (!slot.peerId && data.from) slot.peerId = data.from;
           routeFilePeer(slot);
           if (slot.peerId && fileHub) fileHub.onPeerControl(slot.peerId, data);
+        } else if (isSessionMeshMessage(data) && slot.peerId) {
+          meshBroker.forward(slot.peerId, data);
+        } else if (
+          isSessionCastMessage(data) ||
+          isSessionCameraMessage(data)
+        ) {
+          void goRoomMedia.onCastControl(data);
+          for (const sess of otherSessions(slot)) {
+            try {
+              sess.send(data);
+            } catch {
+              /* ignore */
+            }
+          }
         }
       },
       onBinary: (buf) => {
@@ -377,6 +434,10 @@ export function createRoomRuntime() {
             handlers: handlers(slot),
             attachSession: (sess: RosterPeerSession) => {
               slot.session = sess;
+              sess.pc.addEventListener("track", (ev) => {
+                goRoomMedia.onRemoteTrack(ev, sess.pc);
+                if (slot.peerId) void goRoomMedia.forwardFrom(slot.peerId);
+              });
               refreshGuestSummary();
               if (sess.getChannel()?.readyState === "open") {
                 set({
@@ -453,6 +514,7 @@ export function createRoomRuntime() {
     loop = null;
     goSessionChat.detach();
     goRoomFiles.detach();
+    goRoomMedia.detach();
     fileHub = null;
     surfaceAttached = false;
     for (const slot of slots) {

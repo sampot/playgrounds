@@ -44,6 +44,9 @@ vi.mock("./goRoomFiles.svelte", () => ({
     detach: fixtures.filesDetach,
     onControl: vi.fn(),
     onBinary: vi.fn(),
+    catalogItems: () => [],
+    listingOwner: () => null,
+    forgetOwner: () => [],
   },
 }));
 
@@ -51,11 +54,23 @@ vi.mock("./chromeSession.svelte", () => ({
   chromeSession: { setFlash: vi.fn() },
 }));
 
+vi.mock("./goRoomMedia.svelte", () => ({
+  goRoomMedia: {
+    attach: vi.fn(),
+    detach: vi.fn(),
+    refresh: vi.fn(),
+    onCastControl: vi.fn(),
+    onRemoteTrack: vi.fn(),
+    forwardFrom: vi.fn(),
+  },
+}));
+
 function mockSession() {
   return {
     send: vi.fn(),
     close: vi.fn(),
     getChannel: () => ({ readyState: "open" as const, send: vi.fn() }),
+    pc: { addEventListener: vi.fn() },
   };
 }
 
@@ -180,6 +195,71 @@ describe("roomRuntime", () => {
     first.handlers.onChannelClose();
     expect(rt.getStatus().phase).toBe("open");
     expect(rt.getStatus().guestCount).toBe(1);
+  });
+
+  it("introduces two guests over session_mesh without a second Platform offer", async () => {
+    let loopOpts: {
+      prepareHandlers: () => {
+        handlers: { onMessage: (data: unknown) => void };
+        attachSession: (s: ReturnType<typeof mockSession>) => void;
+      };
+    } | null = null;
+    fixtures.startLoop.mockImplementation((opts: typeof loopOpts) => {
+      loopOpts = opts;
+      return { stop: vi.fn(), inviteId: "inv-room" };
+    });
+    const { createRoomRuntime } = await import("./roomRuntime");
+    const rt = createRoomRuntime();
+    await rt.openBooth();
+    await rt.mintInviteAndAnswer();
+    const a = mockSession();
+    const b = mockSession();
+    const first = loopOpts!.prepareHandlers();
+    first.attachSession(a);
+    first.handlers.onMessage({
+      type: "presence",
+      agentId: "g-a",
+      name: "甲",
+    });
+    const second = loopOpts!.prepareHandlers();
+    second.attachSession(b);
+    second.handlers.onMessage({
+      type: "presence",
+      agentId: "g-b",
+      name: "乙",
+    });
+    expect(b.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "session_mesh",
+        op: "hello",
+        peerId: "g-a",
+      })
+    );
+    expect(a.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "session_mesh",
+        op: "hello",
+        peerId: "g-b",
+      })
+    );
+
+    first.handlers.onMessage({
+      type: "session_mesh",
+      v: 1,
+      op: "offer",
+      from: "spoof",
+      to: "g-b",
+      sdp: "wire",
+    });
+    expect(b.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "session_mesh",
+        op: "offer",
+        from: "g-a",
+        to: "g-b",
+        sdp: "wire",
+      })
+    );
   });
 
   it("does not mint when the Host is not logged in", async () => {

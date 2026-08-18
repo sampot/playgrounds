@@ -2,6 +2,7 @@
  * Roster wire format: compact base64url JSON for QR / text exchange (DEC-045).
  */
 
+import { gzipSync, gunzipSync } from "fflate";
 import {
   ROSTER_SDP_TPL,
   ROSTER_SDP_TPL_AV,
@@ -25,9 +26,14 @@ export const ROSTER_WIRE_MAX_CHARS = 1200;
 
 /**
  * Platform Invite signaling（offer／answer 經 API JSON）：短網址才進 QR，
- * wire 本身不受 OOB QR 1200 限制；仍設合理上限防濫用。
+ * wire 本身不受 OOB QR 1200 限制。包廂 `av1` 是 2+2+DC 原始 SDP，
+ * Chrome codec 列表就接近舊 16KiB；候選只留 BUNDLE 第一段，av1 JSON 再 gzip。
  */
-export const ROSTER_WIRE_MAX_CHARS_SIGNAL = 16_384;
+export const ROSTER_WIRE_MAX_CHARS_SIGNAL = 32_768;
+
+/** av1 JSON gzip 後加此前綴；舊客戶端未壓縮 base64 以 `{`→`e` 開頭。 */
+const ROSTER_WIRE_GZIP_PREFIX = "z";
+const ROSTER_WIRE_GUNZIP_MAX = ROSTER_WIRE_MAX_CHARS_SIGNAL * 4;
 
 export type RosterWirePayloadDc = {
   v: typeof ROSTER_WIRE_VERSION;
@@ -103,6 +109,23 @@ function utf8Encode(text: string): Uint8Array {
 
 function utf8Decode(bytes: Uint8Array): string {
   return new TextDecoder().decode(bytes);
+}
+
+function gzipUtf8Json(json: string): string {
+  const gz = gzipSync(utf8Encode(json), { level: 9 });
+  return ROSTER_WIRE_GZIP_PREFIX + toBase64Url(gz);
+}
+
+function decodeWireBytes(trimmed: string): Uint8Array {
+  if (trimmed.startsWith(ROSTER_WIRE_GZIP_PREFIX) && trimmed.length > 1) {
+    const gz = fromBase64Url(trimmed.slice(1));
+    const raw = gunzipSync(gz);
+    if (raw.byteLength > ROSTER_WIRE_GUNZIP_MAX) {
+      throw new RosterWireError("too_large", "交換字串過長");
+    }
+    return raw;
+  }
+  return fromBase64Url(trimmed);
 }
 
 function candidateToTuple(
@@ -197,7 +220,8 @@ export function encodeRosterWire(
   }
   const maxChars = opts?.maxChars ?? ROSTER_WIRE_MAX_CHARS;
   const json = JSON.stringify(payload);
-  const wire = toBase64Url(utf8Encode(json));
+  const wire =
+    payload.tpl === ROSTER_SDP_TPL_AV ? gzipUtf8Json(json) : toBase64Url(utf8Encode(json));
   if (wire.length > maxChars) {
     const hint =
       maxChars <= ROSTER_WIRE_MAX_CHARS
@@ -222,8 +246,9 @@ export function decodeRosterWire(wire: string): RosterWirePayload {
   }
   let json: string;
   try {
-    json = utf8Decode(fromBase64Url(trimmed));
-  } catch {
+    json = utf8Decode(decodeWireBytes(trimmed));
+  } catch (err) {
+    if (err instanceof RosterWireError) throw err;
     throw new RosterWireError("bad_encoding", "無法解碼 base64url");
   }
   let parsed: unknown;
@@ -313,7 +338,7 @@ export function encodeSessionSdpToRosterWire(
     v: ROSTER_WIRE_VERSION,
     role: opts.role,
     tpl: ROSTER_SDP_TPL_AV,
-    sdp: filtered,
+    sdp: filtered.replace(/\r\n/g, "\n"),
   };
   if (opts.lan) payload.lan = true;
   return encodeRosterWire(payload, { maxChars: opts.maxChars });

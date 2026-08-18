@@ -45,6 +45,7 @@ vi.mock("./goCanvas", () => ({
 vi.mock("@pg/roster/rosterPeer", () => ({
   applyRosterAnswer: fixtures.applyAnswer,
   createRosterOffer: fixtures.createOffer,
+  acceptRosterOffer: vi.fn(),
   isAvatarRelayMessage: () => false,
   isPresenceMessage: () => false,
 }));
@@ -66,6 +67,16 @@ vi.mock("./goRoomFiles.svelte", () => ({
     detach: fixtures.filesDetach,
     onControl: vi.fn(),
     onBinary: vi.fn(),
+  },
+}));
+
+vi.mock("./goRoomMedia.svelte", () => ({
+  goRoomMedia: {
+    attach: vi.fn(),
+    detach: vi.fn(),
+    refresh: vi.fn(),
+    onCastControl: vi.fn(),
+    onRemoteTrack: vi.fn(),
   },
 }));
 
@@ -105,6 +116,7 @@ describe("guestRuntime invite.room", () => {
         send: vi.fn(),
         close: vi.fn(),
         getChannel: () => ({ readyState: "open", send: vi.fn() }),
+        pc: { addEventListener: vi.fn() },
       };
       opts.handlers?.onChannelOpen?.();
       return { session, wire: "offer-wire" };
@@ -176,5 +188,86 @@ describe("guestRuntime invite.room", () => {
     expect(rt.getStatus().message).toBe("已離開這一間");
     expect(rt.getStatus().surface).toBe("room");
     expect(rt.getStatus().error).toBeNull();
+  });
+
+  it("offers a 2+2 mesh peer when Host introduces a larger agentId", async () => {
+    const { createGuestRuntime } = await import("./guestRuntime");
+    const rt = createGuestRuntime();
+    await rt.bootFromShortId("room1");
+    await rt.consentAndPlay("訪客甲");
+    const offerOpts = fixtures.createOffer.mock.calls[0]![0] as {
+      handlers?: { onMessage?: (data: unknown) => void };
+    };
+    fixtures.createOffer.mockClear();
+    offerOpts.handlers?.onMessage?.({
+      type: "session_mesh",
+      v: 1,
+      op: "hello",
+      peerId: "zz-peer",
+    });
+    await vi.waitFor(() => {
+      expect(fixtures.createOffer).toHaveBeenCalled();
+    });
+    expect(fixtures.createOffer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        transport: "signal",
+        media: "ready",
+      })
+    );
+    expect(fixtures.postOffer).toHaveBeenCalledTimes(1);
+  });
+
+  it("ICE failure while connecting is a page error, not host-ended", async () => {
+    let handlers: {
+      onConnectionState?: (state: RTCPeerConnectionState) => void;
+    } = {};
+    fixtures.createOffer.mockImplementation(async (opts: { handlers?: typeof handlers }) => {
+      handlers = opts.handlers ?? {};
+      return {
+        session: {
+          send: vi.fn(),
+          close: vi.fn(),
+          getChannel: () => ({ readyState: "connecting", send: vi.fn() }),
+          pc: { addEventListener: vi.fn() },
+        },
+        wire: "offer-wire",
+      };
+    });
+    let finishWait: ((value: { answer: string }) => void) | undefined;
+    fixtures.postOffer.mockImplementation(
+      () =>
+        new Promise<{ answer: string }>((resolve) => {
+          finishWait = resolve;
+        })
+    );
+    const { createGuestRuntime } = await import("./guestRuntime");
+    const rt = createGuestRuntime();
+    await rt.bootFromShortId("room1");
+    const play = rt.consentAndPlay("訪客甲");
+    await vi.waitFor(() => {
+      expect(handlers.onConnectionState).toBeTypeOf("function");
+    });
+    expect(rt.getStatus().phase).toBe("connecting");
+    handlers.onConnectionState?.("failed");
+    expect(rt.getStatus().phase).toBe("error");
+    expect(rt.getStatus().error).toMatch(/連線失敗/);
+    expect(rt.getStatus().error).not.toMatch(/關掉/);
+    finishWait?.({ answer: "answer-wire" });
+    await play;
+    expect(rt.getStatus().phase).toBe("error");
+  });
+
+  it("channel close after seating is host-ended", async () => {
+    const { createGuestRuntime } = await import("./guestRuntime");
+    const rt = createGuestRuntime();
+    await rt.bootFromShortId("room1");
+    await rt.consentAndPlay("訪客甲");
+    expect(rt.getStatus().phase).toBe("ready");
+    const offerOpts = fixtures.createOffer.mock.calls[0]![0] as {
+      handlers?: { onChannelClose?: () => void };
+    };
+    offerOpts.handlers?.onChannelClose?.();
+    expect(rt.getStatus().phase).toBe("ended");
+    expect(rt.getStatus().error).toBe("主持已關掉這一間");
   });
 });

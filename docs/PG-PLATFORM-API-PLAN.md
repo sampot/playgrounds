@@ -133,7 +133,7 @@
 | --- | --- | --- |
 | `signal.handshake` | 僅薄 O／A（Roster 連線） | P1–2 |
 | `invite.compose` | 開 SAM＋放大畫布＋可選 session＋可選 signal | P4 |
-| `invite.room` | go 包廂（無 SAM；文字／檔等走 DataChannel） | 見 [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md) |
+| `invite.room` | go 包廂（無 SAM；文字／檔走 DataChannel；音視訊 RTP 預留 2+2） | 見 [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md) |
 | 其他 | 預留 | — |
 
 ### 深鏈與短連結
@@ -372,3 +372,4 @@ Auth：`Authorization: Bearer <access_token|api_key|join_cap|…>`（依端點�
 | 2026-08-07 | 場 Invite 短連結 canonical → **`go.samkuo.me/i/…`**（DEC-050）；api `/i/` 改 302→go |
 | 2026-08-18 | HTTP 大綱預留 **`/bulletins`**／admin 布告 CRUD（後段；見 [PG-GO-BULLETIN-PLAN.md](./PG-GO-BULLETIN-PLAN.md)） |
 | 2026-08-18 | Kind 表加 **`invite.room`**（go 包廂；見 [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)） |
+| 2026-08-18 | `invite.room` 註：文字／檔走 DC；音視訊 RTP 預留在場＋節目 2+2 |

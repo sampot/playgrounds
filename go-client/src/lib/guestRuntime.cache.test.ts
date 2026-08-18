@@ -55,6 +55,7 @@ vi.mock("./goCanvas", () => ({
 vi.mock("@pg/roster/rosterPeer", () => ({
   applyRosterAnswer: vi.fn(),
   createRosterOffer: vi.fn(),
+  acceptRosterOffer: vi.fn(),
   isAvatarRelayMessage: () => false,
   isPresenceMessage: () => false,
 }));
@@ -70,6 +71,16 @@ vi.mock("./goSessionChat.svelte", () => ({
 
 vi.mock("./chromeSession.svelte", () => ({
   chromeSession: { setFlash: vi.fn() },
+}));
+
+vi.mock("./goRoomMedia.svelte", () => ({
+  goRoomMedia: {
+    attach: vi.fn(),
+    detach: vi.fn(),
+    refresh: vi.fn(),
+    onCastControl: vi.fn(),
+    onRemoteTrack: vi.fn(),
+  },
 }));
 
 vi.mock("./platformClient", () => ({

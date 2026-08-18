@@ -2,8 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import {
   buildRosterRtcConfiguration,
   iceServersIncludeTurn,
+  reserveBoothMediaTransceivers,
   reserveRosterMediaTransceivers,
   sdpHasAvMediaLines,
+  sdpHasBoothMediaLines,
   sdpHasIceCandidates,
 } from "./rosterPeer";
 
@@ -81,12 +83,26 @@ describe("reserveRosterMediaTransceivers", () => {
   it("adds sendrecv audio and video transceivers", () => {
     const addTransceiver = vi.fn();
     reserveRosterMediaTransceivers({ addTransceiver });
+    expect(addTransceiver).toHaveBeenCalledTimes(2);
     expect(addTransceiver).toHaveBeenCalledWith("audio", {
       direction: "sendrecv",
     });
     expect(addTransceiver).toHaveBeenCalledWith("video", {
       direction: "sendrecv",
     });
+  });
+});
+
+describe("reserveBoothMediaTransceivers", () => {
+  it("adds presence then program sendrecv pairs in frozen order", () => {
+    const addTransceiver = vi.fn();
+    reserveBoothMediaTransceivers({ addTransceiver });
+    expect(addTransceiver.mock.calls).toEqual([
+      ["audio", { direction: "sendrecv" }],
+      ["video", { direction: "sendrecv" }],
+      ["audio", { direction: "sendrecv" }],
+      ["video", { direction: "sendrecv" }],
+    ]);
   });
 });
 
@@ -101,5 +117,27 @@ describe("sdpHasAvMediaLines", () => {
       )
     ).toBe(true);
     expect(sdpHasAvMediaLines(null)).toBe(false);
+  });
+});
+
+describe("sdpHasBoothMediaLines", () => {
+  it("requires two audio and two video m-lines", () => {
+    expect(
+      sdpHasBoothMediaLines(
+        "v=0\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\nm=video 9 UDP/TLS/RTP/SAVPF 96\r\n"
+      )
+    ).toBe(false);
+    expect(
+      sdpHasBoothMediaLines(
+        [
+          "v=0",
+          "m=audio 9 UDP/TLS/RTP/SAVPF 111",
+          "m=video 9 UDP/TLS/RTP/SAVPF 96",
+          "m=audio 9 UDP/TLS/RTP/SAVPF 111",
+          "m=video 9 UDP/TLS/RTP/SAVPF 96",
+        ].join("\r\n")
+      )
+    ).toBe(true);
+    expect(sdpHasBoothMediaLines(null)).toBe(false);
   });
 });

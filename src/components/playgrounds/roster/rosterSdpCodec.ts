@@ -82,25 +82,48 @@ export function sdpHasAvMediaLines(sdp: string | undefined | null): boolean {
   return /(?:^|\r?\n)m=audio /m.test(sdp) && /(?:^|\r?\n)m=video /m.test(sdp);
 }
 
+/** 包廂 2+2：在場音／視＋節目音／視（見 PG-GO-ROOM-PLAN §7.1）。 */
+export function sdpHasBoothMediaLines(sdp: string | undefined | null): boolean {
+  if (!sdp) return false;
+  const audio = sdp.match(/(?:^|\r?\n)m=audio /gm);
+  const video = sdp.match(/(?:^|\r?\n)m=video /gm);
+  return (audio?.length ?? 0) >= 2 && (video?.length ?? 0) >= 2;
+}
+
 export function candidateIdentity(c: RosterIceCandidate): string {
   return `${c.foundation}|${c.component}|${c.protocol.toLowerCase()}|${c.ip}|${c.port}|${c.type}`;
 }
 
-/** Drop a=candidate lines that are not in `keep` (relay／LAN filters). */
+/** Drop a=candidate lines that are not in `keep` (relay／LAN filters).
+ *  BUNDLE shares one ICE transport — keep candidates only on the first m-section. */
 export function filterSdpCandidateLines(
   sdp: string,
   keep: RosterIceCandidate[]
 ): string {
   const allowed = new Set(keep.map(candidateIdentity));
   const nl = sdp.includes("\r\n") ? "\r\n" : "\n";
-  const lines = sdp.replace(/\r\n/g, "\n").split("\n");
-  const out = lines.filter(raw => {
+  const normalized = sdp.replace(/\r\n/g, "\n");
+  const bundleOnce = /(?:^|\n)a=group:BUNDLE /m.test(normalized);
+  const lines = normalized.split("\n");
+  let mSection = 0;
+  const out: string[] = [];
+  for (const raw of lines) {
     const line = raw.trim();
-    if (!line.startsWith("a=candidate:")) return true;
-    const c = parseCandidateLine(line);
-    if (!c) return false;
-    return allowed.has(candidateIdentity(c));
-  });
+    if (line.startsWith("m=")) {
+      mSection += 1;
+      out.push(raw);
+      continue;
+    }
+    if (line.startsWith("a=candidate:")) {
+      if (bundleOnce && mSection > 1) continue;
+      const c = parseCandidateLine(line);
+      if (!c) continue;
+      if (!allowed.has(candidateIdentity(c))) continue;
+      out.push(raw);
+      continue;
+    }
+    out.push(raw);
+  }
   return out.join(nl);
 }
 
@@ -225,6 +248,55 @@ export function rebuildSdpFromFields(
   return lines.join("\r\n") + "\r\n";
 }
 
+const MAX_HOST_CANDIDATES = 6;
+const MAX_SRFLX_CANDIDATES = 4;
+const MAX_RELAY_CANDIDATES = 4;
+
+function uniqueCandidates(
+  candidates: RosterIceCandidate[]
+): RosterIceCandidate[] {
+  const seen = new Set<string>();
+  const out: RosterIceCandidate[] = [];
+  for (const c of candidates) {
+    const id = candidateIdentity(c);
+    if (seen.has(id)) continue;
+    seen.add(id);
+    out.push(c);
+  }
+  return out;
+}
+
+/** Non-trickle wire: UDP only, unique ICE, cap host flood, always keep some srflx. */
+function boundCandidatesForExchange(
+  candidates: RosterIceCandidate[],
+  opts: { keepRelay?: boolean }
+): RosterIceCandidate[] {
+  const unique = uniqueCandidates(candidates);
+  const udp = unique.filter(c => c.protocol.toLowerCase() === "udp");
+  const pool = udp.length > 0 ? udp : unique;
+  const byPrio = (a: RosterIceCandidate, b: RosterIceCandidate) =>
+    b.priority - a.priority;
+  const hosts = pool
+    .filter(c => c.type === "host")
+    .sort(byPrio)
+    .slice(0, MAX_HOST_CANDIDATES);
+  const srflx = pool
+    .filter(c => c.type === "srflx")
+    .sort(byPrio)
+    .slice(0, MAX_SRFLX_CANDIDATES);
+  const relays = opts.keepRelay
+    ? pool
+        .filter(c => c.type === "relay")
+        .sort(byPrio)
+        .slice(0, MAX_RELAY_CANDIDATES)
+    : [];
+  const prflx = pool
+    .filter(c => c.type === "prflx")
+    .sort(byPrio)
+    .slice(0, 2);
+  return uniqueCandidates([...hosts, ...srflx, ...relays, ...prflx]);
+}
+
 export function prepareFieldsForExchange(
   sdp: string,
   opts: { lan?: boolean; keepRelay?: boolean } = {}
@@ -242,16 +314,8 @@ export function prepareFieldsForExchange(
       );
     }
   }
-  // Bound wire size when keeping TURN relays (signal path has larger budget).
-  if (opts.keepRelay && candidates.length > 12) {
-    const hostSrflx = candidates.filter(
-      c => c.type === "host" || c.type === "srflx"
-    );
-    const relays = candidates.filter(c => c.type === "relay").slice(0, 6);
-    const rest = candidates.filter(
-      c => c.type !== "host" && c.type !== "srflx" && c.type !== "relay"
-    );
-    candidates = [...hostSrflx, ...relays, ...rest].slice(0, 14);
-  }
+  candidates = boundCandidatesForExchange(candidates, {
+    keepRelay: opts.keepRelay,
+  });
   return { ...fields, candidates };
 }

@@ -65,8 +65,8 @@ export type RoomFileTransferDeps = {
   localAgentId: string;
   localName: string;
   sendJson: (msg: SessionFileControl) => void;
-  sendBinary: (buf: ArrayBuffer) => void;
-  bufferedAmount?: () => number;
+  sendBinary: (buf: ArrayBuffer, destPeerId?: string) => void;
+  bufferedAmount?: (destPeerId?: string) => number;
   newId?: () => string;
 };
 
@@ -124,9 +124,9 @@ export function createRoomFileTransfer(
     }
   }
 
-  async function waitDrain(): Promise<void> {
+  async function waitDrain(destPeerId?: string): Promise<void> {
     const get = deps.bufferedAmount ?? (() => 0);
-    while (get() > BUFFER_HIGH) {
+    while (get(destPeerId) > BUFFER_HIGH) {
       await new Promise((r) => setTimeout(r, 16));
     }
   }
@@ -134,7 +134,8 @@ export function createRoomFileTransfer(
   async function pumpOutbound(
     fileId: string,
     file: File,
-    transferId: string
+    transferId: string,
+    destPeerId?: string
   ): Promise<void> {
     outboundTransferId = transferId;
     pumpAbort = false;
@@ -144,7 +145,7 @@ export function createRoomFileTransfer(
       let seq = 0;
       while (offset < file.size) {
         if (pumpAbort) return;
-        await waitDrain();
+        await waitDrain(destPeerId);
         if (pumpAbort) return;
         const end = Math.min(offset + SESSION_FILE_CHUNK_PAYLOAD_MAX, file.size);
         const slice = file.slice(offset, end);
@@ -154,7 +155,8 @@ export function createRoomFileTransfer(
             transferId,
             seq,
             payload: buf,
-          })
+          }),
+          destPeerId
         );
         offset += buf.byteLength;
         seq += 1;
@@ -416,7 +418,7 @@ export function createRoomFileTransfer(
         );
         return;
       }
-      void pumpOutbound(data.id, file, transferId);
+      void pumpOutbound(data.id, file, transferId, data.from);
       return;
     }
     if (data.op === "reject" || data.op === "cancel") {

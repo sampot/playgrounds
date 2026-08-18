@@ -33,7 +33,7 @@
 - 把聊天寫進 `gomoku.v1`（或任一 game）session protocol／`act` 權威狀態。
 - `/s/` 單機純玩聊天（無 peer）。
 - 為 go **另造**一套與 play 不相容的 chat wire／殼 API（見 §7.5）。
-- 語音、貼圖包、檔案傳送、已讀回條產品化、審核／檢舉後台（**僅本 overlay**；包廂傳檔／預留音視訊見 [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)）。
+- 語音、貼圖包、檔案傳送、已讀回條產品化、審核／檢舉後台（**僅本 overlay**；包廂傳檔／在場鏡頭／節目投放見 [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)）。
 - 觀戰席專用聊天產品化、大廳配對（fanout＝**同 session 座位**，不是跨場大廳；**不是** go 包廂 `/room`）。
 
 ---
@@ -347,3 +347,4 @@ type SessionChatHints = {
 | 2026-08-16 | **聊天面板打磨：** 快捷訊息預設收起、點選展開、送出後收起；訊息改 RPG 像素對話 bubble |
 | 2026-08-16 | **Host 標記：** wire 可選 `role:"host"`；顯示名「主持」＋金色「主持」tag；不再用「玩家 A」 |
 | 2026-08-18 | 與 [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md) 切開：overlay 非目標的傳檔／語音**不**禁止包廂；用語勿把 overlay 叫包廂 |
+| 2026-08-18 | 包廂播出契約對齊：overlay 仍無鏡頭／投放；那些能力在包廂「在場／節目」 |

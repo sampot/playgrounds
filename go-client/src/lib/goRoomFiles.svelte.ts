@@ -20,8 +20,8 @@ class GoRoomFiles {
     localAgentId: string;
     localName: string;
     sendJson: (msg: SessionFileControl) => void;
-    sendBinary: (buf: ArrayBuffer) => void;
-    bufferedAmount?: () => number;
+    sendBinary: (buf: ArrayBuffer, destPeerId?: string) => void;
+    bufferedAmount?: (destPeerId?: string) => number;
   }): void {
     this.detach();
     this.#xfer = createRoomFileTransfer(opts);

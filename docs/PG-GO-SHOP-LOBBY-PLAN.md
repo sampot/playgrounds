@@ -91,7 +91,7 @@
 | **後場門** | 本機溢流 | → `/apps` | 雲庫 |
 | **廣告看板** | house／贊助 | canvas sprite；→ 下方 DOM `GoAdSlot` | 維修文案 |
 | **Session chat** | 同局 peer | **不**進大廳 | — |
-| **包廂** | 臨時隔間 `/room`（壽命＝主持畫面開著） | 熱點 **包廂門** → `/room` | 局內 overlay；公開聊天區 |
+| **包廂** | 臨時隔間 `/room`（壽命＝主持畫面開著；說／掛／播） | 熱點 **包廂門** → `/room` | 局內 overlay；公開聊天區；視訊會議 |
 
 ---
 
@@ -327,3 +327,4 @@ go-client/ATTRIBUTION.md
 | 2026-08-18 | 大廳改程序化繪製（不載入 tiles／sprite）；版面對齊櫃檯／機台列／南向走道 |
 | 2026-08-18 | 熱點 **包廂** → `/room`（契約 `room`；見 [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)） |
 | 2026-08-18 | 包廂敘事對齊：壽命＝主持 `/room` 畫面開著（門牌 TTL 另計） |
+| 2026-08-18 | 包廂熱點對齊說／掛／播（細節見 [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)） |

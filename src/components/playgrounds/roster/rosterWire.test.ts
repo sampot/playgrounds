@@ -107,6 +107,46 @@ describe("rosterWire", () => {
     expect(decoded.sdp).toContain("192.168.1.10");
     expect(decoded.sdp).not.toContain("typ relay");
   });
+
+  it("包廂 2+2 BUNDLE wire stays under signal cap when candidates are copied per m-line", () => {
+    const wire = encodeSessionSdpToRosterWire(bulkyBoothOfferSdp(), {
+      role: "offer",
+      maxChars: ROSTER_WIRE_MAX_CHARS_SIGNAL,
+    });
+    expect(wire.length).toBeLessThanOrEqual(ROSTER_WIRE_MAX_CHARS_SIGNAL);
+    expect(wire.startsWith("z")).toBe(true);
+    // gzip 後應遠小於未壓縮 av1（約 18KiB）與舊 16KiB 上限。
+    expect(wire.length).toBeLessThan(8_192);
+    const decoded = decodeRosterWireToSdp(wire);
+    expect(decoded.payload.tpl).toBe(ROSTER_SDP_TPL_AV);
+    expect(decoded.sdp.match(/^m=audio /gm)?.length).toBe(2);
+    expect(decoded.sdp.match(/^m=video /gm)?.length).toBe(2);
+    expect(decoded.sdp).toContain("typ srflx");
+    expect(decoded.sdp).not.toContain("tcptype");
+    const chunks = decoded.sdp.split(/^m=/m).slice(1);
+    expect(chunks[0]).toMatch(/a=candidate:/);
+    for (const later of chunks.slice(1)) {
+      expect(later).not.toMatch(/a=candidate:/);
+    }
+  });
+
+  it("still decodes uncompressed av1 wires from older clients", () => {
+    const json = JSON.stringify({
+      v: 1,
+      role: "offer",
+      tpl: ROSTER_SDP_TPL_AV,
+      sdp: SAMPLE_AV_OFFER,
+    });
+    const b64 = Buffer.from(json, "utf8")
+      .toString("base64")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
+    const decoded = decodeRosterWireToSdp(b64);
+    expect(decoded.payload.tpl).toBe(ROSTER_SDP_TPL_AV);
+    expect(decoded.sdp).toMatch(/^m=audio /m);
+    expect(decoded.sdp).toContain("192.168.1.10");
+  });
 });
 
 const SAMPLE_AV_OFFER = [
@@ -144,3 +184,60 @@ const SAMPLE_AV_OFFER = [
   "a=max-message-size:262144",
   "",
 ].join("\r\n");
+
+/** Chrome-like 包廂 offer: 2+2+DC, ICE copied onto every m-line. */
+function bulkyBoothOfferSdp(): string {
+  const candidates = [
+    ...Array.from({ length: 12 }, (_, i) =>
+      `a=candidate:h${i} 1 udp ${2122260223 - i} 10.8.${i}.1 ${50000 + i} typ host generation 0 network-id ${i} network-cost 50`
+    ),
+    "a=candidate:tcp0 1 tcp 1518280447 192.168.1.10 9 typ host tcptype active generation 0",
+    "a=candidate:s0 1 udp 1686052607 203.0.113.5 54322 typ srflx raddr 192.168.1.10 rport 54321 generation 0",
+  ];
+  const ice = [
+    "a=ice-ufrag:AbCdEfGhIj",
+    "a=ice-pwd:abcdefghijklmnopqrstuvwxyzABCD",
+    "a=fingerprint:sha-256 11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00",
+    "a=setup:actpass",
+    ...candidates,
+  ];
+  const videoExtras = Array.from({ length: 18 }, (_, i) => [
+    `a=rtpmap:${96 + i} FakeCodec${i}/90000`,
+    `a=rtcp-fb:${96 + i} goog-remb`,
+    `a=rtcp-fb:${96 + i} transport-cc`,
+    `a=rtcp-fb:${96 + i} ccm fir`,
+    `a=rtcp-fb:${96 + i} nack`,
+    `a=rtcp-fb:${96 + i} nack pli`,
+    `a=fmtp:${96 + i} profile-id=${i};level-asymmetry-allowed=1;packetization-mode=1`,
+    `a=extmap:${i + 1} http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time`,
+  ]).flat();
+  const section = (
+    kind: string,
+    proto: string,
+    mid: string,
+    extra: string[]
+  ) =>
+    [`m=${kind} 9 ${proto}`, "c=IN IP4 0.0.0.0", ...ice, `a=mid:${mid}`, ...extra].join(
+      "\r\n"
+    );
+  return [
+    "v=0",
+    "o=- 1 2 IN IP4 127.0.0.1",
+    "s=-",
+    "t=0 0",
+    "a=group:BUNDLE 0 1 2 3 4",
+    section("audio", "UDP/TLS/RTP/SAVPF 111", "0", [
+      "a=rtpmap:111 opus/48000/2",
+    ]),
+    section("video", "UDP/TLS/RTP/SAVPF 96", "1", videoExtras),
+    section("audio", "UDP/TLS/RTP/SAVPF 111", "2", [
+      "a=rtpmap:111 opus/48000/2",
+    ]),
+    section("video", "UDP/TLS/RTP/SAVPF 96", "3", videoExtras),
+    section("application", "UDP/DTLS/SCTP webrtc-datachannel", "4", [
+      "a=sctp-port:5000",
+      "a=max-message-size:262144",
+    ]),
+    "",
+  ].join("\r\n");
+}

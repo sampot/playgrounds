@@ -9,6 +9,7 @@ export {
   isLanCandidateAddress,
   isLanCandidateIp,
   sdpHasAvMediaLines,
+  sdpHasBoothMediaLines,
   RosterSdpError,
 } from "./rosterSdpCodec";
 export type {
@@ -38,6 +39,7 @@ export {
   iceServersIncludeTurn,
   buildRosterRtcConfiguration,
   reserveRosterMediaTransceivers,
+  reserveBoothMediaTransceivers,
 } from "./rosterPeer";
 export type {
   RosterPeerSession,
@@ -47,6 +49,18 @@ export type {
   RosterWireTransport,
   RosterMediaMode,
 } from "./rosterPeer";
+
+export {
+  BOOTH_TRANSCEIVER_SLOTS,
+  boothTransceiverIndex,
+  boothSlotOfIndex,
+  replaceBoothTrack,
+} from "./rosterBoothMedia";
+export type {
+  BoothMediaLayer,
+  BoothMediaKind,
+  BoothTransceiverPc,
+} from "./rosterBoothMedia";
 
 export { drawIdenticon, identiconDataUrl } from "./rosterIdenticon";
 
@@ -251,3 +265,38 @@ export type {
   SessionFileChunk,
   SessionFileShareItem,
 } from "./rosterSessionFile";
+
+export {
+  SESSION_MESH_TYPE,
+  SESSION_MESH_VERSION,
+  isSessionMeshMessage,
+  buildSessionMeshMessage,
+  shouldOfferMesh,
+} from "./rosterSessionMesh";
+export type {
+  SessionMeshOp,
+  SessionMeshMessage,
+} from "./rosterSessionMesh";
+
+export {
+  SESSION_CAST_TYPE,
+  SESSION_CAST_VERSION,
+  isSessionCastMessage,
+  buildSessionCastMessage,
+} from "./rosterSessionCast";
+export type {
+  SessionCastOp,
+  SessionCastKind,
+  SessionCastMessage,
+} from "./rosterSessionCast";
+
+export {
+  SESSION_CAMERA_TYPE,
+  SESSION_CAMERA_VERSION,
+  isSessionCameraMessage,
+  buildSessionCameraMessage,
+} from "./rosterSessionCamera";
+export type {
+  SessionCameraOp,
+  SessionCameraMessage,
+} from "./rosterSessionCamera";

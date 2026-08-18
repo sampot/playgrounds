@@ -128,6 +128,32 @@ describe("createRoomFileTransfer", () => {
     expect(guest.getState().entries[0]).not.toHaveProperty("blobUrl");
   });
 
+  it("tags outbound chunks with the requester so mesh can skip the Host", async () => {
+    const dests: (string | undefined)[] = [];
+    const owner = createRoomFileTransfer({
+      localAgentId: "g-a",
+      localName: "甲",
+      sendJson: () => {},
+      sendBinary: (_buf, destPeerId) => {
+        dests.push(destPeerId);
+      },
+      newId: () => "file-1",
+    });
+    await owner.shareLocalFile(fileOf("note.txt", 2));
+    owner.onControl({
+      type: SESSION_FILE_TYPE,
+      v: 1,
+      op: "request",
+      id: "file-1",
+      transferId: "tr-1",
+      from: "g-b",
+    });
+    await vi.waitFor(() => {
+      expect(dests.length).toBeGreaterThan(0);
+    });
+    expect(dests.every((d) => d === "g-b")).toBe(true);
+  });
+
   it("rejects a second download while a transfer is in flight", async () => {
     const guest = createRoomFileTransfer({
       localAgentId: "g",

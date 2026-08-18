@@ -7,10 +7,14 @@
   } from "@pg/roster/rosterSessionChat";
   import { goSessionChat } from "$lib/goSessionChat.svelte";
   import { goRoomFiles } from "$lib/goRoomFiles.svelte";
+  import { goRoomMedia } from "$lib/goRoomMedia.svelte";
   import { pickRoomFileSave } from "$lib/goRoomFileSave";
   import GoShareSheet from "$lib/GoShareSheet.svelte";
   import { chromeSession } from "$lib/chromeSession.svelte";
   import {
+    GO_ROOM_CAMERA_PAIR_ONLY,
+    GO_ROOM_CAMERA_STOP_WATCH,
+    GO_ROOM_CAMERA_WATCH,
     GO_ROOM_EMPTY_TIMELINE,
     GO_ROOM_END_CONFIRM_HOST,
     GO_ROOM_KEEP_OPEN,
@@ -21,6 +25,7 @@
     isRoomInviteShareable,
     roomChatWhoLabel,
     roomInviteRemainLabel,
+    roomMediaSummary,
     roomOccupantSummary,
     takePickedFiles,
     type RoomInviteDoor,
@@ -72,7 +77,13 @@
   let leaveAfterEnd = $state(false);
   let confirmDialog = $state<HTMLDialogElement | null>(null);
   let fileInput = $state<HTMLInputElement | null>(null);
+  let programInput = $state<HTMLInputElement | null>(null);
   let fileError = $state("");
+  let mediaError = $state("");
+  let mediaOpen = $state(false);
+  let presenceVideoEl = $state<HTMLVideoElement | null>(null);
+  let localPreviewEl = $state<HTMLVideoElement | null>(null);
+  let programVideoEl = $state<HTMLVideoElement | null>(null);
   let now = $state(Date.now());
   let filesOpen = $state(false);
   let pendingShare = $state(false);
@@ -82,6 +93,14 @@
   const freeText = $derived(goSessionChat.freeTextAllowed);
   const quickReplies = $derived(goSessionChat.quickReplies);
   const files = $derived(goRoomFiles.entries);
+  const mediaSummary = $derived(
+    roomMediaSummary({
+      camera: goRoomMedia.camera,
+      mic: goRoomMedia.mic,
+      programName: goRoomMedia.programName ?? goRoomMedia.remoteProgramName,
+      watching: goRoomMedia.watching,
+    })
+  );
   let dropping = $state(false);
 
   const spoken = $derived.by(() => {
@@ -172,6 +191,16 @@
     if (!confirmEnd && el.open) el.close();
   });
 
+  $effect(() => {
+    if (presenceVideoEl) presenceVideoEl.srcObject = goRoomMedia.presenceStream;
+  });
+  $effect(() => {
+    if (localPreviewEl) localPreviewEl.srcObject = goRoomMedia.localPreviewStream;
+  });
+  $effect(() => {
+    if (programVideoEl) programVideoEl.srcObject = goRoomMedia.programStream;
+  });
+
   function isHostMsg(m: (typeof messages)[number]): boolean {
     if (m.local && goSessionChat.localRole === "host") return true;
     return isSessionChatHostMessage(m);
@@ -219,7 +248,76 @@
     const result = await goRoomFiles.download(id, (opts) =>
       pickRoomFileSave(opts.suggestedName)
     );
-    if (!result.ok && !result.cancelled) fileError = result.error;
+    if (!result.ok && !("cancelled" in result && result.cancelled)) {
+      fileError = result.error;
+    }
+  }
+
+  async function onToggleCamera() {
+    mediaError = "";
+    if (goRoomMedia.camera) {
+      await goRoomMedia.disableCamera();
+      return;
+    }
+    const out = await goRoomMedia.enableCamera();
+    if (!out.ok) {
+      mediaError = out.error;
+      mediaOpen = true;
+    }
+  }
+
+  async function onWatchCamera() {
+    mediaError = "";
+    mediaOpen = true;
+    const out = await goRoomMedia.watchCamera();
+    if (!out.ok) mediaError = out.error;
+  }
+
+  async function onStopWatching() {
+    mediaError = "";
+    await goRoomMedia.stopWatching();
+  }
+
+  async function onToggleMic() {
+    mediaError = "";
+    if (goRoomMedia.mic) {
+      await goRoomMedia.disableMic();
+      return;
+    }
+    const out = await goRoomMedia.enableMic();
+    if (!out.ok) {
+      mediaError = out.error;
+      mediaOpen = true;
+    }
+  }
+
+  async function onPickProgram(ev: Event) {
+    const picked = takePickedFiles(ev.currentTarget as HTMLInputElement);
+    const file = picked[0];
+    if (!file) return;
+    mediaError = "";
+    mediaOpen = true;
+    const out = await goRoomMedia.startProgram(file);
+    if (!out.ok) mediaError = out.error;
+  }
+
+  async function onStopProgram() {
+    mediaError = "";
+    await goRoomMedia.stopProgram();
+  }
+
+  async function onFullscreenProgram() {
+    const el = programVideoEl;
+    if (!el) return;
+    try {
+      if (el.requestFullscreen) await el.requestFullscreen();
+      else
+        await (
+          el as HTMLVideoElement & { webkitEnterFullscreen?: () => void }
+        ).webkitEnterFullscreen?.();
+    } catch {
+      /* ignore */
+    }
   }
 
   function askEnd(leaveHome = false) {
@@ -356,6 +454,125 @@
         </div>
       {/each}
     </div>
+
+    {#if showComposer}
+    <section class="file-tray pixel-frame" aria-labelledby="room-media-title">
+      <button
+        type="button"
+        id="room-media-title"
+        class="file-toggle"
+        aria-expanded={mediaOpen}
+        onclick={() => (mediaOpen = !mediaOpen)}
+      >
+        {mediaOpen ? "▾" : "▸"} {mediaSummary}
+      </button>
+      {#if mediaOpen}
+        {#if mediaError}
+          <p class="err" role="alert">{mediaError}</p>
+        {/if}
+        {#if goRoomMedia.error && goRoomMedia.error !== mediaError}
+          <p class="err" role="alert">{goRoomMedia.error}</p>
+        {/if}
+        <p class="muted">開鏡頭只在這台預覽。對方要按收看，才看得到。</p>
+        <div class="media-previews">
+          {#if goRoomMedia.localPreviewStream}
+            <video
+              bind:this={localPreviewEl}
+              class="media-video"
+              autoplay
+              muted
+              playsinline
+              aria-label="我的鏡頭"
+            ></video>
+          {/if}
+          {#if goRoomMedia.presenceStream}
+            <video
+              bind:this={presenceVideoEl}
+              class="media-video"
+              autoplay
+              playsinline
+              aria-label="對方鏡頭"
+            ></video>
+          {/if}
+          {#if goRoomMedia.programStream}
+            <video
+              bind:this={programVideoEl}
+              class="media-video media-video--program"
+              autoplay
+              playsinline
+              aria-label="正在播出"
+            ></video>
+          {/if}
+        </div>
+        <div class="file-actions">
+          <button
+            type="button"
+            class="pixel-btn"
+            onclick={() => void onToggleCamera()}
+          >
+            {goRoomMedia.camera ? "關鏡頭" : goRoomMedia.cameraBlocked ? GO_ROOM_CAMERA_PAIR_ONLY : "開鏡頭"}
+          </button>
+          {#if goRoomMedia.watching}
+            <button
+              type="button"
+              class="pixel-btn"
+              onclick={() => void onStopWatching()}
+            >
+              {GO_ROOM_CAMERA_STOP_WATCH}
+            </button>
+          {:else if goRoomMedia.remoteCameraOffered}
+            <button
+              type="button"
+              class="pixel-btn pixel-btn--primary"
+              onclick={() => void onWatchCamera()}
+            >
+              {GO_ROOM_CAMERA_WATCH}
+            </button>
+          {/if}
+          <button
+            type="button"
+            class="pixel-btn"
+            onclick={() => void onToggleMic()}
+          >
+            {goRoomMedia.mic ? "關麥克風" : "開麥克風"}
+          </button>
+          {#if goRoomMedia.programName}
+            <button
+              type="button"
+              class="pixel-btn"
+              onclick={() => void onStopProgram()}
+            >
+              停止播出
+            </button>
+          {:else}
+            <input
+              bind:this={programInput}
+              class="file-hidden"
+              type="file"
+              accept="video/*,audio/*"
+              onchange={(e) => void onPickProgram(e)}
+            />
+            <button
+              type="button"
+              class="pixel-btn pixel-btn--primary"
+              onclick={() => programInput?.click()}
+            >
+              播出影片或音樂
+            </button>
+          {/if}
+          {#if goRoomMedia.programStream}
+            <button
+              type="button"
+              class="pixel-btn"
+              onclick={() => void onFullscreenProgram()}
+            >
+              全螢幕收看
+            </button>
+          {/if}
+        </div>
+      {/if}
+    </section>
+    {/if}
 
     {#if showComposer}
     <section
@@ -714,6 +931,34 @@
   }
   .file-tray--drop {
     outline: 2px dashed rgb(var(--ink));
+  }
+  .media-previews {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0.5rem 0;
+  }
+  .media-video {
+    width: 100%;
+    max-width: 16rem;
+    aspect-ratio: 4 / 3;
+    background: #111;
+    border: 2px solid rgb(var(--ink));
+    border-radius: var(--radius);
+    object-fit: cover;
+  }
+  .media-video--program {
+    max-width: 100%;
+    aspect-ratio: 16 / 9;
+  }
+  @media (min-width: 40rem) {
+    .media-video {
+      width: 10rem;
+    }
+    .media-video--program {
+      width: 100%;
+      max-width: 28rem;
+    }
   }
   .file-tray .pixel-btn {
     min-height: 44px;

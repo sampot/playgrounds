@@ -42,9 +42,14 @@ import {
 } from "@pg/roster/rosterSessionChat";
 import { goSessionChat } from "./goSessionChat.svelte";
 import { goRoomFiles } from "./goRoomFiles.svelte";
-import { GO_ROOM_QUICK_REPLIES } from "./goRoom";
+import { goRoomMedia } from "./goRoomMedia.svelte";
+import { GO_ROOM_CONNECT_FAILED, GO_ROOM_QUICK_REPLIES } from "./goRoom";
 import { chromeSession } from "./chromeSession.svelte";
 import { isSessionFileControl } from "@pg/roster/rosterSessionFile";
+import { isSessionMeshMessage } from "@pg/roster/rosterSessionMesh";
+import { isSessionCastMessage } from "@pg/roster/rosterSessionCast";
+import { isSessionCameraMessage } from "@pg/roster/rosterSessionCamera";
+import { createRoomMeshClient } from "./goRoomMeshClient";
 import {
   SESSION_INVITE_ACCEPT_KIND,
   SESSION_INVITE_REJECT_KIND,
@@ -111,6 +116,8 @@ export type GuestStatus = {
   loadProgress: GoLoadProgress | null;
   /** `room` skips SAM／canvas; `sam` is the game invite path. */
   surface: "sam" | "room" | null;
+  /** Room surface: guests in the booth including self (Host not counted). */
+  guestCount: number;
 };
 
 type Listener = (s: GuestStatus) => void;
@@ -152,6 +159,7 @@ export function createGuestRuntime() {
     displayName: "對手",
     loadProgress: null,
     surface: null,
+    guestCount: 0,
   };
   const listeners = new Set<Listener>();
   let localAgentId = newAgentId();
@@ -161,6 +169,7 @@ export function createGuestRuntime() {
   let canvasMode: GuestCanvasMode | null = null;
   let memoryBlobUrls: string[] = [];
   let peerSession: RosterPeerSession | null = null;
+  let meshClient: ReturnType<typeof createRoomMeshClient> | null = null;
   let peerAgentId: string | null = null;
   let composeProtocolId: string | null = null;
   let pendingInvite: SessionInvitePayload | null = null;
@@ -234,6 +243,13 @@ export function createGuestRuntime() {
     accepted = false;
     goSessionChat.detach();
     goRoomFiles.detach();
+    goRoomMedia.detach();
+    try {
+      meshClient?.dispose();
+    } catch {
+      /* ignore */
+    }
+    meshClient = null;
     try {
       peerSession?.close();
     } catch {
@@ -253,6 +269,39 @@ export function createGuestRuntime() {
       canvasGeneration: 0,
       loadProgress: null,
       surface: null,
+    });
+  }
+
+  function failRoomConnect(): void {
+    if (
+      status.phase === "ended" ||
+      status.phase === "left" ||
+      status.phase === "cancelled" ||
+      status.phase === "ready" ||
+      status.phase === "error"
+    ) {
+      return;
+    }
+    goSessionChat.detach();
+    goRoomFiles.detach();
+    goRoomMedia.detach();
+    try {
+      meshClient?.dispose();
+    } catch {
+      /* ignore */
+    }
+    meshClient = null;
+    try {
+      peerSession?.close();
+    } catch {
+      /* ignore */
+    }
+    peerSession = null;
+    set({
+      phase: "error",
+      error: GO_ROOM_CONNECT_FAILED,
+      message: "",
+      surface: "room",
     });
   }
 
@@ -482,6 +531,29 @@ export function createGuestRuntime() {
         s: null,
         attached: false,
       };
+      meshClient?.dispose();
+      meshClient = createRoomMeshClient({
+        localAgentId,
+        localName: name,
+        sendToHost: (msg) => {
+          try {
+            slot.s?.send(msg);
+          } catch {
+            /* ignore */
+          }
+        },
+        onBinary: (_peerId, buf) => goRoomFiles.onBinary(buf),
+        onRosterChange: () => {
+          set({ guestCount: 1 + (meshClient?.knownPeerIds().length ?? 0) });
+          void goRoomMedia.refresh();
+        },
+        onDirectOpen: (_peerId, session) => {
+          session.pc.addEventListener("track", (ev) => {
+            goRoomMedia.onRemoteTrack(ev, session.pc);
+          });
+          void goRoomMedia.refresh();
+        },
+      });
 
       const attachRoomChannels = () => {
         const sess = slot.s;
@@ -510,14 +582,58 @@ export function createGuestRuntime() {
               /* ignore */
             }
           },
-          sendBinary: (buf) => sendRoomBinary(buf),
-          bufferedAmount: () => peerSession?.getChannel()?.bufferedAmount ?? 0,
+          sendBinary: (buf, destPeerId) => {
+            if (destPeerId && meshClient?.sendBinary(destPeerId, buf)) return;
+            sendRoomBinary(buf);
+          },
+          bufferedAmount: (destPeerId) => {
+            if (destPeerId && meshClient?.hasDirect(destPeerId)) {
+              return meshClient.bufferedAmount(destPeerId);
+            }
+            return peerSession?.getChannel()?.bufferedAmount ?? 0;
+          },
+        });
+        goRoomMedia.attach({
+          localAgentId,
+          occupantCount: () => 2 + (meshClient?.knownPeerIds().length ?? 0),
+          peers: () => {
+            const out: {
+              peerId: string;
+              pc: RTCPeerConnection;
+              via: "entrance" | "mesh";
+            }[] = [];
+            if (sess.pc) {
+              out.push({
+                peerId: peerAgentId || "host",
+                pc: sess.pc,
+                via: "entrance",
+              });
+            }
+            for (const id of meshClient?.knownPeerIds() ?? []) {
+              const mesh = meshClient?.sessionFor(id);
+              if (mesh?.pc) {
+                out.push({ peerId: id, pc: mesh.pc, via: "mesh" });
+              }
+            }
+            return out;
+          },
+          sendJson: (msg) => {
+            try {
+              sess.send(msg);
+            } catch {
+              /* ignore */
+            }
+          },
+        });
+        sess.pc.addEventListener("track", (ev) => {
+          goRoomMedia.onRemoteTrack(ev, sess.pc);
         });
         set({
           phase: "ready",
           surface: "room",
           message: "已連線",
           error: null,
+          guestCount: 1 + (meshClient?.knownPeerIds().length ?? 0),
         });
       };
 
@@ -536,6 +652,13 @@ export function createGuestRuntime() {
               goSessionChat.onIncoming(data);
             } else if (isSessionFileControl(data)) {
               goRoomFiles.onControl(data);
+            } else if (isSessionMeshMessage(data)) {
+              void meshClient?.onHostMessage(data);
+            } else if (
+              isSessionCastMessage(data) ||
+              isSessionCameraMessage(data)
+            ) {
+              void goRoomMedia.onCastControl(data);
             }
           },
           onBinary: (buf) => goRoomFiles.onBinary(buf),
@@ -544,17 +667,20 @@ export function createGuestRuntime() {
             if (leavingSelf) return;
             goSessionChat.detach();
             goRoomFiles.detach();
-            markHostEnded("主持已關掉這一間");
+            if (status.phase === "ready") {
+              markHostEnded("主持已關掉這一間");
+              return;
+            }
+            failRoomConnect();
           },
           onConnectionState: (state: RTCPeerConnectionState) => {
             if (leavingSelf) return;
-            if (
-              state === "failed" ||
-              state === "disconnected" ||
-              state === "closed"
-            ) {
+            if (state !== "failed" && state !== "closed") return;
+            if (status.phase === "ready") {
               markHostEnded("主持已關掉這一間");
+              return;
             }
+            failRoomConnect();
           },
           onError: (err: Error) => {
             set({
@@ -586,6 +712,13 @@ export function createGuestRuntime() {
         });
       }
     } catch (e) {
+      if (
+        status.phase === "ended" ||
+        status.phase === "left" ||
+        status.phase === "error"
+      ) {
+        return;
+      }
       set({
         phase: "error",
         error: friendlyInviteError(e, "連線失敗"),
@@ -843,6 +976,13 @@ export function createGuestRuntime() {
   function decline(): void {
     goSessionChat.detach();
     goRoomFiles.detach();
+    goRoomMedia.detach();
+    try {
+      meshClient?.dispose();
+    } catch {
+      /* ignore */
+    }
+    meshClient = null;
     peerSession?.close();
     peerSession = null;
     samFiles = null;
@@ -875,6 +1015,13 @@ export function createGuestRuntime() {
     leavingSelf = true;
     goSessionChat.detach();
     goRoomFiles.detach();
+    goRoomMedia.detach();
+    try {
+      meshClient?.dispose();
+    } catch {
+      /* ignore */
+    }
+    meshClient = null;
     try {
       peerSession?.close();
     } catch {
