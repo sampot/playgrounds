@@ -5,7 +5,6 @@ import {
   isCircleBlocked,
   moveAvatarWithCollision,
   readLobbyWalkPreference,
-  writeLobbyWalkPreference,
   walkInputToward,
   hasWalkArrived,
   resolveLobbyTap,
@@ -16,9 +15,9 @@ import {
   resolveWalkBump,
   LOBBY_AVATAR_RADIUS,
   LOBBY_WALK_FRAME_MS,
-  LOBBY_WALK_STORAGE_KEY,
 } from "./goShopWalk";
 import { LOBBY_BOSS, LOBBY_CABINETS } from "./goLobbyLayout";
+import { cabinetStandPoint } from "./goLobbyCabinets";
 
 describe("lobby walk preference", () => {
   it("defaults to on when storage is empty", () => {
@@ -31,16 +30,9 @@ describe("lobby walk preference", () => {
     expect(readLobbyWalkPreference(storage, true)).toBe(false);
   });
 
-  it("persists off preference", () => {
-    let value = "";
-    const storage = {
-      getItem: (k: string) => (k === LOBBY_WALK_STORAGE_KEY ? value : null),
-      setItem: (k: string, v: string) => {
-        if (k === LOBBY_WALK_STORAGE_KEY) value = v;
-      },
-    };
-    writeLobbyWalkPreference(storage, false);
-    expect(readLobbyWalkPreference(storage, false)).toBe(false);
+  it("ignores a stored off preference so walking stays on", () => {
+    const storage = { getItem: () => "off", setItem: () => {} };
+    expect(readLobbyWalkPreference(storage, false)).toBe(true);
   });
 });
 
@@ -147,16 +139,43 @@ describe("resolveLobbyTap", () => {
       resolveLobbyTap({
         walkEnabled: true,
         world,
-        tappedHotspot: "cabinet",
-      })
-    ).toEqual({ type: "activate", id: "cabinet" });
-    expect(
-      resolveLobbyTap({
-        walkEnabled: true,
-        world,
         tappedHotspot: "help",
       })
     ).toEqual({ type: "activate", id: "help" });
+  });
+
+  it("walks to a cabinet before playing when walking is on", () => {
+    const cab = LOBBY_CABINETS[0]!;
+    const stand = cabinetStandPoint(0);
+    expect(
+      resolveLobbyTap({
+        walkEnabled: true,
+        world: { x: cab.x + 2, y: cab.y + 2 },
+        tappedHotspot: "cabinet",
+        from: { x: 160, y: 168 },
+        cabinetIndex: 0,
+        cabinetStand: stand,
+      })
+    ).toEqual({
+      type: "walk-then-activate",
+      target: stand,
+      id: "cabinet",
+      cabinetIndex: 0,
+    });
+  });
+
+  it("plays immediately when already at the cabinet", () => {
+    const stand = cabinetStandPoint(0);
+    expect(
+      resolveLobbyTap({
+        walkEnabled: true,
+        world: { x: LOBBY_CABINETS[0]!.x + 2, y: LOBBY_CABINETS[0]!.y + 2 },
+        tappedHotspot: "cabinet",
+        from: stand,
+        cabinetIndex: 0,
+        cabinetStand: stand,
+      })
+    ).toEqual({ type: "activate", id: "cabinet" });
   });
 
   it("walks when tapping open floor", () => {
@@ -277,5 +296,53 @@ describe("resolveWalkBump", () => {
         alreadyContact: "boss",
       })
     ).toEqual({ activate: null, contact: null });
+  });
+
+  it("does not activate when walking away from the counter", () => {
+    const down = { up: false, down: true, left: false, right: false };
+    const from = {
+      x: LOBBY_BOSS.x + LOBBY_BOSS.w / 2,
+      y: LOBBY_BOSS.y + LOBBY_BOSS.h + 2,
+    };
+    expect(
+      resolveWalkBump({
+        from,
+        input: down,
+        alreadyContact: null,
+        deltaSec: 0.05,
+      }).activate
+    ).toBeNull();
+  });
+
+  it("does not activate when walking away from the counter's side", () => {
+    const right = { up: false, down: false, left: false, right: true };
+    const from = {
+      x: LOBBY_BOSS.x + LOBBY_BOSS.w + 2,
+      y: LOBBY_BOSS.y + LOBBY_BOSS.h / 2,
+    };
+    expect(
+      resolveWalkBump({
+        from,
+        input: right,
+        alreadyContact: null,
+        deltaSec: 0.05,
+      }).activate
+    ).toBeNull();
+  });
+
+  it("activates when walking into the counter from the side", () => {
+    const left = { up: false, down: false, left: true, right: false };
+    const from = {
+      x: LOBBY_BOSS.x + LOBBY_BOSS.w + 8,
+      y: LOBBY_BOSS.y + LOBBY_BOSS.h / 2,
+    };
+    expect(
+      resolveWalkBump({
+        from,
+        input: left,
+        alreadyContact: null,
+        deltaSec: 0.05,
+      }).activate
+    ).toBe("boss");
   });
 });

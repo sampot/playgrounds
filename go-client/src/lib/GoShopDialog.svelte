@@ -9,13 +9,16 @@
     onChoose: (choice: BossMenuChoice) => void;
   } = $props();
 
-  let dialogEl = $state<HTMLDialogElement | null>(null);
+  let firstBtn = $state<HTMLButtonElement | null>(null);
+  let wasOpen = false;
 
   $effect(() => {
-    const el = dialogEl;
-    if (!el) return;
-    if (open && !el.open) el.showModal();
-    if (!open && el.open) el.close();
+    if (!open) {
+      wasOpen = false;
+      return;
+    }
+    if (!wasOpen) wasOpen = true;
+    firstBtn?.focus();
   });
 
   function close() {
@@ -26,57 +29,72 @@
     onChoose(choice);
     close();
   }
+
+  function onKeydown(event: KeyboardEvent) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      close();
+    }
+  }
 </script>
 
-<dialog
-  bind:this={dialogEl}
-  class="boss-dialog-wrap"
-  aria-labelledby="boss-dialog-title"
-  onclose={close}
-  oncancel={(e) => {
-    e.preventDefault();
-    close();
-  }}
->
-  <div class="boss-dialog pixel-box">
-    <p id="boss-dialog-title" class="boss-dialog-title pixel-text">老闆</p>
-    <ul class="boss-dialog-list">
-      <li>
-        <button type="button" class="pixel-btn" onclick={() => pick("banter")}>
-          隨便說說
-        </button>
-      </li>
-      <li>
-        <button type="button" class="pixel-btn" onclick={() => pick("cabinets")}>
-          今日有什麼
-        </button>
-      </li>
-      <li>
-        <button type="button" class="pixel-btn" onclick={() => pick("help")}>
-          怎麼玩
-        </button>
-      </li>
-    </ul>
-    <button type="button" class="boss-dialog-cancel pixel-btn" onclick={close}>
-      先不用
-    </button>
+{#if open}
+  <div
+    class="boss-overlay"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="boss-dialog-title"
+    tabindex="-1"
+    onkeydown={onKeydown}
+  >
+    <div class="boss-dialog pixel-box">
+      <p id="boss-dialog-title" class="boss-dialog-title pixel-text">老闆</p>
+      <ul class="boss-dialog-list">
+        <li>
+          <button
+            bind:this={firstBtn}
+            type="button"
+            class="pixel-btn"
+            onclick={() => pick("banter")}
+          >
+            隨便說說
+          </button>
+        </li>
+        <li>
+          <button type="button" class="pixel-btn" onclick={() => pick("cabinets")}>
+            今日有什麼
+          </button>
+        </li>
+        <li>
+          <button type="button" class="pixel-btn" onclick={() => pick("help")}>
+            怎麼玩
+          </button>
+        </li>
+      </ul>
+      <button type="button" class="boss-dialog-cancel pixel-btn" onclick={close}>
+        先不用
+      </button>
+    </div>
   </div>
-</dialog>
+{/if}
 
 <style>
-  .boss-dialog-wrap {
-    border: none;
-    padding: 0;
-    max-width: min(100vw - 1.5rem, 18rem);
-    background: transparent;
-  }
-  .boss-dialog-wrap::backdrop {
-    background: color-mix(in oklab, rgb(var(--ink)) 35%, transparent);
+  .boss-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    z-index: 3;
+    background: color-mix(in oklab, rgb(var(--ink)) 22%, transparent);
+    border-radius: var(--radius);
   }
   .boss-dialog {
     width: 100%;
     padding: 0.85rem 1rem 1rem;
     background: rgb(var(--card));
+    border-radius: 0 0 var(--radius) var(--radius);
+    border-top: var(--pixel-edge) solid rgb(var(--ink));
   }
   .boss-dialog-title {
     margin: 0 0 0.65rem;

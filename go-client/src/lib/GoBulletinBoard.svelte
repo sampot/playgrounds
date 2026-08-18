@@ -11,81 +11,102 @@
     onDismiss: (bulletin: GoBulletin) => void;
   } = $props();
 
-  let dialogEl = $state<HTMLDialogElement | null>(null);
+  let closeBtn = $state<HTMLButtonElement | null>(null);
+  let wasOpen = false;
 
   $effect(() => {
-    const el = dialogEl;
-    if (!el) return;
-    if (open && !el.open) el.showModal();
-    if (!open && el.open) el.close();
+    if (!open) {
+      wasOpen = false;
+      return;
+    }
+    if (!wasOpen) wasOpen = true;
+    closeBtn?.focus();
   });
 
   function close() {
     open = false;
   }
+
+  function onKeydown(event: KeyboardEvent) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      close();
+    }
+  }
 </script>
 
-<dialog
-  bind:this={dialogEl}
-  class="bulletin-board"
-  aria-labelledby="bulletin-board-title"
-  onclose={close}
-  oncancel={(e) => {
-    e.preventDefault();
-    close();
-  }}
->
-  <div class="bulletin-board-inner pixel-box">
-    <header class="bulletin-board-header">
-      <h2 id="bulletin-board-title" class="pixel-text">布告欄</h2>
-      <button type="button" class="pixel-btn bulletin-board-close" onclick={close}>
-        關閉
-      </button>
-    </header>
-    {#if bulletins.length === 0}
-      <p class="bulletin-board-empty">目前沒有公告。</p>
-    {:else}
-      <ul class="bulletin-board-list">
-        {#each bulletins as item (item.id)}
-          <li class="bulletin-board-item">
-            <p class="bulletin-board-item-title">{item.title}</p>
-            {#if item.body}
-              <p class="bulletin-board-item-body">{item.body}</p>
-            {/if}
-            <div class="bulletin-board-item-actions">
-              {#if item.href}
-                <a class="pixel-btn" href={item.href}>{item.hrefLabel ?? "詳情"}</a>
+{#if open}
+  <div
+    class="bulletin-overlay"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="bulletin-board-title"
+    tabindex="-1"
+    onkeydown={onKeydown}
+  >
+    <div class="bulletin-board-inner pixel-box">
+      <header class="bulletin-board-header">
+        <h2 id="bulletin-board-title" class="pixel-text">布告欄</h2>
+        <button
+          bind:this={closeBtn}
+          type="button"
+          class="pixel-btn bulletin-board-close"
+          onclick={close}
+        >
+          關閉
+        </button>
+      </header>
+      {#if bulletins.length === 0}
+        <p class="bulletin-board-empty">今日休息。有消息會貼在這裡。</p>
+      {:else}
+        <ul class="bulletin-board-list">
+          {#each bulletins as item (item.id)}
+            <li class="bulletin-board-item">
+              <p class="bulletin-board-item-title">{item.title}</p>
+              {#if item.body}
+                <p class="bulletin-board-item-body">{item.body}</p>
               {/if}
-              {#if item.dismissible}
-                <button
-                  type="button"
-                  class="pixel-btn"
-                  onclick={() => onDismiss(item)}
-                >
-                  關閉此則
-                </button>
-              {/if}
-            </div>
-          </li>
-        {/each}
-      </ul>
-    {/if}
+              <div class="bulletin-board-item-actions">
+                {#if item.href}
+                  <a class="pixel-btn" href={item.href}>{item.hrefLabel ?? "詳情"}</a>
+                {/if}
+                {#if item.dismissible}
+                  <button
+                    type="button"
+                    class="pixel-btn"
+                    onclick={() => onDismiss(item)}
+                  >
+                    關閉此則
+                  </button>
+                {/if}
+              </div>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+    </div>
   </div>
-</dialog>
+{/if}
 
 <style>
-  .bulletin-board {
-    border: none;
-    padding: 0;
-    max-width: min(100vw - 1.5rem, 24rem);
-    background: transparent;
-  }
-  .bulletin-board::backdrop {
-    background: color-mix(in oklab, rgb(var(--ink)) 35%, transparent);
+  .bulletin-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    z-index: 3;
+    background: color-mix(in oklab, rgb(var(--ink)) 22%, transparent);
+    border-radius: var(--radius);
   }
   .bulletin-board-inner {
+    width: 100%;
+    max-height: min(70dvh, 28rem);
+    overflow: auto;
     padding: 0.85rem 1rem 1rem;
     background: rgb(var(--card));
+    border-radius: 0 0 var(--radius) var(--radius);
+    border-top: var(--pixel-edge) solid rgb(var(--ink));
   }
   .bulletin-board-header {
     display: flex;
@@ -107,6 +128,7 @@
     margin: 0;
     font-size: 0.9rem;
     color: rgb(var(--muted));
+    line-height: 1.45;
   }
   .bulletin-board-list {
     list-style: none;

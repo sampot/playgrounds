@@ -4,7 +4,6 @@
   import {
     GO_HOME_DESCRIPTION,
     GO_HOME_DOCUMENT_TITLE,
-    GO_HOME_LEAD,
     goOgMeta,
     goWebsiteJsonLd,
   } from "$lib/goShareMeta";
@@ -19,8 +18,6 @@
   import GoAdSlot from "$lib/GoAdSlot.svelte";
   import GoShopLobby from "$lib/GoShopLobby.svelte";
   import GoShopHotspotNav from "$lib/GoShopHotspotNav.svelte";
-  import GoShopDialog from "$lib/GoShopDialog.svelte";
-  import GoBulletinBoard from "$lib/GoBulletinBoard.svelte";
   import {
     dismissBulletin,
     filterActiveBulletins,
@@ -31,6 +28,17 @@
     resolveShopHotspotAction,
     type ShopHotspotId,
   } from "$lib/goShopHotspots";
+  import { GO_LISTED_CATALOG, recommendHome, type GoCatalogEntry } from "$lib/goCatalog";
+  import {
+    cabinetStandPoint,
+    lobbyDayKey,
+    readLobbyCabinetStore,
+    resolveCabinetHotspotAction,
+    resolveLobbyCabinetGames,
+    writeLobbyCabinetIds,
+    writeLobbyReturnStand,
+  } from "$lib/goLobbyCabinets";
+  import { getLobbySfxPlayer } from "$lib/goLobbySfx";
   import { formatGoBuildStamp, GO_BUILD_ISO } from "$lib/goBuildStamp";
   import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
 
@@ -40,6 +48,9 @@
   let helpDeskOpen = $state(false);
   let cabinetOpen = $state(false);
   let bulletinBoardOpen = $state(false);
+  let sfxEnabled = $state(true);
+  let cabinetGames = $state<GoCatalogEntry[]>([]);
+  const cabinetTitles = $derived(cabinetGames.map((g) => g.title));
   let dismissedBulletins = $state<Record<string, number>>({});
   let activeBulletins = $derived(
     filterActiveBulletins(GO_BULLETIN_FIXTURE, { dismissed: dismissedBulletins })
@@ -53,6 +64,22 @@
   const websiteLdJson = JSON.stringify(websiteLd);
   onMount(() => {
     dismissedBulletins = readDismissedBulletins(localStorage);
+    sfxEnabled = getLobbySfxPlayer().isEnabled();
+    const listed = GO_LISTED_CATALOG.filter((e) => e.kind === "game");
+    const stored = readLobbyCabinetStore(sessionStorage);
+    const today = lobbyDayKey();
+    cabinetGames = resolveLobbyCabinetGames({
+      storedIds: stored.ids,
+      storedDay: stored.day,
+      today,
+      listed,
+      pick: (limit) => recommendHome(limit),
+    });
+    writeLobbyCabinetIds(
+      sessionStorage,
+      cabinetGames.map((g) => g.id),
+      today
+    );
 
     let authChecks = 0;
     let timer: ReturnType<typeof setTimeout>;
@@ -99,26 +126,83 @@
     chromeSession.setFlash(line.text, 3800);
   }
 
+  function listedGames() {
+    return GO_LISTED_CATALOG.filter((e) => e.kind === "game");
+  }
+
+  function persistFloorCabinets(games: readonly GoCatalogEntry[]) {
+    writeLobbyCabinetIds(
+      sessionStorage,
+      games.map((g) => g.id),
+      lobbyDayKey()
+    );
+  }
+
+  function reshuffleFloorCabinets() {
+    cabinetGames = resolveLobbyCabinetGames({
+      storedIds: [],
+      listed: listedGames(),
+      pick: (limit) => recommendHome(limit),
+      force: true,
+    });
+    persistFloorCabinets(cabinetGames);
+  }
+
+  function rememberCabinetStand(index: number | null | undefined) {
+    if (index == null) return;
+    writeLobbyReturnStand(sessionStorage, cabinetStandPoint(index));
+  }
+
   function openCabinets() {
     helpDeskOpen = false;
+    bossDialogOpen = false;
+    bulletinBoardOpen = false;
     cabinetOpen = true;
   }
 
   function openHelpDesk() {
     cabinetOpen = false;
+    bossDialogOpen = false;
+    bulletinBoardOpen = false;
     helpDeskOpen = true;
   }
 
-  function handleHotspot(id: ShopHotspotId) {
+  function handleHotspot(
+    id: ShopHotspotId,
+    detail?: { cabinetIndex?: number | null }
+  ) {
+    const sfx = getLobbySfxPlayer();
+    sfx.unlock();
     const action = resolveShopHotspotAction(id);
+    if (action.type === "toggle-sfx") {
+      sfxEnabled = sfx.toggleEnabled();
+      return;
+    }
+    sfx.playInteract(id);
     switch (action.type) {
       case "boss-menu":
+        cabinetOpen = false;
+        helpDeskOpen = false;
+        bulletinBoardOpen = false;
         bossDialogOpen = true;
         break;
-      case "open-cabinets":
+      case "open-cabinets": {
+        const cab = resolveCabinetHotspotAction({
+          cabinetIndex: detail?.cabinetIndex ?? null,
+          games: cabinetGames,
+        });
+        if (cab.type === "play-cabinet") {
+          rememberCabinetStand(detail?.cabinetIndex);
+          void goto(`/s/${encodeURIComponent(cab.catalogId)}`);
+          break;
+        }
         openCabinets();
         break;
+      }
       case "open-bulletin":
+        cabinetOpen = false;
+        helpDeskOpen = false;
+        bossDialogOpen = false;
         bulletinBoardOpen = true;
         break;
       case "open-help-desk":
@@ -164,22 +248,26 @@
   {@html `<script type="application/ld+json">${websiteLdJson}</script>`}
 </svelte:head>
 
-<h1 class="pixel-text">純玩</h1>
-<p class="lead">{GO_HOME_LEAD}</p>
+<h1 class="sr-only">純玩</h1>
 
-<GoShopLobby onHotspot={handleHotspot} bind:helpDeskOpen bind:cabinetOpen />
-<GoShopHotspotNav onSelect={handleHotspot} />
+<GoShopLobby
+  onHotspot={handleHotspot}
+  bind:helpDeskOpen
+  bind:cabinetOpen
+  bind:bossOpen={bossDialogOpen}
+  bind:bulletinOpen={bulletinBoardOpen}
+  {cabinetTitles}
+  floorGames={cabinetGames}
+  onReshuffleCabinets={reshuffleFloorCabinets}
+  bulletins={activeBulletins}
+  onBulletinDismiss={handleBulletinDismiss}
+  onBossChoose={handleBossMenu}
+/>
+<GoShopHotspotNav onSelect={handleHotspot} sfxEnabled={sfxEnabled} />
 
 <div class="home-ad" id="go-home-ad">
   <GoAdSlot />
 </div>
-
-<GoShopDialog bind:open={bossDialogOpen} onChoose={handleBossMenu} />
-<GoBulletinBoard
-  bind:open={bulletinBoardOpen}
-  bulletins={activeBulletins}
-  onDismiss={handleBulletinDismiss}
-/>
 
 <footer class="home-footer">
   <p>
@@ -189,6 +277,17 @@
 </footer>
 
 <style>
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
   .home-ad {
     margin: 0;
   }

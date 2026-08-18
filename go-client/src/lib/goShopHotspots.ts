@@ -1,4 +1,5 @@
 import {
+  LOBBY_AD,
   LOBBY_BOSS,
   LOBBY_BULLETIN,
   LOBBY_CABINETS,
@@ -13,7 +14,8 @@ export type ShopHotspotId =
   | "bulletin"
   | "help"
   | "cabinet"
-  | "storage";
+  | "storage"
+  | "sfx";
 
 export type ShopHotspot = {
   id: ShopHotspotId;
@@ -39,6 +41,7 @@ export const GO_LOBBY_HOTSPOTS: readonly ShopHotspot[] = [
   { id: "help", label: "詢問處", ...LOBBY_HELP },
   { id: "cabinet", label: "機台區", ...LOBBY_CABINET_ZONE },
   { id: "storage", label: "後場", ...LOBBY_STORAGE },
+  { id: "sfx", label: "音效", ...LOBBY_AD },
 ] as const;
 
 export const GO_LOBBY_INTERACT_RADIUS = 22;
@@ -126,6 +129,16 @@ export function nearestShopHotspotInRange(
   return best?.id ?? null;
 }
 
+/** Pointer target wins; otherwise glow the furniture the avatar is standing by. */
+export function lobbyPromptHotspot(args: {
+  avatar: { x: number; y: number };
+  hover: ShopHotspotId | null;
+  radius?: number;
+}): ShopHotspotId | null {
+  if (args.hover) return args.hover;
+  return nearestShopHotspotInRange(args.avatar.x, args.avatar.y, args.radius);
+}
+
 export function getShopHotspot(
   id: ShopHotspotId,
   hotspots: readonly ShopHotspot[] = GO_LOBBY_HOTSPOTS
@@ -138,7 +151,8 @@ export type LobbyHotspotAction =
   | { type: "open-cabinets" }
   | { type: "open-bulletin" }
   | { type: "open-help-desk" }
-  | { type: "navigate"; href: string };
+  | { type: "navigate"; href: string }
+  | { type: "toggle-sfx" };
 
 export function resolveShopHotspotAction(id: ShopHotspotId): LobbyHotspotAction {
   switch (id) {
@@ -152,5 +166,7 @@ export function resolveShopHotspotAction(id: ShopHotspotId): LobbyHotspotAction 
       return { type: "open-help-desk" };
     case "storage":
       return { type: "navigate", href: "/apps" };
+    case "sfx":
+      return { type: "toggle-sfx" };
   }
 }

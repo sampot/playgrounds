@@ -17,7 +17,8 @@ import {
   type ShopHotspot,
   type ShopHotspotId,
 } from "./goShopHotspots";
-import type { Vec2, WalkFacing } from "./goShopWalk";
+import { walkAnimFrame, type Vec2, type WalkFacing } from "./goShopWalk";
+import { nearestLobbyCabinetIndex } from "./goLobbyCabinets";
 
 export type LobbyCanvasColors = {
   floorA: string;
@@ -32,9 +33,9 @@ export type LobbyCanvasColors = {
 };
 
 export const DEFAULT_LOBBY_COLORS: LobbyCanvasColors = {
-  floorA: "#2c2640",
-  floorB: "#252038",
-  aisle: "#3a334c",
+  floorA: "#6e6488",
+  floorB: "#625886",
+  aisle: "#7c7396",
   wall: "#3e3858",
   wallDark: "#2a243c",
   accent: "#4ae0ff",
@@ -45,7 +46,8 @@ export const DEFAULT_LOBBY_COLORS: LobbyCanvasColors = {
 
 const SKIN = "#f3c7a2";
 const SKIN_SH = "#d9a57e";
-const HAIR = "#3a2418";
+export const PLAYER_HAIR = "#3a2418";
+export const PLAYER_HAIR_HL = "#8a5a38";
 const LINE = "#16121c";
 
 export type LobbyDrawState = {
@@ -56,7 +58,82 @@ export type LobbyDrawState = {
   facing?: WalkFacing;
   walkFrame?: number;
   walking?: boolean;
+  sfxEnabled?: boolean;
+  /** Attract-mode clock for cabinet demo screens (ms). Frozen at 0 when omitted. */
+  nowMs?: number;
+  /** Marquee labels for the four cabinets (today's floor games). */
+  cabinetTitles?: readonly string[];
+  /** Which machine to outline／label when the cabinet hotspot is active. */
+  activeCabinetIndex?: number | null;
 };
+
+export const LOBBY_ATTRACT_FRAME_MS = 160;
+export const LOBBY_ATTRACT_FRAMES = 8;
+
+/** Demo frame for a cabinet attract loop. Cabinets are phase-offset. */
+export function cabinetAttractTick(nowMs: number, cabinetIndex: number): number {
+  const phase = Math.floor(Math.max(0, nowMs) / LOBBY_ATTRACT_FRAME_MS);
+  return (phase + cabinetIndex * 2) % LOBBY_ATTRACT_FRAMES;
+}
+
+export const BOSS_IDLE_CYCLE_MS = 8000;
+
+export type BossIdlePose = {
+  x: number;
+  y: number;
+  facing: WalkFacing;
+  walking: boolean;
+  walkFrame: number;
+};
+
+function lerp(a: number, b: number, t: number): number {
+  return a + (b - a) * t;
+}
+
+/** Occasional shuffle behind the counter; never leaves the desk. */
+export function bossIdlePose(nowMs: number): BossIdlePose {
+  const homeX = LOBBY_BOSS.x + 52;
+  const leftX = homeX - 10;
+  const rightX = homeX + 8;
+  const y = LOBBY_BOSS.y + 14;
+  const t = Math.max(0, nowMs) % BOSS_IDLE_CYCLE_MS;
+
+  let x = homeX;
+  let facing: WalkFacing = "down";
+  let walking = false;
+  let walkClock = 0;
+
+  if (t < 2400) {
+    x = homeX;
+  } else if (t < 3000) {
+    x = lerp(homeX, leftX, (t - 2400) / 600);
+    facing = "left";
+    walking = true;
+    walkClock = t - 2400;
+  } else if (t < 4600) {
+    x = leftX;
+  } else if (t < 5400) {
+    x = lerp(leftX, rightX, (t - 4600) / 800);
+    facing = "right";
+    walking = true;
+    walkClock = t - 4600;
+  } else if (t < 6800) {
+    x = rightX;
+  } else if (t < 7400) {
+    x = lerp(rightX, homeX, (t - 6800) / 600);
+    facing = "left";
+    walking = true;
+    walkClock = t - 6800;
+  }
+
+  return {
+    x: Math.round(x),
+    y,
+    facing,
+    walking,
+    walkFrame: walkAnimFrame(walkClock, walking),
+  };
+}
 
 export type CanvasLayout = {
   cssWidth: number;
@@ -117,15 +194,15 @@ function drawRoom(ctx: CanvasRenderingContext2D, colors: LobbyCanvasColors) {
     for (let x = LOBBY_WALL_SIDE; x < width - LOBBY_WALL_SIDE; x += tile) {
       const odd = (x / tile + y / tile) % 2 === 1;
       px(ctx, odd ? colors.floorB : colors.floorA, x, y, tile, tile);
-      px(ctx, "#1c1828", x, y, tile, 1);
-      px(ctx, "#1c1828", x, y, 1, tile);
+      px(ctx, "#4a4462", x, y, tile, 1);
+      px(ctx, "#4a4462", x, y, 1, tile);
     }
   }
 
   const aisleY = LOBBY_CABINETS[0]!.y + LOBBY_CABINETS[0]!.h;
   px(ctx, colors.aisle, 40, aisleY, 232, height - LOBBY_WALL_BOTTOM - aisleY);
   for (let x = 48; x < 264; x += 8) {
-    px(ctx, "#2e283e", x, aisleY + 2, 4, 1);
+    px(ctx, "#5a5470", x, aisleY + 2, 4, 1);
   }
 
   px(ctx, colors.wall, 0, 0, width, LOBBY_WALL_TOP);
@@ -162,10 +239,11 @@ function drawRoom(ctx: CanvasRenderingContext2D, colors: LobbyCanvasColors) {
   px(ctx, colors.wallDark, LOBBY_ENTRANCE.x + LOBBY_ENTRANCE.w - 2, height - 18, 6, 18);
 }
 
-function drawLamp(ctx: CanvasRenderingContext2D, x: number, y: number) {
+function drawLamp(ctx: CanvasRenderingContext2D, x: number, y: number, nowMs: number) {
   px(ctx, LINE, x + 4, y, 2, 6);
   px(ctx, "#3a3450", x, y + 6, 10, 4);
-  px(ctx, "#ffe9a0", x + 2, y + 7, 6, 2);
+  const flicker = Math.floor(nowMs / 380 + x) % 8 !== 0;
+  px(ctx, flicker ? "#ffe9a0" : "#8a7a48", x + 2, y + 7, 6, 2);
 }
 
 function drawSign(ctx: CanvasRenderingContext2D, colors: LobbyCanvasColors) {
@@ -206,24 +284,33 @@ function drawBulletin(ctx: CanvasRenderingContext2D, active: boolean) {
   if (active) strokeActive(ctx, r);
 }
 
-function drawAd(ctx: CanvasRenderingContext2D, colors: LobbyCanvasColors) {
+function drawAd(
+  ctx: CanvasRenderingContext2D,
+  colors: LobbyCanvasColors,
+  muted: boolean,
+  active: boolean,
+  nowMs: number
+) {
   const r = LOBBY_AD;
+  const pulse = !muted && Math.floor(nowMs / 260) % 2 === 0;
   px(ctx, "#0a1018", r.x, r.y, r.w, r.h);
-  px(ctx, colors.accent, r.x + 2, r.y + 2, r.w - 4, r.h - 4);
+  px(ctx, muted ? "#3a4450" : pulse ? colors.accent : "#2a98b0", r.x + 2, r.y + 2, r.w - 4, r.h - 4);
   px(ctx, "#071018", r.x + 5, r.y + 5, r.w - 10, r.h - 10);
   for (let y = r.y + 6; y < r.y + r.h - 6; y += 2) {
-    px(ctx, "#0c2430", r.x + 6, y, r.w - 12, 1);
+    px(ctx, muted ? "#1a2228" : "#0c2430", r.x + 6, y, r.w - 12, 1);
   }
-  ctx.fillStyle = colors.highlight;
+  ctx.fillStyle = muted ? "#8a9098" : pulse ? colors.highlight : "#d0b048";
   ctx.font = "bold 8px monospace";
   ctx.textAlign = "center";
-  ctx.fillText("PLAY", r.x + r.w / 2, r.y + 17);
+  ctx.fillText(muted ? "MUTE" : "PLAY", r.x + r.w / 2, r.y + 17);
   ctx.textAlign = "start";
-  px(ctx, "#fff3a8", r.x + 8, r.y + r.h - 7, r.w - 16, 2);
+  px(ctx, muted ? "#5a6068" : pulse ? "#fff3a8" : "#c8b070", r.x + 8, r.y + r.h - 7, r.w - 16, 2);
+  if (active) strokeActive(ctx, r);
 }
 
 type FigurePalette = {
   hair: string;
+  hairHl: string;
   skin: string;
   skinSh: string;
   shirt: string;
@@ -234,6 +321,7 @@ type FigurePalette = {
 
 const BOSS_PALETTE: FigurePalette = {
   hair: "#2a1810",
+  hairHl: "#5a3828",
   skin: SKIN,
   skinSh: SKIN_SH,
   shirt: "#2c3a6a",
@@ -244,7 +332,8 @@ const BOSS_PALETTE: FigurePalette = {
 
 function playerPalette(colors: LobbyCanvasColors): FigurePalette {
   return {
-    hair: HAIR,
+    hair: PLAYER_HAIR,
+    hairHl: PLAYER_HAIR_HL,
     skin: SKIN,
     skinSh: SKIN_SH,
     shirt: colors.accent,
@@ -300,6 +389,7 @@ function drawFigure(
 
   if (facing === "up") {
     px(ctx, pal.hair, x - 7, by - 26, 14, 10);
+    px(ctx, pal.hairHl, x - 4, by - 25, 8, 3);
     px(ctx, pal.shirt, x - 7, by - 16, 14, hideLower ? 10 : 14);
     px(ctx, pal.stripe, x - 4, by - 8, 8, 3);
     px(ctx, pal.skin, x - 9, by - 12, 3, hideLower ? 5 : 7);
@@ -328,9 +418,15 @@ function drawFigure(
   }
 }
 
-function drawCounter(ctx: CanvasRenderingContext2D, colors: LobbyCanvasColors, active: boolean) {
+function drawCounter(
+  ctx: CanvasRenderingContext2D,
+  colors: LobbyCanvasColors,
+  active: boolean,
+  nowMs: number
+) {
   const r = LOBBY_BOSS;
-  drawFigure(ctx, r.x + 52, r.y + 14, BOSS_PALETTE, "down", false, 0, true);
+  const pose = bossIdlePose(nowMs);
+  drawFigure(ctx, pose.x, pose.y, BOSS_PALETTE, pose.facing, pose.walking, pose.walkFrame, true);
 
   px(ctx, "#2a2438", r.x + 2, r.y + r.h - 4, r.w - 4, 4);
   px(ctx, "#4a4568", r.x, r.y + 16, r.w, r.h - 16);
@@ -378,34 +474,53 @@ function drawCabinetScreen(
   y: number,
   w: number,
   h: number,
-  kind: number
+  kind: number,
+  tick: number
 ) {
   px(ctx, "#071018", x, y, w, h);
   if (kind === 0) {
-    px(ctx, "#3de0ff", x + 2, y + 8, 3, 2);
-    px(ctx, "#fff", x + 6, y + 3, 1, 1);
-    px(ctx, "#fff", x + 11, y + 6, 1, 1);
-    px(ctx, "#c45c8a", x + 4, y + 5, 6, 4);
-    px(ctx, "#f6c453", x + 8, y + 2, 2, 2);
+    const shipX = 2 + Math.abs((tick % 8) - 4);
+    const shotY = 2 + ((tick * 2) % Math.max(2, h - 5));
+    px(ctx, "#fff", x + 3 + ((tick * 3) % (w - 5)), y + 2 + (tick % 4), 1, 1);
+    px(ctx, "#fff", x + 8 + ((tick * 5) % (w - 9)), y + 5 + ((tick + 2) % 3), 1, 1);
+    px(ctx, "#c45c8a", x + 4 + (tick % 3), y + 3, 5, 3);
+    px(ctx, "#f6c453", x + 8, y + shotY, 1, 2);
+    px(ctx, "#3de0ff", x + shipX, y + h - 4, 4, 2);
   } else if (kind === 1) {
     for (let row = 0; row < 3; row += 1) {
       const c = ["#c45c5c", "#f6c453", "#3de0ff"][row]!;
       for (let col = 0; col < 4; col += 1) {
+        if (row === 0 && col === tick % 4) continue;
         px(ctx, c, x + 2 + col * 4, y + 2 + row * 3, 3, 2);
       }
     }
-    px(ctx, "#efe6d8", x + 7, y + h - 4, 4, 2);
+    const paddleX = 2 + Math.abs((tick % 8) - 4);
+    const ballX = 3 + ((tick * 2) % Math.max(2, w - 6));
+    const ballY = 6 + (tick % 4);
+    px(ctx, "#efe6d8", x + paddleX, y + h - 3, 5, 2);
+    px(ctx, "#fff", x + ballX, y + ballY, 1, 1);
   } else if (kind === 2) {
     px(ctx, "#1a3048", x + 1, y + 1, w - 2, 5);
     px(ctx, "#3a2018", x + 1, y + 6, w - 2, h - 7);
-    px(ctx, "#f6c453", x + w / 2 - 1, y + 6, 2, h - 8);
-    px(ctx, "#efe6d8", x + w / 2 - 3, y + h - 5, 6, 3);
+    const dashY = 6 + (tick % 4);
+    px(ctx, "#f6c453", x + w / 2 - 1, y + dashY, 2, 3);
+    px(ctx, "#f6c453", x + w / 2 - 1, y + ((dashY + 4) % (h - 2)), 2, 2);
+    const carX = w / 2 - 3 + ((tick % 4) - 1);
+    px(ctx, "#efe6d8", x + carX, y + h - 5, 6, 3);
   } else {
     px(ctx, "#143018", x + 1, y + 1, w - 2, h - 2);
     px(ctx, "#7ae0a6", x + 2, y + h - 4, w - 4, 2);
-    px(ctx, "#efe6d8", x + 6, y + 4, 3, 5);
-    px(ctx, "#3de0ff", x + 5, y + 9, 5, 3);
+    const dudeX = 2 + (tick % Math.max(2, w - 8));
+    const bob = tick % 2;
+    px(ctx, "#efe6d8", x + dudeX, y + 4 + bob, 3, 5);
+    px(ctx, "#3de0ff", x + dudeX - 1, y + 9 + bob, 5, 3);
+    px(ctx, "#f6c453", x + w - 5, y + 3 + (tick % 3), 2, 2);
   }
+}
+
+function marqueeTitle(title: string | undefined): string {
+  if (!title) return "";
+  return title.length > 4 ? title.slice(0, 4) : title;
 }
 
 function drawCabinet(
@@ -413,15 +528,24 @@ function drawCabinet(
   colors: LobbyCanvasColors,
   r: { x: number; y: number; w: number; h: number },
   hue: string,
-  kind: number
+  kind: number,
+  tick: number,
+  title: string
 ) {
   px(ctx, LINE, r.x, r.y, r.w, r.h);
   px(ctx, "#2a2438", r.x + 1, r.y + 1, r.w - 2, r.h - 2);
   px(ctx, hue, r.x + 1, r.y + 1, r.w - 2, 8);
   px(ctx, "#fff8e0", r.x + 3, r.y + 2, r.w - 8, 2);
+  if (title) {
+    ctx.fillStyle = "#1a1020";
+    ctx.font = "6px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(title, r.x + r.w / 2, r.y + 8);
+    ctx.textAlign = "start";
+  }
   px(ctx, LINE, r.x + 3, r.y + 9, r.w - 6, 1);
   px(ctx, "#12101a", r.x + 3, r.y + 10, r.w - 6, 16);
-  drawCabinetScreen(ctx, r.x + 5, r.y + 12, r.w - 10, 12, kind);
+  drawCabinetScreen(ctx, r.x + 5, r.y + 12, r.w - 10, 12, kind, tick);
   px(ctx, "#3a3458", r.x + 2, r.y + 27, r.w - 4, 7);
   px(ctx, "#4a4468", r.x + 3, r.y + 28, r.w - 6, 2);
   px(ctx, "#1c1828", r.x + 6, r.y + 30, 4, 4);
@@ -434,13 +558,31 @@ function drawCabinet(
   px(ctx, colors.highlight, r.x + r.w / 2 - 1, r.y + 38, 2, 2);
 }
 
-function drawCabinets(ctx: CanvasRenderingContext2D, colors: LobbyCanvasColors, active: boolean) {
+function drawCabinets(
+  ctx: CanvasRenderingContext2D,
+  colors: LobbyCanvasColors,
+  active: boolean,
+  nowMs: number,
+  titles: readonly string[],
+  avatar: Vec2,
+  activeCabinetIndex: number | null
+) {
   const hues = ["#c45c8a", "#2cb8d8", "#e0a030", "#3aaa68"];
   LOBBY_CABINETS.forEach((r, i) => {
-    drawCabinet(ctx, colors, r, hues[i % hues.length]!, i);
+    drawCabinet(
+      ctx,
+      colors,
+      r,
+      hues[i % hues.length]!,
+      i,
+      cabinetAttractTick(nowMs, i),
+      marqueeTitle(titles[i])
+    );
   });
   if (active) {
-    for (const r of LOBBY_CABINETS) strokeActive(ctx, r);
+    const i = activeCabinetIndex ?? nearestLobbyCabinetIndex(avatar.x, avatar.y);
+    const r = i != null ? LOBBY_CABINETS[i] : null;
+    if (r) strokeActive(ctx, r);
   }
 }
 
@@ -498,18 +640,27 @@ export function drawLobbyFrame(
   hotspots: readonly ShopHotspot[] = GO_LOBBY_HOTSPOTS
 ): void {
   const colors = mergeColors(state.colors);
+  const nowMs = state.nowMs ?? 0;
   ctx.clearRect(0, 0, GO_LOBBY_WORLD.width, GO_LOBBY_WORLD.height);
   drawRoom(ctx, colors);
-  drawLamp(ctx, 70, 24);
-  drawLamp(ctx, 160, 24);
-  drawLamp(ctx, 250, 24);
+  drawLamp(ctx, 70, 24, nowMs);
+  drawLamp(ctx, 160, 24, nowMs);
+  drawLamp(ctx, 250, 24, nowMs);
   drawSign(ctx, colors);
   const active = state.nearHotspot ?? state.hoverHotspot;
   drawBulletin(ctx, active === "bulletin");
-  drawAd(ctx, colors);
-  drawCounter(ctx, colors, active === "boss");
+  drawAd(ctx, colors, state.sfxEnabled === false, active === "sfx", nowMs);
+  drawCounter(ctx, colors, active === "boss", nowMs);
   drawHelp(ctx, colors, active === "help");
-  drawCabinets(ctx, colors, active === "cabinet");
+  drawCabinets(
+    ctx,
+    colors,
+    active === "cabinet",
+    nowMs,
+    state.cabinetTitles ?? [],
+    state.avatar,
+    state.activeCabinetIndex ?? null
+  );
   drawStorage(ctx, colors, active === "storage");
   drawAvatar(
     ctx,
@@ -523,10 +674,25 @@ export function drawLobbyFrame(
   if (state.nearHotspot) {
     const spot = hotspots.find((h) => h.id === state.nearHotspot);
     if (spot) {
+      let label = spot.label;
+      let lx = spot.x;
+      let ly = Math.max(12, spot.y - 4);
+      if (spot.id === "cabinet") {
+        const i =
+          state.activeCabinetIndex ??
+          nearestLobbyCabinetIndex(state.avatar.x, state.avatar.y);
+        const titled = i != null ? state.cabinetTitles?.[i] : undefined;
+        if (titled) label = titled;
+        const cab = i != null ? LOBBY_CABINETS[i] : null;
+        if (cab) {
+          lx = cab.x;
+          ly = Math.max(12, cab.y - 4);
+        }
+      }
       ctx.fillStyle = colors.ink;
       ctx.font = "10px monospace";
       ctx.textAlign = "start";
-      ctx.fillText(spot.label, spot.x, Math.max(12, spot.y - 4));
+      ctx.fillText(label, lx, ly);
     }
   }
 }

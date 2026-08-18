@@ -4,6 +4,7 @@ import {
   GO_LOBBY_HOTSPOTS,
   getShopHotspot,
   hitTestShopHotspot,
+  lobbyPromptHotspot,
   nearestShopHotspotInRange,
   resolveShopHotspotAction,
   shouldShowGoLobby,
@@ -42,9 +43,11 @@ describe("hitTestShopHotspot", () => {
 });
 
 describe("GO_LOBBY_HOTSPOTS", () => {
-  it("omits the decorative wall board from shortcuts", () => {
+  it("maps PLAY neon to an sfx toggle, not a decorative board", () => {
     expect(GO_LOBBY_HOTSPOTS.map((s) => s.label)).not.toContain("看板");
-    expect(hitTestShopHotspot(LOBBY_AD.x + 4, LOBBY_AD.y + 4)).toBeNull();
+    expect(hitTestShopHotspot(LOBBY_AD.x + 4, LOBBY_AD.y + 4)).toBe("sfx");
+    expect(getShopHotspot("sfx")?.label).toBe("音效");
+    expect(resolveShopHotspotAction("sfx")).toEqual({ type: "toggle-sfx" });
   });
 });
 
@@ -90,5 +93,33 @@ describe("resolveShopHotspotAction", () => {
     expect(resolveShopHotspotAction("cabinet")).toEqual({
       type: "open-cabinets",
     });
+  });
+});
+
+describe("lobbyPromptHotspot", () => {
+  it("uses hover when pointing, otherwise the nearest furniture", () => {
+    const boss = getShopHotspot("boss")!;
+    const nearBoss = {
+      x: boss.x + boss.w / 2,
+      y: boss.y + boss.h + 10,
+    };
+    expect(
+      lobbyPromptHotspot({
+        avatar: nearBoss,
+        hover: "sfx",
+      })
+    ).toBe("sfx");
+    expect(
+      lobbyPromptHotspot({
+        avatar: nearBoss,
+        hover: null,
+      })
+    ).toBe("boss");
+    expect(
+      lobbyPromptHotspot({
+        avatar: { x: 160, y: 168 },
+        hover: null,
+      })
+    ).toBeNull();
   });
 });

@@ -1,6 +1,8 @@
 import {
   GO_LOBBY_HOTSPOTS,
   GO_LOBBY_WORLD,
+  distanceToRect,
+  getShopHotspot,
   hitTestShopHotspot,
   rectsForHotspot,
   type ShopHotspotId,
@@ -15,7 +17,6 @@ import {
   type LobbyRect,
 } from "./goLobbyLayout";
 
-export const LOBBY_WALK_STORAGE_KEY = "pg_go_lobby_walk";
 export const LOBBY_AVATAR_SESSION_KEY = "pg_go_lobby_avatar";
 export const LOBBY_WALK_ARRIVAL_RADIUS = 6;
 
@@ -63,22 +64,10 @@ export function walkAnimFrame(elapsedMs: number, walking: boolean): number {
 }
 
 export function readLobbyWalkPreference(
-  storage: Pick<Storage, "getItem"> | null | undefined,
+  _storage: Pick<Storage, "getItem"> | null | undefined,
   prefersReducedMotion: boolean
 ): boolean {
-  if (prefersReducedMotion) return false;
-  if (!storage) return true;
-  const raw = storage.getItem(LOBBY_WALK_STORAGE_KEY);
-  if (raw === "off") return false;
-  if (raw === "on") return true;
-  return true;
-}
-
-export function writeLobbyWalkPreference(
-  storage: Pick<Storage, "setItem">,
-  enabled: boolean
-): void {
-  storage.setItem(LOBBY_WALK_STORAGE_KEY, enabled ? "on" : "off");
+  return !prefersReducedMotion;
 }
 
 /** Default spawn in the south aisle. */
@@ -213,14 +202,34 @@ function hotspotTouchedByCircle(
   return best?.id ?? null;
 }
 
+function distanceToHotspot(pos: Vec2, id: ShopHotspotId): number {
+  const spot = getShopHotspot(id);
+  if (!spot) return Infinity;
+  let best = Infinity;
+  for (const rect of rectsForHotspot(spot)) {
+    best = Math.min(best, distanceToRect(pos.x, pos.y, rect));
+  }
+  return best;
+}
+
+/** True when the step's keyboard direction moves closer to the hotspot. */
+export function isWalkingTowardHotspot(
+  from: Vec2,
+  attempted: Vec2,
+  id: ShopHotspotId
+): boolean {
+  return distanceToHotspot(attempted, id) < distanceToHotspot(from, id) - 1e-6;
+}
+
 export type WalkBumpResult = {
   activate: ShopHotspotId | null;
   contact: ShopHotspotId | null;
 };
 
 /**
- * Keyboard walk: bumping an interactable (attempted move overlaps it) opens it.
- * Same contact is ignored until the player walks off.
+ * Keyboard walk: bumping an interactable (attempted move overlaps it) opens it
+ * only when moving toward it. Walking away does not trigger. Same contact is
+ * ignored until the player walks off.
  */
 export function resolveWalkBump(args: {
   from: Vec2;
@@ -258,6 +267,9 @@ export function resolveWalkBump(args: {
     }
   }
   if (!contact) return { activate: null, contact: null };
+  if (!isWalkingTowardHotspot(args.from, attempted, contact)) {
+    return { activate: null, contact: null };
+  }
   if (contact === args.alreadyContact) {
     return { activate: null, contact };
   }
@@ -324,6 +336,7 @@ export function hasWalkArrived(from: Vec2, to: Vec2): boolean {
 export type LobbyTapResult =
   | { type: "activate"; id: ShopHotspotId }
   | { type: "walk"; target: Vec2 }
+  | { type: "walk-then-activate"; target: Vec2; id: ShopHotspotId; cabinetIndex: number | null }
   | { type: "place"; target: Vec2 };
 
 /** Tap a hotspot to interact with that object; tap floor to walk or place. */
@@ -331,7 +344,21 @@ export function resolveLobbyTap(args: {
   walkEnabled: boolean;
   world: Vec2;
   tappedHotspot: ShopHotspotId | null;
+  from?: Vec2;
+  cabinetIndex?: number | null;
+  cabinetStand?: Vec2 | null;
 }): LobbyTapResult {
+  if (args.tappedHotspot === "cabinet" && args.walkEnabled && args.cabinetStand) {
+    const from = args.from ?? args.world;
+    if (!hasWalkArrived(from, args.cabinetStand)) {
+      return {
+        type: "walk-then-activate",
+        target: args.cabinetStand,
+        id: "cabinet",
+        cabinetIndex: args.cabinetIndex ?? null,
+      };
+    }
+  }
   if (args.tappedHotspot) return { type: "activate", id: args.tappedHotspot };
   if (args.walkEnabled) return { type: "walk", target: args.world };
   return { type: "place", target: args.world };

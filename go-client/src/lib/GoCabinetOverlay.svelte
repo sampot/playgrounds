@@ -1,44 +1,65 @@
 <script lang="ts">
-  import { recommendHome, searchGoCatalog, type GoCatalogEntry } from "$lib/goCatalog";
+  import { searchGoCatalog, type GoCatalogEntry } from "$lib/goCatalog";
+  import {
+    cabinetStandPoint,
+    resolveCabinetOverlayRecs,
+    writeLobbyReturnStand,
+  } from "$lib/goLobbyCabinets";
   import GoEntryCover from "$lib/GoEntryCover.svelte";
 
   let {
     open = $bindable(false),
+    floorGames = [],
+    onReshuffle,
   }: {
     open?: boolean;
+    floorGames?: readonly GoCatalogEntry[];
+    onReshuffle?: () => void;
   } = $props();
 
   let input = $state("");
-  let pool = $state<GoCatalogEntry[]>([]);
   let recs = $state<GoCatalogEntry[]>([]);
   let recsReady = $state(false);
   let isSearching = $state(false);
   let searchEl = $state<HTMLInputElement | null>(null);
   let wasOpen = false;
 
-  function applyFreshPool() {
+  function applyFloorGames() {
+    const next = resolveCabinetOverlayRecs({
+      floorGames,
+      query: "",
+      search: searchGoCatalog,
+    });
     input = "";
-    pool = recommendHome(4);
-    recs = pool;
-    isSearching = false;
+    recs = next.recs;
+    isSearching = next.isSearching;
     recsReady = true;
   }
 
   function handleSearch(event: Event) {
     const target = event.target as HTMLInputElement;
+    const next = resolveCabinetOverlayRecs({
+      floorGames,
+      query: target.value,
+      search: searchGoCatalog,
+    });
     input = target.value.trim();
-    if (input.length === 0) {
-      recs = pool;
-      isSearching = false;
-      return;
-    }
-    recs = searchGoCatalog(input, 3);
-    isSearching = true;
+    recs = next.recs;
+    isSearching = next.isSearching;
   }
 
   function reshuffle() {
-    applyFreshPool();
+    input = "";
+    isSearching = false;
+    onReshuffle?.();
     searchEl?.focus();
+  }
+
+  function rememberFloorStand(entry: GoCatalogEntry) {
+    const index = floorGames.findIndex((game) => game.id === entry.id);
+    if (index < 0) return;
+    if (typeof sessionStorage === "undefined") return;
+    writeLobbyReturnStand(sessionStorage, cabinetStandPoint(index));
   }
 
   function close() {
@@ -58,10 +79,16 @@
       return;
     }
     if (!wasOpen) {
-      applyFreshPool();
+      applyFloorGames();
       wasOpen = true;
     }
     searchEl?.focus();
+  });
+
+  $effect(() => {
+    if (!open || isSearching) return;
+    recs = [...floorGames];
+    recsReady = true;
   });
 </script>
 
@@ -81,7 +108,7 @@
           關閉
         </button>
       </header>
-      <p class="cabinet-lead">選一個遊戲直接玩。造訪過的離線也能再開。</p>
+      <p class="cabinet-lead">場上這四台。再次推薦會換成大廳機台。</p>
       <div class="cabinet-search">
         <input
           bind:this={searchEl}
@@ -97,7 +124,11 @@
           <ul class="cabinet-grid">
             {#each recs as entry (entry.id)}
               <li>
-                <a class="cabinet-card" href={`/s/${encodeURIComponent(entry.id)}`}>
+                <a
+                  class="cabinet-card"
+                  href={`/s/${encodeURIComponent(entry.id)}`}
+                  onclick={() => rememberFloorStand(entry)}
+                >
                   <span class="cabinet-cover" aria-hidden="true">
                     {#key `${entry.id}:${entry.cover ?? ""}`}
                       <GoEntryCover

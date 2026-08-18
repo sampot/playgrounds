@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { browser } from "$app/environment";
+  import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import Chrome from "$lib/Chrome.svelte";
   import GoPlayIntro from "$lib/GoPlayIntro.svelte";
@@ -8,6 +9,7 @@
   import { chromeSession } from "$lib/chromeSession.svelte";
   import { goAuth } from "$lib/goAuth.svelte";
   import { goBrowserSupports } from "$lib/goCanvasSupport";
+  import { shouldEscapeToHome } from "$lib/goEscapeHome";
   import { registerGoServiceWorker } from "$lib/registerGoSw";
   import { pixelWipe, pixelWipeOut } from "$lib/goTransition";
   import "$lib/styles.css";
@@ -23,11 +25,37 @@
   const browserUnsupported = $state(browser && !goBrowserSupports().supported);
   const playing = $derived(chromeSession.canvasActive);
 
+  function isTextEntryTarget(target: EventTarget | null): boolean {
+    if (!(target instanceof HTMLElement)) return false;
+    return Boolean(
+      target.closest("input, textarea, select, [contenteditable='true']")
+    );
+  }
+
   onMount(() => {
     if (!browserUnsupported) {
       registerGoServiceWorker();
       void goAuth.initFromLocation();
     }
+
+    function onKeydown(event: KeyboardEvent) {
+      const modalOpen = Boolean(document.querySelector("dialog[open]"));
+      if (
+        !shouldEscapeToHome({
+          key: event.key,
+          pathname: page.url.pathname,
+          modalOpen,
+          textEntry: isTextEntryTarget(event.target),
+        })
+      ) {
+        return;
+      }
+      event.preventDefault();
+      void goto("/");
+    }
+
+    window.addEventListener("keydown", onKeydown);
+    return () => window.removeEventListener("keydown", onKeydown);
   });
 </script>
 

@@ -10,6 +10,7 @@
     hitTestShopHotspot,
     getShopHotspot,
     hotspotCenter,
+    lobbyPromptHotspot,
     type ShopHotspotId,
   } from "$lib/goShopHotspots";
   import {
@@ -17,7 +18,6 @@
     defaultLobbyAvatarPosition,
     moveAvatarWithCollision,
     readLobbyWalkPreference,
-    writeLobbyWalkPreference,
     readLobbyAvatarPosition,
     writeLobbyAvatarPosition,
     clampAvatarToWorld,
@@ -32,17 +32,51 @@
     type Vec2,
   } from "$lib/goShopWalk";
   import { followLobbyPath, planLobbyWalk } from "$lib/goLobbyPath";
+  import {
+    hitTestLobbyCabinetIndex,
+    nearestLobbyCabinetIndex,
+    cabinetStandPoint,
+    consumeLobbyReturnStand,
+  } from "$lib/goLobbyCabinets";
+  import type { GoCatalogEntry } from "$lib/goCatalog";
+  import {
+    getLobbySfxPlayer,
+    shouldPlayFootstep,
+    type LobbySfxPlayer,
+  } from "$lib/goLobbySfx";
+  import type { GoBulletin } from "$lib/goBulletin";
   import GoHelpDesk from "$lib/GoHelpDesk.svelte";
   import GoCabinetOverlay from "$lib/GoCabinetOverlay.svelte";
+  import GoShopDialog from "$lib/GoShopDialog.svelte";
+  import GoBulletinBoard from "$lib/GoBulletinBoard.svelte";
 
   let {
     onHotspot,
     helpDeskOpen = $bindable(false),
     cabinetOpen = $bindable(false),
+    bossOpen = $bindable(false),
+    bulletinOpen = $bindable(false),
+    cabinetTitles = [],
+    floorGames = [],
+    onReshuffleCabinets,
+    bulletins = [],
+    onBulletinDismiss,
+    onBossChoose,
   }: {
-    onHotspot: (id: ShopHotspotId) => void;
+    onHotspot: (
+      id: ShopHotspotId,
+      detail?: { cabinetIndex?: number | null }
+    ) => void;
     helpDeskOpen?: boolean;
     cabinetOpen?: boolean;
+    bossOpen?: boolean;
+    bulletinOpen?: boolean;
+    cabinetTitles?: readonly string[];
+    floorGames?: readonly GoCatalogEntry[];
+    onReshuffleCabinets?: () => void;
+    bulletins?: GoBulletin[];
+    onBulletinDismiss?: (bulletin: GoBulletin) => void;
+    onBossChoose?: (choice: "banter" | "cabinets" | "help") => void;
   } = $props();
 
   let canvasEl = $state<HTMLCanvasElement | null>(null);
@@ -52,6 +86,7 @@
   let walkEnabled = $state(true);
   let prefersReducedMotion = $state(false);
   let hoverHotspot = $state<ShopHotspotId | null>(null);
+  let hoverCabinetIndex = $state<number | null>(null);
   let input = $state<WalkInput>({
     up: false,
     down: false,
@@ -59,16 +94,22 @@
     right: false,
   });
   let walkPath: Vec2[] = [];
+  let pendingCabinetIndex: number | null = null;
   let facing = $state<WalkFacing>("down");
   let walking = $state(false);
   let walkFrame = $state(0);
   let walkClock = 0;
   let bumpContact: ShopHotspotId | null = null;
+  let sfx: LobbySfxPlayer | null = null;
+  let prevWalkFrame = 0;
 
-  let overlayOpen = $derived(helpDeskOpen || cabinetOpen);
+  let overlayOpen = $derived(
+    helpDeskOpen || cabinetOpen || bossOpen || bulletinOpen
+  );
   const collisionGrid = createLobbyCollisionGrid();
   let raf = 0;
   let lastFrame = 0;
+  let attractNow = 0;
 
   function applyLayout() {
     if (!containerEl || !canvasEl) return;
@@ -87,13 +128,20 @@
     ctx.imageSmoothingEnabled = false;
     ctx.save();
     ctx.setTransform(layout.dpr * layout.scale, 0, 0, layout.dpr * layout.scale, 0, 0);
+    const prompt = lobbyPromptHotspot({ avatar, hover: hoverHotspot });
     drawLobbyFrame(ctx, {
       avatar,
-      nearHotspot: hoverHotspot,
+      nearHotspot: prompt,
       hoverHotspot,
       facing,
       walking,
       walkFrame,
+      sfxEnabled: sfx?.isEnabled() ?? true,
+      nowMs: prefersReducedMotion ? 0 : attractNow,
+      cabinetTitles,
+      activeCabinetIndex:
+        hoverCabinetIndex ??
+        (prompt === "cabinet" ? nearestLobbyCabinetIndex(avatar.x, avatar.y) : null),
     });
     ctx.restore();
   }
@@ -102,16 +150,23 @@
     if (!lastFrame) lastFrame = now;
     const delta = Math.min(0.05, (now - lastFrame) / 1000);
     lastFrame = now;
+    attractNow = now;
 
     if (walkEnabled && !overlayOpen) {
       let activeInput = input;
+      let arrivedPlay: number | null = null;
       if (walkPath.length > 0) {
         const step = followLobbyPath(avatar, walkPath);
         walkPath = step.path;
         activeInput = step.input;
-        if (step.arrived) walkPath = [];
+        if (step.arrived) {
+          walkPath = [];
+          arrivedPlay = pendingCabinetIndex;
+          pendingCabinetIndex = null;
+        }
       }
       const moving = walkInputActive(activeInput);
+      const wasWalking = walking;
       walking = moving;
       if (moving) {
         facing = facingFromWalkInput(activeInput, facing);
@@ -120,9 +175,16 @@
         walkClock = 0;
       }
       walkFrame = walkAnimFrame(walkClock, moving);
+      if (shouldPlayFootstep(prevWalkFrame, walkFrame, moving, wasWalking)) {
+        sfx?.playStep();
+      }
+      prevWalkFrame = walkFrame;
       const from = avatar;
       avatar = moveAvatarWithCollision(avatar, activeInput, delta, collisionGrid);
-      if (!walkPath.length && moving) {
+      if (arrivedPlay != null) {
+        bumpContact = null;
+        activateHotspot("cabinet", arrivedPlay);
+      } else if (!walkPath.length && moving) {
         const bump = resolveWalkBump({
           from,
           input: activeInput,
@@ -130,60 +192,88 @@
           deltaSec: delta,
         });
         bumpContact = bump.contact;
-        if (bump.activate) activateHotspot(bump.activate);
+        if (bump.activate === "cabinet") {
+          activateHotspot("cabinet", nearestLobbyCabinetIndex(from.x, from.y));
+        } else if (bump.activate) {
+          activateHotspot(bump.activate);
+        }
       } else if (!moving) {
         bumpContact = null;
       }
     } else {
       walking = false;
       walkFrame = 0;
+      prevWalkFrame = 0;
       bumpContact = null;
     }
     paint();
     raf = requestAnimationFrame(frame);
   }
 
-  function pointerHotspot(clientX: number, clientY: number): ShopHotspotId | null {
+  function pointerWorld(clientX: number, clientY: number): Vec2 | null {
     if (!canvasEl || !layout) return null;
     const rect = canvasEl.getBoundingClientRect();
-    const world = screenToWorld(clientX - rect.left, clientY - rect.top, layout);
-    return hitTestShopHotspot(world.x, world.y);
+    return screenToWorld(clientX - rect.left, clientY - rect.top, layout);
   }
 
   function handlePointerMove(event: PointerEvent) {
-    hoverHotspot = pointerHotspot(event.clientX, event.clientY);
+    const world = pointerWorld(event.clientX, event.clientY);
+    hoverHotspot = world ? hitTestShopHotspot(world.x, world.y) : null;
+    hoverCabinetIndex =
+      hoverHotspot === "cabinet" && world
+        ? hitTestLobbyCabinetIndex(world.x, world.y)
+        : null;
     if (!walkEnabled) paint();
   }
 
   function handlePointerLeave() {
     hoverHotspot = null;
+    hoverCabinetIndex = null;
     if (!walkEnabled) paint();
   }
 
-  function activateHotspot(id: ShopHotspotId) {
-    onHotspot(id);
+  function activateHotspot(id: ShopHotspotId, cabinetIndex: number | null = null) {
+    onHotspot(id, { cabinetIndex });
   }
 
   function handlePointerDown(event: PointerEvent) {
+    sfx?.unlock();
     if (overlayOpen) return;
     if (!layout || !canvasEl) return;
     canvasEl.focus({ preventScroll: true });
     const rect = canvasEl.getBoundingClientRect();
     const world = screenToWorld(event.clientX - rect.left, event.clientY - rect.top, layout);
     hoverHotspot = hitTestShopHotspot(world.x, world.y);
+    const cabinetIndex =
+      hoverHotspot === "cabinet" ? hitTestLobbyCabinetIndex(world.x, world.y) : null;
     const action = resolveLobbyTap({
       walkEnabled,
       world,
       tappedHotspot: hoverHotspot,
+      from: avatar,
+      cabinetIndex,
+      cabinetStand: cabinetIndex != null ? cabinetStandPoint(cabinetIndex) : null,
     });
     if (action.type === "activate") {
-      activateHotspot(action.id);
+      pendingCabinetIndex = null;
+      if (action.id === "cabinet") {
+        activateHotspot("cabinet", cabinetIndex);
+      } else {
+        activateHotspot(action.id);
+      }
       return;
     }
-    if (action.type === "walk") {
+    if (action.type === "walk-then-activate") {
+      pendingCabinetIndex = action.cabinetIndex;
       walkPath = planLobbyWalk(avatar, clampAvatarToWorld(action.target), collisionGrid);
       return;
     }
+    if (action.type === "walk") {
+      pendingCabinetIndex = null;
+      walkPath = planLobbyWalk(avatar, clampAvatarToWorld(action.target), collisionGrid);
+      return;
+    }
+    pendingCabinetIndex = null;
     avatar = clampAvatarToWorld(action.target);
     paint();
   }
@@ -199,8 +289,10 @@
     const next = walkInputFromKey(input, event.key, true);
     if (next) {
       event.preventDefault();
+      sfx?.unlock();
       input = next;
       walkPath = [];
+      pendingCabinetIndex = null;
     }
   }
 
@@ -208,12 +300,6 @@
     if (isTextEntryTarget(event.target)) return;
     const next = walkInputFromKey(input, event.key, false);
     if (next) input = next;
-  }
-
-  function toggleWalk() {
-    walkEnabled = !walkEnabled;
-    writeLobbyWalkPreference(localStorage, walkEnabled);
-    paint();
   }
 
   /** A11y nav: move avatar near hotspot then activate. */
@@ -228,9 +314,12 @@
 
   onMount(() => {
     prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    sfx = getLobbySfxPlayer();
     walkEnabled = readLobbyWalkPreference(localStorage, prefersReducedMotion);
     avatar =
-      readLobbyAvatarPosition(sessionStorage) ?? defaultLobbyAvatarPosition();
+      consumeLobbyReturnStand(sessionStorage) ??
+      readLobbyAvatarPosition(sessionStorage) ??
+      defaultLobbyAvatarPosition();
 
     applyLayout();
     paint();
@@ -262,6 +351,7 @@
   $effect(() => {
     if (!overlayOpen) return;
     walkPath = [];
+    pendingCabinetIndex = null;
     input = { up: false, down: false, left: false, right: false };
   });
 </script>
@@ -270,17 +360,9 @@
   <div class="go-lobby-toolbar">
     <p class="go-lobby-lead pixel-text">
       {walkEnabled
-        ? "點地板走動；點物件互動。方向鍵碰到櫃檯、機台或詢問處即開啟。"
-        : "點大廳熱點互動，或改走動模式。"}
+        ? "點地板走動；點物件互動。點右上 PLAY 可開關音效。"
+        : "點大廳熱點互動。"}
     </p>
-    <button
-      type="button"
-      class="go-lobby-walk-toggle pixel-btn"
-      onclick={toggleWalk}
-      aria-pressed={walkEnabled}
-    >
-      {walkEnabled ? "改點選" : "開始走動"}
-    </button>
   </div>
   <div class="go-lobby-canvas-wrap">
     <div class="go-lobby-stage" class:go-lobby-stage--chrome={overlayOpen} bind:this={containerEl}>
@@ -294,7 +376,17 @@
         onpointerdown={handlePointerDown}
       ></canvas>
       <GoHelpDesk bind:open={helpDeskOpen} />
-      <GoCabinetOverlay bind:open={cabinetOpen} />
+      <GoCabinetOverlay
+        bind:open={cabinetOpen}
+        {floorGames}
+        onReshuffle={onReshuffleCabinets}
+      />
+      <GoShopDialog bind:open={bossOpen} onChoose={onBossChoose ?? (() => {})} />
+      <GoBulletinBoard
+        bind:open={bulletinOpen}
+        {bulletins}
+        onDismiss={onBulletinDismiss ?? (() => {})}
+      />
     </div>
   </div>
 </section>
@@ -315,11 +407,6 @@
     margin: 0;
     font-size: 0.82rem;
     color: color-mix(in oklab, rgb(var(--ink)) 82%, transparent);
-    flex: 1 1 12rem;
-  }
-  .go-lobby-walk-toggle {
-    min-height: 44px;
-    flex: 0 0 auto;
   }
   .go-lobby-canvas-wrap {
     width: 100%;
