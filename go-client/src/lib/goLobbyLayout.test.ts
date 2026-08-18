@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { hitTestShopHotspot } from "./goShopHotspots";
+import { hitTestShopHotspot, nearestShopHotspotInRange } from "./goShopHotspots";
 import {
   createLobbyCollisionGrid,
   defaultLobbyAvatarPosition,
   isCircleBlocked,
+  LOBBY_AVATAR_RADIUS,
 } from "./goShopWalk";
 import {
   LOBBY_AD,
@@ -15,6 +16,7 @@ import {
   LOBBY_SIGN,
   LOBBY_SPAWN,
   LOBBY_STORAGE,
+  LOBBY_WALL_TOP,
   lobbyBlockingRects,
   unionRects,
 } from "./goLobbyLayout";
@@ -94,5 +96,19 @@ describe("goLobbyLayout", () => {
   it("keeps the wall sign clear of bulletin and ad", () => {
     expect(rectsOverlap(LOBBY_BULLETIN, LOBBY_SIGN)).toBe(false);
     expect(rectsOverlap(LOBBY_AD, LOBBY_SIGN)).toBe(false);
+  });
+
+  it("puts the bulletin on the walkable center wall, sign above the counter", () => {
+    expect(LOBBY_SIGN.x).toBeLessThan(LOBBY_BULLETIN.x);
+    expect(LOBBY_BULLETIN.x).toBeGreaterThanOrEqual(LOBBY_BOSS.x + LOBBY_BOSS.w);
+    expect(rectsOverlap(LOBBY_BULLETIN, LOBBY_BOSS)).toBe(false);
+
+    const grid = createLobbyCollisionGrid();
+    const standX = LOBBY_BULLETIN.x + LOBBY_BULLETIN.w / 2;
+    const standY = LOBBY_WALL_TOP + LOBBY_AVATAR_RADIUS + 2;
+    expect(isCircleBlocked(standX, standY, LOBBY_AVATAR_RADIUS, grid)).toBe(
+      false
+    );
+    expect(nearestShopHotspotInRange(standX, standY)).toBe("bulletin");
   });
 });

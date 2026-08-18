@@ -289,7 +289,7 @@ function drawSign(ctx: CanvasRenderingContext2D, colors: LobbyCanvasColors) {
   px(ctx, "#9cf4ff", r.x + 2, r.y + 1, r.w - 4, 2);
   px(ctx, "#102830", r.x + 3, r.y + 3, r.w - 6, r.h - 5);
   ctx.fillStyle = colors.accent;
-  ctx.font = "bold 9px monospace";
+  ctx.font = "bold 8px monospace";
   ctx.textAlign = "center";
   ctx.fillText("山姆鍋遊樂場", r.x + r.w / 2, r.y + 11);
   ctx.textAlign = "start";
@@ -306,17 +306,18 @@ function drawBulletin(ctx: CanvasRenderingContext2D, active: boolean) {
       px(ctx, "#b89058", x, y, 1, 1);
     }
   }
-  px(ctx, "#f7f1e4", r.x + 6, r.y + 4, 18, 12);
-  px(ctx, "#c45c5c", r.x + 8, r.y + 3, 2, 2);
-  px(ctx, "#d0d0d0", r.x + 8, r.y + 7, 12, 1);
-  px(ctx, "#d0d0d0", r.x + 8, r.y + 9, 10, 1);
-  px(ctx, "#dfeaf8", r.x + 28, r.y + 3, 16, 13);
-  px(ctx, "#3d6aaa", r.x + 30, r.y + 2, 2, 2);
-  px(ctx, "#7aa0c8", r.x + 30, r.y + 6, 11, 6);
-  px(ctx, "#f8d4c4", r.x + 48, r.y + 4, 14, 11);
-  px(ctx, "#c45c5c", r.x + 50, r.y + 3, 2, 2);
-  px(ctx, "#e8a090", r.x + 50, r.y + 7, 9, 5);
-  px(ctx, "#fff8e8", r.x + 64, r.y + 5, 8, 9);
+  px(ctx, "#f7f1e4", r.x + 8, r.y + 4, 22, 12);
+  px(ctx, "#c45c5c", r.x + 10, r.y + 3, 2, 2);
+  px(ctx, "#d0d0d0", r.x + 10, r.y + 7, 16, 1);
+  px(ctx, "#d0d0d0", r.x + 10, r.y + 9, 14, 1);
+  px(ctx, "#dfeaf8", r.x + 38, r.y + 3, 22, 13);
+  px(ctx, "#3d6aaa", r.x + 40, r.y + 2, 2, 2);
+  px(ctx, "#7aa0c8", r.x + 40, r.y + 6, 16, 6);
+  px(ctx, "#f8d4c4", r.x + 68, r.y + 4, 20, 11);
+  px(ctx, "#c45c5c", r.x + 70, r.y + 3, 2, 2);
+  px(ctx, "#e8a090", r.x + 70, r.y + 7, 14, 5);
+  px(ctx, "#fff8e8", r.x + 96, r.y + 5, 16, 9);
+  px(ctx, "#c45c5c", r.x + 98, r.y + 4, 2, 2);
   if (active) strokeActive(ctx, r);
 }
 

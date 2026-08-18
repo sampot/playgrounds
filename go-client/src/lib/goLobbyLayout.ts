@@ -6,14 +6,14 @@ export const LOBBY_WALL_TOP = 24;
 export const LOBBY_WALL_SIDE = 10;
 export const LOBBY_WALL_BOTTOM = 10;
 
-/** Storefront sign on the back wall (must stay clear of bulletin / ad). */
-export const LOBBY_SIGN: LobbyRect = { x: 96, y: 4, w: 128, h: 14 };
+/** Storefront sign on the back-left wall, above the counter (not a hotspot). */
+export const LOBBY_SIGN: LobbyRect = { x: 12, y: 4, w: 76, h: 14 };
 
 /** Service counter, left of the back wall. Approach from the south. */
 export const LOBBY_BOSS: LobbyRect = { x: 16, y: 32, w: 80, h: 40 };
 
-/** Posters mounted on the back wall, left of the sign. */
-export const LOBBY_BULLETIN: LobbyRect = { x: 12, y: 3, w: 76, h: 18 };
+/** Posters on the back-wall center. Approach from the south aisle. */
+export const LOBBY_BULLETIN: LobbyRect = { x: 96, y: 3, w: 128, h: 18 };
 
 /** 包廂門：右牆、後場上方。從西側走近。 */
 export const LOBBY_ROOM: LobbyRect = { x: 272, y: 40, w: 32, h: 56 };
