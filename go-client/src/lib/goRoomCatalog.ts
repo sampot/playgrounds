@@ -41,3 +41,11 @@ export function catalogPlayLabel(item: CatalogItemLike): "播放" | "收聽" {
   if (/\.(mp3|m4a|aac|wav|ogg|flac)$/i.test(name)) return "收聽";
   return "播放";
 }
+
+export function catalogTransferHint(opts: {
+  status: string;
+  playing: boolean;
+}): "播放中" | "傳送中" | null {
+  if (opts.status !== "transferring") return null;
+  return opts.playing ? "播放中" : "傳送中";
+}

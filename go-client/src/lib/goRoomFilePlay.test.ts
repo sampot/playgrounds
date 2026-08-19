@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   SESSION_FILE_PLAY_BUFFER_MAX,
   createPlayByteWindow,
+  createPlayFeedGate,
 } from "./goRoomFilePlay";
 
 describe("createPlayByteWindow", () => {
@@ -25,5 +26,24 @@ describe("createPlayByteWindow", () => {
 
   it("keeps the production window well under a whole-file 256 MiB cap", () => {
     expect(SESSION_FILE_PLAY_BUFFER_MAX).toBe(32 * 1024 * 1024);
+  });
+});
+
+describe("createPlayFeedGate", () => {
+  it("holds chunks until mp4box is ready, then feeds them in arrival order", async () => {
+    const starts: number[] = [];
+    const gate = createPlayFeedGate({
+      onMp4Chunk(_buf, fileStart) {
+        starts.push(fileStart);
+      },
+    });
+    void gate.push(new Uint8Array(4));
+    void gate.push(new Uint8Array(4));
+    expect(gate.pendingBytes()).toBe(8);
+    expect(starts).toEqual([]);
+    await gate.readyMp4();
+    await gate.push(new Uint8Array(4));
+    expect(starts).toEqual([0, 4, 8]);
+    expect(gate.pendingBytes()).toBe(0);
   });
 });

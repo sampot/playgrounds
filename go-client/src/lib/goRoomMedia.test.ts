@@ -159,7 +159,7 @@ describe("createRoomMedia", () => {
     expect(media.getState().presenceStream).not.toBeNull();
   });
 
-  it("does not push mic RTP until a peer requests to listen", async () => {
+  it("pushes mic RTP to everyone in the booth without waiting for a listen request", async () => {
     const json: unknown[] = [];
     const pc = mockPc();
     const mic = track("audio", "mic");
@@ -178,17 +178,145 @@ describe("createRoomMedia", () => {
       op: "offer",
       from: "host",
     });
-    expect(pc.transceivers[0]!.sender.replaceTrack).not.toHaveBeenCalledWith(
-      mic
-    );
+    expect(pc.transceivers[0]!.sender.replaceTrack).toHaveBeenCalledWith(mic);
+  });
 
+  it("auto-listens when someone offers a mic", async () => {
+    const json: unknown[] = [];
+    const media = createRoomMedia({
+      localAgentId: "g-a",
+      occupantCount: () => 2,
+      peers: () => [],
+      sendJson: (m) => json.push(m),
+    });
     await media.onControl({
+      type: SESSION_MIC_TYPE,
+      v: 1,
+      op: "offer",
+      from: "host",
+    });
+    expect(media.getState().listening).toBe(true);
+    expect(json).toContainEqual({
       type: SESSION_MIC_TYPE,
       v: 1,
       op: "request",
       from: "g-a",
     });
+  });
+
+  it("puts a local file on the TV program slot for every peer", async () => {
+    class FakeStream {
+      constructor(public tracks: MediaStreamTrack[]) {}
+    }
+    vi.stubGlobal("MediaStream", FakeStream);
+    const json: unknown[] = [];
+    const pc = mockPc();
+    const video = track("video", "prog-v");
+    const file = new File([new Uint8Array(4)], "MTV.mp4", { type: "video/mp4" });
+    const media = createRoomMedia({
+      localAgentId: "host",
+      occupantCount: () => 2,
+      peers: () => [{ peerId: "g-a", pc, via: "entrance" }],
+      sendJson: (m) => json.push(m),
+      captureProgram: async () => ({
+        audio: null,
+        video,
+        stop: vi.fn(),
+      }),
+    });
+    expect((await media.startProgram(file)).ok).toBe(true);
+    expect(json).toContainEqual({
+      type: SESSION_CAST_TYPE,
+      v: 1,
+      op: "offer",
+      from: "host",
+      kind: "video",
+      name: "MTV.mp4",
+    });
+    expect(pc.transceivers[3]!.sender.replaceTrack).toHaveBeenCalledWith(video);
+    expect(media.getState().programName).toBe("MTV.mp4");
+    expect(media.getState().localProgramStream).not.toBeNull();
+  });
+
+  it("auto-pulls program RTP when the TV is offered", async () => {
+    const json: unknown[] = [];
+    const media = createRoomMedia({
+      localAgentId: "g-a",
+      occupantCount: () => 2,
+      peers: () => [],
+      sendJson: (m) => json.push(m),
+    });
+    await media.onControl({
+      type: SESSION_CAST_TYPE,
+      v: 1,
+      op: "offer",
+      from: "host",
+      kind: "video",
+      name: "MTV.mp4",
+    });
+    expect(media.getState().watchingProgram).toBe(true);
+    expect(media.getState().remoteProgramName).toBe("MTV.mp4");
+    expect(json).toContainEqual({
+      type: SESSION_CAST_TYPE,
+      v: 1,
+      op: "request",
+      from: "g-a",
+    });
+  });
+
+  it("sends presence audio and program video to the same peer", async () => {
+    const pc = mockPc();
+    const mic = track("audio", "mic");
+    const video = track("video", "prog-v");
+    const file = new File([new Uint8Array(4)], "clip.mp4", { type: "video/mp4" });
+    const media = createRoomMedia({
+      localAgentId: "host",
+      occupantCount: () => 2,
+      peers: () => [{ peerId: "g-a", pc, via: "entrance" }],
+      sendJson: () => {},
+      getUserMedia: async () =>
+        ({ getVideoTracks: () => [], getAudioTracks: () => [mic] }) as unknown as MediaStream,
+      captureProgram: async () => ({
+        audio: null,
+        video,
+        stop: vi.fn(),
+      }),
+    });
+    expect((await media.enableMic()).ok).toBe(true);
+    expect((await media.startProgram(file)).ok).toBe(true);
     expect(pc.transceivers[0]!.sender.replaceTrack).toHaveBeenCalledWith(mic);
+    expect(pc.transceivers[3]!.sender.replaceTrack).toHaveBeenCalledWith(video);
+  });
+
+  it("puts a designated peer live onto the program slot", async () => {
+    const json: unknown[] = [];
+    const a = mockPc();
+    const b = mockPc();
+    const cam = track("video", "from-a");
+    a.transceivers[1]!.receiver.track = cam as unknown as {
+      kind: string;
+      id: string;
+      readyState: "live" | "ended";
+    };
+    const media = createRoomMedia({
+      localAgentId: "host",
+      occupantCount: () => 3,
+      peers: () => [
+        { peerId: "g-a", pc: a, via: "entrance" },
+        { peerId: "g-b", pc: b, via: "entrance" },
+      ],
+      sendJson: (m) => json.push(m),
+      forward: true,
+    });
+    await media.putLiveOnTv("g-a", "小明");
+    expect(json).toContainEqual({
+      type: SESSION_CAMERA_TYPE,
+      v: 1,
+      op: "request",
+      from: "host",
+    });
+    expect(b.transceivers[3]!.sender.replaceTrack).toHaveBeenCalledWith(cam);
+    expect(media.getState().programName).toBe("小明");
   });
 
   it("lets display media replace the camera on the same live video slot", async () => {
@@ -368,6 +496,7 @@ describe("createRoomMedia", () => {
     expect((await media.watchCamera()).ok).toBe(true);
     expect((await media.watchProgram("file-1")).ok).toBe(false);
     expect(media.getState().watching).toBe(true);
+    expect(media.getState().watchingProgram).toBe(false);
     expect(json.some((m) => (m as { op?: string }).op === "release")).toBe(
       false
     );

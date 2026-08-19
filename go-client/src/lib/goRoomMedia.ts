@@ -1,6 +1,6 @@
 /**
  * 包廂在場／節目媒體：replaceTrack on booth 2+2。
- * 掛上目錄、request 才對該 peer 送 RTP（PG-GO-ROOM-PLAN §5.5／§9）。
+ * 節目＝房級電視；在場聲＝開麥即送；在場影像仍要 request（PG-GO-ROOM-PLAN §9.8）。
  */
 
 import {
@@ -47,6 +47,7 @@ export type RoomMediaState = {
   remoteProgramKind: "audio" | "video" | null;
   presenceStream: MediaStream | null;
   programStream: MediaStream | null;
+  localProgramStream: MediaStream | null;
   localPreviewStream: MediaStream | null;
   ownerDecodeUrl: string | null;
   ownerDecodeKind: "audio" | "video" | null;
@@ -84,6 +85,7 @@ export type RoomMedia = {
   disableMic(): Promise<void>;
   startProgram(file: File): Promise<RoomMediaResult>;
   stopProgram(): Promise<void>;
+  putLiveOnTv(peerId: string, name?: string): Promise<RoomMediaResult>;
   warmProgram(id: string): Promise<RoomMediaResult>;
   captureFromElement(el: HTMLMediaElement): Promise<RoomMediaResult>;
   stopStreamingFile(id: string): Promise<void>;
@@ -156,7 +158,8 @@ export function createRoomMedia(opts: {
   let remoteProgramFrom: string | null = null;
   let remoteCameraFrom: string | null = null;
   let remoteMicFrom: string | null = null;
-  const sendKindByPeer = new Map<string, "presence" | "program">();
+  let programFromLive = false;
+  let tvSourcePeerId: string | null = null;
   let remotePresenceVideo: MediaStreamTrack | null = null;
   let remotePresenceAudio: MediaStreamTrack | null = null;
   let remoteProgramVideo: MediaStreamTrack | null = null;
@@ -174,6 +177,7 @@ export function createRoomMedia(opts: {
   let remoteLives: { peerId: string; camera: boolean; mic: boolean }[] = [];
   let presenceCache: { ids: string; stream: MediaStream } | null = null;
   let programCache: { ids: string; stream: MediaStream } | null = null;
+  let localProgramCache: { ids: string; stream: MediaStream } | null = null;
   let localCache: { ids: string; stream: MediaStream } | null = null;
 
   function snap(): RoomMediaState {
@@ -185,8 +189,13 @@ export function createRoomMedia(opts: {
       (t): t is MediaStreamTrack => Boolean(t) && isLiveTrack(t)
     );
     const localTracks = [camera].filter((t): t is MediaStreamTrack => Boolean(t));
+    const localProgramTracks = [
+      program?.video ?? null,
+      program?.audio ?? null,
+    ].filter((t): t is MediaStreamTrack => isLiveTrack(t));
     presenceCache = streamOf(presenceTracks, presenceCache);
     programCache = streamOf(programTracks, programCache);
+    localProgramCache = streamOf(localProgramTracks, localProgramCache);
     localCache = streamOf(localTracks, localCache);
     return {
       camera: liveSource === "camera",
@@ -197,6 +206,7 @@ export function createRoomMedia(opts: {
       remoteProgramKind,
       presenceStream: presenceCache?.stream ?? null,
       programStream: programCache?.stream ?? null,
+      localProgramStream: localProgramCache?.stream ?? null,
       localPreviewStream: localCache?.stream ?? null,
       ownerDecodeUrl,
       ownerDecodeKind,
@@ -303,33 +313,52 @@ export function createRoomMedia(opts: {
     }
   }
 
-  function outboundKind(
-    peerId: string
-  ): "presence" | "program" | null {
-    return (
-      sendKindByPeer.get(peerId) ??
-      (programWatchers.has(peerId)
-        ? "program"
-        : cameraWatchers.has(peerId) || micListeners.has(peerId)
-          ? "presence"
-          : null)
+  function markAll(set: Set<string>): number {
+    const before = set.size;
+    for (const peer of opts.peers()) {
+      if (peer.peerId) set.add(peer.peerId);
+    }
+    return set.size - before;
+  }
+
+  function syncLiveProgram(): void {
+    if (!programFromLive || !tvSourcePeerId) return;
+    if (
+      tvSourcePeerId === "local" ||
+      tvSourcePeerId === opts.localAgentId
+    ) {
+      program = { audio: mic, video: camera, stop() {} };
+      return;
+    }
+    const from = opts.peers().find((p) => p.peerId === tvSourcePeerId);
+    if (!from) return;
+    program = {
+      audio: receiverTrack(from.pc, "presence", "audio"),
+      video: receiverTrack(from.pc, "presence", "video"),
+      stop() {},
+    };
+  }
+
+  function offerProgram(): void {
+    if (!program && !programName) return;
+    opts.sendJson(
+      buildSessionCastMessage({
+        op: "offer",
+        from: opts.localAgentId,
+        kind: program?.video ? "video" : "audio",
+        name: programName ?? "節目",
+      })
     );
   }
 
   async function push(): Promise<void> {
     for (const peer of opts.peers()) {
       if (!peer.peerId) continue;
-      const kind = outboundKind(peer.peerId);
       const presenceVideo =
-        kind === "presence" && camera && cameraWatchers.has(peer.peerId)
-          ? camera
-          : null;
+        camera && cameraWatchers.has(peer.peerId) ? camera : null;
       const presenceAudio =
-        kind === "presence" && mic && micListeners.has(peer.peerId)
-          ? mic
-          : null;
-      const sendProgram =
-        kind === "program" && program && programWatchers.has(peer.peerId);
+        mic && micListeners.has(peer.peerId) ? mic : null;
+      const sendProgram = Boolean(program && programWatchers.has(peer.peerId));
       await replaceBoothTrack(peer.pc, "presence", "audio", presenceAudio);
       await replaceBoothTrack(peer.pc, "presence", "video", presenceVideo);
       await replaceBoothTrack(
@@ -388,6 +417,8 @@ export function createRoomMedia(opts: {
     }
     program?.stop();
     program = next;
+    programFromLive = false;
+    tvSourcePeerId = null;
     programName = file.name.trim() || "影片";
     remoteProgramName = null;
     remoteProgramKind = null;
@@ -554,6 +585,7 @@ export function createRoomMedia(opts: {
             from: opts.localAgentId,
           })
         );
+        markAll(micListeners);
         await push();
         emit();
         return { ok: true };
@@ -581,19 +613,73 @@ export function createRoomMedia(opts: {
     async startProgram(file) {
       const out = await captureLocalFile(file);
       if (!out.ok) return out;
+      markAll(programWatchers);
+      offerProgram();
       await push();
       emit();
       return { ok: true };
     },
     async stopProgram() {
+      if (program || programName) {
+        opts.sendJson(
+          buildSessionCastMessage({
+            op: "unoffer",
+            from: opts.localAgentId,
+          })
+        );
+      }
       programWatchers.clear();
-      program?.stop();
+      if (!programFromLive) program?.stop();
       program = null;
+      programFromLive = false;
+      tvSourcePeerId = null;
       programName = null;
       streamingFileId = null;
       revokeOwnerDecode();
       await push();
       emit();
+    },
+    async putLiveOnTv(peerId, name) {
+      const local =
+        !peerId ||
+        peerId === "local" ||
+        peerId === opts.localAgentId;
+      if (local) {
+        if (!camera && !mic) {
+          return { ok: false, error: "先開鏡頭或麥克風" };
+        }
+        if (!programFromLive) program?.stop();
+        tvSourcePeerId = opts.localAgentId;
+        programFromLive = true;
+        program = {
+          audio: mic,
+          video: camera,
+          stop() {},
+        };
+      } else {
+        const from = opts.peers().find((p) => p.peerId === peerId);
+        if (!from) return { ok: false, error: "這個人不在" };
+        if (!programFromLive) program?.stop();
+        tvSourcePeerId = peerId;
+        programFromLive = true;
+        opts.sendJson(
+          buildSessionCameraMessage({
+            op: "request",
+            from: opts.localAgentId,
+          })
+        );
+        syncLiveProgram();
+      }
+      programName = name?.trim() || "鏡頭";
+      remoteProgramName = null;
+      remoteProgramKind = null;
+      error = null;
+      markAll(programWatchers);
+      offerProgram();
+      await push();
+      if (!local) await this.forwardFrom(peerId);
+      emit();
+      return { ok: true };
     },
     async warmProgram(id) {
       const file = opts.resolveLocalFile?.(id) ?? null;
@@ -704,8 +790,22 @@ export function createRoomMedia(opts: {
       listening = false;
       emit();
     },
-    async watchProgram() {
-      return { ok: false, error: "影音檔請用播放，不走 live stream" };
+    async watchProgram(id?: string) {
+      if (id) {
+        return { ok: false, error: "影音檔請用播放，不走 live stream" };
+      }
+      watchingProgram = true;
+      error = null;
+      collectRemoteFromPeers();
+      opts.sendJson(
+        buildSessionCastMessage({
+          op: "request",
+          from: opts.localAgentId,
+        })
+      );
+      emit();
+      scheduleIngest();
+      return { ok: true };
     },
     async stopWatchingProgram() {
       if (watchingProgram) {
@@ -722,6 +822,12 @@ export function createRoomMedia(opts: {
     },
     async refresh() {
       collectRemoteFromPeers();
+      if (programFromLive) syncLiveProgram();
+      if (program) {
+        const added = markAll(programWatchers);
+        if (added > 0) offerProgram();
+      }
+      if (mic) markAll(micListeners);
       await push();
       emit();
     },
@@ -732,23 +838,29 @@ export function createRoomMedia(opts: {
       if (!from) return;
       for (const dest of peers) {
         if (dest.peerId === fromPeerId) continue;
-        const kind = outboundKind(dest.peerId);
-        if (kind === "presence") {
-          if (!camera && cameraWatchers.has(dest.peerId)) {
-            const video = receiverTrack(from.pc, "presence", "video");
-            if (video) {
-              await replaceBoothTrack(dest.pc, "presence", "video", video);
-            }
-          }
-          if (!mic && micListeners.has(dest.peerId)) {
-            const audio = receiverTrack(from.pc, "presence", "audio");
-            if (audio) {
-              await replaceBoothTrack(dest.pc, "presence", "audio", audio);
-            }
+        if (!camera && cameraWatchers.has(dest.peerId)) {
+          const video = receiverTrack(from.pc, "presence", "video");
+          if (video) {
+            await replaceBoothTrack(dest.pc, "presence", "video", video);
           }
         }
+        if (!mic && micListeners.has(dest.peerId)) {
+          const audio = receiverTrack(from.pc, "presence", "audio");
+          if (audio) {
+            await replaceBoothTrack(dest.pc, "presence", "audio", audio);
+          }
+        }
+        if (programFromLive && programWatchers.has(dest.peerId)) {
+          const audio =
+            program?.audio ?? receiverTrack(from.pc, "presence", "audio");
+          const video =
+            program?.video ?? receiverTrack(from.pc, "presence", "video");
+          if (audio) await replaceBoothTrack(dest.pc, "program", "audio", audio);
+          if (video) await replaceBoothTrack(dest.pc, "program", "video", video);
+          continue;
+        }
         if (program) continue;
-        if (kind !== "program" || !programWatchers.has(dest.peerId)) continue;
+        if (!programWatchers.has(dest.peerId)) continue;
         const audio = receiverTrack(from.pc, "program", "audio");
         const video = receiverTrack(from.pc, "program", "video");
         if (audio) await replaceBoothTrack(dest.pc, "program", "audio", audio);
@@ -772,7 +884,6 @@ export function createRoomMedia(opts: {
         }
         if (data.op === "request") {
           cameraWatchers.add(data.from);
-          sendKindByPeer.set(data.from, "presence");
           if (camera) await push();
           else if (opts.forward && remoteCameraFrom && remoteCameraFrom !== data.from) {
             await this.forwardFrom(remoteCameraFrom);
@@ -782,9 +893,6 @@ export function createRoomMedia(opts: {
         }
         if (data.op === "release") {
           cameraWatchers.delete(data.from);
-          if (!cameraWatchers.has(data.from) && !micListeners.has(data.from)) {
-            sendKindByPeer.delete(data.from);
-          }
           await push();
           emit();
         }
@@ -796,6 +904,11 @@ export function createRoomMedia(opts: {
           setRemoteLive(data.from, { mic: true });
           remoteMicFrom = data.from;
           emit();
+          if (!listening) void this.listenMic();
+          if (opts.forward) {
+            markAll(micListeners);
+            await this.forwardFrom(data.from);
+          }
           return;
         }
         if (data.op === "unoffer") {
@@ -807,7 +920,6 @@ export function createRoomMedia(opts: {
         if (data.op === "request") {
           if (!mic && !opts.forward) return;
           micListeners.add(data.from);
-          sendKindByPeer.set(data.from, "presence");
           if (mic) await push();
           else if (opts.forward && remoteMicFrom && remoteMicFrom !== data.from) {
             await this.forwardFrom(remoteMicFrom);
@@ -817,9 +929,6 @@ export function createRoomMedia(opts: {
         }
         if (data.op === "release") {
           micListeners.delete(data.from);
-          if (!cameraWatchers.has(data.from) && !micListeners.has(data.from)) {
-            sendKindByPeer.delete(data.from);
-          }
           await push();
           emit();
         }
@@ -832,6 +941,11 @@ export function createRoomMedia(opts: {
         remoteProgramKind = data.kind ?? "video";
         remoteProgramFrom = data.from;
         emit();
+        if (!watchingProgram) void this.watchProgram();
+        if (opts.forward) {
+          markAll(programWatchers);
+          await this.forwardFrom(data.from);
+        }
         return;
       }
       if (data.op === "unoffer") {
@@ -847,54 +961,12 @@ export function createRoomMedia(opts: {
           return;
         }
         programWatchers.add(data.from);
-        sendKindByPeer.set(data.from, "program");
         const peers = opts.peers().filter((p) => p.peerId);
         if (!peers.some((p) => p.peerId === data.from)) {
-          for (const p of peers) {
-            programWatchers.add(p.peerId);
-            sendKindByPeer.set(p.peerId, "program");
-          }
-        }
-        if (data.id && opts.resolveLocalFile) {
-          const file = opts.resolveLocalFile(data.id);
-          if (file) {
-            const out = await ensureCaptured(data.id);
-            if (out.ok) {
-              opts.sendJson(
-                buildSessionCastMessage({
-                  op: "state",
-                  from: opts.localAgentId,
-                  id: data.id,
-                  paused: false,
-                  t: 0,
-                })
-              );
-            } else {
-              opts.sendJson(
-                buildSessionCastMessage({
-                  op: "reject",
-                  from: opts.localAgentId,
-                  id: data.id,
-                })
-              );
-              emit();
-              return;
-            }
-          } else if (!opts.forward) {
-            opts.sendJson(
-              buildSessionCastMessage({
-                op: "reject",
-                from: opts.localAgentId,
-                id: data.id,
-              })
-            );
-            emit();
-            return;
-          }
+          for (const p of peers) programWatchers.add(p.peerId);
         }
         if (program) await push();
-        const owner =
-          (data.id && opts.ownerOf?.(data.id)) || remoteProgramFrom;
+        const owner = remoteProgramFrom;
         if (opts.forward && owner && owner !== opts.localAgentId) {
           await this.forwardFrom(owner);
         }
@@ -915,7 +987,6 @@ export function createRoomMedia(opts: {
       }
       if (data.op === "release") {
         programWatchers.delete(data.from);
-        if (!programWatchers.has(data.from)) sendKindByPeer.delete(data.from);
         await push();
         emit();
       }
@@ -936,6 +1007,10 @@ export function createRoomMedia(opts: {
       const slot = boothSlotOfIndex(index);
       if (!slot) return;
       holdRemote(slot, ev.track);
+      if (programFromLive) {
+        syncLiveProgram();
+        void push();
+      }
       emit();
     },
     getState: snap,

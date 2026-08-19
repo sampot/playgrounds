@@ -10,26 +10,29 @@
   import { goRoomMedia } from "$lib/goRoomMedia.svelte";
   import { pickRoomFileSave } from "$lib/goRoomFileSave";
   import GoShareSheet from "$lib/GoShareSheet.svelte";
+  import GoBoothStage from "$lib/GoBoothStage.svelte";
   import { chromeSession } from "$lib/chromeSession.svelte";
+  import type { BoothHotspotId } from "$lib/goBoothHotspots";
   import {
     GO_ROOM_CAMERA_STOP_WATCH,
     GO_ROOM_CAST_STOP_WATCH,
     GO_ROOM_EMPTY_TIMELINE,
     GO_ROOM_END_CONFIRM_HOST,
-    GO_ROOM_KEEP_OPEN,
     GO_ROOM_LEAVE_CONFIRM_GUEST,
     GO_ROOM_LOGIN_HINT,
-    GO_ROOM_MEDIA_OFF,
+    GO_ROOM_PUT_ON_TV,
     GO_ROOM_SHARE_HINT,
     GO_ROOM_SHARE_TITLE,
+    GO_ROOM_TV_OFF_BTN,
     attachMediaStream,
+    attachPlaybackUrl,
     canShareDisplay,
     isRoomInviteShareable,
     roomChatWhoLabel,
-    roomInviteRemainLabel,
-    roomMediaSummary,
     roomOccupantRows,
-    roomOccupantSummary,
+    roomStageStatus,
+    roomTvLabel,
+    roomTvStream,
     takePickedFiles,
     type RoomInviteDoor,
     type RoomOccupantPeer,
@@ -37,6 +40,7 @@
   import {
     catalogConsumes,
     catalogPlayLabel,
+    catalogTransferHint,
   } from "$lib/goRoomCatalog";
 
   type RoomUiPhase = "idle" | "open" | "ended" | "error" | "connecting" | "ready";
@@ -94,6 +98,8 @@
   let filePlayEl = $state<HTMLMediaElement | null>(null);
   let now = $state(Date.now());
   let filesOpen = $state(false);
+  let chatOpen = $state(false);
+  let seatOverlay = $state<number | null>(null);
   let pendingShare = $state(false);
 
   const messages = $derived(goSessionChat.messages);
@@ -102,15 +108,6 @@
   const quickReplies = $derived(goSessionChat.quickReplies);
   const files = $derived(
     goRoomFiles.entries.filter((f) => f.kind !== "dir" && f.kind !== "device")
-  );
-  const mediaSummary = $derived(
-    roomMediaSummary({
-      camera: goRoomMedia.camera,
-      mic: goRoomMedia.mic,
-      display: goRoomMedia.display,
-      watching: goRoomMedia.watching,
-      listening: goRoomMedia.listening,
-    })
   );
   const roster = $derived(
     roomOccupantRows({
@@ -128,6 +125,35 @@
       remoteLives: goRoomMedia.remoteLives,
     })
   );
+  const tvLabel = $derived(
+    roomTvLabel({
+      programName: goRoomMedia.programName,
+      remoteProgramName: goRoomMedia.remoteProgramName,
+    })
+  );
+  const tvStream = $derived(
+    roomTvStream({
+      programStream: goRoomMedia.programStream,
+      localProgramStream: goRoomMedia.localProgramStream,
+    })
+  );
+  const tvOn = $derived(
+    Boolean(
+      tvStream || goRoomMedia.programName || goRoomMedia.remoteProgramName
+    )
+  );
+  const overlayOpen = $derived(
+    chatOpen ||
+      filesOpen ||
+      seatOverlay !== null ||
+      (role === "host" && !loggedIn && phase === "idle") ||
+      phase === "connecting" ||
+      phase === "error" ||
+      phase === "ended"
+  );
+  const seatPerson = $derived(
+    seatOverlay !== null ? (roster[seatOverlay] ?? null) : null
+  );
   let dropping = $state(false);
 
   const spoken = $derived.by(() => {
@@ -140,9 +166,6 @@
     }
   });
 
-  const remainLabel = $derived(
-    roomInviteRemainLabel(inviteExpiresAt, now)
-  );
   const shareable = $derived(
     isRoomInviteShareable({ shortUrl, expiresAt: inviteExpiresAt, now })
   );
@@ -164,9 +187,9 @@
     if (phase === "connecting") return message || "正在進包廂…";
     if (phase === "ended") return message || "這一間已結束";
     if (inBooth) {
-      const people = roomOccupantSummary({ guestCount });
-      if (role === "guest" && peerName) return `${people} · ${peerName}`;
-      return message || people;
+      const line = roomStageStatus({ guestCount, tvLabel });
+      if (role === "guest" && peerName) return `${line} · ${peerName}`;
+      return message || line;
     }
     return message;
   });
@@ -202,6 +225,18 @@
 
   $effect(() => {
     chromeSession.escapeGuard = () => {
+      if (chatOpen) {
+        chatOpen = false;
+        return false;
+      }
+      if (filesOpen) {
+        filesOpen = false;
+        return false;
+      }
+      if (seatOverlay !== null) {
+        seatOverlay = null;
+        return false;
+      }
       if (!live) return true;
       leaveAfterEnd = true;
       confirmEnd = true;
@@ -224,6 +259,14 @@
   });
   $effect(() => {
     attachMediaStream(localPreviewEl, goRoomMedia.localPreviewStream);
+  });
+  $effect(() => {
+    const el = filePlayEl;
+    const url = goRoomFiles.playback?.url ?? null;
+    void tick().then(() => {
+      if ((goRoomFiles.playback?.url ?? null) !== url) return;
+      attachPlaybackUrl(filePlayEl ?? el, url);
+    });
   });
 
   function isHostMsg(m: (typeof messages)[number]): boolean {
@@ -332,6 +375,59 @@
     if (!out.ok) fileError = out.error;
   }
 
+  async function onPutOnTv(id: string) {
+    mediaError = "";
+    const file = goRoomFiles.localFile(id);
+    if (!file) {
+      mediaError = "只有這台掛上的檔能放到電視上";
+      return;
+    }
+    const out = await goRoomMedia.startProgram(file);
+    if (!out.ok) mediaError = out.error;
+  }
+
+  async function onPutLiveOnTv(peerId: string, name: string) {
+    mediaError = "";
+    const out = await goRoomMedia.putLiveOnTv(peerId, name);
+    if (!out.ok) mediaError = out.error;
+  }
+
+  async function onStopTv() {
+    mediaError = "";
+    await goRoomMedia.stopProgram();
+  }
+
+  function closePanels() {
+    chatOpen = false;
+    filesOpen = false;
+    seatOverlay = null;
+  }
+
+  function onBoothHotspot(id: BoothHotspotId) {
+    if (id === "tv") {
+      closePanels();
+      if (role === "host") filesOpen = true;
+      return;
+    }
+    if (id === "door") {
+      closePanels();
+      if (role === "host") inviteInBooth();
+      return;
+    }
+    if (id === "shelf") {
+      chatOpen = false;
+      seatOverlay = null;
+      filesOpen = true;
+      return;
+    }
+    if (id.startsWith("seat:")) {
+      const i = Number(id.slice(5));
+      chatOpen = false;
+      filesOpen = false;
+      seatOverlay = Number.isFinite(i) ? i : null;
+    }
+  }
+
   async function onUnshare(id: string) {
     goRoomFiles.unshareLocal(id);
   }
@@ -369,420 +465,374 @@
   }
 </script>
 
-<p class="room-back">
-  {#if live}
-    <button type="button" class="room-back-btn" onclick={() => askEnd(true)}>← 回遊樂場大廳</button>
-  {:else}
-    <a href="/">← 回遊樂場大廳</a>
-  {/if}
-</p>
+<h1 class="sr-only">包廂</h1>
+<p class="sr-only" role="status">{statusLabel}</p>
 
-<header class="room-head">
-  <div class="room-head-row">
-    <h1 class="pixel-text">包廂</h1>
-    {#if inBooth}
-      <div class="room-head-actions">
+<GoBoothStage
+  occupants={inBooth ? roster : []}
+  {tvOn}
+  {tvStream}
+  {overlayOpen}
+  showTools={inBooth}
+  inviteEnabled={role === "host"}
+  onHotspot={onBoothHotspot}
+>
+  {#if role === "host" && !loggedIn && phase === "idle"}
+    <div class="booth-overlay" role="dialog" aria-modal="true" aria-labelledby="room-login-title">
+      <div class="booth-sheet pixel-box">
+        <p id="room-login-title" class="booth-sheet-title pixel-text">開包廂</p>
+        <p>開這一間是為了請人進來一起看電視。被請進來的人不必有通行證。</p>
+        <button type="button" class="pixel-btn pixel-btn--primary" onclick={() => onLogin?.()}>
+          登入後開包廂
+        </button>
+        <p class="muted">{GO_ROOM_LOGIN_HINT} 單機小品不受影響。</p>
+      </div>
+    </div>
+  {:else if phase === "connecting"}
+    <div class="booth-overlay" role="status">
+      <div class="booth-sheet pixel-box">
+        <p>{message || "正在進包廂…"}</p>
+      </div>
+    </div>
+  {:else if phase === "error"}
+    <div class="booth-overlay" role="alert">
+      <div class="booth-sheet pixel-box">
+        <p class="err">{error || "無法開始"}</p>
         {#if role === "host"}
+          <button type="button" class="pixel-btn pixel-btn--primary" onclick={() => onInvite?.()}>
+            再試一次
+          </button>
+        {/if}
+      </div>
+    </div>
+  {:else if phase === "ended"}
+    <div class="booth-overlay" role="status">
+      <div class="booth-sheet pixel-box">
+        <p>{message || "這一間已結束"}</p>
+        <div class="room-actions">
+          {#if role === "host" && loggedIn}
+            <button type="button" class="pixel-btn pixel-btn--primary" onclick={() => onReissue?.()}>
+              再開一間
+            </button>
+          {/if}
+          <a class="pixel-btn" href="/">回遊樂場大廳</a>
+        </div>
+      </div>
+    </div>
+  {:else if chatOpen && showComposer}
+    <div class="booth-overlay" role="dialog" aria-modal="true" aria-label="包廂文字">
+      <div class="booth-sheet pixel-box">
+        <div class="booth-sheet-bar">
+          <p class="booth-sheet-title pixel-text">文字</p>
+          <button type="button" class="pixel-btn" onclick={() => (chatOpen = false)}>關閉</button>
+        </div>
+        <div class="room-timeline" bind:this={listEl} role="log" aria-label="包廂文字">
+          {#if messages.length === 0}
+            <p class="muted">{GO_ROOM_EMPTY_TIMELINE}</p>
+          {/if}
+          {#each messages as m (m.id)}
+            <div
+              class={[
+                "bubble",
+                m.local && "bubble--local",
+                isHostMsg(m) && "bubble--host",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+            >
+              <span class="bubble-who">
+                {#if isHostMsg(m)}
+                  <span class="host-tag">主持</span>
+                {/if}
+                {#if who(m)}<span>{who(m)}</span>{/if}
+              </span>
+              <span class="bubble-text">{m.text}</span>
+            </div>
+          {/each}
+        </div>
+        {#if quickReplies.length > 0}
           <button
             type="button"
-            class="pixel-btn pixel-btn--primary"
-            onclick={() => inviteInBooth()}
+            class="quick-toggle"
+            aria-expanded={quickOpen}
+            onclick={() => (quickOpen = !quickOpen)}
           >
-            {door === "expired" ? "再發一張" : "請人進來"}
+            {quickOpen ? "▾" : "▸"} 快捷語
           </button>
-        {/if}
-        <button type="button" class="pixel-btn pixel-btn--danger-outline" onclick={() => askEnd()}>
-          {role === "host" ? "結束" : "離開"}
-        </button>
-      </div>
-    {/if}
-  </div>
-  <p class="room-status" role="status">{statusLabel || "臨時隔間：對話只在在場者之間；檔案點下載才存到你選的位置。"}</p>
-  {#if inBooth}
-    <ul class="occupant-chips" aria-label="在場">
-      {#each roster as o (o.peerId)}
-        <li class="occupant-chip">
-          <span class="occupant-avatar" aria-hidden="true">{o.name.slice(0, 1)}</span>
-          <span class="occupant-name">{o.name}</span>
-          {#if o.liveVideo || o.liveAudio}
-            <span
-              class="occupant-live"
-              title={o.liveVideo
-                ? o.mine && goRoomMedia.display
-                  ? "畫面已開"
-                  : "鏡頭已開"
-                : "麥克風已開"}
-            >
-              {o.liveVideo
-                ? o.mine && goRoomMedia.display
-                  ? "畫面"
-                  : "鏡頭"
-                : "麥"}
-            </span>
-            {#if !o.mine}
-              {#if goRoomMedia.watching || goRoomMedia.listening}
-                <button
-                  type="button"
-                  class="pixel-btn occupant-watch"
-                  onclick={() => void onStopWatching()}
-                >
-                  {GO_ROOM_CAMERA_STOP_WATCH}
-                </button>
-              {:else}
-                <button
-                  type="button"
-                  class="pixel-btn pixel-btn--primary occupant-watch"
-                  onclick={() => void onWatchOccupant(o.peerId)}
-                >
-                  收看
-                </button>
-              {/if}
-            {/if}
+          {#if quickOpen}
+            <div class="quick" role="group" aria-label="快捷語">
+              {#each quickReplies as q (q)}
+                <button type="button" class="pixel-btn" onclick={() => onQuick(q)}>{q}</button>
+              {/each}
+            </div>
           {/if}
-        </li>
-      {/each}
-    </ul>
-      <div class="live-toolbar">
-        <button type="button" class="pixel-btn" onclick={() => void onToggleCamera()}>
-          {goRoomMedia.camera ? "關鏡頭" : "開鏡頭"}
-        </button>
-        <button type="button" class="pixel-btn" onclick={() => void onToggleMic()}>
-          {goRoomMedia.mic ? "關麥克風" : "開麥克風"}
-        </button>
-        {#if canShareDisplay()}
-          <button type="button" class="pixel-btn" onclick={() => void onToggleDisplay()}>
-            {goRoomMedia.display ? "停止畫面" : "分享畫面"}
-          </button>
         {/if}
-      </div>
-      {#if mediaError}
-        <p class="err" role="alert">{mediaError}</p>
-      {/if}
-      {#if goRoomMedia.error && goRoomMedia.error !== mediaError}
-        <p class="err" role="alert">{goRoomMedia.error}</p>
-      {/if}
-      {#if goRoomMedia.localPreviewStream}
-        <video
-          bind:this={localPreviewEl}
-          class="media-video"
-          autoplay
-          muted
-          playsinline
-          aria-label={goRoomMedia.display ? "我的畫面" : "我的鏡頭"}
-        ></video>
-      {/if}
-      <video
-        bind:this={presenceVideoEl}
-        class={[
-          "media-video",
-          !goRoomMedia.watching && "media-video--idle",
-        ]
-          .filter(Boolean)
-          .join(" ")}
-        autoplay
-        playsinline
-        muted={!goRoomMedia.listening}
-        aria-hidden={!goRoomMedia.watching}
-        aria-label="正在收看"
-      ></video>
-      {#if goRoomMedia.watching || goRoomMedia.listening}
-        <div class="live-toolbar">
-          <button type="button" class="pixel-btn" onclick={() => void onStopWatching()}>
-            {GO_ROOM_CAMERA_STOP_WATCH}
+        <form class="composer" onsubmit={onSubmit}>
+          <input
+            class="pixel-input composer-input"
+            type="text"
+            maxlength={SESSION_CHAT_MAX_TEXT_CHARS}
+            placeholder="說點什麼…"
+            autocomplete="off"
+            enterkeyhint="send"
+            bind:value={draft}
+          />
+          <button type="submit" class="pixel-btn pixel-btn--primary" disabled={!draft.trim()}>
+            送出
           </button>
-        </div>
-      {/if}
-  {/if}
-</header>
-
-{#if role === "host" && !loggedIn && phase === "idle"}
-  <section class="pixel-frame room-card">
-    <p>
-      這一間可以傳文字，也可以在分享區掛檔。點下載才會存到你選的位置。關分頁或結束就沒了目錄，不會存到遊樂場伺服器。
-    </p>
-    <button type="button" class="pixel-btn pixel-btn--primary" onclick={() => onLogin?.()}>
-      登入後開包廂
-    </button>
-    <p class="muted">{GO_ROOM_LOGIN_HINT} 單機小品不受影響。</p>
-  </section>
-{/if}
-
-{#if phase === "connecting"}
-  <section class="pixel-frame room-card" role="status">
-    <p>{message || "正在進包廂…"}</p>
-  </section>
-{/if}
-
-{#if phase === "error"}
-  <section class="pixel-frame room-card" role="alert">
-    <p class="err">{error || "無法開始"}</p>
-    {#if role === "host"}
-      <button type="button" class="pixel-btn pixel-btn--primary" onclick={() => onInvite?.()}>
-        再試一次
-      </button>
-    {/if}
-  </section>
-{/if}
-
-{#if phase === "ended"}
-  <section class="pixel-frame room-card" role="status">
-    <p>{message || "這一間已結束"}</p>
-    <div class="room-actions">
-      {#if role === "host" && loggedIn}
-        <button type="button" class="pixel-btn pixel-btn--primary" onclick={() => onReissue?.()}>
-          再開一間
-        </button>
-      {/if}
-      <a class="pixel-btn" href="/">回遊樂場大廳</a>
+        </form>
+      </div>
     </div>
-  </section>
-{/if}
-
-{#if inBooth}
-  <div class="room-main">
-    <div class="room-col">
-    <div class="room-timeline pixel-frame" bind:this={listEl} role="log" aria-label="包廂時間線">
-      {#if messages.length === 0}
-        <p class="muted">{GO_ROOM_EMPTY_TIMELINE}</p>
-      {/if}
-      {#each messages as m (m.id)}
-        <div
-          class={[
-            "bubble",
-            m.local && "bubble--local",
-            isHostMsg(m) && "bubble--host",
-          ]
-            .filter(Boolean)
-            .join(" ")}
-        >
-          <span class="bubble-who">
-            {#if isHostMsg(m)}
-              <span class="host-tag">主持</span>
-            {/if}
-            {#if who(m)}<span>{who(m)}</span>{/if}
-          </span>
-          <span class="bubble-text">{m.text}</span>
-        </div>
-      {/each}
-    </div>
-
-    {#if showComposer}
-    <section
-      class={["file-tray", "pixel-frame", dropping && "file-tray--drop"]
-        .filter(Boolean)
-        .join(" ")}
+  {:else if filesOpen && showComposer}
+    <div
+      class={["booth-overlay", dropping && "booth-overlay--drop"].filter(Boolean).join(" ")}
+      role="dialog"
+      aria-modal="true"
       aria-labelledby="room-files-title"
       ondragover={(e) => {
         e.preventDefault();
         dropping = true;
-        filesOpen = true;
       }}
       ondragleave={() => (dropping = false)}
       ondrop={(e) => {
         e.preventDefault();
         dropping = false;
-        filesOpen = true;
         const list = e.dataTransfer?.files;
         if (list) void shareFiles(list);
       }}
     >
-      {#if goRoomFiles.playback}
-        <div class="file-player">
-          {#if goRoomFiles.playback.kind === "audio"}
-            <audio
-              bind:this={filePlayEl}
-              class="file-player-audio"
-              src={goRoomFiles.playback.url}
-              controls
-              playsinline
-              ontimeupdate={() =>
-                goRoomFiles.notePlayhead(filePlayEl?.currentTime ?? 0)}
-              aria-label="播放 {goRoomFiles.playback.name}"
-            ></audio>
-          {:else}
-            <video
-              bind:this={filePlayEl}
-              class="media-video media-video--program"
-              src={goRoomFiles.playback.url}
-              controls
-              playsinline
-              ontimeupdate={() =>
-                goRoomFiles.notePlayhead(filePlayEl?.currentTime ?? 0)}
-              aria-label="播放 {goRoomFiles.playback.name}"
-            ></video>
-          {/if}
-          <button
-            type="button"
-            class="pixel-btn"
-            onclick={() => goRoomFiles.stopPlay()}
-          >
-            {GO_ROOM_CAST_STOP_WATCH}
+      <div class="booth-sheet pixel-box">
+        <div class="booth-sheet-bar">
+          <p id="room-files-title" class="booth-sheet-title pixel-text">分享區</p>
+          <button type="button" class="pixel-btn" onclick={() => (filesOpen = false)}>關閉</button>
+        </div>
+        {#if goRoomFiles.playback}
+          <div class="file-player">
+            {#if goRoomFiles.playback.kind === "audio"}
+              <audio
+                bind:this={filePlayEl}
+                class="file-player-audio"
+                controls
+                playsinline
+                ontimeupdate={() =>
+                  goRoomFiles.notePlayhead(filePlayEl?.currentTime ?? 0)}
+                aria-label="播放 {goRoomFiles.playback.name}"
+              ></audio>
+            {:else}
+              <video
+                bind:this={filePlayEl}
+                class="media-video media-video--program"
+                controls
+                playsinline
+                ontimeupdate={() =>
+                  goRoomFiles.notePlayhead(filePlayEl?.currentTime ?? 0)}
+                aria-label="播放 {goRoomFiles.playback.name}"
+              ></video>
+            {/if}
+            <button type="button" class="pixel-btn" onclick={() => goRoomFiles.stopPlay()}>
+              {GO_ROOM_CAST_STOP_WATCH}
+            </button>
+          </div>
+        {/if}
+        <p class="muted">
+          只掛檔；影音可私下播放或下載。放到電視上才是全場同一路。
+        </p>
+        {#if fileError}
+          <p class="err" role="alert">{fileError}</p>
+        {/if}
+        <input
+          bind:this={fileInput}
+          class="file-hidden"
+          type="file"
+          multiple
+          onchange={(e) => void onPickFile(e)}
+        />
+        <div class="file-actions">
+          <button type="button" class="pixel-btn" onclick={() => fileInput?.click()}>
+            選擇檔案
           </button>
         </div>
-      {/if}
-      <button
-        type="button"
-        id="room-files-title"
-        class="file-toggle"
-        aria-expanded={filesOpen}
-        onclick={() => (filesOpen = !filesOpen)}
-      >
-        {filesOpen ? "▾" : "▸"} 分享區
-        {#if files.length > 0}
-          · {files.length}
-        {:else}
-          · 尚未掛上
+        {#if files.length === 0}
+          <p class="muted">把檔案拖到這裡，或按選擇檔案（可多選）。</p>
         {/if}
-        {#if mediaSummary !== GO_ROOM_MEDIA_OFF}
-          · {mediaSummary}
-        {/if}
-      </button>
-      {#if filesOpen}
-      <p class="muted">
-        這是這一間的共用目錄。只掛檔；影音可下載或在本機播放。鏡頭開在上面的在場名單，不進目錄。
-      </p>
-      {#if fileError}
-        <p class="err" role="alert">{fileError}</p>
-      {/if}
-      <input
-        bind:this={fileInput}
-        class="file-hidden"
-        type="file"
-        multiple
-        onchange={(e) => void onPickFile(e)}
-      />
-      <div class="file-actions">
-      <button
-        type="button"
-        class="pixel-btn"
-        onclick={() => fileInput?.click()}
-      >
-        選擇檔案
-      </button>
-      </div>
-      {#if files.length === 0}
-        <p class="muted">把檔案拖到這裡，或按選擇檔案（可多選）。鏡頭開在上面的名單。</p>
-      {/if}
-      <ul class="file-list">
-        {#each files as f (f.id)}
-          <li class="file-row">
-            <p class="file-name">{f.path || f.name}</p>
-            <p class="muted">
-              {formatSize(f.size)} · {f.mine ? "我" : f.ownerName}
-              {#if f.status === "transferring"} · 傳送中 {formatSize(f.received)}
-              {:else if f.status === "error"} · {f.error || "失敗"}
-              {/if}
-            </p>
-            <div class="file-actions">
-              {#if catalogConsumes(f).includes("play")}
-                <button
-                  type="button"
-                  class="pixel-btn pixel-btn--primary"
-                  disabled={f.status === "transferring" && goRoomFiles.playback?.id !== f.id}
-                  onclick={() => void onPlayFile(f.id)}
-                >
-                  {goRoomFiles.playback?.id === f.id
-                    ? "停止播放"
-                    : catalogPlayLabel(f)}
-                </button>
-              {/if}
-              {#if f.mine}
-                <button
-                  type="button"
-                  class="pixel-btn"
-                  onclick={() => void onUnshare(f.id)}
-                >
-                  撤回
-                </button>
-              {:else if catalogConsumes(f).includes("download")}
-                <button
-                  type="button"
-                  class="pixel-btn pixel-btn--primary"
-                  disabled={f.status === "transferring"}
-                  onclick={() => void onDownload(f.id)}
-                >
-                  下載
-                </button>
-              {/if}
-            </div>
-          </li>
-        {/each}
-      </ul>
-      {/if}
-    </section>
-  {/if}
-    </div>
-    <aside class="room-side pixel-frame">
-      <p class="side-title">這一間</p>
-      <p class="room-status">{statusLabel}</p>
-      <p class="muted">{GO_ROOM_KEEP_OPEN}</p>
-      {#if roster.length > 0}
-        <ul class="occupant-list">
-          {#each roster as o (o.peerId)}
-            <li>
-              {o.name}{#if o.liveVideo || o.liveAudio}
-                · {o.liveVideo ? "鏡頭" : "麥"}
-              {/if}
+        <ul class="file-list">
+          {#each files as f (f.id)}
+            {@const transferHint = catalogTransferHint({
+              status: f.status,
+              playing: goRoomFiles.playback?.id === f.id,
+            })}
+            <li class="file-row">
+              <p class="file-name">{f.path || f.name}</p>
+              <p class="muted">
+                {formatSize(f.size)} · {f.mine ? "我" : f.ownerName}
+                {#if transferHint} · {transferHint} {formatSize(f.received)}
+                {:else if f.status === "error"} · {f.error || "失敗"}
+                {/if}
+              </p>
+              <div class="file-actions">
+                {#if catalogConsumes(f).includes("play")}
+                  <button
+                    type="button"
+                    class="pixel-btn"
+                    disabled={f.status === "transferring" && goRoomFiles.playback?.id !== f.id}
+                    onclick={() => void onPlayFile(f.id)}
+                  >
+                    {goRoomFiles.playback?.id === f.id
+                      ? "停止播放"
+                      : catalogPlayLabel(f)}
+                  </button>
+                {/if}
+                {#if role === "host" && f.mine && catalogConsumes(f).includes("play")}
+                  <button
+                    type="button"
+                    class="pixel-btn pixel-btn--primary"
+                    onclick={() => void onPutOnTv(f.id)}
+                  >
+                    {GO_ROOM_PUT_ON_TV}
+                  </button>
+                {/if}
+                {#if f.mine}
+                  <button type="button" class="pixel-btn" onclick={() => void onUnshare(f.id)}>
+                    撤回
+                  </button>
+                {:else if catalogConsumes(f).includes("download")}
+                  <button
+                    type="button"
+                    class="pixel-btn pixel-btn--primary"
+                    disabled={f.status === "transferring"}
+                    onclick={() => void onDownload(f.id)}
+                  >
+                    下載
+                  </button>
+                {/if}
+              </div>
             </li>
           {/each}
         </ul>
-      {/if}
-      {#if role === "host"}
-        {#if door === "none"}
-          <p class="muted">還沒發邀請</p>
-        {:else if door === "live"}
-          <p class="muted">邀請有效{remainLabel ? ` · ${remainLabel}` : ""}</p>
-        {:else}
-          <p class="muted">邀請已過期</p>
-        {/if}
-        <button
-          type="button"
-          class="pixel-btn pixel-btn--primary"
-          onclick={() => inviteInBooth()}
-        >
-          {door === "expired" ? "再發一張邀請" : "請人進來"}
-        </button>
-      {/if}
-      <button type="button" class="pixel-btn pixel-btn--danger-outline" onclick={() => askEnd()}>
-        {role === "host" ? "結束這一間" : "離開這一間"}
-      </button>
-    </aside>
-  </div>
-
-  {#if showComposer}
-    {#if quickReplies.length > 0}
-      <button
-        type="button"
-        class="quick-toggle"
-        aria-expanded={quickOpen}
-        onclick={() => (quickOpen = !quickOpen)}
-      >
-        {quickOpen ? "▾" : "▸"} 快捷語
-      </button>
-      {#if quickOpen}
-        <div class="quick" role="group" aria-label="快捷語">
-          {#each quickReplies as q (q)}
-            <button type="button" class="pixel-btn" onclick={() => onQuick(q)}>{q}</button>
-          {/each}
+      </div>
+    </div>
+  {:else if seatPerson}
+    <div class="booth-overlay" role="dialog" aria-modal="true" aria-label={seatPerson.name}>
+      <div class="booth-sheet pixel-box">
+        <div class="booth-sheet-bar">
+          <p class="booth-sheet-title pixel-text">{seatPerson.name}</p>
+          <button type="button" class="pixel-btn" onclick={() => (seatOverlay = null)}>關閉</button>
         </div>
-      {/if}
-    {/if}
-    <form class="composer" onsubmit={onSubmit}>
-      <input
-        class="pixel-input composer-input"
-        type="text"
-        maxlength={SESSION_CHAT_MAX_TEXT_CHARS}
-        placeholder="說點什麼…"
-        autocomplete="off"
-        enterkeyhint="send"
-        bind:value={draft}
-      />
-      <button type="submit" class="pixel-btn pixel-btn--primary" disabled={!draft.trim()}>
-        送出
-      </button>
-    </form>
+        {#if seatPerson.liveVideo || seatPerson.liveAudio}
+          <p class="muted">
+            {seatPerson.liveVideo
+              ? seatPerson.mine && goRoomMedia.display
+                ? "畫面已開"
+                : "鏡頭已開"
+              : "麥克風已開"}
+          </p>
+        {/if}
+        <div class="file-actions">
+          {#if role === "host" && (seatPerson.liveVideo || seatPerson.liveAudio)}
+            <button
+              type="button"
+              class="pixel-btn pixel-btn--primary"
+              onclick={() =>
+                void onPutLiveOnTv(seatPerson.mine ? "local" : seatPerson.peerId, seatPerson.name)}
+            >
+              {GO_ROOM_PUT_ON_TV}
+            </button>
+          {:else if !seatPerson.mine && (seatPerson.liveVideo || seatPerson.liveAudio)}
+            {#if goRoomMedia.watching || goRoomMedia.listening}
+              <button type="button" class="pixel-btn" onclick={() => void onStopWatching()}>
+                {GO_ROOM_CAMERA_STOP_WATCH}
+              </button>
+            {:else}
+              <button
+                type="button"
+                class="pixel-btn pixel-btn--primary"
+                onclick={() => void onWatchOccupant(seatPerson.peerId)}
+              >
+                收看
+              </button>
+            {/if}
+          {:else}
+            <p class="muted">點座位不會自動上電視。</p>
+          {/if}
+        </div>
+      </div>
+    </div>
   {/if}
+</GoBoothStage>
+
+{#if inBooth}
+  <nav class="room-dock" aria-label="包廂操作">
+    <button type="button" class="pixel-btn" onclick={() => askEnd(true)}>回大廳</button>
+    <button
+      type="button"
+      class="pixel-btn pixel-btn--primary"
+      onclick={() => void onToggleMic()}
+    >
+      {goRoomMedia.mic ? "關麥克風" : "開麥克風"}
+    </button>
+    <button
+      type="button"
+      class="pixel-btn"
+      aria-expanded={chatOpen}
+      onclick={() => {
+        chatOpen = !chatOpen;
+        if (chatOpen) {
+          filesOpen = false;
+          seatOverlay = null;
+        }
+      }}
+    >
+      文字{#if messages.length > 0} · {messages.length}{/if}
+    </button>
+    <button type="button" class="pixel-btn" onclick={() => void onToggleCamera()}>
+      {goRoomMedia.camera ? "關鏡頭" : "開鏡頭"}
+    </button>
+    {#if canShareDisplay()}
+      <button type="button" class="pixel-btn" onclick={() => void onToggleDisplay()}>
+        {goRoomMedia.display ? "停止畫面" : "分享畫面"}
+      </button>
+    {/if}
+    {#if role === "host" && tvOn}
+      <button type="button" class="pixel-btn" onclick={() => void onStopTv()}>
+        {GO_ROOM_TV_OFF_BTN}
+      </button>
+    {/if}
+    <button type="button" class="pixel-btn pixel-btn--danger-outline" onclick={() => askEnd()}>
+      {role === "host" ? "結束" : "離開"}
+    </button>
+  </nav>
+  {#if mediaError}
+    <p class="err" role="alert">{mediaError}</p>
+  {/if}
+  {#if goRoomMedia.error && goRoomMedia.error !== mediaError}
+    <p class="err" role="alert">{goRoomMedia.error}</p>
+  {/if}
+  <video
+    bind:this={localPreviewEl}
+    class="media-video media-video--idle"
+    autoplay
+    muted
+    playsinline
+    aria-hidden="true"
+  ></video>
+  <video
+    bind:this={presenceVideoEl}
+    class="media-video media-video--idle"
+    autoplay
+    playsinline
+    muted={!goRoomMedia.listening}
+    aria-hidden="true"
+  ></video>
+{:else}
+  <nav class="room-dock" aria-label="包廂操作">
+    {#if live}
+      <button type="button" class="pixel-btn" onclick={() => askEnd(true)}>回大廳</button>
+    {:else}
+      <a class="pixel-btn" href="/">回大廳</a>
+    {/if}
+  </nav>
 {/if}
+
 
 <dialog
   bind:this={confirmDialog}
@@ -825,6 +875,54 @@
 {/if}
 
 <style>
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .booth-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    z-index: 2;
+    background: color-mix(in oklab, rgb(var(--ink)) 22%, transparent);
+    border-radius: var(--radius);
+  }
+  .booth-overlay--drop {
+    outline: 2px dashed rgb(var(--ink));
+    outline-offset: -6px;
+  }
+  .booth-sheet {
+    width: 100%;
+    max-height: min(70%, 28rem);
+    overflow: auto;
+    padding: 0.75rem 0.85rem 0.9rem;
+    background: rgb(var(--card));
+    border-radius: 0 0 var(--radius) var(--radius);
+    border-top: var(--pixel-edge) solid rgb(var(--ink));
+  }
+  .booth-sheet-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+  .booth-sheet-title {
+    margin: 0;
+    font-size: 0.9rem;
+  }
+  .booth-sheet-bar .pixel-btn {
+    min-height: 44px;
+  }
   .room-back {
     margin: 0 0 0.75rem;
     font-size: 0.9rem;
@@ -917,16 +1015,22 @@
     flex-direction: column;
     gap: 0.75rem;
     margin: 0 0 0.75rem;
+    flex: 1 1 auto;
+    min-height: 0;
   }
   .room-col {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
     min-width: 0;
+    flex: 1 1 auto;
+  }
+  .room-chat-drawer {
+    padding: 0.65rem;
   }
   .room-timeline {
-    min-height: 12rem;
-    max-height: min(50vh, 24rem);
+    min-height: 6rem;
+    max-height: min(36vh, 16rem);
     overflow: auto;
     display: flex;
     flex-direction: column;
@@ -997,6 +1101,11 @@
     opacity: 0;
     pointer-events: none;
     overflow: hidden;
+  }
+  .media-video--presence {
+    width: min(100%, 10rem);
+    max-height: 5rem;
+    object-fit: cover;
   }
   .owner-decode {
     display: grid;
@@ -1148,7 +1257,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: 0.4rem;
-    margin: 0.5rem 0 1rem;
+    margin: 0.5rem 0 0;
   }
   .composer-input {
     flex: 1 1 12rem;
@@ -1156,6 +1265,17 @@
   }
   .composer button[type="submit"] {
     min-height: 44px;
+  }
+  .room-dock {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin: 0.45rem 0 0;
+    padding: 0 0 calc(0.35rem + env(safe-area-inset-bottom, 0px));
+  }
+  .room-dock .pixel-btn {
+    min-height: 44px;
+    flex: 1 1 auto;
   }
   .file-hidden {
     position: absolute;
@@ -1202,8 +1322,7 @@
       min-width: 0;
     }
     .room-timeline {
-      flex: 1 1 auto;
-      max-height: min(50vh, 28rem);
+      max-height: min(40vh, 18rem);
     }
     .room-head-actions {
       display: none;

@@ -7,6 +7,8 @@ import {
   GO_ROOM_MESH_ENABLED,
   GO_ROOM_SHARE_HINT,
   attachMediaStream,
+  attachPlaybackUrl,
+  GO_ROOM_TV_OFF,
   isRoomInviteShareable,
   mediaTrackHasFrames,
   roomChatWhoLabel,
@@ -18,6 +20,9 @@ import {
   roomOccupantRows,
   roomOccupantSummary,
   roomRemoteSinkVisible,
+  roomStageStatus,
+  roomTvLabel,
+  roomTvStream,
   takePickedFiles,
 } from "./goRoom";
 
@@ -95,6 +100,48 @@ describe("roomMediaSummary", () => {
     expect(
       roomMediaSummary({ camera: false, mic: false, display: true })
     ).toBe("畫面已開 · 等對方收看");
+  });
+});
+
+describe("roomTvLabel", () => {
+  it("names the shared TV, not a private player", () => {
+    expect(roomTvLabel({})).toBe(GO_ROOM_TV_OFF);
+    expect(roomTvLabel({ programName: "MTV.mp4" })).toBe("正在播 MTV.mp4");
+    expect(roomTvLabel({ remoteProgramName: "clip.webm" })).toBe(
+      "正在播 clip.webm"
+    );
+    expect(roomTvLabel({ sourceName: "小明" })).toBe("電視上是 小明");
+  });
+});
+
+describe("roomTvStream", () => {
+  it("prefers the remote program RTP over the local capture", () => {
+    const remote = { id: "remote" } as unknown as MediaStream;
+    const local = { id: "local" } as unknown as MediaStream;
+    expect(roomTvStream({ programStream: remote, localProgramStream: local })).toBe(
+      remote
+    );
+    expect(roomTvStream({ programStream: null, localProgramStream: local })).toBe(
+      local
+    );
+    expect(roomTvStream({ programStream: null, localProgramStream: null })).toBeNull();
+  });
+});
+
+describe("roomStageStatus", () => {
+  it("keeps the alone line when the TV is off", () => {
+    expect(
+      roomStageStatus({ guestCount: 0, tvLabel: GO_ROOM_TV_OFF })
+    ).toBe("就你一個人 · 把這頁開著，這一間才還在");
+  });
+
+  it("appends the TV when people are in or the set is on", () => {
+    expect(
+      roomStageStatus({ guestCount: 2, tvLabel: GO_ROOM_TV_OFF })
+    ).toBe("3 人在 · 電視關機");
+    expect(
+      roomStageStatus({ guestCount: 0, tvLabel: "正在播 MTV.mp4" })
+    ).toBe("就你一個人 · 把這頁開著，這一間才還在 · 正在播 MTV.mp4");
   });
 });
 
@@ -234,7 +281,7 @@ describe("booth copy", () => {
 
   it("warns that hung items and live pulls stop when the Host ends the booth", () => {
     expect(GO_ROOM_END_CONFIRM_HOST).toBe(
-      "關掉後在場的人會斷線，目錄會沒了，正在收看的鏡頭會停。已存到硬碟的檔不受影響。"
+      "關掉後在場的人會斷線，目錄會沒了，電視與鏡頭會停。已存到硬碟的檔不受影響。"
     );
     expect(GO_ROOM_LEAVE_CONFIRM_GUEST).toBe(
       "離開後你會斷線；其他人還在。你掛上的項目會從分享區拿掉。"
@@ -258,6 +305,46 @@ describe("mediaTrackHasFrames", () => {
       muted: false,
     } as MediaStreamTrack;
     expect(mediaTrackHasFrames(t)).toBe(true);
+  });
+});
+
+describe("attachPlaybackUrl", () => {
+  it("does not reassign src when the playback URL is unchanged", async () => {
+    const play = vi.fn(async () => {});
+    const assigned: string[] = [];
+    const el = {
+      paused: true,
+      muted: false,
+      play,
+      _src: "",
+      get src() {
+        return this._src;
+      },
+      set src(v: string) {
+        assigned.push(v);
+        this._src = v;
+      },
+    };
+    const url = "blob:play-1";
+    attachPlaybackUrl(el, url);
+    el.paused = false;
+    attachPlaybackUrl(el, url);
+    attachPlaybackUrl(el, url);
+    expect(assigned).toEqual([url]);
+    expect(play).toHaveBeenCalledTimes(1);
+  });
+
+  it("mutes and retries when autoplay with audio is blocked", async () => {
+    const play = vi
+      .fn()
+      .mockRejectedValueOnce(new DOMException("NotAllowedError"))
+      .mockResolvedValueOnce(undefined);
+    const el = { src: "", paused: true, muted: false, play };
+    attachPlaybackUrl(el, "blob:play-2");
+    await vi.waitFor(() => {
+      expect(el.muted).toBe(true);
+    });
+    expect(play).toHaveBeenCalledTimes(2);
   });
 });
 

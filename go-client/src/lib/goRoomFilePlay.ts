@@ -154,6 +154,60 @@ function withFileStart(chunk: Uint8Array, fileStart: number): ArrayBuffer {
   return buf;
 }
 
+export type PlayFeedGate = {
+  push(chunk: Uint8Array): Promise<void>;
+  readyMp4(): Promise<void>;
+  readyRaw(): Promise<void>;
+  pendingBytes(): number;
+};
+
+/** Serialize DC chunks so mp4box never sees out-of-order bytes while createFile is loading. */
+export function createPlayFeedGate(opts: {
+  onMp4Chunk: (buf: ArrayBuffer, fileStart: number) => void;
+  onRawChunk?: (chunk: Uint8Array) => Promise<void>;
+}): PlayFeedGate {
+  const pending: Uint8Array[] = [];
+  let fileStart = 0;
+  let mode: "wait" | "mp4" | "raw" = "wait";
+  let pumping = Promise.resolve();
+
+  async function drain(): Promise<void> {
+    while (pending.length && mode !== "wait") {
+      const chunk = pending.shift();
+      if (!chunk) break;
+      if (mode === "mp4") {
+        opts.onMp4Chunk(withFileStart(chunk, fileStart), fileStart);
+        fileStart += chunk.byteLength;
+      } else {
+        await opts.onRawChunk?.(chunk);
+      }
+    }
+  }
+
+  function enqueue(work: () => Promise<void>): Promise<void> {
+    pumping = pumping.then(work, work);
+    return pumping;
+  }
+
+  return {
+    push(chunk: Uint8Array) {
+      pending.push(chunk.slice());
+      return enqueue(drain);
+    },
+    readyMp4() {
+      mode = "mp4";
+      return enqueue(drain);
+    },
+    readyRaw() {
+      mode = "raw";
+      return enqueue(drain);
+    },
+    pendingBytes() {
+      return pending.reduce((n, c) => n + c.byteLength, 0);
+    },
+  };
+}
+
 async function loadMp4Box(): Promise<{ createFile: () => Mp4BoxFile } | null> {
   try {
     const mod = (await import("mp4box")) as {
@@ -182,17 +236,22 @@ export function createMsePlaySink(opts: PlaySinkOpts = {}): RoomPlaySink {
 
   const ms = new MediaSrc();
   const url = URL.createObjectURL(ms);
-  const pending: Uint8Array[] = [];
-  let queuedBytes = 0;
   let appended = 0;
   let sb: SourceBuffer | null = null;
   let updating = Promise.resolve();
   let dead = false;
-  let fileStart = 0;
   let mp4: Mp4BoxFile | null = null;
+  const gate = createPlayFeedGate({
+    onMp4Chunk(buf) {
+      mp4?.appendBuffer(buf);
+    },
+    async onRawChunk(chunk) {
+      await appendRaw(chunk);
+    },
+  });
 
   function liveBytes(): number {
-    return queuedBytes + Math.max(0, appended);
+    return gate.pendingBytes() + Math.max(0, appended);
   }
 
   async function evictIfNeeded(): Promise<void> {
@@ -225,11 +284,7 @@ export function createMsePlaySink(opts: PlaySinkOpts = {}): RoomPlaySink {
   }
 
   async function appendRaw(chunk: Uint8Array): Promise<void> {
-    if (!sb) {
-      pending.push(chunk);
-      queuedBytes += chunk.byteLength;
-      return;
-    }
+    if (!sb) return;
     updating = updating.then(async () => {
       if (dead || !sb) return;
       await evictIfNeeded();
@@ -252,9 +307,7 @@ export function createMsePlaySink(opts: PlaySinkOpts = {}): RoomPlaySink {
     } catch {
       return;
     }
-    const queued = pending.splice(0);
-    queuedBytes = 0;
-    for (const c of queued) await appendRaw(c);
+    await gate.readyRaw();
   }
 
   async function openMp4(): Promise<void> {
@@ -283,11 +336,20 @@ export function createMsePlaySink(opts: PlaySinkOpts = {}): RoomPlaySink {
       } catch {
         return;
       }
+      if (typeof info.duration === "number" && info.timescale > 0) {
+        try {
+          ms.duration = info.duration / info.timescale;
+        } catch {
+          /* ignore */
+        }
+      }
       for (const t of info.tracks) {
         file.setSegmentOptions(t.id, sb, { nbSamples: 30 });
       }
       const inits = file.initializeSegmentation();
-      const buffers = Array.isArray(inits) ? inits.map((x) => x.buffer) : [inits.buffer];
+      const buffers = Array.isArray(inits)
+        ? inits.map((x) => x.buffer)
+        : [inits.buffer];
       updating = updating.then(async () => {
         if (!sb || dead) return;
         for (const buffer of buffers) {
@@ -312,12 +374,7 @@ export function createMsePlaySink(opts: PlaySinkOpts = {}): RoomPlaySink {
         }
       });
     };
-    const queued = pending.splice(0);
-    queuedBytes = 0;
-    for (const c of queued) {
-      file.appendBuffer(withFileStart(c, fileStart));
-      fileStart += c.byteLength;
-    }
+    await gate.readyMp4();
   }
 
   ms.addEventListener("sourceopen", () => {
@@ -332,16 +389,7 @@ export function createMsePlaySink(opts: PlaySinkOpts = {}): RoomPlaySink {
     url,
     async append(chunk: Uint8Array) {
       if (dead) return "low";
-      const copy = chunk.slice();
-      if (mp4) {
-        mp4.appendBuffer(withFileStart(copy, fileStart));
-        fileStart += copy.byteLength;
-      } else if (sb) {
-        await appendRaw(copy);
-      } else {
-        pending.push(copy);
-        queuedBytes += copy.byteLength;
-      }
+      await gate.push(chunk);
       return pressureOf(liveBytes(), highBytes, lowBytes);
     },
     async evictUntil(seconds: number) {
@@ -376,8 +424,6 @@ export function createMsePlaySink(opts: PlaySinkOpts = {}): RoomPlaySink {
     },
     destroy() {
       dead = true;
-      pending.length = 0;
-      queuedBytes = 0;
       try {
         if (ms.readyState === "open") ms.endOfStream();
       } catch {

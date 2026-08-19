@@ -19,6 +19,7 @@ const EMPTY: RoomMediaState = {
   remoteProgramKind: null,
   presenceStream: null,
   programStream: null,
+  localProgramStream: null,
   localPreviewStream: null,
   ownerDecodeUrl: null,
   ownerDecodeKind: null,
@@ -40,6 +41,7 @@ class GoRoomMedia {
   remoteProgramName = $state<string | null>(null);
   presenceStream = $state<MediaStream | null>(null);
   programStream = $state<MediaStream | null>(null);
+  localProgramStream = $state<MediaStream | null>(null);
   localPreviewStream = $state<MediaStream | null>(null);
   ownerDecodeUrl = $state<string | null>(null);
   ownerDecodeKind = $state<"audio" | "video" | null>(null);
@@ -73,6 +75,7 @@ class GoRoomMedia {
       this.remoteProgramName = s.remoteProgramName;
       this.presenceStream = s.presenceStream;
       this.programStream = s.programStream;
+      this.localProgramStream = s.localProgramStream;
       this.localPreviewStream = s.localPreviewStream;
       this.ownerDecodeUrl = s.ownerDecodeUrl;
       this.ownerDecodeKind = s.ownerDecodeKind;
@@ -99,6 +102,7 @@ class GoRoomMedia {
     this.remoteProgramName = EMPTY.remoteProgramName;
     this.presenceStream = null;
     this.programStream = null;
+    this.localProgramStream = null;
     this.localPreviewStream = null;
     this.ownerDecodeUrl = null;
     this.ownerDecodeKind = null;
@@ -183,6 +187,13 @@ class GoRoomMedia {
 
   stopProgram() {
     return this.#media?.stopProgram() ?? Promise.resolve();
+  }
+
+  putLiveOnTv(peerId: string, name?: string) {
+    return (
+      this.#media?.putLiveOnTv(peerId, name) ??
+      Promise.resolve({ ok: false as const, error: "尚未連線" })
+    );
   }
 
   warmProgram(id: string) {

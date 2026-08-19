@@ -143,7 +143,7 @@ export function createRoomFileTransfer(
     return {
       entries: entries.map((e) => ({ ...e })),
       busy: busy(),
-      playback: playback ? { ...playback } : null,
+      playback,
     };
   }
 

@@ -1,6 +1,6 @@
 /**
- * Hang／pull like session_file: offering a program does not send RTP until
- * a peer requests to watch (PG-GO-ROOM-PLAN §9.6). JSON only — never media bytes.
+ * Hang／pull like session_file for catalog; TV offer is room-level (PG-GO-ROOM-PLAN §9.7／§9.8).
+ * JSON only — never media bytes.
  */
 
 export const SESSION_CAST_TYPE = "session_cast" as const;

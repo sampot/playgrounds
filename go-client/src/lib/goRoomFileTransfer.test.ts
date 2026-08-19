@@ -268,6 +268,50 @@ describe("createRoomFileTransfer", () => {
     expect(guest.getState().playback?.kind).toBe("video");
   });
 
+  it("keeps the same playback object while remote play chunks arrive", async () => {
+    const sink = createPlayByteWindow({ mime: "video/mp4" });
+    const guest = createRoomFileTransfer({
+      localAgentId: "g",
+      localName: "訪客",
+      sendJson: () => {},
+      sendBinary: () => {},
+      newId: () => "tr-1",
+      createPlaySink: () => sink,
+    });
+    guest.onControl({
+      type: SESSION_FILE_TYPE,
+      v: 1,
+      op: "share",
+      id: "clip",
+      name: "clip.mp4",
+      size: 8,
+      mime: "video/mp4",
+      owner: "h",
+    });
+    const seen: { url: string }[] = [];
+    guest.subscribe((s) => {
+      if (s.playback) seen.push(s.playback);
+    });
+    expect((await guest.play("clip")).ok).toBe(true);
+    const first = seen[seen.length - 1];
+    expect(first?.url).toBe(sink.url);
+    guest.onBinary(
+      encodeSessionFileChunk({
+        transferId: "tr-1",
+        seq: 0,
+        payload: new Uint8Array(4),
+      })
+    );
+    guest.onBinary(
+      encodeSessionFileChunk({
+        transferId: "tr-1",
+        seq: 1,
+        payload: new Uint8Array(4),
+      })
+    );
+    expect(seen[seen.length - 1]).toBe(first);
+  });
+
   it("starts playing a file larger than 256 MiB without buffering the whole file", async () => {
     const sink = createPlayByteWindow({
       maxBytes: 64,

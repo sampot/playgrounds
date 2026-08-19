@@ -8,7 +8,7 @@ export const GO_ROOM_SHARE_HINT =
 
 export const GO_ROOM_QUICK_REPLIES = ["在嗎", "等一下", "收到", "謝謝"] as const;
 
-export const GO_ROOM_EMPTY_TIMELINE = "還沒有訊息。先打字也可以。";
+export const GO_ROOM_EMPTY_TIMELINE = "還沒有訊息。";
 
 export const GO_ROOM_KEEP_OPEN = "這一間只在這個畫面開著的時候存在。";
 
@@ -16,7 +16,7 @@ export const GO_ROOM_LOGIN_HINT =
   "被請進來的人不必有通行證；開這一間的人要留在這個畫面。另一台裝置請掃邀請進來。";
 
 export const GO_ROOM_END_CONFIRM_HOST =
-  "關掉後在場的人會斷線，目錄會沒了，正在收看的鏡頭會停。已存到硬碟的檔不受影響。";
+  "關掉後在場的人會斷線，目錄會沒了，電視與鏡頭會停。已存到硬碟的檔不受影響。";
 
 export const GO_ROOM_LEAVE_CONFIRM_GUEST =
   "離開後你會斷線；其他人還在。你掛上的項目會從分享區拿掉。";
@@ -25,6 +25,9 @@ export const GO_ROOM_CONNECT_FAILED =
   "連線失敗。請靠近同一網路，或請對方再發一次邀請。";
 
 export const GO_ROOM_MEDIA_OFF = "鏡頭 · 未開";
+export const GO_ROOM_TV_OFF = "電視關機";
+export const GO_ROOM_PUT_ON_TV = "放到電視上";
+export const GO_ROOM_TV_OFF_BTN = "關掉電視";
 export const GO_ROOM_CAMERA_WATCH = "收看";
 export const GO_ROOM_CAMERA_STOP_WATCH = "停止收看";
 export const GO_ROOM_MIC_LISTEN = "收聽";
@@ -68,6 +71,41 @@ export function roomMediaSummary(opts: {
   if (opts.camera) return "鏡頭已開 · 等對方收看";
   if (opts.mic) return "麥克風已開 · 等對方收聽";
   return GO_ROOM_MEDIA_OFF;
+}
+
+/** Shared TV label. Private playback never belongs here. */
+export function roomTvLabel(opts: {
+  programName?: string | null;
+  remoteProgramName?: string | null;
+  sourceName?: string | null;
+}): string {
+  const file = opts.remoteProgramName?.trim() || opts.programName?.trim();
+  if (file) return `正在播 ${file}`;
+  const who = opts.sourceName?.trim();
+  if (who) return `電視上是 ${who}`;
+  return GO_ROOM_TV_OFF;
+}
+
+/** Bind the TV hole: remote program RTP, else the local capture while we are the house. */
+export function roomTvStream(opts: {
+  programStream: MediaStream | null;
+  localProgramStream?: MediaStream | null;
+}): MediaStream | null {
+  return opts.programStream ?? opts.localProgramStream ?? null;
+}
+
+/** Status line: who is in + what the TV is doing. Never a door-code countdown. */
+export function roomStageStatus(opts: {
+  guestCount: number;
+  tvLabel: string;
+}): string {
+  const people = roomOccupantSummary({ guestCount: opts.guestCount });
+  const tv = opts.tvLabel.trim();
+  if (!tv || tv === GO_ROOM_TV_OFF) {
+    if (opts.guestCount <= 0) return people;
+    return `${people} · ${GO_ROOM_TV_OFF}`;
+  }
+  return `${people} · ${tv}`;
 }
 
 export type RoomOccupantPeer = {
@@ -238,6 +276,43 @@ export function attachMediaStream(
   }
   el.srcObject = stream;
   if (stream) void tryPlay(el);
+}
+
+function playbackSrcOf(el: { src: string; getAttribute?: (name: string) => string | null }): string {
+  const attr = el.getAttribute?.("src");
+  if (attr) return attr;
+  return el.src || "";
+}
+
+/**
+ * Bind a blob / HTTP playback URL without resetting media src on every roster emit.
+ * Re-assigning the same blob: MediaSource URL closes the source and leaves a black frame.
+ */
+export function attachPlaybackUrl(
+  el: {
+    src: string;
+    paused: boolean;
+    muted: boolean;
+    play: () => Promise<void>;
+    getAttribute?: (name: string) => string | null;
+    removeAttribute?: (name: string) => void;
+  } | null | undefined,
+  url: string | null
+): void {
+  if (!el) return;
+  if (!url) {
+    if (playbackSrcOf(el)) {
+      el.removeAttribute?.("src");
+      el.src = "";
+    }
+    return;
+  }
+  if (playbackSrcOf(el) === url || el.src === url) {
+    if (el.paused) void tryPlay(el);
+    return;
+  }
+  el.src = url;
+  void tryPlay(el);
 }
 
 async function tryPlay(el: {

@@ -30,6 +30,12 @@ class GoRoomFiles {
     this.#unsub = this.#xfer.subscribe((s) => {
       this.entries = s.entries;
       this.busy = s.busy;
+      if (
+        this.playback?.id === s.playback?.id &&
+        this.playback?.url === s.playback?.url
+      ) {
+        return;
+      }
       this.playback = s.playback;
     });
   }

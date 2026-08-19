@@ -1,39 +1,44 @@
 # Playgrounds 純玩版：包廂（go `/room`）
 
-> **狀態：** Draft（2026-08-19）— Phase 1：進門即主面、**入座不鎖 1:1**；**包廂＝主持 `/room` 畫面，過期的是門牌**；契約：**說／掛／要**、**分享目錄只掛檔**、SDP **2+2**（在場＝live；節目槽空置）、第二台掃門牌；**現況＝Hub 星狀**；每人同時**最多一條 live**（WebRTC）；影音檔＝**漸進下載＋本機播放器**  
+> **狀態：** Draft（2026-08-19）— 主面＝**包廂電視**（節目 RTP；主持指定來源）；文字＝開口備援（非主欄）；兩層螢幕（電視 ≠ 我這台）；目錄檔私下播／下載走 DC；靜態內景延續大廳畫風（**不走動**）；其餘：進門即主面、不鎖 1:1、兩個時鐘、Hub 星狀、SDP **2+2**
 > **權威決策：** 從屬 [DECISIONS.md](./DECISIONS.md) **DEC-050**（純玩版）、**DEC-045**（Roster／薄 signaling；**非** Avatars 產品面）、**DEC-047**（Platform Invite）；**不另開 DEC**  
 > **相關：** [PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)、[PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md)（登入＋記憶體 field API key）、[PG-GO-HOST-INVITE-PLAN.md](./PG-GO-HOST-INVITE-PLAN.md)（GO-INVITE＝遊戲 compose；**勿混**）、[PG-GO-SESSION-CHAT-PLAN.md](./PG-GO-SESSION-CHAT-PLAN.md)（局內 overlay 對話——**勿混**）、[PG-GO-SHOP-LOBBY-PLAN.md](./PG-GO-SHOP-LOBBY-PLAN.md)（大廳熱點入口）、[PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)、[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（官方 TURN；包廂 ICE **與**遊戲邀請分開）、`.cursor/rules/no-native-dialogs.mdc`、`.cursor/rules/mobile-first-ux.mdc`、[GLOSSARY.md](./GLOSSARY.md)
 
-一句話：已登入會員進 **`/room` 就是這一間包廂**（主面立刻出現；**不必先請人**）。**包廂活著＝主持這個畫面還開著；過期的是邀請碼，不是這一間。** 同一張有效門牌可請人進來，**也可給自己的另一台掃**（不要再開一個 `/room`）。連上之後資料只走 WebRTC（**不**經 Platform 中繼、**不**雲存）。人數**對齊遊戲 session**：**不鎖 1:1**。產品動詞：**說**、**掛**、**要**（下載／檢視／播放／收看 live）。**分享目錄只掛檔**（不掛資料夾、不是裝置）。**Live stream**（鏡頭或畫面分享，可含聲音）出現在**在場名單**，走 WebRTC RTP；每人同時最多一條。**影音檔**走 DataChannel 漸進下載，收方用本機播放器（可前進／後退），**不佔 live 通路**。**現況檔 bytes 與 live RTP 皆經主持（Hub）轉送**（Guest↔Guest mesh **延後**）。收看 live：進門後綁本機 `<video>`，**按收看才顯示**。**第一階段產品**＝文字＋傳檔；媒體 UI 分階段，SDP **現在**留 2+2。**契約不把包廂定成聊天室或視訊會議。**
+一句話：已登入會員進 **`/room` 就是這一間包廂**（主面立刻出現；**不必先請人**）。**包廂活著＝主持這個畫面還開著；過期的是邀請碼，不是這一間。** 快樂路徑＝**請人進來一起看 MTV／片子**（或主持把某人的 live 切上電視）。**主面是這一臺包廂電視**，不是時間線——資訊架構對齊視訊會議（舞台＝畫面，文字＝抽屜），產品不是會議格子牆。每人自帶手機／筆電可掛檔、下載、**私下播放**，**不跟電視互斥**。電視畫面由**主持指定來源**，一律 **WebRTC 節目 RTP**（電影＝來源端本機播檔再 `captureStream`；會議＝指定誰的 live）；目錄檔的私下播／下載仍走 DataChannel。開口用麥；文字是不方便開口時的輔助。同一張有效門牌可請人進來，也可給自己的另一台掃。人數不鎖 1:1。資料只走 WebRTC（**不**經 Platform 中繼、**不**雲存、**不錄製**）。**現況 Hub 星狀**（mesh 延後）。UI＝大廳同族的**靜態內景**（不走動）。
 
 ---
 
 ## 1. 動機
 
-- 大廳已有「椅子／桌」熱點與 `/chat` 占位，但公開大廳聊天不像現實用法。網咖／室內遊樂場更常見的是：**租一間包廂**，關門說話、傳東西、開鏡頭、把桌機上的影片或音樂丟到手機。
-- **預設分享故事是自己的裝置之間。** 例如舊手機瀏覽器進包廂、掛上鏡頭；需要時從同一間裡的另一台收看 live，當遠端監控。請別人進來走同一條門牌、同一套目錄，不是第二套產品。
-- 同一條門牌要同時服務兩種現場：**請別人進來**，以及**自己的另一台裝置**（筆電開著 `/room`，手機掃碼進來傳相片、收看鏡頭、掛檔）。後者不是附加功能，只是同一間的第二個座位。
+- 大廳已有「椅子／桌」熱點與 `/chat` 占位，但公開大廳聊天不像現實用法。網咖／室內遊樂場更常見的是：**租一間包廂**，關門一起看 MTV／片子、邊看邊講話、把檔丟到架子上；每人還可以滑自己的手機。
+- **主面是屋子裡那一臺電視**，不是聊天室。視訊會議也是畫面當舞台、文字當輔助——包廂同一層資訊架構，但舞台是**共用電視**（主持導播），不是每人一格臉。
+- **兩層螢幕：** 包廂電視＝全場同一路；口袋裡／膝上那台＝自己的（掛、下載、私下播另一部）。兩件事並行，不互斥。
+- **預設分享故事仍含自己的裝置之間。** 例如筆電當屋子（電視來源）、手機掃門牌進來收看；舊手機掛鏡頭當遠端監控。請別人進來走同一條門牌、同一套目錄，不是第二套產品。
+- 同一條門牌要同時服務兩種現場：**請別人進來一起看**，以及**自己的另一台裝置**。後者不是附加功能，只是同一間的第二個座位。
 - Invite／WebRTC 目前幾乎只服務 **開 SAM 入座**（`invite.compose`）。要測「能不能連上」或做遊戲以外的用途，只能先開一局五子棋——過重，也把連線綁死在某一顆小品。
-- 局內 [`session_chat`](./PG-GO-SESSION-CHAT-PLAN.md) 是對弈 overlay（預設收合、遊戲優先），**不是**一般用途隔間；該計劃把語音／傳檔列為 overlay **非目標**，那些能力應落在包廂。
-- 分享區「下載到硬碟」在 iOS Safari 常沒有 Save picker（Phase 1 已否決 Blob 後備）。**收看對方 live**（名單上開鏡頭再拉 RTP）與**播放目錄裡的影音檔**（漸進下載＋本機播放器）是兩條路；不要把「存檔」當成唯一把檔從 A 台送到 B 台的辦法。
+- 局內 [`session_chat`](./PG-GO-SESSION-CHAT-PLAN.md) 是對弈 overlay（預設收合、遊戲優先），**不是**一般用途隔間；該計劃把語音／傳檔列為 overlay **非目標**，那些能力應落在包廂。包廂裡文字同樣是 overlay，不是主欄。
+- 分享區「下載到硬碟」在 iOS Safari 常沒有 Save picker（Phase 1 已否決 Blob 後備）。**私下播目錄檔**（DC＋本機播放器）與**電視收看**（節目 RTP）是兩條路；不要把「存檔」當成唯一把檔從 A 台送到 B 台的辦法，也不要把私下播當成電視。
 - DEC-045 已撤銷「線上」tab。包廂是 **Invite 拉人進臨時隔間**，不是常駐誰在線、不是好友名單。
 
 ---
 
 ## 2. 目標
 
-- **包廂＝一般用途 peer 隔間（硬）：** 產品面是「這一間」；裡面做什麼由階段遞增，**禁止**把 API／UI 契約寫死成「只能聊天」或「視訊會議」。
-- **進門即主面（硬）：** 已登入會員開 `/room`＝已經在包廂裡（時間線／輸入／這一間）。邀請是**面內動作**（請人進來），**不是**進門條件。一個人在也是這一間。
+- **包廂＝一般用途 peer 隔間（硬）：** 產品面是「這一間」；裡面做什麼由階段遞增。**禁止**把契約寫死成「只能聊天」。**禁止**做成視訊會議 SaaS（格子牆、錄製、等候室、舉手、雲端 SFU）。可以用來一起看片，也可以由主持把某人 live 切上電視——那是導播，不是開會產品。
+- **進門即主面（硬）：** 已登入會員開 `/room`＝已經在包廂裡。**主面是包廂電視**（關機也佔主高度）。邀請是**面內動作**（請人進來），**不是**進門條件。一個人在也是這一間。**禁止**用全頁時間線當進門第一眼。
 - **兩個時鐘（硬）：** 包廂壽命＝主持 `/room` 這份文件還在；門牌壽命＝該張 `invite.room` 的 TTL（預設 5m）。門牌過期只擋**新人**；主面與已入座連線不受影響。**按「請人進來」才鑄門牌**（同一時間最多一張有效）。見 §6.4。
 - **人數對齊遊戲 session（硬）：** 包廂**不鎖 1:1 入座**。同一張**有效** Invite 短鏈可多人 join；**文字**對已連線 peer **fanout**；**分享目錄** fanout、**內容只在有人 `request` 時 Owner→Requester**。API／UI 勿把包廂寫成雙人專用隔間。鏡頭**不**因第三人加入而關。見 §5.5。
 - **預設分享模型（硬）：** 分享目錄＝這一間願意分享的**檔**（授權，**不**把內容推給任何人）。**不掛資料夾。** 其他人依檔選擇下載、檢視、或**播放**（影音）。**Live stream 不是目錄項**——開鏡頭／畫面出現在**在場名單**。見 §5.5。
 - **兩種在場同一條門牌（硬）：** 「請人進來」與「自己的另一台掃碼」契約相同。**第二台請掃門牌**；已登入再開 `/room`＝**另一間空包廂**，不是連上既有這一間。見 §5.4。
-- **三個動詞（硬）：** **說**、**掛**、**要**分開。掛＝把**檔**寫進分享目錄。要＝下載／檢視／播放檔；收看 live＝點名單上的鏡頭。同一份影音可下載也可播放——兩個動作，都是向 owner 拉 **bytes**，不是 RTP。見 §5.3。
-- **媒體槽（硬）：** SDP **在場**（live 影像＋聲音）＋**節目**（槽位預留、現況空置）。第一次 SDP 就留 2+2（§7.1）；live `replaceTrack`，**禁止**經 Platform 二次 O／A。這是傳輸槽位，**不是**會議格子。
-- **一條 live（硬）：** 同一參與者同時最多發布**一條** live stream（可含影像與聲音）。來源是 `getUserMedia` **或** `getDisplayMedia`，**不能並行**。Live 走 WebRTC RTP。觀看端同時只收一條 live。影音檔播放**不佔**這條通路。
-- **Hub 轉送（現況硬；mesh 延後）：** 進門仍是 Guest↔Host 一條 PC。**檔 bytes 與 live RTP 一律經主持轉給請求者**。Guest↔Guest mesh **延後**。見 §7.4。
-- **收看綁定（硬）：** 收看端在 PC 建立後就把遠端 live 軌綁上本機 `<video>`（即使還沒畫面）；**使用者按收看才顯示**。
-- **第一階段可交付：** 會員進 `/room` 即包廂 UI（可先不請人）；可請人進來；Guest 開 `/i/<short>` 同意進同一間 → DataChannel 文字＋傳檔；有人連上即「已連線」。Live 名單與檔案播放見 Phase 2a／2b。
+- **三個動詞（硬）：** **說**、**掛**、**要**分開。**說**＝開口為主（麥），文字＝不方便開口時的輔助面。掛＝把**檔**寫進分享目錄。要＝下載／檢視／**私下播放**檔（DC）；電視收看＝節目 RTP（不是「要」目錄檔）。見 §5.3、§5.6。
+- **兩層螢幕（硬）：** **包廂電視**與**我這台裝置**分開。電視＝主持指定的一路 RTP。我這台可同時掛／下載／私下播，**不跟電視互斥**。見 §5.6。
+- **電視＝主持導播（硬）：** 這一間同時只有一個電視來源（關機／檔／某 peer 的 live）。來源由主持指定——看電影＝主持決定廣播哪一步（來源端播放器是時鐘）；會議式切台＝主持決定現在電視上是誰。被指定的人不是新主持。見 §5.7。
+- **媒體槽（硬）：** SDP **在場**（我的鏡頭／麥）＋**節目**（**房級電視**）。第一次 SDP 就留 2+2（§7.1）；`replaceTrack`，**禁止**經 Platform 二次 O／A。節目槽**不是**空置裝飾，也**不是**會議格子。
+- **一條出站在場 live（硬）：** 同一參與者同時最多發布**一條**在場 live（可含影像與聲音）。來源是 `getUserMedia` **或** `getDisplayMedia`，**不能並行**。這是「我能貢獻給電視／開口」的訊號，**不**禁止同機私下播檔。
+- **電視走 RTP（硬）：** 主持廣播電影／MTV **與其他 live 一樣走 WebRTC 節目槽**，**不**經 DataChannel 把片子送到每人解碼。來源端本機播檔 → `captureStream`（或等價）→ program `replaceTrack`。DC 只服務目錄的私下播與下載。
+- **Hub 轉送（現況硬；mesh 延後）：** 進門仍是 Guest↔Host 一條 PC。**檔 bytes 與 RTP 一律經主持轉。** Guest↔Guest mesh **延後**。見 §7.4。
+- **收看綁定（硬）：** 進門 PC 一建立，就把遠端 **節目** receiver 綁上電視用 `<video>`（即使還沒畫面；**不要** `display:none`）。**房級：在場自動收電視**（關機＝空軌／關機畫面）。在場鏡頭仍須明示才拉影像。見 §9。
+- **第一階段可交付：** 會員進 `/room` 即包廂 UI（可先不請人）；可請人進來；Guest 開 `/i/<short>` 同意進同一間 → DC 文字＋傳檔。電視／開口／內景見後續階段；SDP **現在**留 2+2。
 - **同一套邀請門牌：** 短鏈 canonical 仍是 `https://go.samkuo.me/i/<short_id>`（QR／分享面）；Host 主面是 `/room`。Guest 進門後**留在** `/i/`（**禁止**改寫成 `/room`）。
 - **資料不落雲端、不錄製：** 正文、檔案 bytes、音視訊 RTP **不**經 signaling／Invite API／物件儲存；**不**做雲端或本機「存成影片」。文字時間線只在頁面生命週期；檔案內容**不**暫存在分頁——見 §8.2。
 - **開這一間要登入、被請進來不必**（對齊 GO-INVITE／遊戲 Guest）。自己的第二台當 Guest 時也不必登入。
@@ -54,14 +59,16 @@
 - 使用者自備 TURN（DEC-045／047 否決）。
 - 以包廂繞過受保護串流（DRM 畫面變黑不是要修的功能）。
 - 第一刀場殼 `play` 同步同一包廂 UX（wire 預留共用；產品面先 go）。
-- 把包廂做成視訊會議 SaaS（格子牆、錄製、等候室、舉手、雲端 SFU）。在場可多人各開一條 live；**不做**會議格子牆、**不**對未 `request` 的人送 RTP。
+- 把包廂做成視訊會議 SaaS（格子牆、錄製、等候室、舉手、雲端 SFU）。在場可多人各開一條在場 live；**不做**會議格子牆。房級電視與在場聲見 §9.8（自動收節目 ≠ 自動開相機）。
+- 複製大廳可行走地圖當 `/room`；把包廂做成可通關 JRPG 或點歌／歌詞／評分 KTV 機台。
 - 經 **Platform** 第二輪 O／A／renegotiation；Platform 或第三方 **SFU 中繼 RTP**。
 - 完整 BitTorrent swarm（下載者當種子、infohash 產品面）；為 mesh 邊預留無上限 video m-line。
 - 雲端片庫、VOD、把收看「存成影片」；AirDrop／Nearby／系統隔空投送當產品路徑。
 - 以再開一個 `/room` 當「連上既有這一間」（`/room` 不是房號）。
-- 同一觀看端同時收兩路 live（SDP 每條 PC 一條 presence video）；同一人同時開鏡頭又開畫面分享；4K／跨網電影院承諾。
-- **Live 收看不得**為通過而組整檔 `Blob`／MSE（live 走 RTP）。**檔案播放**走滑動緩衝／MSE（RAM 有頂、**不以整檔大小拒絕**）；本機掛的 `File` 可用 object URL（OS 檔，不進 JS heap）。關播放器即 `revoke`／拆 MSE。**下載落盤**仍禁止整檔 Blob 後備（§8.2）。
-- **包廂傳檔不得**用 Service Worker 攔截下載／把 ReadableStream 當 `Response` 餵系統下載管理員。
+- 同時收兩路**在場**視訊拼成格子牆（節目＋在場是兩層槽，不是兩張臉）。同一人同時開鏡頭又開畫面分享；4K／跨網電影院承諾。
+- 用 DataChannel／每人本機 seek **當作包廂電視**的傳輸；用節目 RTP／`captureStream` **代替**個人下載或私下播檔。
+- **Live 收看不得**為通過而組整檔 `Blob`／MSE（live 走 RTP）。**檔案播放**走滑動緩衝／MSE，或（遠端檔）用 **Service Worker** 把 DC bytes 編成給 `<video>`／`<audio>` 的 `Response`（可 Range）；RAM 有頂、**不以整檔大小拒絕**。本機掛的 `File` 可用 object URL（OS 檔，不進 JS heap）。關播放器即 `revoke`／拆 MSE／停 SW 攔截。**下載落盤**仍禁止整檔 Blob 後備（§8.2）。
+- **包廂下載不得**用 Service Worker 攔截另存、把 ReadableStream 當下載 `Response` 餵系統下載管理員。**播放**允許 SW（§9.3）。
 - **包廂傳檔不得**用 OPFS、IndexedDB、Cache Storage 當檔案緩衝或落盤。
 - **包廂傳檔不得**掛資料夾／子目錄（沒有 dir 列、沒有「選資料夾」）。一次可多選檔。
 - **包廂傳檔不得**把整份檔讀進 RAM（分享者 `arrayBuffer()` 整檔、收方組 `Blob`／`blob:` URL 再 `<a download>`）。
@@ -80,12 +87,12 @@
 8. **同時一 SAM 仍成立** — 包廂不是 SAM；進 `/s/`／遊戲 `/i/` 則離開包廂（破壞性，頁內確認）。
 9. **進門即這一間** — 已登入開 `/room` 就是包廂主面。**沒按「請人進來」就不鑄 Invite、不倒數。** **禁止**用「尚未邀請」另做一套非包廂畫面當主流程；也禁止進門自動鑄門牌，讓 TTL 變成「房間快到期」的氛圍。
 10. **不鎖雙人入座** — Host answer loop **持續作答**（對齊遊戲 compose 多 join；勿 `maxAnswers: 1`）。文字／**分享目錄** fanout；內容按 `request` 路由。函式名勿叫 `sendToOpponent`。**鏡頭不因人數開關。**
-11. **主面 ≠ 分享面** — 主面只回答「誰在這一間」；QR／TTL／再發一張只出現在「請人進來」分享面（寬屏側欄最多門牌**小狀態**，不常駐大 QR）。
+11. **主面＝電視；分享面＝邀請** — 主面回答「這一臺電視在播什麼／誰在這一間」。QR／TTL／再發一張只出現在「請人進來」分享面（寬屏側欄最多門牌**小狀態**，不常駐大 QR）。**禁止**把時間線當主欄。
 12. **第二台掃門牌** — 連上既有這一間的唯一辦法是掃（或開）**這一張** `/i/<short>`。已登入會員在另一台開 `/room`＝新的空一間。分享面必須寫這句，避免自己連自己連不上。
-13. **說／掛／要分開** — 文字不承載檔 bytes；分享目錄不是播放器本體；收看／收聽的 RTP **不**做成時間線氣泡。
+13. **說／掛／要分開** — **說**＝開口為主、文字為輔（文字不承載檔 bytes）。分享目錄不是電視本體。電視 RTP **不**做成時間線氣泡。私下播檔不佔節目槽。
 14. **主持＝進門與轉送樞紐（Hub）** — Platform 只握手 Guest↔Host。文字、目錄由主持轉送。**現況檔 bytes 與音視訊 RTP 一律經主持轉給請求者**（Guest 只保有進門那一條 PC）。Guest↔Guest mesh（`session_mesh`）**延後**。**不**規定媒體必須經主持轉碼（轉的是 track／幀，不是重編碼）。
 15. **鏡頭預設關、不錄製** — 進包廂不開相機／麥。掛上的媒體與檔只在這一間還開著時存在於在場裝置之間。
-16. **內容永遠按需拉（硬）** — Owner **禁止**在沒有該 peer 的 `request` 時送檔 bytes 或 live RTP（含開麥、開鏡頭）。Host 只轉給請求者。不做格子牆。每人同時最多一條出站 live、只收看一條 live。影音檔播放走 DC，不佔 live。收看端 **PC 一建立就綁本機 video**，**顯示**只在使用者按收看之後。人數不是鏡頭開關。
+16. **內容按需拉；房級電視例外（硬）** — 目錄檔 bytes、在場**影像**：**禁止**在沒有該 peer 的 `request` 時送。Host 只轉給請求者。不做格子牆。每人最多一條出站在場 live。私下播檔走 DC，不佔節目槽。**房級：** 在場自動收**節目**（電視）與（開麥者的）**在場聲**——進門即對節目／在場音 `request`；**不**自動 `request` 在場視訊、**不**自動開相機。收看端 **PC 一建立就綁節目 `<video>`**（電視洞）；關機時可藏視覺、**不要** `display:none` 以免解碼停。人數不是鏡頭開關。
 
 ---
 
@@ -99,7 +106,7 @@ Guest 掃碼 `/i/<short>`  ──kind=invite.room──►  同意 → 同一包
 深鏈 `/s/`／遊戲 `/i/`  ──bypass──►  不經包廂
 ```
 
-進 `/room` 後大廳 canvas **卸載**（對齊 `/s/`、`/i/`：殼是大廳，包廂不是第二個大廳）。
+進 `/room` 後大廳 canvas **卸載**（對齊 `/s/`、`/i/`：殼是大廳）。包廂是**另一張靜態內景**（不走動、不重用大廳地圖），不是第二個大廳、也不是功能表單殼硬套 pixel 框就算完。見 §5.8。
 
 大廳熱點：讀者面 **包廂**（門／隔間入口，不是大廳正中「公開聊天區」）。契約 `hotspotId`＝`room`；大廳畫成南向包廂門。見 [PG-GO-SHOP-LOBBY-PLAN.md](./PG-GO-SHOP-LOBBY-PLAN.md)。
 
@@ -107,8 +114,8 @@ Guest 掃碼 `/i/<short>`  ──kind=invite.room──►  同意 → 同一包
 
 | 用 | 不用 |
 | --- | --- |
-| 包廂、進包廂、請人進來、**結束這一間**（主持）、**離開這一間**（Guest）、再發一張邀請、分享區、分享目錄、掛上、下載、檢視、收看、收聽、撤回 | 聊天區、聊天室、房間、Room、Lounge、Lobby（對讀者）；「先邀請才能進包廂」；附加檔、傳給對方、接收附件；Guest 說「結束這一間」 |
-| 鏡頭、麥克風、收看、收聽、在場、分享目錄、播放 | 直播、推流、串流伺服器、視訊會議、開會（對讀者）；把 RTP 叫成「傳檔」；把掛上說成已經送到對方；把鏡頭當成目錄裡的虛擬檔 |
+| 包廂、進包廂、請人進來、**結束這一間**（主持）、**離開這一間**（Guest）、再發一張邀請、分享區、分享目錄、掛上、下載、檢視、收看、收聽、撤回、**包廂電視**、**放到電視上**、**私下播放** | 聊天區、聊天室、房間、Room、Lounge、Lobby（對讀者）；「先邀請才能進包廂」；附加檔、傳給對方、接收附件；Guest 說「結束這一間」；把時間線叫主畫面 |
+| 鏡頭、麥克風、開口、收看、收聽、在場、分享目錄、播放、導播／指定來源（對內） | 直播、推流、串流伺服器、視訊會議、開會（對讀者產品名）；把 RTP 叫成「傳檔」；把掛上說成已經送到對方；把鏡頭當成目錄裡的虛擬檔；把私下播叫成上電視 |
 | 已連線、N 人在、就你、這一間還在、把這頁開著 | 直連、P2P、DataChannel、TURN、視訊會議 SaaS 腔；把**入座**說成只能兩人；**包廂倒數／房間即將過期／租期** |
 | URL `/room`（與 `/help`／`/apps` 同：路徑英文、chrome 中文）；門牌／邀請（主持 UI 可說「門牌」） | 把 `/chat` 當產品 canonical；對 Guest／分享 title 說「門牌」當產品名 |
 
@@ -118,20 +125,20 @@ Guest 掃碼 `/i/<short>`  ──kind=invite.room──►  同意 → 同一包
 
 | 動詞 | 讀者面 | 傳輸 | 階段 |
 | --- | --- | --- | --- |
-| **說** | 文字時間線 | DataChannel `session_chat` fanout | Phase 1 |
+| **說** | **開口**（麥）為主；**文字**＝抽屜／把手（不方便開口時） | 在場音 RTP（房級自動收）；文字 `session_chat` fanout | 文字＝Phase 1 wire；開口／房級聲＝媒體階段 |
 | **掛** | 把**檔**寫進**分享目錄**（授權；不傳內容；**不掛資料夾**） | 目錄 metadata fanout | 檔＝Phase 1；SDP 現在就要 |
-| **要** | 依型別：**下載**、**檢視**、**播放**（影音檔）；**收看** live（名單） | 檔 bytes 走 DC；live 走 RTP（**現況經 Host Hub**；mesh 延後） | 下載＝Phase 1；檢視／播放／收看＝Phase 2 |
+| **要** | 依型別：**下載**、**檢視**、**私下播放**（影音檔，我這台） | 檔 bytes 走 DC（**現況經 Host Hub**；mesh 延後） | 下載＝Phase 1；檢視／私下播＝Phase 2 |
 
-讀者面不要出現「要」這個字當按鈕——列上寫下載／檢視／播放；名單上寫收看。契約層都是向 owner 拉。
+**放到電視上**不是「要」目錄檔：那是主持指定電視來源，走**節目 RTP**（§5.7）。讀者面不要出現「要」這個字當按鈕——列上寫下載／檢視／播放；電視相關寫放到電視上／電視上是…。
 
-影音檔的「播放」＝向 owner 拉 bytes，本機播放器邊收邊播（可 seek），**不是** WebRTC media stream，也**不是**先把整檔緩進分頁。Live 的「收看」才走 RTP。**不要**把鏡頭掛進目錄。
+**私下播放**＝向 owner 拉 bytes，本機播放器邊收邊播（可 seek），**不是** WebRTC、**不是**包廂電視、也**不是**先把整檔緩進分頁。遠端檔可用 Service Worker 當片源（§9.3）。**不要**把鏡頭掛進目錄。
 
 ### 5.4 兩種在場（硬）
 
 | 故事 | 主持 | Guest | 快樂路徑 |
 | --- | --- | --- | --- |
-| **請人進來** | 筆電（或一直開著的那台）`/room` | 別人掃 QR | 文字、傳檔、按需收看彼此掛上的鏡頭／檔 |
-| **自己的另一台** | 通常是插電、畫面不關的那台 | **同一人**掃**這一張**門牌（不必登入） | 手機相片丟筆電、桌機影片給手機收看、舊手機掛鏡頭當遠端監控 |
+| **請人進來** | 筆電（或一直開著的那台）`/room` | 別人掃 QR | 一起看電視、開口、傳檔、私下播 |
+| **自己的另一台** | 通常是插電、畫面不關的那台（常當電視來源） | **同一人**掃**這一張**門牌（不必登入） | 手機當座位收電視、丟相片、私下播／下載；舊手機掛鏡頭給主持切上電視 |
 
 兩者走同一條 `invite.room`，**不做**「我的裝置」帳號綁定或第二套邀請。第三人（再掃一台傳檔、再掛一路鏡頭）**不**關掉已掛的鏡頭。
 
@@ -146,7 +153,7 @@ Guest 掃碼 `/i/<short>`  ──kind=invite.room──►  同意 → 同一包
         ↓
 分享目錄 fanout 到在場所有人（僅 metadata；平面檔列表）
         ↓
-某人對某一檔選擇下載／檢視／播放；或對某人的 live 選擇收看
+某人對某一檔選擇下載／檢視／私下播放；主持可把某檔或某 live **放到電視上**
         ↓
 向該項 owner request → 只對這條連線送 bytes 或 RTP
 ```
@@ -155,16 +162,59 @@ Guest 掃碼 `/i/<short>`  ──kind=invite.room──►  同意 → 同一包
 | --- | --- |
 | **目錄** | 所有人掛上的**檔**合成一份清單。晚進門拿快照。**不含**鏡頭、**不含**資料夾 |
 | **掛** | Owner 取得本機讀取授權（`File` handle）。**不**讀檔內容。**沒有**目錄 handle |
-| **Live** | 開鏡頭或畫面＝在場名單標示。`getUserMedia` 與 `getDisplayMedia` 互斥，合成**一條** live（可含聲音）。未 `request` 不送 RTP |
-| **消費依型別** | 一般檔→下載；圖片→檢視、下載；**影音檔→播放與下載**（bytes；本機播放器）。鏡頭→名單收看。沒有的動作不畫 |
-| **傳輸槽** | SDP 在場軌＝live；節目軌**現況空置**（檔案不再走 RTP） |
-| **預設故事** | 同一人的不同裝置互拉。舊手機開鏡頭，另一台在名單上點收看 |
-| **要** | 請求者主動 `request`。沒 request 的人零內容 |
-| **房級規則** | **本刀不定義。** |
+| **Live（在場）** | 開鏡頭或畫面＝在場名單標示。`getUserMedia` 與 `getDisplayMedia` 互斥，合成**一條**在場 live（可含聲音）。**影像**未 `request` 不送 RTP。**在場聲**見房級規則 |
+| **消費依型別** | 一般檔→下載；圖片→檢視、下載；**影音檔→私下播放與下載**（bytes；本機播放器）。**上電視**＝主持指定來源（RTP），不是目錄上的「播放」 |
+| **傳輸槽** | SDP **在場**＝開口／可被指定上電視的 live；**節目**＝**房級電視** |
+| **預設故事** | 請人進來一起看 MTV；或同一人的不同裝置（筆電當電視來源、手機當座位） |
+| **要** | 目錄內容：請求者主動 `request`。沒 request 的人零**檔 bytes** |
+| **房級規則** | **在場自動收節目（電視）與開麥者的在場聲。不自動收在場影像、不自動開相機。** 見 §9.8 |
 
-**不做格子牆。** 觀看端同一時間只收一條 live。要換就對另一人 `request`。收看的 `<video>` 在進門 PC 建立後就綁上遠端軌，未按收看時不顯示。播放影音檔不影響 live。
+**不做格子牆。** 電視同時一路。在場影像要換上電視＝主持切來源，不是每人點收看拼牆。節目 `<video>` 在進門 PC 建立後就綁上遠端節目軌。**私下播放不影響電視、不佔節目槽。**
 
-Wire：目錄 metadata 走 `session_file`（**只掛檔**）。Live 控制走 `session_camera`／`session_mic`。影音檔播放重用 `session_file` chunk（不是 `session_cast` RTP）。遠端若送來 `kind:dir`（舊客戶端），本機**不列、不 request**。
+Wire：目錄 metadata 走 `session_file`（**只掛檔**）。在場 live 控制走 `session_camera`／`session_mic`。電視控制走 `session_cast`（指定來源；**不**載影音 bytes）。影音檔**私下播放**重用 `session_file` chunk（不是節目 RTP）。遠端若送來 `kind:dir`（舊客戶端），本機**不列、不 request**。
+
+### 5.6 兩層螢幕（硬）
+
+| | **包廂電視** | **我這台裝置** |
+| --- | --- | --- |
+| 誰在看 | 在場都對準同一塊（進門即收節目） | 只有我 |
+| 誰決定 | 主持指定來源（§5.7） | 我自己 |
+| 傳輸 | **節目槽 RTP** | 掛／下載／私下播＝`session_file` DC；我的鏡頭／麥＝在場槽 |
+| 時鐘 | 來源端播放器或 live；收看端跟著 RTP 走（**不能**對電視獨立 seek） | 本機播放器自己 seek |
+| 互斥 | 同時一個來源 | **不跟電視互斥** |
+
+場景裡的電視洞**只綁節目**。私下播放器、分享區、下載是這台裝置的 DOM chrome（抽屜／次要面），**不要**再塞進電視洞。
+
+電視上在放電影時，我可以在手機另播一部、預覽下一部、或把檔掛上架子——只有我聽到／看到私下那路，不會變成全場電視。
+
+### 5.7 包廂電視＝主持導播（硬）
+
+這一間電視狀態只有一份，例如：
+
+```text
+off                         // 關機（進門仍綁節目 video；畫面關機／雪花）
+file { owner, id }          // 來源端本機播該檔 → captureStream → 節目 RTP
+peer { peerId }             // 該人當下的在場 live（鏡頭或畫面）→ Hub 送到每人節目槽
+```
+
+- **只有主持能指定／切換來源。** 可指定自己或某位 Guest。被指定者不是新主持。
+- **看電影／MTV：** 來源端（通常是主持、且持有 `File`）本機 `<video>`／`<audio>` 播放，`HTMLMediaElement.captureStream()`（或等價）進 **program** `replaceTrack`。Seek／暫停＝動來源端播放器，收看端看到的就是那步。**禁止**用 DC＋每人獨立播放器冒充電視。
+- **會議式切台：** 主持把來源設成某 peer 的在場 live。電視上是「現在這路」，不是格子牆、不是 speaker view 牆。
+- 晚進門對準當下電視，不必再點「收看」。
+- `session_cast` 可帶 `name`／`paused`／`t` 當**標籤**（電視上寫片名）；**不是**同步時鐘。時鐘就是 RTP。
+- 星狀下主持對每位 Guest 各送 program RTP（瀏覽器常每條 PC 各編一次）。人數軟頂 ≤6。**不是**雲端轉碼／片庫。
+
+來源端 `captureStream` 快樂路徑＝桌機 Chromium。iOS Safari 當**收看端**收 RTP。若要以 iOS 當電影來源而 `captureStream` 失敗：頁內說明改由桌機當電視來源——**不要**為通過而把電視改回 DC 播檔。
+
+### 5.8 內景場景（硬）
+
+- **靜態遊戲內場景**當殼，延續大廳 canvas 色盤／`px()`／暖燈／人物繪法。**禁止**行走、碰撞、點地移動、重用 `GoShopLobby` 地圖。
+- 電視洞：canvas 畫機殼；真正的 `<video>` 用 `worldToScreen` **疊在螢幕矩形上**（WebRTC `srcObject` 不能當主路徑畫進 canvas）。
+- 可點家具（熱點 ≥44×44 邏輯 px）：電視（展開完整播放控制／全螢幕）、門（主持請人進來，**不要**大 QR 畫在門上）、架子（展開分享區）、座位上的人（在場；點人不自動上電視）。
+- 時間線**不**畫進 canvas。文字／分享／登入／座位＝疊在舞台上的 overlay（對齊大廳老闆／機台面）。
+- 清單永遠可及：canvas 失敗、`prefers-reduced-motion`、讀屏 → 電視仍是 DOM `<video>`，分享／開口／文字仍可用（大廳雙模式的包廂版，但**沒有**走路開關）。
+- 舞台＝頁面主內容（大廳同級 canvas 尺寸 320×200）；**不要**旁邊再加時間線。熱點按鈕在舞台下。寬屏遞增，禁止桌面先做再 `max-width` 縮小。
+- Guest `/i/` 不經大廳；內景本身須讀成「你在一間包廂」。可選極短 pixel wipe（不擋進門）。
 
 ---
 
@@ -205,8 +255,8 @@ intent:
 **Host（開這一間）**
 
 ```text
-未登入 `/room` → 仍是包廂殼（時間線空態）＋主 CTA「登入後開包廂」（goAuth.login；不擋回大廳、不擋 `/s/`）
-已登入 → **直接包廂主面**（時間線／輸入／這一間；門牌＝尚未發出，不倒數）
+未登入 `/room` → 仍是包廂殼（電視關機＋主 CTA「登入後開包廂」）（goAuth.login；不擋回大廳、不擋 `/s/`）
+已登入 → **直接包廂主面**（電視舞台／這一間；門牌＝尚未發出，不倒數；文字抽屜預設收）
   →「請人進來」且尚無有效門牌：
        mintPlatformInvite({ kind: "invite.room", intent, targetField: goOrigin() })
        → 開 GoShareSheet（QR／複製／系統分享；url＝/i/<short>）
@@ -291,10 +341,10 @@ consent → connecting → 在這一間
 包廂 `createOffer` 前，**順序凍結**（m-line 對不齊＝連線失敗）：
 
 ```ts
-pc.addTransceiver("audio", { direction: "sendrecv" }); // 在場音（麥）
-pc.addTransceiver("video", { direction: "sendrecv" }); // 在場視（鏡頭）
-pc.addTransceiver("audio", { direction: "sendrecv" }); // 節目音（音樂／影片聲）
-pc.addTransceiver("video", { direction: "sendrecv" }); // 節目視（影片／後期螢幕）
+pc.addTransceiver("audio", { direction: "sendrecv" }); // 在場音（開口）
+pc.addTransceiver("video", { direction: "sendrecv" }); // 在場視（鏡頭／畫面）
+pc.addTransceiver("audio", { direction: "sendrecv" }); // 節目音（包廂電視）
+pc.addTransceiver("video", { direction: "sendrecv" }); // 節目視（包廂電視）
 pc.createDataChannel("roster", { ordered: true });
 ```
 
@@ -313,7 +363,7 @@ pc.createDataChannel("roster", { ordered: true });
 | `session_chat` | **用** | 文字；重用 [`rosterSessionChat.ts`](../src/components/playgrounds/roster/rosterSessionChat.ts) |
 | `session_file` | **用** | 分享目錄（**檔** metadata）＋按需串流（見 §8.2）；**不是**聊天附件 push；**不是**未 request 就送 bytes；**不掛資料夾** |
 | `session_mesh` | **延後** | 主持轉送任兩 peer 的 O／A；**不**經 Platform；**不**載檔 bytes／RTP。現況不介紹、不建 mesh 邊 |
-| `session_cast` | Phase 2 | 節目項控制面（掛上／拿下／可選 paused＋t）；**不**承載影音 bytes；RTP 只送給 `request` 的人 |
+| `session_cast` | 媒體階段 | **電視控制面**（指定來源／關機；可選 name／paused／t 當標籤）；**不**承載影音 bytes；節目 RTP 走 Hub |
 | `session_camera` | Phase 2 | 鏡頭項：offer＝掛上；`request` 才送 RTP |
 | `session_ping` | 可選 | RTT 探測；對人可顯示「約 N ms」，不揭露路徑 |
 | `avatar_relay` | 不用 | 包廂無 SAM session；後期若在包廂開局再掛 |
@@ -368,18 +418,19 @@ Host **只轉**這些 JSON（將來），不 `setRemoteDescription` 別人的 me
 
 ## 8. 第一階段產品（文字＋傳檔）
 
-### 8.1 文字
+### 8.1 文字（輔助面）
 
 重用 `session_chat` wire／fanout／去重。包廂殼差異：
 
 - 永遠自由文字（無 SAM `SessionChatHints`；無對弈 `active` 閘）
-- 全頁時間線（**不是**右緣把手；沒有遊戲畫布要讓路）
-- 對「同包廂已連線 peer」**fanout**（對齊 session-chat；一人在時送出可留本機時間線，可加一句低調「對方還看不到——這間目前只有你」——**不要**因此藏起輸入列／主面）
+- **不是主面、不是全頁時間線。** 對齊視訊會議 chat 與局內 overlay：預設收合的抽屜／把手。主高度讓給電視。
+- 對「同包廂已連線 peer」**fanout**（一人在時送出可留本機；可加一句低調「對方還看不到——這間目前只有你」——**不要**因此把抽屜做成進門英雄）
 - 快捷語可留少數（在嗎／等一下／收到／謝謝）；預設收起
-- 單則上限可沿用 200 字，或包廂略放寬並寫進測試；時間線記憶體上限建議 200 則
+- 單則上限可沿用 200 字；時間線記憶體上限建議 200 則
 - 斷線清空；無雲端歷史
 - Bubble 視覺可與 overlay 同族（本機右、遠端左；**顯示登入名**＋金色「主持」標記，名不是「主持」）
-- 空態只說還沒有訊息；**不要**用空態當「請人進來」等待室（請人已在頂列／側欄）
+- 開口（麥）比打開文字更順手；權限拒或不能出聲才強調文字把手
+- 空態不要寫「還沒有訊息。先打字也可以。」當主畫面；電視關機才是空態
 
 ### 8.2 傳檔（分享目錄＋串流落盤）
 
@@ -392,7 +443,7 @@ Host **只轉**這些 JSON（將來），不 `setRemoteDescription` 別人的 me
 
 對讀者可寫：**檔案還在分享者這台裝置上。點下載才會存到你選的位置。關包廂，目錄就沒了；已存到你硬碟的檔不受影響。**
 
-**收看 live ≠ 下載 ≠ 播放檔（硬）：** 分享區「下載」走本節 Save picker。同一份影音要**當場看／聽**走 §9.3 **播放**（`session_file` chunk → 本機播放器滑動緩衝，可 seek），不走 live RTP。名單上的鏡頭才走 §9 RTP。iOS 無 Save picker 時下載失敗——**播放**才是手機把桌機影片看完的快樂路徑；播放**不是**下載 Blob 後備，也**不**因檔大於某 MiB 就改叫人下載。圖片「檢視」見 §9.3。
+**收看 live ≠ 下載 ≠ 私下播放 ≠ 包廂電視（硬）：** 分享區「下載」走本節 Save picker。同一份影音要**自己看／聽、可 seek** 走 §9.3 **私下播放**（`session_file` chunk → 本機播放器；可用 SW 當片源），**不**走節目 RTP。**放到電視上**才走 §5.7／§9 節目 RTP。iOS 無 Save picker 時下載失敗——私下播放仍可用；收電視是另一條路。圖片「檢視」見 §9.3。
 
 **不掛資料夾（硬）：** 產品面只有檔。禁止 `<input webkitdirectory>`、`showDirectoryPicker()` 當掛上路徑。遠端若送來 `kind:dir`，忽略、不列、不對資料夾本身 `request`。
 
@@ -400,8 +451,8 @@ Host **只轉**這些 JSON（將來），不 `setRemoteDescription` 別人的 me
 
 | 否決 | 原因 |
 | --- | --- |
-| Service Worker 攔截下載、`ReadableStream` 當下載 `Response` | 本契約禁止為傳檔加／改 SW |
-| OPFS／IndexedDB／Cache Storage 當緩衝或落盤 | 不是使用者選的檔；也不是「下載到本機硬碟」的產品語意 |
+| Service Worker 攔截**下載**、`ReadableStream` 當**下載** `Response` 餵系統下載管理員 | 下載必須走 Save picker 串流落盤；**不要**用 SW 當下載後備 |
+| OPFS／IndexedDB／Cache Storage 當**下載**緩衝或落盤 | 不是使用者選的檔；也不是「下載到本機硬碟」的產品語意。播放 SW **亦不得** `Cache.put` 整檔 |
 | 分享者 `file.arrayBuffer()`（或一次讀完整份） | 整檔進 RAM |
 | 收方累積 `chunks[]`、`assemble`、`new Blob`、`blob:` URL、`<a download>` | 整檔進 RAM；下載變成「先暫存再另存」 |
 | 一人下載就把 bytes fanout 給所有人 | 沒點下載的人被塞檔 |
@@ -420,7 +471,7 @@ showSaveFilePicker({ suggestedName }) → fileHandle.createWritable()
 
 之後每收到一幀 `writable.write(payload)`，傳完 `close()`。取消 picker＝**不**發 `request`。
 
-瀏覽器沒有 `showSaveFilePicker`／`createWritable`（常見：iOS Safari）→ **這次下載失敗**，頁內說明換系統瀏覽器或電腦再開；**禁止**為通過而改走 Blob／OPFS／SW。掛檔（`<input type="file">`／drop）仍可用 OS 選擇器——那是讀取授權，不是落盤。
+瀏覽器沒有 `showSaveFilePicker`／`createWritable`（常見：iOS Safari）→ **這次下載失敗**，頁內說明換系統瀏覽器或電腦再開；**禁止**為通過而改走 Blob／OPFS／把 SW 當下載。可改走 §9.3 **播放**。掛檔（`<input type="file">`／drop）仍可用 OS 選擇器——那是讀取授權，不是落盤。
 
 #### Wire
 
@@ -430,7 +481,7 @@ showSaveFilePicker({ suggestedName }) → fileHandle.createWritable()
 session_file.share     { id, name, size, mime, owner }   // 掛上：僅檔 metadata。本客戶端不送 kind:dir／parentId
 session_file.unshare   { id }                      // 撤一檔
 session_file.catalog   { items: share[] }          // 晚進門：Host 重放目錄
-session_file.request   { id, transferId, from }    // 下載或播放；writable 僅下載要就緒
+session_file.request   { id, transferId, from, offset? }  // 下載或播放；writable 僅下載要就緒；播放 Range 可帶 byte offset
 session_file.reject    { id, transferId }          // 已撤回／擁有者離席／無寫入能力／忙碌
 session_file.pause     { id, transferId }          // 播放緩衝滿；owner 停泵、transfer 仍在
 session_file.resume    { id, transferId }          // 窗口有空；owner 續泵
@@ -464,100 +515,145 @@ DataChannel `open` ＝「已連線」。可選 ping。不把「先連包廂再�
 
 ## 9. 媒體項（契約現在凍；UI 分階段）
 
-下列**不是**非目標。Phase 1 **不做**鏡頭／播放 UI，但 **§7.1 的 2+2 SDP 與「開 live 後 request 才送 RTP」現在凍結**——禁止之後用 Platform renegotiation 補軌。仍預留的只有「在包廂開一局」。房級「自動去拉」規則**本刀不定義**。
+下列**不是**非目標。Phase 1 **不做**鏡頭／電視 UI，但 **§7.1 的 2+2 SDP** 現在凍結——禁止之後用 Platform renegotiation 補軌。仍預留的只有「在包廂開一局」。
 
-Live 在在場名單；檔在分享目錄。SDP 在場層載 live；節目層現況空置。
+**在場槽**載開口／鏡頭／畫面（可被主持切上電視）。**節目槽載房級電視**（不再空置）。目錄檔的私下播走 DC，不上節目槽。
 
-### 9.1 一條 live（SDP 在場槽）
+### 9.1 在場 live（SDP 在場槽）
 
 | | 規格 |
 | --- | --- |
-| **來源** | `getUserMedia` **或** `getDisplayMedia`，**不能同時**。一條 live 可含影像＋聲音 |
-| **人數** | 每人同時最多發布一條。觀看端同時只收一條。預設關 |
-| **產品面** | 在場名單標示（頭像旁「有開鏡頭」）；**不是**目錄虛擬檔 |
-| **傳輸** | WebRTC RTP（presence A/V）。現況經 Host 轉給 `request` 的人 |
+| **來源** | `getUserMedia` **或** `getDisplayMedia`，**不能同時**。一條**在場** live 可含影像＋聲音 |
+| **人數** | 每人同時最多**發布**一條在場 live。預設關相機 |
+| **產品面** | 在場名單標示；**不是**目錄虛擬檔；**不是**包廂電視（除非主持指定此路為電視來源） |
+| **傳輸** | WebRTC RTP（presence A/V）。現況經 Host 轉 |
 
-**收看綁定（硬）：** 進門 PC 一建立，就把遠端 presence receiver track 綁到本機 `<video srcObject>`。**顯示**只在按「收看」之後。禁止等有畫面才第一次 `srcObject`。停止收看＝藏起 element，**不必**拆掉綁定。
+**在場影像：** 進門可把遠端 presence receiver 綁到本機隱藏 `<video>`（1×1／透明，**不要** `display:none`）。點座位上的人不自動上電視。上電視＝主持切來源，改走節目洞。
 
-關 live／停止收看＝對該請求者 `replaceTrack(null)`。Owner 關掉＝對所有 watcher 停軌並 `unoffer`。
+關在場 live＝`replaceTrack(null)` 並 `unoffer`。
 
-**否決**把鏡頭／畫面掛進分享目錄。**否決**影音檔走 `captureStream`／節目 RTP。
+**否決**把鏡頭／畫面掛進分享目錄。**否決**用 `captureStream`／節目 RTP **代替私下播檔或下載**。**必須**用 `captureStream`／節目 RTP 當**電視**（§9.2）。
 
 **否決**「第三人加入就關鏡頭」。人數不關 live。不做格子牆。
 
-節目 transceiver **留著空置**（避免之後 Platform renegotiation）；不是產品面的「掛節目」。
+### 9.2 包廂電視（SDP 節目槽）
 
-### 9.2 拓樸
+| | 規格 |
+| --- | --- |
+| **來源** | 主持指定：關機／來源端檔 `captureStream`／某 peer 的在場 live。見 §5.7 |
+| **人數** | 全場同時一路。在場**自動收**（房級 §9.8） |
+| **產品面** | 內景電視洞；關機也是主視覺 |
+| **傳輸** | WebRTC **節目** RTP。現況經 Host 轉給每位在場。**禁止**用 DC 當電視 |
 
-與傳檔同一條：**現況 Hub 星狀；mesh 延後。** 誰收得到 RTP 只看誰 `request` 了哪一項，與人數無關。每人同時只收一路、只送一路。
+**電視綁定（硬）：** 進門 PC 一建立，就把遠端 **program** receiver 綁到電視洞 `<video srcObject>`。禁止等有畫面才第一次綁。關機＝空軌或關機視覺，**不要**拆綁定、**不要** `display:none`。
+
+聲音兩層可並行：節目音＝片／電視來源；在場音＝開口。
+
+### 9.3 拓樸
+
+與傳檔同一條：**現況 Hub 星狀；mesh 延後。**
 
 ```text
-Host ↔ X      進門 PC：文字／目錄／檔 DC／live RTP（僅該 peer 請求的那一條）
-Guest ↔ Guest 不另建 PC；Host 轉幀／轉 track 給該請求者
+Host ↔ X      進門 PC：文字／目錄／檔 DC／在場 RTP／節目 RTP（電視）
+Guest ↔ Guest 不另建 PC；控制面經 Host fanout；內容經 Host 轉幀／轉 track
 ```
 
-| | 任意人數（含自己的第二台、第三台） |
+| | 任意人數（含自己的另一台） |
 | --- | --- |
-| **Live** | 開在名單。A 收看 B＝B→Host→A 送 presence（Host 自己是 B 或 A 時少一跳）。C 沒 request 就沒畫面 |
-| **檔 bytes／播放** | 進門 DC；Guest↔Guest 經 Host star。播放不佔 live RTP |
+| **電視** | 節目槽；主持指定來源；在場自動收 |
+| **在場影像** | 開在名單；上電視＝主持切來源。未指定則零影像 RTP（聲見 §9.8） |
+| **檔 bytes／私下播** | 進門 DC；不佔節目槽；不跟電視互斥 |
 
-- **不做：** 雲端 SFU、為每人預留無上限 **額外** video m-line、會議格子牆、owner 無 request 就 `replaceTrack` 給所有 PC、規定媒體必須經主持轉碼。
-- **延後：** Guest–Guest mesh（檔＋音視訊同一條邊）；signaling＝主持，不是 Platform。現況不介紹、不建邊。
-- 人數軟頂（可調）：文字／掛檔／媒體項對齊遊戲 session；包廂 ≤6。超過頁內說明。
+- **不做：** 雲端 SFU、為每人預留無上限**額外** video m-line、會議格子牆、把私下播改走 RTP。
+- **延後：** Guest–Guest mesh。現況不介紹、不建邊。
+- 人數軟頂（可調）：包廂 ≤6。超過頁內說明。星狀下電影 RTP 常是每條 PC 各編一次。
 
-### 9.3 拉的方式依項目
+### 9.4 拉的方式依項目
 
-| | 下載（§8.2） | 檢視 | 播放（影音檔） | 收看 live |
-| --- | --- | --- | --- | --- |
-| 目的 | 對方硬碟多一份 | 當場看圖；散場沒有檔 | 當場看／聽；散場沒有檔 | 當場看／聽對方鏡頭或畫面 |
-| 開始 | 先 Save picker，再拉 bytes | `request` 後有上限暫看 | `session_file` chunk 邊收邊播（滑動緩衝） | 向該人 `request` 後才送 RTP |
-| RAM | ≤ 一幀 chunk | 小圖可組暫存 object URL，看完 `revoke`；超限只准下載 | 只留播放窗口（軟頂 **32 MiB** MSE／滑動緩衝）；**不以整檔大小拒絕**。緩衝滿則 `pause` owner，播掉再 `resume`。關播放器 `revoke`。**不是**下載 Blob 後備 | 瀏覽器 RTP 播放管線；**禁止**為 live 組整檔 Blob |
-| 控制 | 下載者自己的進度 | 請求者關預覽即停 | **本機播放器**（前進／後退／暫停）；不佔 live | 音量各調各的；換人收看＝改 `request` |
+| | 下載（§8.2） | 檢視 | 私下播放（影音檔） | 包廂電視 | 在場鏡頭 |
+| --- | --- | --- | --- | --- | --- |
+| 目的 | 對方硬碟多一份 | 當場看圖 | 我這台看／聽；可 seek；散場沒有檔 | 全場同一路；跟著來源走 | 可被主持切上電視 |
+| 開始 | 先 Save picker，再拉 bytes | `request` 後有上限暫看 | `session_file` chunk（滑動緩衝／MSE，或 SW 片源） | 進門即收節目 | 開＝offer；影像待指定 |
+| RAM | ≤ 一幀 chunk | 小圖可組暫存 object URL | 播放窗口軟頂 **32 MiB**；緩衝滿 `pause` owner | 瀏覽器 RTP；**禁止**組整檔 Blob | 同左 |
+| 控制 | 下載者自己的進度 | 關預覽即停 | **本機播放器** seek／暫停 | **來源端** seek／暫停；收看端不可對電視獨立拖進度 | 本機預覽 |
 
-檢視不是下載的 Blob 後備，也不是縮圖預先傳。播放＝只想看、不要一份落盤檔。可等檔頭足夠就開播（mp4 常要 moov）；仍是 DC bytes，不是 RTP。**禁止**為播放組整檔 `Blob` 當暫存（本機 `File` object URL 除外——那是 OS 檔，不是把遠端 bytes 堆進 JS）。
+檢視不是下載的 Blob 後備。私下播放＝只想自己看、不要一份落盤檔，**不是**電視。可等檔頭足夠就開播（mp4 常要 moov）；仍是 DC bytes。**禁止**為私下播組整檔 `Blob` 當暫存（本機 `File` object URL 除外）。
 
-### 9.4 瀏覽器（驗收寫死，不當 Phase 2 bug）
+**遠端私下播可用 Service Worker（允許、有邊界）：** 若 MSE／滑動窗口不夠讓瀏覽器原生 `<video>`／`<audio>` 做 Range／漸進讀檔，**可以**用 go 既有 SW 攔截一個本機播放 URL（例：`/room-play/<transferId>`），把 `session_file` chunk 編成 `Response`（含 `206` Range）。bytes 仍只走 WebRTC。
+
+| 可 | 不可 |
+| --- | --- |
+| 攔截**播放** URL；`ReadableStream`／Range 當媒體 `Response` | 攔截「下載」或餵系統下載管理員 |
+| 改 go **既有** SW（不要為包廂另註冊第二個） | `Cache.put`／OPFS／IndexedDB 存整檔 |
+| 關播放器即取消 fetch、丟窗口、停對 owner 的 `request` | 用 SW 當 iOS 下載後備；用 SW／DC 當包廂電視 |
+
+本機掛的檔仍走 `File` object URL，不必經 SW。
+
+**禁止**用 WebRTC 當「我這台播目錄檔」的路徑。**必須**用 WebRTC 當包廂電視。
+
+### 9.5 瀏覽器（驗收寫死，不當後續階段 bug）
 
 | 能力 | 快樂路徑 | 失敗怎麼辦 |
 | --- | --- | --- |
-| 收看 live、開鏡頭、開麥 | 含 iOS Safari | 權限拒＝頁內說明 |
-| 播放目錄影音檔 | 收方本機 `<video controls>`／`<audio controls>`；大檔邊收邊播 | 解不了→頁內說明；**不要**改叫人下載當唯一出路 |
-| 螢幕分享 `getDisplayMedia` | 與鏡頭互斥的同一條 live | 權限拒＝頁內說明 |
-| Save picker 下載 | 桌機／Android Chromium | iOS 失敗（§8.2）；改走播放 |
+| 收電視（節目 RTP）、開鏡頭、開麥 | 含 iOS Safari 當收看／開口 | 權限拒＝頁內說明 |
+| 電影來源 `captureStream` | 桌機／Android Chromium 當屋子 | iOS 當來源失敗→頁內說明改桌機當電視來源；收看端仍收 RTP |
+| 私下播目錄影音 | 本機 `<video controls>`／`<audio controls>`；大檔邊收邊播；遠端可用 SW 片源 | 解不了→頁內說明；**不要**改叫人下載當唯一出路 |
+| 螢幕分享 `getDisplayMedia` | 與鏡頭互斥的同一條**在場** live；可被指定上電視 | 權限拒＝頁內說明 |
+| Save picker 下載 | 桌機／Android Chromium | iOS 失敗（§8.2）；改私下播或只收電視 |
 | 選資料夾掛上 | **不做** | 不畫該控件；drop 夾內檔當獨立檔 |
 
-**禁止**用 WebRTC media stream 收看目錄裡的影片檔。**禁止**為下載組整檔 Blob。播放緩衝例外見 §9.3。
+**禁止**用 WebRTC media stream **私下播**目錄裡的影片檔。**必須**用 WebRTC 當包廂電視。**禁止**為下載組整檔 Blob。私下播可用 SW 當片源；下載仍禁止 SW。
 
-### 9.5 誰能掛、誰能拉
+### 9.6 誰能掛、誰能拉
 
-- **鏡頭／畫面：** 任一在座裝置可開（預設關）。**開＝本機預覽＋名單標示，不送 RTP。** 對方按「收看」才 `request`。`getUserMedia` 與 `getDisplayMedia` 互斥。人數不禁用控件。瀏覽器權限對話＝OS 權限，不是產品 `confirm`。
-- **麥：** 可與鏡頭同一條 live（聲音軌）；不是第二條 live。
-- **影音檔：** 掛在目錄裡。對方按「播放」才拉 bytes 進本機播放器。**不要** `captureStream`。快樂路徑＝桌機掛影片、手機播放。
-- 進包廂**不**自動開相機、**不**自動替任何人 `request`。
+- **鏡頭／畫面：** 任一在座裝置可開（預設關）。**開＝本機預覽＋名單標示。** `getUserMedia` 與 `getDisplayMedia` 互斥。上電視＝主持指定。人數不禁用控件。瀏覽器權限對話＝OS 權限，不是產品 `confirm`。
+- **麥：** 可與鏡頭同一條在場 live（聲音軌）；不是第二條出站 live。房級：開麥者的聲自動給在場。
+- **影音檔：** 掛在目錄裡。**私下播放**才拉 bytes。**放到電視上**＝來源端已有該 `File`，走 `captureStream`＋節目 RTP。
+- 進包廂**不**自動開相機。**自動**收電視與開麥者的聲。
 
-### 9.6 控制面 `session_cast`／`session_camera`
+### 9.7 控制面 `session_cast`／`session_camera`
 
-JSON、DataChannel；**不**載影音 bytes。Live offer／unoffer 經 Host fanout。RTP **只**走 Owner→該 `request` 的 peer（現況經 Host 轉 track）。
+JSON、DataChannel；**不**載影音 bytes。RTP 走 Hub。
 
-**影音檔播放不走 `session_cast`。** 重用 `session_file.request`／chunk／`done`；收方滑動緩衝進播放器，不是 Save picker。緩衝滿時 `pause`／`resume` 同一 `transferId`（Host 只轉、不結束該 transfer）。
-
-**鏡頭** `session_camera`（麥可同形或另 `session_mic`；實作可合併為一條 live）：
+**電視** `session_cast`（主持發出；fanout）：
 
 ```text
-session_camera.offer    { from }   // 掛上：可被收看，尚未送 RTP
+session_cast.offer    { from: host, id?: fileId, fromPeer?: peerId, name? }  // 指定來源（檔或 peer）；關機用 unoffer
+session_cast.unoffer  { from: host }                                         // 電視關機
+session_cast.state    { from: host, paused?, t?, name? }                     // 可選標籤，不是時鐘
+```
+
+收看端**不必**再 `request` 節目（房級已收）。`paused`／`t` 僅 UI。
+
+**私下播檔不走 `session_cast`。** 重用 `session_file.request`／chunk／`done`；收方滑動緩衝、MSE 或 **SW 片源**，不是 Save picker。緩衝滿時 `pause`／`resume` 同一 `transferId`。
+
+**鏡頭** `session_camera`：
+
+```text
+session_camera.offer    { from }   // 掛上：可被指定上電視；影像不因 offer 就 fanout
 session_camera.unoffer  { from }
-session_camera.request  { from }   // 收看：對端才對該 peer replaceTrack
+session_camera.request  { from }   // 非主路徑：明示拉影像（若需要本機預覽別人臉）
 session_camera.release  { from }
 ```
 
-### 9.7 其他預留
+### 9.8 房級規則（定案）
+
+| 項 | 規則 |
+| --- | --- |
+| 節目（電視） | 進門／入座即收節目。新人對準當下電視。Host 對在場所有 program sender 送當下來源 |
+| 在場聲 | 有人 `offer` 麥 → 在場自動收該音軌。關麥／離席即停 |
+| 在場影像 | **不**自動 `request`。上電視＝主持指定，Hub 把該路送到節目槽 |
+| 相機／畫面 | 進門不自動 `getUserMedia`／`getDisplayMedia` |
+| 目錄檔 | 仍無 `request` 零 bytes |
+
+不改「無 request 不送**檔 bytes**／不送**未指定的在場影像**」。房級是對**電視**與**開口**的例外。
+
+### 9.9 其他預留
 
 | 方向 | 概要 | 依賴 |
 | --- | --- | --- |
 | **在包廂開一局** | 已有 PC → 重用，不再經 signaling；本機開 SAM session | DEC-045 重用；GO-INVITE 後期；可先「散場再鑄遊戲邀請」 |
-| **螢幕分享** | 同一條 live；與鏡頭互斥 | 不阻塞 2a |
-| **房級規則** | 例如進門即對在場麥 `request` | **有實際需求再定義**；不改「無 request 不送內容」 |
-| **房級規則** | 例如進門即對在場麥 `request` | **有實際需求再定義**；不改「無 request 不送內容」 |
+| **螢幕分享** | 同一條在場 live；與鏡頭互斥；可被指定上電視 | 不阻塞電視 |
 
 實作約束：**peer 當一等物件**。遊戲 SAM 若日後掛上同一 PC，應忽略閒置 A/V 軌；對弈中**不要**自動開相機。
 
@@ -567,16 +663,18 @@ session_camera.release  { from }
 
 ## 10. UX
 
-隱喻：網咖包廂——坐進去燈就亮；要加人再開門貼一張限時通行證。QR 是門上的便條，不是房間本身。自己的手機掃同一張便條＝第二個座位，不是再開一間。
+隱喻：網咖包廂——坐進去燈就亮、電視在牆上；要加人再開門貼一張限時通行證。QR 是門上的便條，不是房間本身。自己的手機掃同一張便條＝第二個座位（自帶螢幕），不是再開一間。
 
-**主面永遠回答「誰在這一間」；分享面才回答「這張邀請還能不能用」。** 正在收看的預覽是分享區裡的事（Phase 2），不要一進門就是大鏡頭。
+**主面是包廂電視**（關機也是主體）。分享面才回答「這張邀請還能不能用」。文字跟視訊會議一樣不是 UI 主體。不要一進門就是每人一格鏡頭。
 
 ### 10.1 誰看見什麼
 
 | | 主持 | Guest |
 | --- | --- | --- |
-| 時間線／輸入／分享區 | 進門即有 | 連上才有（connecting 用短狀態，不要空殼裝成已在） |
-| 鏡頭／麥／節目（Phase 2） | 進門即可掛；預設未掛 | 連上才有 |
+| 電視舞台／內景 | 進門即有 | 連上才有（connecting 用短狀態，不要空殼裝成已在） |
+| 開口（麥）／鏡頭 | 進門即可；預設未開相機 | 連上才有 |
+| 文字抽屜／分享區 | 進門即有（預設收） | 連上才有 |
+| 指定電視來源 | 有 | **無** |
 | 請人進來／門牌／TTL | 有 | **無** |
 | 在場名單 | 有 | 有 |
 | 結束這一間 | 有（散場） | 改 **離開這一間** |
@@ -588,40 +686,42 @@ session_camera.release  { from }
 1. **頂列（不自動藏）**  
    左：包廂。右：人數膠囊（「就你」／「3 人在」）＋主動作。  
    主持：`請人進來`（主）／`結束`（次、危險描邊）。Guest：只有 `離開`。熱區 ≥44×44px。
-2. **一句狀態（live 區）**  
-   只講在場與連線，**不講 TTL**。  
-   例：`就你一個人 · 把這頁開著，這一間才還在`；有人：`3 人在`（可加顯示名）。斷一人可短暫 `小明已離開`，再回到人數。門牌過期**不**取代這一行（用 flash 或分享面）。
-3. **時間線（主體，flex 吃剩餘高度）**  
-   只有文字。空態：`還沒有訊息。先打字也可以。` **不要**寫「或請人進來」。
-4. **分享區＝可收合條**  
-   預設一行：`分享區 · 尚未掛上`／`分享區 · 2`。展開才有 drop／選檔（可多選）／下載與播放。說明縮成展開後一句。窄屏不要跟時間線搶固定 50vh。  
-   **不要**做成輸入列「附加檔」、**不要**檔案氣泡混進時間線、**不要**「對方想傳檔過來／接收／拒絕」。鏡頭開在在場名單；目錄**只掛檔**。
-5. **輸入列 sticky 底**  
-   主持一進來就有；不要等第一位 Guest。快捷語預設收起。
-6. **請人進來 → 分享面（唯一放大 QR 的地方）**  
+2. **一句狀態**  
+   人數＋電視（關機／正在播〈名〉／電視上是〈誰〉）。**不講 TTL。**  
+   例：`就你一個人 · 把這頁開著，這一間才還在`；有人：`3 人在`。門牌過期**不**取代這一行。
+3. **舞台（主體）**  
+   靜態內景 canvas **就是頁面主內容**（對齊大廳：熱點按鈕在舞台下，其餘 chrome 藏）。電視洞 DOM `<video>` 對準機殼。關機＝雪花／黑屏。文字／分享／登入／座位動作＝**疊在 canvas 上的 overlay**（對齊大廳老闆／機台面），不要把時間線放舞台旁邊。
+4. **底列**  
+   開麥克風（主）／分享／文字把手。快捷語預設收起。主持另有「放到電視上」（來源在分享區或在場名單指定）。
+5. **文字＝抽屜（預設收）**  
+   對齊會議 chat。不要全頁時間線，不要空態「先打字也可以」當英雄。
+6. **分享區＝可收合面**  
+   掛檔／下載／**私下播放**。私下播放器在這台裝置 chrome，**不**佔電視洞。  
+   **不要**做成輸入列「附加檔」、**不要**檔案氣泡混進文字、**不要**「對方想傳檔過來／接收／拒絕」。
+7. **請人進來 → 分享面（唯一放大 QR 的地方）**  
    - 有效：QR、口誦 `go.samkuo.me/i/…`、複製／系統分享、一句 `這張邀請約 N 分鐘內有效；過期後再發一張即可，這一間不會因此關掉。`  
    - **必備一句：** `另一台裝置請掃這張邀請進來，不要再開一間包廂。`  
    - 過期：**不要**再畫死 QR；主 CTA `再發一張邀請`。  
    - 尚未鑄：按請人進來再鑄再開分享面。
-7. **確認（頁內，非原生 dialog）**  
-   - 主持結束／Esc／回大廳：`關掉後在場的人會斷線，目錄會沒了，正在收看的鏡頭與節目會停。已存到硬碟的檔不受影響。`  
+8. **確認（頁內，非原生 dialog）**  
+   - 主持結束／Esc／回大廳：`關掉後在場的人會斷線，目錄會沒了，電視與鏡頭會停。已存到硬碟的檔不受影響。`  
    - Guest 離開／Esc／回大廳：`離開後你會斷線；其他人還在。你掛上的項目會從分享區拿掉。`
 
 ### 10.3 寬屏（`min-width` 遞增）
 
-左：時間線＋（可較開的）分享區＋輸入。  
-右「這一間」卡片：
+上／左：舞台（電視內景，可較高）。  
+下／右：在場、門牌小狀態、分享／文字抽屜。
 
-- 在場名單（主持金色標記＋顯示名；誰開了鏡頭可點收看）
+- 在場名單（主持金色標記＋顯示名；主持可指定誰上電視）
 - 一句：`這一間只在這個畫面開著的時候存在。`
 - 門牌列：**小狀態**，不是英雄 QR  
   - 尚未請人：`還沒發邀請`＋「請人進來」  
-  - 有效：`邀請有效 · 還有 4:32`＋「顯示邀請」（開同一分享面）  
+  - 有效：`邀請有效 · 還有 4:32`＋「顯示邀請」  
   - 過期：`邀請已過期`＋「再發一張」
-- Phase 2：正在收看的預覽一塊（不要一進門就是大畫面；不要格子牆）
+- 電視控制（主持）：關機／放到電視上／切來源
 - `結束這一間`
 
-**禁止**桌面先做再 `max-width` 縮小。**禁止**把大 QR 等待面當成已登入會員的預設首屏（寬屏也不常駐 240px QR）。現場掃碼是分享面的工作。
+**禁止**桌面先做再 `max-width` 縮小。**禁止**把大 QR 等待面當成已登入會員的預設首屏。**禁止**左欄全頁時間線。現場掃碼是分享面的工作。
 
 ### 10.4 未登入／結束後／Guest 進不去
 
@@ -631,19 +731,16 @@ session_camera.release  { from }
 
 Guest 主持已離開：主 CTA 回大廳；次要「請對方再發邀請」。
 
-`/room` 不是對弈 canvas：頂列**不必** 3s 自動收起。Esc 回大廳（現況 `goEscapeHome` 含 `/chat` → 改 `/room`）。分享面開啟、確認散場期間：對齊既有 sheet 焦點與取消。
+`/room` 不是對弈 canvas：頂列**不必** 3s 自動收起。Esc 回大廳（現況 `goEscapeHome` 含 `/chat` → 改 `/room`）。分享面開啟、確認散場、文字抽屜開啟期間：對齊既有 sheet 焦點與取消。
 
-### 10.5 正在收看（Phase 2；契約現在凍）
+### 10.5 電視與私下播放（契約現在凍）
 
-窄屏預設；對齊分享區——**可收合**，不要會議格子牆，不要把 RTP 氣泡丟進時間線。預覽只出現在**你已經 request** 的項。遠端 `<video>` 在進門後就掛在 DOM 並綁 `srcObject`（可 1×1／透明，**不要** `display:none` 以免解碼停）；按收看才拿掉隱藏。
-
-- 沒有正在拉的媒體：不另開一條「鏡頭與投放」；分享區列未掛／已掛即可。綁定用的 video 仍可在 DOM 裡藏著
-- 已收看某路鏡頭：小預覽＋停止收看／owner 可撤回（同時不能再收節目）
-- 已收聽某路麥：狀態＋停止收聽
-- 已收看節目：`正在收看 · <片名或音樂>`＋本機可全螢幕；停止收看（同時不能再收鏡頭）
-- 開鏡頭／麥＝瀏覽器權限對話；失敗頁內說明
-- 預設全未掛、無人代為 `request`
-- 對讀者不說直播／推流／WebRTC；不要會議格子牆；第三人在場**不**藏鏡頭控件
+- 電視洞永遠在舞台；關機也在。綁定進門即做。
+- 主持指定來源後全場電視亮；收看端不可對電視獨立 seek（想自己拖進度＝私下播放／下載）。
+- 私下播放與電視**並行**；第二個本機 `<video>` 在裝置 chrome。
+- 開鏡頭／麥＝瀏覽器權限對話；失敗頁內說明。
+- 對讀者不說直播／推流／WebRTC；不要會議格子牆；第三人在場**不**藏鏡頭控件。
+- 點電視可展開完整控制（音量／全螢幕／主持的播放控制）；窄屏機殼內容納不下原生 controls。
 
 ---
 
@@ -655,14 +752,14 @@ Guest 主持已離開：主 CTA 回大廳；次要「請對方再發邀請」。
 | Host API key | 頁面記憶體；mint／作答；關頁即失 |
 | 時間線 | RAM；散場丟 |
 | 檔案目錄 | RAM metadata（含目錄樹相對路徑）；散場丟。**內容**只在下載時寫入使用者選的檔；分頁不留副本 |
-| 檔案緩衝 | **禁止** OPFS／IndexedDB／Cache／SW／整檔 Blob 當**下載**後備（檢視圖的上限暫存除外；**播放**見下） |
-| 播放緩衝 | 影音檔播放＝滑動窗口／MSE（軟頂 32 MiB）；**不以整檔大小拒絕**；關播放器 `revoke`。本機掛檔可用 `File` object URL |
+| 檔案緩衝 | **禁止** OPFS／IndexedDB／Cache／SW 當**下載**後備（檢視圖的上限暫存除外；**播放**見下） |
+| 播放緩衝 | 影音檔播放＝滑動窗口／MSE，或遠端 **SW 片源**（軟頂 32 MiB）；**不以整檔大小拒絕**；關播放器 `revoke`／停攔截。本機掛檔可用 `File` object URL。SW **不得** Cache 整檔 |
 | 收看緩衝 | live 僅瀏覽器 RTP 管線；**禁止**為 live 組整檔 Blob |
 | 顯示名 | 可繼續 Roster `localStorage` |
 | 分析 | 若打點，只計「鑄了包廂邀請／握手成功／掛過鏡頭」之類；不記正文、檔名、RTP |
 | 離線 | 包廂**不能**離線加入（與 `/i/` 同） |
 
-對讀者可寫：**對話、鏡頭與檔案只在在場者的瀏覽器之間；檔案點下載才存到你選的位置，不會存到遊樂場伺服器。不錄影。** 主持把這個畫面關掉，這一間就散了；目錄沒了，已存到硬碟的檔不受影響。
+對讀者可寫：**電視、開口與檔案只在在場者的瀏覽器之間；檔案點下載才存到你選的位置，不會存到遊樂場伺服器。不錄影。** 主持把這個畫面關掉，這一間就散了；目錄沒了，已存到硬碟的檔不受影響。
 
 ---
 
@@ -673,17 +770,18 @@ Guest 主持已離開：主 CTA 回大廳；次要「請對方再發邀請」。
 | Invite | `wantsRosterSignal` 認 `invite.room`；**不要**對 room stamp 遊戲用 `relay: true` |
 | Host | `roomRuntime`：進 `/room` 即主面；**按需** mint（勿 `openBooth` 自動鑄）；answer loop **持續作答**；門牌過期停 loop、清／作廢可分享的 shortUrl、**不**把 phase 打成 ended；**不** `open` SAM session |
 | Guest | `guestRuntime`／`/i/` 依 kind **或** `intent.surface` 分流；room 不 `resolveGoSamFiles`；同意後**不** `replaceState` `/room`；離開 ≠ 主持散場 |
-| 文字 | `goSessionChat` 加全頁模式，或包廂自用同一 store |
-| 檔案 | 共用 `rosterSessionFile.ts`＋單測；chunk **現況經 Host star**（`goRoomFileStar`）；禁止全員 fanout；`goRoomFileTransfer` 串流 `slice`／writable，禁止組 Blob；**只掛檔、不掛資料夾** |
+| 文字 | `goSessionChat` **抽屜／overlay**（撤全頁時間線當主面） |
+| 檔案 | 共用 `rosterSessionFile.ts`＋單測；chunk **現況經 Host star**；禁止全員 fanout；`goRoomFileTransfer` 串流 `slice`／writable，禁止組下載 Blob；**只掛檔、不掛資料夾**；遠端**私下播**可用既有 SW 當片源 |
 | Mesh | **延後。** `session_mesh` 模組留著；`GO_ROOM_MESH_ENABLED = false`。Host 不介紹、Guest 不建第二條 PC |
 | Peer | 進門 booth 2+2 helper（勿把遊戲 DC-only／現況 1+1 默默改掉）。mesh 邊日後同一套 |
-| 媒體 | live `replaceTrack` **只對有 `request` 的 peer**；每人同時一條 live；PC 建立後綁本機 video，按收看才顯示；人數不關鏡頭；RTP **經 Host 轉給請求者**；影音檔**不**走節目 RTP |
+| 媒體 | **節目槽＝電視**（進門綁 program `<video>`；房級送來源；電影 `captureStream`）。在場＝開口／可指定上電視。私下播走 DC，不佔節目。人數不關鏡頭 |
+| 場景 | `goBoothCanvas`／`goBoothLayout`（新內景；抽大廳色盤／`px`／`drawFigure`）。**不要**重用 `GoShopLobby`。電視洞 `worldToScreen` 疊 DOM video |
 | 分享 | `GoShareSheet` 邀請模式；title「邀請你進包廂」；**必備**「另一台請掃碼、不要再開一間」 |
 | 路由 | `go-client/src/routes/room/`；`/chat` 導向 `/room` |
 | 大廳 | hotspot `room` → `/room`；label「包廂」 |
 | chrome | 「更多」連到 `/room`；Esc／bulletin 路徑表 |
 
-TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest、持續作答（非 1 Guest）、SDP **兩組** A/V m-line、`share` 不上 chunk、`request` 前已有 writable、chunk RAM≤一幀、第三者收不到 transfer、無 SW／OPFS／Blob 後備、**拒絕掛資料夾**、fanout 檔清單、斷線 `unshare`、門牌過期包廂仍 open、過期後禁止分享舊 shortUrl、Guest 離開人數 -1。現況 **不**介紹 `session_mesh`。媒體：無 `request` 不 `replaceTrack`；第三人加入不關鏡頭；PC 建立後遠端軌已綁 video；同時只收／送一路。純文件本刀不寫程式。
+TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest、持續作答（非 1 Guest）、SDP **兩組** A/V m-line、`share` 不上 chunk、`request` 前已有 writable、chunk RAM≤一幀、第三者收不到 transfer、下載無 SW／OPFS／Blob 後備、**拒絕掛資料夾**、fanout 檔清單、斷線 `unshare`、門牌過期包廂仍 open、過期後禁止分享舊 shortUrl、Guest 離開人數 -1。現況 **不**介紹 `session_mesh`。媒體：進門綁節目 video；電視來源走 program RTP；私下播不清電視；無指定則零在場影像 RTP；第三人加入不關鏡頭。純文件本刀不寫程式。
 
 ---
 
@@ -691,16 +789,16 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 
 | Phase | 內容 | 完成定義 | 狀態 |
 | --- | --- | --- | --- |
-| **0. 契約** | 本文件；GLOSSARY／交叉引用 | 包廂≠overlay≠compose；進門即主面；入座不鎖 1:1；**目錄只掛檔**；**live 在名單**；影音檔播放＝DC；**現況 Hub**；一條 live；兩個時鐘；按需鑄；Guest 留 `/i/`；說／掛／要；SDP 2+2；第二台掃門牌 | **本刀** |
+| **0. 契約** | 本文件；GLOSSARY／交叉引用 | 包廂≠overlay≠compose；進門即主面；入座不鎖 1:1；**主面＝電視**；**兩層螢幕**；電視＝節目 RTP；私下播＝DC；主持導播；靜態內景不走動；目錄只掛檔；現況 Hub；兩個時鐘；按需鑄；Guest 留 `/i/`；SDP 2+2 | **本刀** |
 | **1. 文字＋傳檔** | 進 `/room` 即主面；按需 mint `invite.room`、`/i/` consent、DC、`session_chat` fanout、`session_file` **分享目錄＋串流落盤**（只掛檔）；answer loop 持續作答 | 會員不必先邀請就見包廂 UI（無 TTL）；同一短鏈 ≥2 Guest 與 Host 互傳文字；分享區可掛檔、點下載才寫入另存檔；無 Save picker 則頁內說明、不組 Blob；Platform 無正文／無檔 bytes；未登入不能開這一間；`/chat`→`/room`；門牌過期包廂仍在 | **按需鑄／兩個時鐘已落地；多人傳檔 e2e 手測仍待；現況 star；不掛資料夾** |
 | **1b. SDP 2+2** | 進門 offer／answer **2 audio + 2 video**（軌空）；具名 booth helper；遊戲 SDP 不動 | 進門 SDP 含兩組 `m=audio`、兩組 `m=video`；遊戲 compose 仍無須 2+2 | **已落地**（`reserveBoothMediaTransceivers`） |
 | **1c. Mesh 直連** | `session_mesh`；邊＝2+2＋DC；檔 chunk 與 RTP 直連／star 備援 | 兩位 Guest 之間：下載與節目／麥可不經 Host 組裝 | **延後**（`GO_ROOM_MESH_ENABLED = false`；先把 Hub 查清楚） |
-| **2a. Live（鏡頭／麥／畫面）** | 開在名單；對方 `request` 才 `replaceTrack`；`getUserMedia` XOR `getDisplayMedia`；不做格子牆 | 不經 Platform 二次 O／A；預設未開；無 request 零 RTP | **已落地** |
-| **2b. 目錄影音播放** | 掛在目錄的影片／音樂可下載或漸進下載進本機播放器；不走 live RTP | 片源不出雲；可 seek | **已落地** |
-| **2c.** | （預留） | | 預留 |
+| **2a. Live（鏡頭／麥／畫面）** | 開在名單；在場**影像**仍 `request` 才送；麥＝房級；`getUserMedia` XOR `getDisplayMedia`；不做格子牆 | 不經 Platform 二次 O／A；預設未開相機；無指定則零在場影像 RTP | **已落地**（2c 起麥改房級） |
+| **2b. 目錄影音私下播** | 掛在目錄的影片／音樂可下載或漸進下載進本機播放器；不走節目 RTP | 片源不出雲；可 seek；**不**當電視 | **已落地**（分享區播放器；不佔電視洞） |
+| **2c. 包廂電視＋內景** | 靜態內景；節目槽＝電視；主持指定來源（檔 `captureStream` 或 peer live）；房級收節目／在場聲；文字收成抽屜 | 關機電視佔主高度；一起看 MTV 走 RTP；私下播與電視並行；不走動 | **已落地**（`GoBoothStage`；節目 RTP；文字／分享抽屜） |
 | **3. 重用 peer 開局** | 包廂已連 → SAM session | 不必再掃一次（可選） | 預留 |
 
-建議實作順序 **0 → 1 → 1b**；**1c（mesh）延後**，Guest↔Guest 的檔／節目／麥先走 Hub。其後 **對齊 2a／2b 為按需拉**（Host↔Guest 與 Guest↔Guest 媒體都走進門 PC／Host 轉 track）。若只做一刀媒體：自己兩台「筆電片 → 手機看」補 iOS 不能下載的洞，**2b 可先於 2a**。
+建議實作順序 **0 → 1 → 1b**（已落地）→ **2c（電視＋內景）** 對齊本契約；**1c mesh 延後**。2a 在場 live 可與 2c 同刀：開口＋指定上電視。2b 私下播保留為裝置 chrome，不要再當主面播放器。
 
 ---
 
@@ -709,30 +807,33 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 | # | 題 | 定案 |
 | --- | --- | --- |
 | 1 | 名稱／URL | 讀者「包廂」；canonical **`/room`**；舊 `/chat` 導轉 |
-| 2 | 產品本質 | **一般用途隔間**；Phase 1＝文字＋傳檔，**不是**功能上限 |
+| 2 | 產品本質 | **一般用途隔間**；快樂路徑＝請人進來一起看電視。Phase 1＝文字＋傳檔 **wire**，不是產品主形 |
 | 3 | Invite | **`invite.room`**；門牌仍 `/i/`；無 SAM |
-| 4 | 文字 | 重用 `session_chat` |
-| 5 | 傳檔 | `session_file` **分享目錄**；點下載才串流到 `showSaveFilePicker`；**禁止** SW、OPFS、整檔 RAM／Blob。**只掛檔，不掛資料夾** |
-| 6 | SDP | 進門 **2 audio + 2 video**＋DC（在場＋節目；軌空；順序凍）；mesh 邊日後同一套；**禁止** Platform renegotiation；遊戲 compose 維持 DC-only |
+| 4 | 文字 | 重用 `session_chat`；**輔助抽屜**，不是主面（對齊視訊會議 chat） |
+| 5 | 傳檔 | `session_file` **分享目錄**；點下載才串流到 `showSaveFilePicker`；**下載禁止** SW、OPFS、整檔 RAM／Blob。**只掛檔，不掛資料夾**。**私下播可用** go 既有 SW 當片源 |
+| 6 | SDP | 進門 **2 audio + 2 video**＋DC；**在場**＝開口／鏡頭；**節目**＝房級電視；mesh 邊日後同一套；**禁止** Platform renegotiation；遊戲 compose 維持 DC-only |
 | 7 | ICE | 包廂 **≠** 遊戲 relay-only stamp；高碼率以同一網路為快樂路徑 |
 | 8 | 登入 | 開這一間要；被請進來不要（自己的第二台當 Guest 也不要） |
 | 9 | 雲 | 無；散場丟；**不錄製** |
-| 10 | 進門 | **已登入開 `/room`＝包廂主面**；邀請是面內動作 |
-| 11 | 人數 | **入座不鎖 1:1**；同一張**有效** Invite 多 join；文字／**分享目錄** fanout；內容按 `request` 路由。鏡頭**不**因人數開關 |
+| 10 | 進門 | **已登入開 `/room`＝包廂主面（電視舞台）**；邀請是面內動作 |
+| 11 | 人數 | **入座不鎖 1:1**；同一張**有效** Invite 多 join；文字／**分享目錄** fanout。鏡頭**不**因人數開關 |
 | 12 | 兩個時鐘 | 包廂壽命＝主持 `/room` 文件；門牌 TTL 只管請新人；過期 ≠ 散場 |
 | 13 | 按需鑄 | **沒按「請人進來」就不 mint**；同一時間最多一張有效門牌；過期後禁止分享舊 QR |
 | 14 | Guest URL | 同意後**留在** `/i/<short>`；**禁止** `replaceState` `/room` |
 | 15 | 角色 CTA | 主持「結束這一間」；Guest「離開這一間」；主面不把 TTL 當包廂狀態 |
-| 16 | 第二台 | **掃門牌**進來；再開 `/room`＝另一間空包廂；不另做裝置配對。預設分享故事＝自己的裝置互拉（含舊手機掛鏡頭當監控） |
-| 17 | 三個動詞 | **說**／**掛**／**要**（下載、檢視、播放檔、收看 live）分開；同一影音可下載也可播放，都是向 owner 拉 bytes |
-| 18 | 媒體層 | SDP **在場**＝live；節目槽空置。每人同時一條 live。預設未開。PC 建立後綁 video，按收看才顯示。Live 在名單不在目錄 |
-| 19 | 收看 vs 播放 vs 下載 | live 收看走 RTP；檔案播放與下載走 `session_file`；播放＝滑動緩衝（可 pause owner），不是整檔 Blob；下載禁止 Blob 後備 |
-| 20 | 拓樸 | 進門＝Guest↔Host（Platform 一次）。**現況檔與 live 皆經 Host Hub 轉給請求者**。Guest↔Guest mesh **延後**。否決 Platform 第二輪與雲端 SFU |
-| 21 | 節目源 | **否決** `captureStream` 當檔案收看路徑 |
-| 22 | 用語 | 鏡頭、麥克風、收看、播放、掛上、分享目錄；不用直播、會議 SaaS、P2P、串流伺服器 |
-| 23 | 內容傳輸 | **永遠按需拉。** 無該 peer 的 `request` 則零 bytes／零 RTP。不做格子牆 |
+| 16 | 第二台 | **掃門牌**進來；再開 `/room`＝另一間空包廂。自帶螢幕可私下播，不跟電視互斥 |
+| 17 | 三個動詞 | **說**（開口為主、文字為輔）／**掛**／**要**（下載、檢視、私下播）。放到電視上≠要目錄檔 |
+| 18 | 媒體層 | SDP **在場**＝開口／可指定上電視的 live；**節目**＝包廂電視。每人一條出站在場 live。進門不開相機。PC 建立後綁節目 video |
+| 19 | 電視 vs 私下播 vs 下載 | **電視＝節目 RTP**（電影 `captureStream` 或 peer live）。私下播與下載走 `session_file`。兩者不互斥 |
+| 20 | 拓樸 | 進門＝Guest↔Host（Platform 一次）。**現況檔與 RTP 皆經 Host Hub**。Guest↔Guest mesh **延後**。否決 Platform 第二輪與雲端 SFU |
+| 21 | 節目源 | **電視必須 RTP。** 否決用 `captureStream`／RTP **代替**個人下載或私下播。否決用 DC 當電視 |
+| 22 | 用語 | 包廂電視、放到電視上、私下播放、開口；不用直播、會議 SaaS 產品名、P2P、串流伺服器 |
+| 23 | 內容傳輸 | 檔 bytes 與未指定的在場影像：無 `request` 則零。**房級：** 自動收電視與開麥者的聲。不做格子牆 |
 | 24 | 分享目錄 | **只有檔**；不掛資料夾；鏡頭／畫面不是項 |
-| 25 | 一條 live | `getUserMedia` XOR `getDisplayMedia`；可含影像＋聲音 |
+| 25 | 一條出站在場 live | `getUserMedia` XOR `getDisplayMedia`；可含影像＋聲音 |
+| 26 | 兩層螢幕 | 包廂電視 ≠ 我這台。私下播／掛／下載不跟電視互斥 |
+| 27 | 主持導播 | 僅主持指定電視來源（檔或 peer）。被指定者不是新主持 |
+| 28 | 內景 | 靜態場景延續大廳畫風；**不走動**；不重用大廳地圖；電視洞＝canvas 機殼＋DOM `<video>` |
 
 ---
 
@@ -740,8 +841,8 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 
 | 流 | 是 | 不是 |
 | --- | --- | --- |
-| **包廂 `/room`** | 臨時隔間；進門即主面；Invite 請人**或自己的另一台**（入座可多人）；**活著＝主持畫面開著**；說／掛／要；分享目錄＋按需拉；**現況 Hub 轉送**（mesh 延後） | 大廳公開桌、局內 overlay、型錄 SAM、必須先邀請才看得到 UI、入座只能兩人、5 分鐘租期的雲端房間、視訊會議格子牆、再開 `/room` 當連線 |
-| **Session chat** | 已在遊戲 session 裡的附屬對話 | 包廂主面 |
+| **包廂 `/room`** | 臨時隔間；進門即**電視主面**；Invite 請人**或自己的另一台**；**活著＝主持畫面開著**；一起看電視（節目 RTP）；自帶裝置可私下播／掛／下載；開口為主、文字為輔；現況 Hub | 大廳可行走地圖、全頁聊天室、局內 overlay、型錄 SAM、必須先邀請才看得到 UI、入座只能兩人、5 分鐘租期的雲端房間、視訊會議格子牆、再開 `/room` 當連線、用 DC 當電視 |
+| **Session chat** | 已在遊戲 session 裡的附屬對話 | 包廂主面；包廂文字抽屜可同族但不是局內 overlay |
 | **GO-INVITE** | `invite.compose` 開指定 SAM | 包廂 kind |
 | **布告** | 全站營運公告 | peer 對話 |
 | **`/s/`** | 單機傳閱 | 無 peer、無包廂 |
@@ -754,10 +855,10 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 
 - [x] 本文件；不另開 DEC
 - [x] GLOSSARY「包廂」；大廳熱點／主計劃交叉引用
-- [x] **進門即主面：** 已登入開 `/room` 即時間線／輸入，不必先按邀請
+- [x] **進門即主面：** 已登入開 `/room` 即包廂 UI，不必先按邀請；主面＝靜態內景＋電視（2c）
 - [x] **不鎖 1:1 入座：** 同一短鏈多人可進；時間線 fanout；分享目錄同步（內容不全員推送）
 - [x] **兩個時鐘：** 包廂＝Host document；門牌 TTL 分開；按需鑄；Guest 留 `/i/`
-- [x] **說／掛／要；分享目錄＋按需拉；在場＋節目 2+2；第二台掃門牌；現況 Hub 星狀（mesh 延後）；一路收／一路送；PC 後綁 video**（§5.3／§5.5／§7.1／§7.4／§9）
+- [x] **契約本刀：** 主面＝電視；兩層螢幕；電視＝節目 RTP；私下播＝DC；主持導播；靜態內景；房級收節目／在場聲（§5.6–5.8／§9／§10）
 
 **Phase 1（實作後）**
 
@@ -801,3 +902,6 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 | 2026-08-19 | **Live ≠ 檔：** 每人同時一條 live（`getUserMedia` XOR `getDisplayMedia`，可含聲），走 WebRTC，出現在在場名單。目錄只掛檔。影音檔改漸進下載＋本機播放器（可 seek），不佔 live、不走 `captureStream` |
 | 2026-08-19 | **只掛檔：** 分享目錄不掛資料夾；拿掉「選資料夾」／`webkitdirectory`。Drop 夾內檔當獨立檔。遠端 `kind:dir` 忽略 |
 | 2026-08-19 | **播放≠整檔緩存：** 取消 256 MiB 整檔上限。播放＝滑動窗口（32 MiB）／MSE，緩衝滿 `pause` owner。本機 `File` 仍走 object URL（不進 JS heap） |
+| 2026-08-19 | **播放可用 SW：** 遠端影音播放若需要，可用 go 既有 Service Worker 攔截播放 URL、把 DC chunk 編成媒體 `Response`（含 Range）。下載仍禁止 SW／Cache 整檔 |
+| 2026-08-19 | **包廂電視主面：** 靜態內景（不走動）；主面＝電視不是時間線；兩層螢幕（電視 RTP ≠ 私下播 DC）；主持指定來源；電影廣播＝節目 RTP／`captureStream`；房級收電視與開麥聲；文字＝輔助抽屜。凍結 #18–#28 |
+| 2026-08-19 | **2c 落地：** `goBoothLayout`／`GoBoothStage`；節目槽＝電視（`startProgram`／`putLiveOnTv`）；房級收節目與麥；文字／分享抽屜；私下播留在分享區 |
