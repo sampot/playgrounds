@@ -40,6 +40,7 @@ import {
   isSessionChatMessage,
   sessionChatPhaseFromEvent,
 } from "@pg/roster/rosterSessionChat";
+import { isSessionChatCtlMessage } from "@pg/roster/rosterSessionChatCtl";
 import { goSessionChat } from "./goSessionChat.svelte";
 import { goRoomFiles } from "./goRoomFiles.svelte";
 import { goRoomMedia } from "./goRoomMedia.svelte";
@@ -700,6 +701,8 @@ export function createGuestRuntime() {
               });
               void goRoomMedia.refresh();
             } else if (isSessionChatMessage(data)) {
+              goSessionChat.onIncoming(data);
+            } else if (isSessionChatCtlMessage(data)) {
               goSessionChat.onIncoming(data);
             } else if (isSessionFileControl(data)) {
               goRoomFiles.onControl(data);

@@ -173,6 +173,52 @@ describe("roomRuntime", () => {
     expect(b.send).toHaveBeenCalled();
   });
 
+  it("fans guest float emojis and drops guest delete", async () => {
+    let loopOpts: {
+      prepareHandlers: () => {
+        handlers: { onMessage: (data: unknown) => void };
+        attachSession: (s: ReturnType<typeof mockSession>) => void;
+      };
+    } | null = null;
+    fixtures.startLoop.mockImplementation((opts: typeof loopOpts) => {
+      loopOpts = opts;
+      return { stop: vi.fn(), inviteId: "inv-room" };
+    });
+    const { createRoomRuntime } = await import("./roomRuntime");
+    const rt = createRoomRuntime();
+    await rt.openBooth();
+    await rt.mintInviteAndAnswer();
+    const a = mockSession();
+    const b = mockSession();
+    const first = loopOpts!.prepareHandlers();
+    first.attachSession(a);
+    const second = loopOpts!.prepareHandlers();
+    second.attachSession(b);
+    const float = {
+      type: "session_chat_ctl",
+      v: 1,
+      op: "float",
+      from: "g-a",
+      id: "flt-1",
+      emoji: "🎉",
+    };
+    a.send.mockClear();
+    b.send.mockClear();
+    first.handlers.onMessage(float);
+    expect(b.send).toHaveBeenCalledWith(float);
+    expect(a.send).not.toHaveBeenCalledWith(float);
+    b.send.mockClear();
+    first.handlers.onMessage({
+      type: "session_chat_ctl",
+      v: 1,
+      op: "delete",
+      from: "g-a",
+      id: "del-1",
+      targetId: "m1",
+    });
+    expect(b.send).not.toHaveBeenCalled();
+  });
+
   it("does not close the booth when one guest leaves", async () => {
     let loopOpts: {
       prepareHandlers: () => {

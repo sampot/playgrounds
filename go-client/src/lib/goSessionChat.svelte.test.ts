@@ -187,4 +187,135 @@ describe("goSessionChat", () => {
     goSessionChat.setHints({ quickReplies: [] });
     expect(goSessionChat.quickReplies).toEqual([]);
   });
+
+  it("merges local system notes into the page feed without unread", () => {
+    goSessionChat.attach({
+      localAgentId: "me",
+      layout: "page",
+      peers: [{ send: () => {} }],
+    });
+    expect(
+      goSessionChat.noteSystem({
+        id: "sys-join-1",
+        ts: 1,
+        tone: "presence",
+        text: "張三 已加入包廂",
+      })
+    ).toBe(true);
+    expect(goSessionChat.unread).toBe(0);
+    expect(goSessionChat.feed).toEqual([
+      expect.objectContaining({
+        kind: "system",
+        id: "sys-join-1",
+      }),
+    ]);
+    goSessionChat.sendText("hi");
+    expect(goSessionChat.feed.map((row) => row.kind)).toEqual(["system", "chat"]);
+    goSessionChat.noteSystem({
+      id: "sys-join-1",
+      ts: 2,
+      tone: "presence",
+      text: "張三 已加入包廂",
+    });
+    expect(goSessionChat.feed.filter((row) => row.id === "sys-join-1")).toHaveLength(
+      1
+    );
+  });
+
+  it("fans out a +1 reaction and a TV float", () => {
+    const sent: unknown[] = [];
+    goSessionChat.attach({
+      localAgentId: "me",
+      layout: "page",
+      peers: [],
+      broadcast: (msg) => {
+        sent.push(msg);
+        return 1;
+      },
+    });
+    goSessionChat.sendText("hi");
+    const mid = goSessionChat.messages[0]!.id;
+    expect(goSessionChat.react(mid, "👍")).toBe(true);
+    expect(goSessionChat.reactionRows(mid)).toEqual([
+      { emoji: "👍", count: 1, mine: true },
+    ]);
+    expect(goSessionChat.react(mid, "👍")).toBe(true);
+    expect(goSessionChat.reactionRows(mid)).toEqual([]);
+    expect(goSessionChat.floatEmoji("🎉")).toBe(true);
+    expect(goSessionChat.floats.map((f) => f.emoji)).toEqual(["🎉"]);
+    expect(
+      sent.filter((m) => (m as { type?: string }).type === "session_chat_ctl")
+    ).toHaveLength(3);
+  });
+
+  it("lets Host lock and silence guests; Host can still type", () => {
+    const sent: unknown[] = [];
+    goSessionChat.attach({
+      localAgentId: "host-1",
+      localRole: "host",
+      layout: "page",
+      peers: [],
+      broadcast: (msg) => {
+        sent.push(msg);
+        return 1;
+      },
+    });
+    expect(goSessionChat.setTextLocked(true)).toBe(true);
+    expect(goSessionChat.textLocked).toBe(true);
+    expect(goSessionChat.sendText("host ok")).toBe(true);
+    goSessionChat.detach();
+    goSessionChat.attach({
+      localAgentId: "g-a",
+      localRole: "guest",
+      layout: "page",
+      peers: [],
+      broadcast: (msg) => {
+        sent.push(msg);
+        return 1;
+      },
+    });
+    goSessionChat.onIncoming({
+      type: "session_chat_ctl",
+      v: 1,
+      op: "lock",
+      from: "host-1",
+      id: "lock-1",
+    });
+    expect(goSessionChat.textLocked).toBe(true);
+    expect(goSessionChat.sendText("nope")).toBe(false);
+    goSessionChat.onIncoming({
+      type: "session_chat_ctl",
+      v: 1,
+      op: "unlock",
+      from: "host-1",
+      id: "unlock-1",
+    });
+    goSessionChat.onIncoming({
+      type: "session_chat_ctl",
+      v: 1,
+      op: "silence",
+      from: "host-1",
+      id: "sil-1",
+      to: "g-a",
+      until: Date.now() + 60_000,
+    });
+    expect(goSessionChat.sendText("still no")).toBe(false);
+  });
+
+  it("deletes a line and captions it onto the TV", () => {
+    goSessionChat.attach({
+      localAgentId: "host-1",
+      localRole: "host",
+      layout: "page",
+      peers: [],
+      broadcast: () => 1,
+    });
+    goSessionChat.sendText("上電視");
+    const mid = goSessionChat.messages[0]!.id;
+    expect(goSessionChat.captionMessage(mid)).toBe(true);
+    expect(goSessionChat.caption?.text).toBe("上電視");
+    expect(goSessionChat.deleteMessage(mid)).toBe(true);
+    expect(goSessionChat.messages).toHaveLength(0);
+    expect(goSessionChat.deleteMessage(mid)).toBe(false);
+  });
 });

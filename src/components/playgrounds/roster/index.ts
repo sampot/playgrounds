@@ -326,3 +326,23 @@ export type {
   SessionBoothOp,
   SessionBoothMessage,
 } from "./rosterSessionBooth";
+
+export {
+  SESSION_CHAT_CTL_TYPE,
+  SESSION_CHAT_CTL_VERSION,
+  SESSION_CHAT_FLOAT_EMOJIS,
+  SESSION_CHAT_CAPTION_MS,
+  SESSION_CHAT_FLOAT_MS,
+  SESSION_CHAT_SILENCE_MS,
+  isSessionChatCtlMessage,
+  sessionChatCtlAllowedFromGuest,
+  buildSessionChatCtlMessage,
+  applyChatReaction,
+  chatReactionRows,
+} from "./rosterSessionChatCtl";
+export type {
+  SessionChatCtlOp,
+  SessionChatCtlMessage,
+  SessionChatFloatEmoji,
+  ChatReactionMap,
+} from "./rosterSessionChatCtl";

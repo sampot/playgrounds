@@ -12,6 +12,11 @@ import {
   broadcastSessionChat,
   isSessionChatMessage,
 } from "@pg/roster/rosterSessionChat";
+import {
+  buildSessionChatCtlMessage,
+  isSessionChatCtlMessage,
+  sessionChatCtlAllowedFromGuest,
+} from "@pg/roster/rosterSessionChatCtl";
 import { isSessionFileControl } from "@pg/roster/rosterSessionFile";
 import { isSessionMeshMessage } from "@pg/roster/rosterSessionMesh";
 import { isSessionCastMessage } from "@pg/roster/rosterSessionCast";
@@ -317,10 +322,20 @@ export function createRoomRuntime() {
             meshBroker.introduce(data.agentId);
           }
           refreshGuestSummary();
-        } else if (isSessionChatMessage(data)) {
+            } else if (isSessionChatMessage(data)) {
           const toast = goSessionChat.onIncoming(data);
           if (toast) chromeSession.setFlash(toast, 2800);
           broadcastSessionChat(otherSessions(slot), data);
+        } else if (isSessionChatCtlMessage(data)) {
+          if (!sessionChatCtlAllowedFromGuest(data)) return;
+          goSessionChat.onIncoming(data);
+          for (const sess of otherSessions(slot)) {
+            try {
+              sess.send(data);
+            } catch {
+              /* ignore */
+            }
+          }
         } else if (isSessionFileControl(data)) {
           if (!slot.peerId && data.owner) slot.peerId = data.owner;
           if (!slot.peerId && data.from) slot.peerId = data.from;
@@ -353,6 +368,38 @@ export function createRoomRuntime() {
       onChannelOpen: () => {
         if (status.phase !== "ended") {
           fanoutOccupancy();
+          const sess = slot.session;
+          if (sess) {
+            if (goSessionChat.textLocked) {
+              try {
+                sess.send(
+                  buildSessionChatCtlMessage({
+                    op: "lock",
+                    from: localAgentId,
+                  })
+                );
+              } catch {
+                /* ignore */
+              }
+            }
+            for (const [to, until] of Object.entries(
+              goSessionChat.silencedUntil ?? {}
+            )) {
+              if (typeof until !== "number" || until <= Date.now()) continue;
+              try {
+                sess.send(
+                  buildSessionChatCtlMessage({
+                    op: "silence",
+                    from: localAgentId,
+                    to,
+                    until,
+                  })
+                );
+              } catch {
+                /* ignore */
+              }
+            }
+          }
           set({
             phase: "open",
             error: null,

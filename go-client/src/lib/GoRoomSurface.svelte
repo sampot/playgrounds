@@ -5,6 +5,11 @@
     SESSION_CHAT_MAX_TEXT_CHARS,
     isSessionChatHostMessage,
   } from "@pg/roster/rosterSessionChat";
+  import {
+    SESSION_CHAT_FLOAT_EMOJIS,
+    chatReactionRows,
+    type SessionChatFloatEmoji,
+  } from "@pg/roster/rosterSessionChatCtl";
   import { goSessionChat } from "$lib/goSessionChat.svelte";
   import { goRoomFiles } from "$lib/goRoomFiles.svelte";
   import { goRoomMedia } from "$lib/goRoomMedia.svelte";
@@ -26,8 +31,17 @@
     GO_ROOM_LEAVE_CONFIRM_GUEST,
     GO_ROOM_LOGIN_HINT,
     GO_ROOM_PUT_ON_TV,
+    GO_ROOM_ROLE_HOST,
     GO_ROOM_SHARE_HINT,
     GO_ROOM_SHARE_TITLE,
+    GO_ROOM_TEXT_CAPTION,
+    GO_ROOM_TEXT_DELETE,
+    GO_ROOM_TEXT_LOCK,
+    GO_ROOM_TEXT_LOCKED_HINT,
+    GO_ROOM_TEXT_SILENCE,
+    GO_ROOM_TEXT_SILENCED_HINT,
+    GO_ROOM_TEXT_UNLOCK,
+    GO_ROOM_TEXT_UNSILENCE,
     GO_ROOM_TV_OFF_BTN,
     attachMediaStream,
     attachPlaybackUrl,
@@ -78,6 +92,27 @@
     catalogPlayLabel,
     catalogTransferHint,
   } from "$lib/goRoomCatalog";
+  import {
+    formatRoomChatClock,
+    newRoomSystemId,
+    parseRoomChatSegments,
+    roomChatApplyMention,
+    roomChatFilterMentionTargets,
+    roomChatMentionDraft,
+    roomOccupancyChanges,
+    roomShareCatalogChanges,
+    roomSystemFileActions,
+    roomSystemFileText,
+    roomSystemJoinText,
+    roomSystemLeaveText,
+    roomSystemTvFileText,
+    roomSystemTvLiveText,
+    roomTvCue,
+    roomTvCueChange,
+    type RoomMentionPerson,
+    type RoomShareRow,
+    type RoomTvCue,
+  } from "$lib/goRoomTimeline";
 
   type RoomUiPhase = "idle" | "open" | "ended" | "error" | "connecting" | "ready";
 
@@ -151,11 +186,29 @@
   let tvVideoEl = $state<HTMLVideoElement | null>(null);
   let tvSlotEl = $state<HTMLElement | null>(null);
   let cinemaUserEnter = $state(false);
+  let menuMsgId = $state<string | null>(null);
+  let holdTimer: ReturnType<typeof setTimeout> | null = null;
 
   const messages = $derived(goSessionChat.messages);
+  const feed = $derived(goSessionChat.feed);
   const connected = $derived(goSessionChat.connected);
   const freeText = $derived(goSessionChat.freeTextAllowed);
   const quickReplies = $derived(goSessionChat.quickReplies);
+  const reactionMap = $derived(goSessionChat.reactions);
+  const stageFloats = $derived(goSessionChat.floats);
+  const tvCaption = $derived(goSessionChat.caption);
+  const textLocked = $derived(goSessionChat.textLocked);
+  const localSilenced = $derived(
+    goSessionChat.isPeerSilenced(goSessionChat.localAgentId ?? "")
+  );
+  const canSpeak = $derived(role === "host" || (!textLocked && !localSilenced));
+  const composerHint = $derived(
+    !canSpeak
+      ? localSilenced
+        ? GO_ROOM_TEXT_SILENCED_HINT
+        : GO_ROOM_TEXT_LOCKED_HINT
+      : "說點什麼… @ 可提及成員"
+  );
   const files = $derived(
     goRoomFiles.entries.filter((f) => f.kind !== "dir" && f.kind !== "device")
   );
@@ -390,10 +443,109 @@
   });
 
   $effect(() => {
-    void messages.length;
+    void feed.length;
     if (!listEl) return;
     void tick().then(() => {
       if (listEl) listEl.scrollTop = listEl.scrollHeight;
+    });
+  });
+
+  $effect(() => {
+    void stageFloats.length;
+    void tvCaption?.until;
+    const t = setInterval(() => goSessionChat.pruneStage(), 200);
+    return () => clearInterval(t);
+  });
+
+  let occPrev: RoomMentionPerson[] | null = null;
+  let occGuestReady = false;
+  $effect(() => {
+    if (role === "guest" && occupantPeers.length === 0 && !occGuestReady) {
+      return;
+    }
+    occGuestReady = true;
+    const next = occupantPeers.map((p) => ({ peerId: p.peerId, name: p.name }));
+    const { joined, left } = roomOccupancyChanges(occPrev, next);
+    occPrev = next;
+    const ts = Date.now();
+    for (const row of joined) {
+      goSessionChat.noteSystem({
+        id: newRoomSystemId(`join-${row.peerId}`),
+        ts,
+        tone: "presence",
+        text: roomSystemJoinText(row.name),
+      });
+    }
+    for (const row of left) {
+      goSessionChat.noteSystem({
+        id: newRoomSystemId(`leave-${row.peerId}`),
+        ts,
+        tone: "presence",
+        text: roomSystemLeaveText(row.name),
+      });
+    }
+  });
+
+  let sharePrev: RoomShareRow[] | null = null;
+  $effect(() => {
+    const next = files.map((f) => ({
+      id: f.id,
+      name: f.name,
+      ownerName: f.ownerName,
+    }));
+    const added = roomShareCatalogChanges(sharePrev, next);
+    sharePrev = next;
+    const ts = Date.now();
+    for (const row of added) {
+      const listed = files.find((f) => f.id === row.id);
+      const acts = listed
+        ? roomSystemFileActions(listed)
+        : { preview: false, download: true };
+      goSessionChat.noteSystem({
+        id: newRoomSystemId(`file-${row.id}`),
+        ts,
+        tone: "file",
+        text: roomSystemFileText(row.ownerName, row.name),
+        file: {
+          id: row.id,
+          name: row.name,
+          preview: acts.preview,
+          download: acts.download,
+        },
+      });
+    }
+  });
+
+  let tvPrev: RoomTvCue | null = null;
+  $effect(() => {
+    const next = roomTvCue({
+      tvSourcePeerId: goRoomMedia.tvSourcePeerId,
+      programName: goRoomMedia.programName,
+      remoteProgramName: goRoomMedia.remoteProgramName,
+      occupants: [
+        ...occupantPeers,
+        { peerId: "local", name: goAuth.profile?.label?.trim() || "我" },
+      ],
+    });
+    const change = roomTvCueChange(tvPrev, next);
+    tvPrev = next;
+    if (!change) return;
+    const ts = Date.now();
+    if (change.kind === "live") {
+      goSessionChat.noteSystem({
+        id: newRoomSystemId("tv-live"),
+        ts,
+        tone: "tv",
+        text: roomSystemTvLiveText(GO_ROOM_ROLE_HOST, change.name),
+      });
+      return;
+    }
+    if (change.kind !== "file") return;
+    goSessionChat.noteSystem({
+      id: newRoomSystemId("tv-file"),
+      ts,
+      tone: "tv",
+      text: roomSystemTvFileText(GO_ROOM_ROLE_HOST, change.name),
     });
   });
 
@@ -528,9 +680,74 @@
     });
   }
 
+  const mentionPeople = $derived.by((): RoomMentionPerson[] => {
+    const rows: RoomMentionPerson[] = memberCards.map((c) => ({
+      peerId: c.peerId,
+      name: c.name,
+    }));
+    const label = goAuth.profile?.label?.trim();
+    if (label) rows.push({ peerId: "local", name: label });
+    return rows;
+  });
+  const mentionPick = $derived(
+    memberCards
+      .filter((c) => !c.mine)
+      .map((c) => ({ peerId: c.peerId, name: c.name }))
+  );
+  const mentionDraft = $derived(roomChatMentionDraft(draft));
+  const mentionHits = $derived(
+    mentionDraft
+      ? roomChatFilterMentionTargets(mentionDraft.query, mentionPick)
+      : []
+  );
+
+  function chatCard(m: (typeof messages)[number]) {
+    if (m.local) return memberCards.find((c) => c.mine) ?? null;
+    return memberCards.find((c) => c.peerId === m.from) ?? null;
+  }
+
+  function insertMention(person: RoomMentionPerson) {
+    if (!mentionDraft) return;
+    draft = roomChatApplyMention(draft, mentionDraft.start, person);
+    composerInputEl?.focus();
+  }
+
+  function clearHold() {
+    if (holdTimer) {
+      clearTimeout(holdTimer);
+      holdTimer = null;
+    }
+  }
+
+  function openMsgMenu(id: string) {
+    menuMsgId = id;
+  }
+
+  function onBubblePointerDown(id: string) {
+    clearHold();
+    holdTimer = setTimeout(() => openMsgMenu(id), 450);
+  }
+
+  function onReact(targetId: string, emoji: SessionChatFloatEmoji) {
+    goSessionChat.react(targetId, emoji);
+  }
+
+  function onSystemPreview(fileId: string) {
+    const listed = files.find((f) => f.id === fileId);
+    if (!listed) {
+      pane = "files";
+      return;
+    }
+    if (catalogConsumes(listed).includes("play")) {
+      void onPlayFile(fileId);
+      return;
+    }
+    pane = "files";
+  }
+
   function onSubmit(ev: Event) {
     ev.preventDefault();
-    if (!freeText) return;
+    if (!freeText || !canSpeak) return;
     if (goSessionChat.sendText(draft)) draft = "";
   }
 
@@ -823,6 +1040,8 @@
         onSeek={(seconds) => goRoomMedia.seekProgram(seconds)}
         onFullscreen={() => void onTvFullscreen()}
         onPower={() => void onStopTv()}
+        floats={stageFloats}
+        caption={tvCaption && tvCaption.until > Date.now() ? tvCaption.text : null}
       />
       {#if showAd}
         <div class="room-ad">
@@ -992,7 +1211,7 @@
               aria-pressed={paneTabOn("chat")}
               onclick={() => onPaneTab("chat")}
             >
-              文字{#if messages.length > 0} · {messages.length}{/if}
+              文字{#if feed.length > 0} · {feed.length}{/if}
             </button>
           {/if}
         </nav>
@@ -1197,22 +1416,212 @@
           {#if panesConcurrent}
             <p class="room-pane-title pixel-text">文字</p>
           {/if}
+          {#if role === "host"}
+            <button
+              type="button"
+              class={["pixel-btn", textLocked && "pixel-btn--primary"].filter(Boolean).join(" ")}
+              aria-pressed={textLocked}
+              onclick={() => goSessionChat.setTextLocked(!textLocked)}
+            >
+              {textLocked ? GO_ROOM_TEXT_UNLOCK : GO_ROOM_TEXT_LOCK}
+            </button>
+          {:else if !canSpeak}
+            <p class="muted">{composerHint}</p>
+          {/if}
           <div class="room-timeline" bind:this={listEl} role="log" aria-label="包廂文字">
-            {#if messages.length === 0}
+            {#if feed.length === 0}
               <p class="muted">{GO_ROOM_EMPTY_TIMELINE}</p>
             {/if}
-            {#each messages as m (m.id)}
-              <div
-                class={["bubble", m.local && "bubble--local", isHostMsg(m) && "bubble--host"]
-                  .filter(Boolean)
-                  .join(" ")}
-              >
-                <span class="bubble-who">
-                  {#if isHostMsg(m)}<span class="host-tag">主持</span>{/if}
-                  {#if who(m)}<span>{who(m)}</span>{/if}
-                </span>
-                <span class="bubble-text">{m.text}</span>
-              </div>
+            {#each feed as row (row.id)}
+              {#if row.kind === "system"}
+                <div
+                  class={[
+                    "sys",
+                    row.system.tone === "file" && "sys--file",
+                    row.system.tone === "tv" && "sys--tv",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                >
+                  <p class="sys-text">{row.system.text}</p>
+                  {#if row.system.file}
+                    {@const listed = files.find((f) => f.id === row.system.file?.id)}
+                    <div class="sys-actions">
+                      {#if row.system.file.preview}
+                        <button
+                          type="button"
+                          class="pixel-btn"
+                          disabled={!listed}
+                          onclick={() => onSystemPreview(row.system.file!.id)}
+                        >
+                          預覽
+                        </button>
+                      {/if}
+                      {#if row.system.file.download}
+                        <button
+                          type="button"
+                          class="pixel-btn pixel-btn--primary"
+                          disabled={!listed || listed.status === "transferring"}
+                          onclick={() => void onDownload(row.system.file!.id)}
+                        >
+                          下載
+                        </button>
+                      {/if}
+                    </div>
+                  {/if}
+                </div>
+              {:else}
+                {@const m = row.chat}
+                {@const card = chatCard(m)}
+                {@const chips = chatReactionRows(
+                  reactionMap,
+                  m.id,
+                  goSessionChat.localAgentId
+                )}
+                <div
+                  class={["bubble", m.local && "bubble--local", isHostMsg(m) && "bubble--host"]
+                    .filter(Boolean)
+                    .join(" ")}
+                  role="article"
+                  onpointerdown={() => onBubblePointerDown(m.id)}
+                  onpointerup={clearHold}
+                  onpointercancel={clearHold}
+                  onpointerleave={clearHold}
+                  oncontextmenu={(e) => {
+                    e.preventDefault();
+                    clearHold();
+                    openMsgMenu(m.id);
+                  }}
+                >
+                  <div class="bubble-head">
+                    <span class="bubble-avatar" aria-hidden="true">
+                      {#if card?.avatarUrl}
+                        <img
+                          class="bubble-avatar-img"
+                          src={card.avatarUrl}
+                          alt=""
+                          width="32"
+                          height="32"
+                          referrerpolicy="no-referrer"
+                        />
+                      {:else}
+                        <span class="bubble-avatar-letter">
+                          {card?.avatarInitial ?? "?"}
+                        </span>
+                      {/if}
+                    </span>
+                    <span class="bubble-who">
+                      {#if who(m)}<span class="bubble-name">{who(m)}</span>{/if}
+                      {#if isHostMsg(m)}
+                        <span class="host-tag">{GO_ROOM_ROLE_HOST}</span>
+                      {/if}
+                      <time class="bubble-time" datetime={new Date(m.ts).toISOString()}>
+                        {formatRoomChatClock(m.ts)}
+                      </time>
+                    </span>
+                    <button
+                      type="button"
+                      class="bubble-more"
+                      aria-label="訊息選單"
+                      aria-expanded={menuMsgId === m.id}
+                      onclick={(e) => {
+                        e.stopPropagation();
+                        clearHold();
+                        menuMsgId = menuMsgId === m.id ? null : m.id;
+                      }}
+                    >
+                      ⋯
+                    </button>
+                  </div>
+                  <p class="bubble-text">
+                    {#each parseRoomChatSegments(m.text, mentionPeople) as part, i (i)}
+                      {#if part.type === "mention"}
+                        <span class="bubble-mention">{part.text}</span>
+                      {:else}{part.text}{/if}
+                    {/each}
+                  </p>
+                  {#if chips.length > 0}
+                    <div class="react-chips" aria-label="反應">
+                      {#each chips as chip (chip.emoji)}
+                        <button
+                          type="button"
+                          class={["react-chip", chip.mine && "react-chip--mine"]
+                            .filter(Boolean)
+                            .join(" ")}
+                          onclick={() => onReact(m.id, chip.emoji as SessionChatFloatEmoji)}
+                        >
+                          {chip.emoji} {chip.count}
+                        </button>
+                      {/each}
+                    </div>
+                  {/if}
+                  {#if menuMsgId === m.id}
+                    <div class="msg-menu" role="menu">
+                      <div class="msg-menu-emojis" role="group" aria-label="加反應">
+                        {#each SESSION_CHAT_FLOAT_EMOJIS as emoji (emoji)}
+                          <button
+                            type="button"
+                            class="float-btn"
+                            onclick={() => {
+                              onReact(m.id, emoji);
+                              menuMsgId = null;
+                            }}
+                          >
+                            {emoji}
+                          </button>
+                        {/each}
+                      </div>
+                      {#if role === "host"}
+                        <button
+                          type="button"
+                          class="pixel-btn"
+                          onclick={() => {
+                            goSessionChat.captionMessage(m.id);
+                            menuMsgId = null;
+                          }}
+                        >
+                          {GO_ROOM_TEXT_CAPTION}
+                        </button>
+                        <button
+                          type="button"
+                          class="pixel-btn"
+                          onclick={() => {
+                            goSessionChat.deleteMessage(m.id);
+                            menuMsgId = null;
+                          }}
+                        >
+                          {GO_ROOM_TEXT_DELETE}
+                        </button>
+                        {#if !m.local}
+                          {#if goSessionChat.isPeerSilenced(m.from)}
+                            <button
+                              type="button"
+                              class="pixel-btn"
+                              onclick={() => {
+                                goSessionChat.unsilencePeer(m.from);
+                                menuMsgId = null;
+                              }}
+                            >
+                              {GO_ROOM_TEXT_UNSILENCE}
+                            </button>
+                          {:else}
+                            <button
+                              type="button"
+                              class="pixel-btn"
+                              onclick={() => {
+                                goSessionChat.silencePeer(m.from);
+                                menuMsgId = null;
+                              }}
+                            >
+                              {GO_ROOM_TEXT_SILENCE}
+                            </button>
+                          {/if}
+                        {/if}
+                      {/if}
+                    </div>
+                  {/if}
+                </div>
+              {/if}
             {/each}
           </div>
           {#if quickReplies.length > 0}
@@ -1233,17 +1642,49 @@
             {/if}
           {/if}
           <form class="composer" onsubmit={onSubmit}>
+            {#if mentionHits.length > 0}
+              <ul class="mention-list" role="listbox" aria-label="提及成員">
+                {#each mentionHits as person (person.peerId)}
+                  <li>
+                    <button
+                      type="button"
+                      class="mention-item"
+                      onclick={() => insertMention(person)}
+                    >
+                      @{person.name}
+                    </button>
+                  </li>
+                {/each}
+              </ul>
+            {/if}
+            <div class="float-bar" role="group" aria-label="飄浮表情">
+              {#each SESSION_CHAT_FLOAT_EMOJIS as emoji (emoji)}
+                <button
+                  type="button"
+                  class="float-btn"
+                  aria-label={`飄浮 ${emoji}`}
+                  onclick={() => goSessionChat.floatEmoji(emoji)}
+                >
+                  {emoji}
+                </button>
+              {/each}
+            </div>
             <input
               bind:this={composerInputEl}
               class="pixel-input composer-input"
               type="text"
               maxlength={SESSION_CHAT_MAX_TEXT_CHARS}
-              placeholder="說點什麼…"
+              placeholder={composerHint}
               autocomplete="off"
               enterkeyhint="send"
+              disabled={!canSpeak}
               bind:value={draft}
             />
-            <button type="submit" class="pixel-btn pixel-btn--primary" disabled={!draft.trim()}>
+            <button
+              type="submit"
+              class="pixel-btn pixel-btn--primary"
+              disabled={!canSpeak || !draft.trim()}
+            >
               送出
             </button>
           </form>
@@ -1635,31 +2076,169 @@
   }
   .bubble {
     align-self: flex-start;
-    max-width: 90%;
+    max-width: 92%;
   }
   .bubble--local {
     align-self: flex-end;
-    text-align: right;
+  }
+  .bubble-head {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+  }
+  .bubble-more {
+    flex: 0 0 auto;
+    min-width: 44px;
+    min-height: 44px;
+    margin-left: auto;
+    border: none;
+    background: transparent;
+    font: inherit;
+    font-size: 1.1rem;
+    cursor: pointer;
+  }
+  .bubble-avatar {
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 2px solid rgb(var(--ink));
+    background: color-mix(in oklab, rgb(var(--ink)) 10%, rgb(var(--fill)));
+  }
+  .bubble-avatar-img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .bubble-avatar-letter {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    font-weight: 700;
   }
   .bubble-who {
     display: flex;
-    gap: 0.35rem;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.3rem;
+    min-width: 0;
     font-size: 0.75rem;
     color: rgb(var(--muted));
   }
-  .bubble--local .bubble-who {
-    justify-content: flex-end;
+  .bubble-name {
+    font-weight: 700;
+    color: rgb(var(--ink));
+  }
+  .bubble-time {
+    font-variant-numeric: tabular-nums;
+    opacity: 0.85;
   }
   .host-tag {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.25rem;
+    padding: 0.05rem 0.35rem;
+    border-radius: 999px;
+    background: rgb(var(--gold));
+    color: rgb(var(--ink));
+    font-size: 0.65rem;
     font-weight: 700;
   }
   .bubble-text {
-    display: inline-block;
-    margin-top: 0.15rem;
-    padding: 0.4rem 0.55rem;
+    display: block;
+    margin: 0.2rem 0 0 2.4rem;
+    padding: 0.45rem 0.6rem;
     border: 2px solid rgb(var(--ink));
     border-radius: var(--radius);
     background: rgb(var(--fill));
+    word-break: break-word;
+    line-height: 1.4;
+  }
+  .bubble--local .bubble-text {
+    background: color-mix(in oklab, rgb(var(--accent)) 14%, rgb(var(--fill)));
+  }
+  .bubble-mention {
+    font-weight: 700;
+    color: rgb(var(--accent));
+  }
+  .react-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    margin: 0.25rem 0 0 2.4rem;
+  }
+  .react-chip,
+  .float-btn {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0 0.4rem;
+    border: 2px solid rgb(var(--ink));
+    border-radius: 999px;
+    background: rgb(var(--fill));
+    font: inherit;
+    cursor: pointer;
+  }
+  .react-chip--mine {
+    background: color-mix(in oklab, rgb(var(--accent)) 18%, rgb(var(--fill)));
+  }
+  .msg-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin: 0.35rem 0 0 2.4rem;
+    padding: 0.4rem;
+    border: 2px solid rgb(var(--ink));
+    border-radius: var(--radius);
+    background: rgb(var(--fill));
+  }
+  .msg-menu-emojis,
+  .float-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+  .float-bar {
+    flex: 1 1 100%;
+  }
+  .msg-menu .pixel-btn {
+    min-height: 44px;
+  }
+  .sys {
+    align-self: stretch;
+    margin: 0.1rem 0;
+    padding: 0.45rem 0.6rem;
+    border-radius: var(--radius);
+    background: color-mix(in oklab, rgb(var(--ink)) 8%, rgb(var(--fill)));
+    color: color-mix(in oklab, rgb(var(--ink)) 78%, transparent);
+    font-size: 0.82rem;
+  }
+  .sys--file {
+    border: 2px solid color-mix(in oklab, rgb(var(--ink)) 22%, transparent);
+    background: color-mix(in oklab, rgb(var(--ink)) 6%, rgb(var(--fill)));
+  }
+  .sys--tv {
+    border: 2px solid rgb(var(--gold));
+    background: color-mix(in oklab, rgb(var(--gold)) 16%, rgb(var(--fill)));
+    color: rgb(var(--ink));
+  }
+  .sys-text {
+    margin: 0;
+    line-height: 1.4;
+  }
+  .sys-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.4rem;
+  }
+  .sys-actions .pixel-btn {
+    min-height: 44px;
   }
   .file-list {
     list-style: none;
@@ -1725,9 +2304,39 @@
     margin-bottom: 0.4rem;
   }
   .composer {
+    position: relative;
     display: flex;
+    flex-wrap: wrap;
     gap: 0.35rem;
     margin-top: auto;
+  }
+  .mention-list {
+    flex: 1 1 100%;
+    list-style: none;
+    margin: 0;
+    padding: 0.25rem;
+    border: 2px solid rgb(var(--ink));
+    border-radius: var(--radius);
+    background: rgb(var(--fill));
+    max-height: 9rem;
+    overflow: auto;
+  }
+  .mention-item {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 44px;
+    padding: 0.35rem 0.55rem;
+    border: none;
+    background: transparent;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .mention-item:hover,
+  .mention-item:focus-visible {
+    background: color-mix(in oklab, rgb(var(--accent)) 16%, transparent);
+    outline: none;
   }
   .composer-input {
     flex: 1 1 auto;

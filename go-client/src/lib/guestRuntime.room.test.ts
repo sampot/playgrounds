@@ -238,6 +238,28 @@ describe("guestRuntime invite.room", () => {
     expect(rt.getStatus().error).toMatch(/請你離開/);
   });
 
+  it("applies Host chat lock over session_chat_ctl", async () => {
+    const { createGuestRuntime } = await import("./guestRuntime");
+    const rt = createGuestRuntime();
+    await rt.bootFromShortId("room1");
+    await rt.consentAndPlay("訪客甲");
+    const offerOpts = fixtures.createOffer.mock.calls[0]![0] as {
+      handlers?: { onMessage?: (data: unknown) => void };
+    };
+    offerOpts.handlers?.onMessage?.({
+      type: "session_chat_ctl",
+      v: 1,
+      op: "lock",
+      from: "host-1",
+      id: "lock-1",
+    });
+    expect(fixtures.chatAttach).toHaveBeenCalled();
+    const { goSessionChat } = await import("./goSessionChat.svelte");
+    expect(goSessionChat.onIncoming).toHaveBeenCalledWith(
+      expect.objectContaining({ op: "lock" })
+    );
+  });
+
   it("ignores session_mesh hello so Guest↔Guest stays on the Host hub", async () => {
     const { createGuestRuntime } = await import("./guestRuntime");
     const rt = createGuestRuntime();

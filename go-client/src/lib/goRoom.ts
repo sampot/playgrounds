@@ -7,6 +7,14 @@ export const GO_ROOM_SHARE_HINT =
   "這張邀請約 5 分鐘內有效；過期後再發一張即可，這一間不會因此關掉。請對方用相機掃碼進來。另一台裝置請掃這張邀請進來，不要再開一間包廂。";
 
 export const GO_ROOM_QUICK_REPLIES = ["在嗎", "等一下", "收到", "謝謝"] as const;
+export const GO_ROOM_TEXT_LOCK = "全員禁言";
+export const GO_ROOM_TEXT_UNLOCK = "解除全員禁言";
+export const GO_ROOM_TEXT_SILENCE = "暫時禁言";
+export const GO_ROOM_TEXT_UNSILENCE = "解除禁言";
+export const GO_ROOM_TEXT_DELETE = "刪除訊息";
+export const GO_ROOM_TEXT_CAPTION = "推播至大電視";
+export const GO_ROOM_TEXT_LOCKED_HINT = "僅主持人可發言";
+export const GO_ROOM_TEXT_SILENCED_HINT = "你已被暫時禁言";
 
 /** Right overlay width in rem. Always overlay; never in-flow. */
 export const ROOM_CHAT_PANEL_REM = 22;

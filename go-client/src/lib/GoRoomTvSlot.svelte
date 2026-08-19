@@ -34,6 +34,8 @@
     onPower,
     videoEl = $bindable<HTMLVideoElement | null>(null),
     slotEl = $bindable<HTMLElement | null>(null),
+    floats = [],
+    caption = null,
   }: {
     tvOn?: boolean;
     tvStream?: MediaStream | null;
@@ -52,6 +54,8 @@
     onPower: () => void;
     videoEl?: HTMLVideoElement | null;
     slotEl?: HTMLElement | null;
+    floats?: { id: string; emoji: string }[];
+    caption?: string | null;
   } = $props();
 
   const showTransport = $derived(roomTvHudHasTransport(hudKind));
@@ -213,6 +217,18 @@
       {/if}
     </div>
   {/if}
+  {#if floats.length > 0}
+    <div class="tv-floats" aria-hidden="true">
+      {#each floats as f, i (f.id)}
+        <span class="tv-float" style={`--n:${i}`}>{f.emoji}</span>
+      {/each}
+    </div>
+  {/if}
+  {#if caption}
+    <div class="tv-caption" role="status">
+      <p class="tv-caption-text">{caption}</p>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -360,6 +376,62 @@
     margin: 0;
     transform: rotate(-90deg);
     accent-color: #f4efe4;
+  }
+  .tv-floats {
+    position: absolute;
+    right: 0.45rem;
+    bottom: 2.4rem;
+    z-index: 2;
+    pointer-events: none;
+    display: flex;
+    flex-direction: row-reverse;
+    gap: 0.15rem;
+    align-items: flex-end;
+  }
+  .tv-float {
+    font-size: 1.55rem;
+    line-height: 1;
+    animation: tv-float-up 2.2s ease-out forwards;
+    animation-delay: calc(var(--n, 0) * 40ms);
+  }
+  @keyframes tv-float-up {
+    0% {
+      transform: translateY(0) scale(0.85);
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(-7.5rem) scale(1.15);
+      opacity: 0;
+    }
+  }
+  .tv-caption {
+    position: absolute;
+    left: 0.4rem;
+    right: 0.4rem;
+    bottom: 0.35rem;
+    z-index: 2;
+    pointer-events: none;
+    overflow: hidden;
+    padding: 0.28rem 0.5rem;
+    border-radius: var(--radius);
+    background: color-mix(in oklab, #000 62%, transparent);
+    color: #fff;
+  }
+  .tv-caption-text {
+    margin: 0;
+    font-size: 0.85rem;
+    font-weight: 700;
+    line-height: 1.35;
+    white-space: nowrap;
+    animation: tv-caption-marquee 3s linear both;
+  }
+  @keyframes tv-caption-marquee {
+    0% {
+      transform: translateX(100%);
+    }
+    100% {
+      transform: translateX(-100%);
+    }
   }
   .sr-only {
     position: absolute;
