@@ -2,6 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import {
   BOOTH_AD_LEFT,
   BOOTH_AD_RIGHT,
+  BOOTH_DOOR,
+  BOOTH_SHELF,
+  BOOTH_TV,
   BOOTH_TV_SCREEN,
   GO_BOOTH_WORLD,
 } from "./goBoothLayout";
@@ -101,5 +104,51 @@ describe("drawBoothFrame", () => {
     fillRect.mockClear();
     drawBoothFrame(ctx, { occupants: [], hoverHotspot: null });
     expect(withTwo).toBeGreaterThan(fillRect.mock.calls.length);
+  });
+
+  it("paints a hover bar on the door like TV and shelf", () => {
+    const { ctx, fillRect } = mockCtx();
+    drawBoothFrame(ctx, { occupants: [], hoverHotspot: "door" });
+    const bars = fillRect.mock.calls.filter(
+      (c) => c[2] === 2 && c[3] === BOOTH_DOOR.h && c[0] === BOOTH_DOOR.x + BOOTH_DOOR.w - 2
+    );
+    expect(bars.length).toBe(1);
+    expect(bars[0]![1]).toBe(BOOTH_DOOR.y);
+
+    fillRect.mockClear();
+    drawBoothFrame(ctx, { occupants: [], hoverHotspot: "shelf" });
+    expect(
+      fillRect.mock.calls.some(
+        (c) =>
+          c[0] === BOOTH_SHELF.x &&
+          c[1] === BOOTH_SHELF.y &&
+          c[2] === 2 &&
+          c[3] === BOOTH_SHELF.h
+      )
+    ).toBe(true);
+
+    fillRect.mockClear();
+    drawBoothFrame(ctx, { occupants: [], hoverHotspot: "tv" });
+    expect(
+      fillRect.mock.calls.some(
+        (c) =>
+          c[0] === BOOTH_TV.x + 6 &&
+          c[1] === BOOTH_TV.y + BOOTH_TV.h - 8 &&
+          c[2] === BOOTH_TV.w - 12 &&
+          c[3] === 4
+      )
+    ).toBe(true);
+
+    fillRect.mockClear();
+    drawBoothFrame(ctx, { occupants: [], hoverHotspot: null });
+    expect(
+      fillRect.mock.calls.some(
+        (c) =>
+          c[0] === BOOTH_DOOR.x + BOOTH_DOOR.w - 2 &&
+          c[1] === BOOTH_DOOR.y &&
+          c[2] === 2 &&
+          c[3] === BOOTH_DOOR.h
+      )
+    ).toBe(false);
   });
 });

@@ -191,9 +191,13 @@ export function drawBoothFrame(
   drawSnow(ctx, state.nowMs ?? 0, Boolean(state.reducedMotion) || Boolean(state.tvOn));
 
   const door = BOOTH_DOOR;
+  const hoverDoor = state.hoverHotspot === "door";
   px(ctx, colors.wood, door.x, door.y, door.w, door.h);
   px(ctx, "#3a2a1c", door.x + 4, door.y + 6, door.w - 8, door.h - 12);
-  px(ctx, state.hoverHotspot === "door" ? colors.accent : colors.highlight, door.x + 18, door.y + 28, 4, 4);
+  px(ctx, hoverDoor ? colors.accent : colors.highlight, door.x + 18, door.y + 28, 4, 4);
+  if (hoverDoor) {
+    px(ctx, colors.accent, door.x + door.w - 2, door.y, 2, door.h);
+  }
 
   const shelf = BOOTH_SHELF;
   px(ctx, colors.wood, shelf.x, shelf.y, shelf.w, shelf.h);
