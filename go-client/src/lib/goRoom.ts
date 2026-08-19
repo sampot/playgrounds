@@ -17,15 +17,12 @@ export const ROOM_CHAT_PANEL_GUTTER_REM = 2.75;
 export const ROOM_SHORT_LANDSCAPE_MAX_HEIGHT_PX = 560;
 export const ROOM_SHORT_LANDSCAPE_MQ = `(orientation: landscape) and (max-height: ${ROOM_SHORT_LANDSCAPE_MAX_HEIGHT_PX}px)`;
 
-/** 40rem — tablet concurrent panes. Keep in sync with CSS min-width. */
-export const ROOM_SHELL_TABLET_MIN_PX = 640;
-/** 64rem — desktop TV + rail. Keep in sync with CSS min-width. */
-export const ROOM_SHELL_DESKTOP_MIN_PX = 1024;
+/** 48rem — desktop TV + right rail. Keep in sync with CSS min-width. */
+export const ROOM_SHELL_DESKTOP_MIN_PX = 768;
 
 export type RoomShellMode =
   | "portrait"
   | "short-landscape"
-  | "tablet"
   | "desktop";
 
 export type RoomShellPane = "members" | "files" | "chat";
@@ -46,16 +43,57 @@ export function roomShellMode(opts: {
 }): RoomShellMode {
   if (roomShortLandscape(opts)) return "short-landscape";
   if (opts.widthPx >= ROOM_SHELL_DESKTOP_MIN_PX) return "desktop";
-  if (opts.widthPx >= ROOM_SHELL_TABLET_MIN_PX) return "tablet";
   return "portrait";
 }
 
+/** Hall never shows members/files/chat as three concurrent columns. */
 export function roomShellPanesConcurrent(
+  _mode: RoomShellMode,
+  _cinema = false
+): boolean {
+  return false;
+}
+
+/** Desktop hall: files stay on the rail; members/chat share the lower half. */
+export function roomShellFilesPinned(
   mode: RoomShellMode,
   cinema = false
 ): boolean {
-  if (cinema) return false;
-  return mode === "tablet" || mode === "desktop";
+  return !cinema && mode === "desktop";
+}
+
+/** Tabs to render. Empty = all panes in flow. */
+export function roomShellTabPanes(
+  mode: RoomShellMode,
+  cinema = false
+): RoomShellPane[] {
+  if (cinema) return ["members", "files", "chat"];
+  if (mode === "desktop") return ["members", "chat"];
+  return ["members", "files", "chat"];
+}
+
+export function roomShellShowPane(opts: {
+  target: RoomShellPane;
+  pane: RoomShellPane;
+  concurrent: boolean;
+  filesPinned: boolean;
+}): boolean {
+  if (opts.concurrent) return true;
+  if (opts.filesPinned) {
+    if (opts.target === "files") return true;
+    const lower = opts.pane === "chat" ? "chat" : "members";
+    return opts.target === lower;
+  }
+  return opts.pane === opts.target;
+}
+
+/** Lower-half tab while files are pinned; otherwise the selected pane. */
+export function roomShellActiveTab(
+  pane: RoomShellPane,
+  filesPinned: boolean
+): RoomShellPane {
+  if (filesPinned) return pane === "chat" ? "chat" : "members";
+  return pane;
 }
 
 export function roomShellDefaultPane(): RoomShellPane {
@@ -362,10 +400,10 @@ export function roomStageStatus(opts: {
 }): string {
   const people = roomOccupantSummary({ guestCount: opts.guestCount });
   const tv = opts.tvLabel.trim();
-  if (!tv || tv === GO_ROOM_TV_OFF) {
-    if (opts.guestCount <= 0) return people;
-    return `${people} · ${GO_ROOM_TV_OFF}`;
-  }
+  const tvOn = Boolean(tv && tv !== GO_ROOM_TV_OFF);
+  if (!people && !tvOn) return "";
+  if (!people) return tv;
+  if (!tvOn) return `${people} · ${GO_ROOM_TV_OFF}`;
   return `${people} · ${tv}`;
 }
 
@@ -473,7 +511,7 @@ export function roomChatWhoLabel(opts: {
 /** Status line: who is in the booth. Never a door-code countdown. */
 export function roomOccupantSummary(opts: { guestCount: number }): string {
   const guests = Math.max(0, Math.floor(opts.guestCount));
-  if (guests <= 0) return "就你一個人 · 把這頁開著，這一間才還在";
+  if (guests <= 0) return "";
   return `${guests + 1} 人在`;
 }
 

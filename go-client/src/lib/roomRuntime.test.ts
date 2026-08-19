@@ -96,7 +96,7 @@ describe("roomRuntime", () => {
     expect(rt.getStatus().phase).toBe("open");
     expect(rt.getStatus().shortUrl).toBeNull();
     expect(rt.getStatus().inviteDoor).toBe("none");
-    expect(rt.getStatus().message).toMatch(/就你一個人/);
+    expect(rt.getStatus().message).toBe("");
     expect(fixtures.chatAttach).toHaveBeenCalledWith(
       expect.objectContaining({
         layout: "page",
@@ -377,7 +377,7 @@ describe("roomRuntime", () => {
       expect(rt.getStatus().phase).toBe("open");
       expect(rt.getStatus().inviteDoor).toBe("expired");
       expect(rt.getStatus().shortUrl).toBeNull();
-      expect(rt.getStatus().message).toMatch(/就你一個人/);
+      expect(rt.getStatus().message).toBe("");
       expect(stop).toHaveBeenCalled();
       expect(fixtures.revoke).toHaveBeenCalledWith("inv-room");
     } finally {

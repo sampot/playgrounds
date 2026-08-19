@@ -42,9 +42,13 @@ import {
   roomEscStep,
   roomInviteDoorRow,
   roomShowAdSlot,
+  roomShellActiveTab,
   roomShellDefaultPane,
+  roomShellFilesPinned,
   roomShellMode,
   roomShellPanesConcurrent,
+  roomShellShowPane,
+  roomShellTabPanes,
   roomStageStatus,
   roomTvLabel,
   roomTvStream,
@@ -77,10 +81,8 @@ function liveFileInput(initial: File[]) {
 }
 
 describe("roomOccupantSummary", () => {
-  it("treats the Host alone as already in the booth", () => {
-    expect(roomOccupantSummary({ guestCount: 0 })).toBe(
-      "就你一個人 · 把這頁開著，這一間才還在"
-    );
+  it("stays quiet when the Host is alone", () => {
+    expect(roomOccupantSummary({ guestCount: 0 })).toBe("");
   });
 
   it("counts Host plus guests, not 1:1", () => {
@@ -175,10 +177,10 @@ describe("roomTvStream", () => {
 });
 
 describe("roomStageStatus", () => {
-  it("keeps the alone line when the TV is off", () => {
+  it("hides the line when the Host is alone and the TV is off", () => {
     expect(
       roomStageStatus({ guestCount: 0, tvLabel: GO_ROOM_TV_OFF })
-    ).toBe("就你一個人 · 把這頁開著，這一間才還在");
+    ).toBe("");
   });
 
   it("appends the TV when people are in or the set is on", () => {
@@ -187,7 +189,7 @@ describe("roomStageStatus", () => {
     ).toBe("3 人在 · 電視關機");
     expect(
       roomStageStatus({ guestCount: 0, tvLabel: "正在播 MTV.mp4" })
-    ).toBe("就你一個人 · 把這頁開著，這一間才還在 · 正在播 MTV.mp4");
+    ).toBe("正在播 MTV.mp4");
   });
 });
 
@@ -473,22 +475,80 @@ describe("roomShortLandscape", () => {
 describe("roomShellMode", () => {
   it("defaults to portrait on a phone", () => {
     expect(roomShellMode({ widthPx: 390, heightPx: 844 })).toBe("portrait");
+    expect(roomShellMode({ widthPx: 767, heightPx: 1024 })).toBe("portrait");
     expect(roomShellPanesConcurrent("portrait")).toBe(false);
+    expect(roomShellFilesPinned("portrait")).toBe(false);
+    expect(roomShellTabPanes("portrait")).toEqual([
+      "members",
+      "files",
+      "chat",
+    ]);
     expect(roomShellDefaultPane()).toBe("members");
   });
 
-  it("uses a short-landscape split on a phone on its side", () => {
+  it("uses a short-landscape split on a phone on its side, with three tabs", () => {
+    expect(roomShellMode({ widthPx: 667, heightPx: 375 })).toBe(
+      "short-landscape"
+    );
     expect(roomShellMode({ widthPx: 844, heightPx: 390 })).toBe(
       "short-landscape"
     );
     expect(roomShellPanesConcurrent("short-landscape")).toBe(false);
+    expect(roomShellFilesPinned("short-landscape")).toBe(false);
+    expect(roomShellTabPanes("short-landscape")).toEqual([
+      "members",
+      "files",
+      "chat",
+    ]);
   });
 
-  it("shows all three panes on tablet and desktop", () => {
-    expect(roomShellMode({ widthPx: 768, heightPx: 1024 })).toBe("tablet");
+  it("uses the desktop right rail from 768px when height is not scarce", () => {
+    expect(roomShellMode({ widthPx: 768, heightPx: 1024 })).toBe("desktop");
+    expect(roomShellPanesConcurrent("desktop")).toBe(false);
+    expect(roomShellFilesPinned("desktop")).toBe(true);
+    expect(roomShellTabPanes("desktop")).toEqual(["members", "chat"]);
+  });
+
+  it("pins files on the desktop rail and tabs members with chat", () => {
     expect(roomShellMode({ widthPx: 1440, heightPx: 900 })).toBe("desktop");
-    expect(roomShellPanesConcurrent("tablet")).toBe(true);
-    expect(roomShellPanesConcurrent("desktop")).toBe(true);
+    expect(roomShellPanesConcurrent("desktop")).toBe(false);
+    expect(roomShellFilesPinned("desktop")).toBe(true);
+    expect(roomShellTabPanes("desktop")).toEqual(["members", "chat"]);
+    expect(
+      roomShellShowPane({
+        target: "files",
+        pane: "members",
+        concurrent: false,
+        filesPinned: true,
+      })
+    ).toBe(true);
+    expect(
+      roomShellShowPane({
+        target: "members",
+        pane: "files",
+        concurrent: false,
+        filesPinned: true,
+      })
+    ).toBe(true);
+    expect(
+      roomShellShowPane({
+        target: "chat",
+        pane: "members",
+        concurrent: false,
+        filesPinned: true,
+      })
+    ).toBe(false);
+    expect(
+      roomShellShowPane({
+        target: "chat",
+        pane: "chat",
+        concurrent: false,
+        filesPinned: true,
+      })
+    ).toBe(true);
+    expect(roomShellActiveTab("files", true)).toBe("members");
+    expect(roomShellActiveTab("chat", true)).toBe("chat");
+    expect(roomShellActiveTab("files", false)).toBe("files");
   });
 });
 
@@ -518,14 +578,6 @@ describe("roomChromePeekInsetEndPx", () => {
         mode: "portrait",
         cinema: false,
         viewportWidthPx: 390,
-        railLeftPx: 0,
-      })
-    ).toBe(0);
-    expect(
-      roomChromePeekInsetEndPx({
-        mode: "tablet",
-        cinema: false,
-        viewportWidthPx: 768,
         railLeftPx: 0,
       })
     ).toBe(0);
@@ -632,7 +684,14 @@ describe("room cinema shell", () => {
 
   it("does not keep three in-flow panes while cinema is on", () => {
     expect(roomShellPanesConcurrent("desktop", true)).toBe(false);
-    expect(roomShellPanesConcurrent("desktop")).toBe(true);
+    expect(roomShellFilesPinned("desktop", true)).toBe(false);
+    expect(roomShellTabPanes("desktop", true)).toEqual([
+      "members",
+      "files",
+      "chat",
+    ]);
+    expect(roomShellPanesConcurrent("desktop")).toBe(false);
+    expect(roomShellFilesPinned("desktop")).toBe(true);
   });
 });
 

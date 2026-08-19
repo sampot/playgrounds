@@ -45,9 +45,13 @@
     roomInviteRemainLabel,
     roomOccupantRows,
     roomShowAdSlot,
+    roomShellActiveTab,
     roomShellDefaultPane,
+    roomShellFilesPinned,
     roomShellMode,
     roomShellPanesConcurrent,
+    roomShellShowPane,
+    roomShellTabPanes,
     roomStageStatus,
     roomTvLabel,
     roomTvStream,
@@ -239,15 +243,35 @@
   const panesConcurrent = $derived(
     roomShellPanesConcurrent(shellMode, cinema)
   );
+  const filesPinned = $derived(roomShellFilesPinned(shellMode, cinema));
+  const tabPanes = $derived(roomShellTabPanes(shellMode, cinema));
   const showPaneBody = $derived(!cinema || cinemaDrawer);
   const showMembers = $derived(
-    showPaneBody && (panesConcurrent || pane === "members")
+    showPaneBody &&
+      roomShellShowPane({
+        target: "members",
+        pane,
+        concurrent: panesConcurrent,
+        filesPinned,
+      })
   );
   const showFiles = $derived(
-    showPaneBody && (panesConcurrent || pane === "files")
+    showPaneBody &&
+      roomShellShowPane({
+        target: "files",
+        pane,
+        concurrent: panesConcurrent,
+        filesPinned,
+      })
   );
   const showChat = $derived(
-    showPaneBody && (panesConcurrent || pane === "chat")
+    showPaneBody &&
+      roomShellShowPane({
+        target: "chat",
+        pane,
+        concurrent: panesConcurrent,
+        filesPinned,
+      })
   );
 
   const statusLabel = $derived.by(() => {
@@ -607,7 +631,9 @@
   }
 
   function paneTabOn(id: RoomShellPane): boolean {
-    return pane === id && (!cinema || cinemaDrawer);
+    return (
+      roomShellActiveTab(pane, filesPinned) === id && (!cinema || cinemaDrawer)
+    );
   }
 
   function inviteInBooth() {
@@ -638,7 +664,7 @@
   bind:this={roomEl}
 >
   <h1 class="sr-only">包廂</h1>
-  <p class="sr-only" role="status">{statusLabel}</p>
+    <p class="sr-only" role="status">{statusLabel}</p>
 
   <div class="room-tv-col">
     <div class="room-tv-stage">
@@ -649,7 +675,9 @@
         </div>
       {/if}
     </div>
-    <p class="room-status">{statusLabel}</p>
+    {#if statusLabel}
+      <p class="room-status">{statusLabel}</p>
+    {/if}
   </div>
 
   {#if inBooth}
@@ -661,46 +689,154 @@
         onclick={() => (cinemaDrawer = false)}
       ></button>
     {/if}
+    <div class="room-lower">
+    <nav class="room-dock" aria-label="包廂操作">
+      <button
+        type="button"
+        class={["pixel-btn", "room-dock-btn", goRoomMedia.mic && "pixel-btn--primary"]
+          .filter(Boolean)
+          .join(" ")}
+        aria-label={goRoomMedia.mic ? "關麥克風" : "開麥克風"}
+        aria-pressed={goRoomMedia.mic}
+        title={goRoomMedia.mic ? "關麥克風" : "開麥克風"}
+        onclick={() => void onToggleMic()}
+      >
+        <svg class="dock-icon" viewBox="0 0 24 24" aria-hidden="true">
+          {#if goRoomMedia.mic}
+            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+            <line x1="12" y1="19" x2="12" y2="22" />
+          {:else}
+            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 .4 1.5" />
+            <path d="M15 9.3V5a3 3 0 0 0-4.2-2.7" />
+            <path d="M19 10v2a7 7 0 0 1-8.1 6.9" />
+            <path d="M5 10v2a7 7 0 0 0 3.2 5.8" />
+            <line x1="12" y1="19" x2="12" y2="22" />
+            <line x1="4" y1="4" x2="20" y2="20" />
+          {/if}
+        </svg>
+      </button>
+      <button
+        type="button"
+        class={["pixel-btn", "room-dock-btn", goRoomMedia.camera && "pixel-btn--primary"]
+          .filter(Boolean)
+          .join(" ")}
+        aria-label={goRoomMedia.camera ? "關鏡頭" : "開鏡頭"}
+        aria-pressed={goRoomMedia.camera}
+        title={goRoomMedia.camera ? "關鏡頭" : "開鏡頭"}
+        onclick={() => void onToggleCamera()}
+      >
+        <svg class="dock-icon" viewBox="0 0 24 24" aria-hidden="true">
+          {#if goRoomMedia.camera}
+            <path d="m16 13 5.2 3.5a.5.5 0 0 0 .8-.4V7.9a.5.5 0 0 0-.8-.4L16 11" />
+            <rect x="2" y="6" width="14" height="12" rx="2" />
+          {:else}
+            <path d="m16 13 5.2 3.5a.5.5 0 0 0 .8-.4v-3.2" />
+            <path d="M16 10.8V11l-2.1-1.4" />
+            <path d="M2 8.2V16a2 2 0 0 0 2 2h9.2" />
+            <path d="M8.4 6H14a2 2 0 0 1 2 2v.5" />
+            <line x1="4" y1="4" x2="20" y2="20" />
+          {/if}
+        </svg>
+      </button>
+      {#if canShareDisplay()}
+        <button
+          type="button"
+          class={["pixel-btn", "room-dock-btn", goRoomMedia.display && "pixel-btn--primary"]
+            .filter(Boolean)
+            .join(" ")}
+          aria-label={goRoomMedia.display ? "停止畫面" : "分享畫面"}
+          aria-pressed={goRoomMedia.display}
+          title={goRoomMedia.display ? "停止畫面" : "分享畫面"}
+          onclick={() => void onToggleDisplay()}
+        >
+          <svg class="dock-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="2" y="3" width="20" height="14" rx="2" />
+            <path d="M8 21h8" />
+            <path d="M12 17v4" />
+            {#if goRoomMedia.display}
+              <path d="m9 10 3-3 3 3" />
+              <path d="M12 7v6" />
+            {/if}
+          </svg>
+        </button>
+      {/if}
+      {#if role === "host" && tvOn}
+        <button
+          type="button"
+          class="pixel-btn room-dock-btn"
+          aria-label={GO_ROOM_TV_OFF_BTN}
+          title={GO_ROOM_TV_OFF_BTN}
+          onclick={() => void onStopTv()}
+        >
+          <svg class="dock-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="2" y="7" width="20" height="15" rx="2" />
+            <polyline points="17 2 12 7 7 2" />
+            <line x1="8" y1="12" x2="16" y2="17" />
+            <line x1="16" y1="12" x2="8" y2="17" />
+          </svg>
+        </button>
+      {/if}
+      <button
+        type="button"
+        class="pixel-btn pixel-btn--danger-outline room-dock-btn"
+        aria-label={role === "host" ? "結束" : "離開"}
+        title={role === "host" ? "結束" : "離開"}
+        onclick={() => askEnd()}
+      >
+        <svg class="dock-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+          <polyline points="16 17 21 12 16 7" />
+          <line x1="21" y1="12" x2="9" y2="12" />
+        </svg>
+      </button>
+    </nav>
     <div
       class={["room-shell", cinema && cinemaDrawer && "room-shell--drawer"]
         .filter(Boolean)
         .join(" ")}
       bind:this={railEl}
     >
-      {#if !panesConcurrent}
+      {#if tabPanes.length > 0}
         <nav class="room-tabs" aria-label="包廂分區">
-          <button
-            type="button"
-            class={["pixel-btn", paneTabOn("members") && "pixel-btn--primary"].filter(Boolean).join(" ")}
-            aria-pressed={paneTabOn("members")}
-            aria-expanded={cinema ? cinemaDrawer && pane === "members" : undefined}
-            onclick={() => onPaneTab("members")}
-          >
-            成員
-          </button>
-          <button
-            type="button"
-            class={["pixel-btn", paneTabOn("files") && "pixel-btn--primary"].filter(Boolean).join(" ")}
-            aria-pressed={paneTabOn("files")}
-            aria-expanded={cinema ? cinemaDrawer && pane === "files" : undefined}
-            onclick={() => onPaneTab("files")}
-          >
-            檔案
-          </button>
-          <button
-            type="button"
-            class={["pixel-btn", paneTabOn("chat") && "pixel-btn--primary"].filter(Boolean).join(" ")}
-            aria-pressed={paneTabOn("chat")}
-            aria-expanded={cinema ? cinemaDrawer && pane === "chat" : undefined}
-            onclick={() => onPaneTab("chat")}
-          >
-            文字{#if messages.length > 0} · {messages.length}{/if}
-          </button>
+          {#if tabPanes.includes("members")}
+            <button
+              type="button"
+              class={["pixel-btn", paneTabOn("members") && "pixel-btn--primary"].filter(Boolean).join(" ")}
+              aria-pressed={paneTabOn("members")}
+              aria-expanded={cinema ? cinemaDrawer && pane === "members" : undefined}
+              onclick={() => onPaneTab("members")}
+            >
+              成員
+            </button>
+          {/if}
+          {#if tabPanes.includes("files")}
+            <button
+              type="button"
+              class={["pixel-btn", paneTabOn("files") && "pixel-btn--primary"].filter(Boolean).join(" ")}
+              aria-pressed={paneTabOn("files")}
+              aria-expanded={cinema ? cinemaDrawer && pane === "files" : undefined}
+              onclick={() => onPaneTab("files")}
+            >
+              檔案
+            </button>
+          {/if}
+          {#if tabPanes.includes("chat")}
+            <button
+              type="button"
+              class={["pixel-btn", paneTabOn("chat") && "pixel-btn--primary"].filter(Boolean).join(" ")}
+              aria-pressed={paneTabOn("chat")}
+              aria-expanded={cinema ? cinemaDrawer && pane === "chat" : undefined}
+              onclick={() => onPaneTab("chat")}
+            >
+              文字{#if messages.length > 0} · {messages.length}{/if}
+            </button>
+          {/if}
         </nav>
       {/if}
 
       {#if showMembers}
-        <section class="room-pane" aria-label="成員">
+        <section class="room-pane room-pane--members" aria-label="成員">
           {#if panesConcurrent}
             <p class="room-pane-title pixel-text">成員</p>
           {/if}
@@ -786,7 +922,7 @@
 
       {#if showFiles && showComposer}
         <section
-          class={["room-pane", dropping && "room-pane--drop"].filter(Boolean).join(" ")}
+          class={["room-pane", "room-pane--files", dropping && "room-pane--drop"].filter(Boolean).join(" ")}
           aria-label="檔案"
           ondragover={(e) => {
             e.preventDefault();
@@ -800,7 +936,7 @@
             if (list) void shareFiles(list);
           }}
         >
-          {#if panesConcurrent}
+          {#if panesConcurrent || filesPinned}
             <p class="room-pane-title pixel-text">檔案</p>
           {/if}
           {#if goRoomFiles.playback}
@@ -963,36 +1099,14 @@
         </section>
       {/if}
     </div>
-  {/if}
 
-  {#if inBooth}
-    <nav class="room-dock" aria-label="包廂操作">
-      <button type="button" class="pixel-btn pixel-btn--primary" onclick={() => void onToggleMic()}>
-        {goRoomMedia.mic ? "關麥克風" : "開麥克風"}
-      </button>
-      <button type="button" class="pixel-btn" onclick={() => void onToggleCamera()}>
-        {goRoomMedia.camera ? "關鏡頭" : "開鏡頭"}
-      </button>
-      {#if canShareDisplay()}
-        <button type="button" class="pixel-btn" onclick={() => void onToggleDisplay()}>
-          {goRoomMedia.display ? "停止畫面" : "分享畫面"}
-        </button>
-      {/if}
-      {#if role === "host" && tvOn}
-        <button type="button" class="pixel-btn" onclick={() => void onStopTv()}>
-          {GO_ROOM_TV_OFF_BTN}
-        </button>
-      {/if}
-      <button type="button" class="pixel-btn pixel-btn--danger-outline" onclick={() => askEnd()}>
-        {role === "host" ? "結束" : "離開"}
-      </button>
-    </nav>
     {#if mediaError}
-      <p class="err" role="alert">{mediaError}</p>
+      <p class="err room-live-err" role="alert">{mediaError}</p>
     {/if}
     {#if goRoomMedia.error && goRoomMedia.error !== mediaError}
-      <p class="err" role="alert">{goRoomMedia.error}</p>
+      <p class="err room-live-err" role="alert">{goRoomMedia.error}</p>
     {/if}
+    </div>
     <video
       bind:this={localPreviewEl}
       class="media-video media-video--idle"
@@ -1147,6 +1261,36 @@
     overflow: hidden;
     padding: 0.35rem 0.65rem calc(0.5rem + env(safe-area-inset-bottom, 0px));
   }
+  .room--portrait.room--chrome-overlay:not(.room--cinema) {
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.4rem;
+  }
+  .room--portrait.room--chrome-overlay:not(.room--cinema) .room-tv-col {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .room--portrait.room--chrome-overlay:not(.room--cinema) .room-tv-stage {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+  .room--portrait.room--chrome-overlay:not(.room--cinema) .room-tv-col :global(.tv-slot) {
+    height: 100%;
+    aspect-ratio: auto;
+  }
+  .room--portrait.room--chrome-overlay:not(.room--cinema) .room-lower {
+    min-height: 0;
+    overflow: hidden;
+  }
+  .room--portrait.room--chrome-overlay:not(.room--cinema) .room-shell {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+  .room--portrait.room--chrome-overlay:not(.room--cinema) .room-pane--chat {
+    min-height: 0;
+  }
   .room--cinema {
     position: relative;
     height: 100%;
@@ -1270,6 +1414,17 @@
     flex: 1 1 auto;
     gap: 0.45rem;
   }
+  .room-lower {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    flex: 1 1 auto;
+    gap: 0.35rem;
+  }
+  .room--cinema .room-lower {
+    display: contents;
+  }
   .room-tabs {
     display: flex;
     flex-wrap: wrap;
@@ -1325,8 +1480,23 @@
     gap: 0.35rem;
     flex: 0 0 auto;
   }
-  .room-dock .pixel-btn {
+  .room-dock-btn {
     min-height: 44px;
+    min-width: 44px;
+    width: 44px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .dock-icon {
+    width: 22px;
+    height: 22px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
   .room-sheet {
     position: fixed;
@@ -1516,83 +1686,131 @@
   .confirm-actions .pixel-btn {
     min-height: 44px;
   }
-  @media (min-width: 40rem) {
-    .room--tablet .room-shell,
-    .room--desktop .room-shell {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 0.6rem;
-      min-height: 12rem;
-    }
-    .room--tablet .room-tabs,
-    .room--desktop .room-tabs {
-      display: none;
-    }
-  }
-  @media (min-width: 64rem) {
-    .room--desktop {
+  @media (min-width: 48rem) {
+    .room--desktop:not(.room--cinema) {
       display: grid;
       grid-template-columns: minmax(0, 1fr) 22rem;
-      grid-template-rows: minmax(0, 1fr) auto;
-      gap: 0.65rem;
+      grid-template-rows: minmax(0, 1fr);
+      gap: 0;
       max-width: none;
       height: 100%;
+      min-height: 0;
+      padding: 0;
     }
-    .room--desktop .room-tv-col {
+    .room--desktop:not(.room--cinema) .room-tv-col {
       grid-column: 1;
-      grid-row: 1;
-      align-self: stretch;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      padding: 0.35rem 0.65rem;
     }
-    .room--desktop .room-tv-stage {
-      height: calc(100% - 1.6rem);
+    .room--desktop:not(.room--cinema) .room-tv-stage {
+      flex: 1 1 auto;
+      min-height: 0;
     }
-    .room--desktop .room-tv-col :global(.tv-slot) {
+    .room--desktop:not(.room--cinema) .room-tv-col :global(.tv-slot) {
       height: 100%;
       aspect-ratio: auto;
     }
-    .room--desktop .room-shell {
+    .room--desktop:not(.room--cinema) .room-lower {
       grid-column: 2;
-      grid-row: 1;
-      grid-template-columns: 1fr;
-      grid-template-rows: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.2fr);
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      height: 100%;
+      gap: 0.35rem;
+      padding: 0.45rem 0.65rem calc(0.5rem + env(safe-area-inset-bottom, 0px));
+      background: rgb(var(--card));
+      border-left: var(--pixel-edge) solid rgb(var(--ink));
+      box-sizing: border-box;
     }
-    .room--desktop .room-dock {
-      grid-column: 1 / span 2;
-      grid-row: 2;
+    .room--desktop:not(.room--cinema) .room-dock {
+      flex: 0 0 auto;
+      padding-bottom: 0.35rem;
+      border-bottom: 1px solid color-mix(in oklab, rgb(var(--ink)) 18%, transparent);
+    }
+    .room--desktop:not(.room--cinema) .room-shell {
+      flex: 1 1 auto;
+      display: grid;
+      grid-template-columns: 1fr;
+      grid-template-areas:
+        "files"
+        "tabs"
+        "lower";
+      grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr);
+      min-height: 0;
+      gap: 0;
+    }
+    .room--desktop:not(.room--cinema) .room-tabs {
+      display: flex;
+      grid-area: tabs;
+      flex: none;
+      padding: 0.25rem 0 0.15rem;
+    }
+    .room--desktop:not(.room--cinema) .room-pane--files {
+      grid-area: files;
+      border-bottom: 1px solid color-mix(in oklab, rgb(var(--ink)) 18%, transparent);
+    }
+    .room--desktop:not(.room--cinema) .room-pane--members,
+    .room--desktop:not(.room--cinema) .room-pane--chat {
+      grid-area: lower;
     }
   }
   @media (orientation: landscape) and (max-height: 560px) {
-    .room--short-landscape {
+    .room--short-landscape:not(.room--cinema) {
       display: grid;
       grid-template-columns: minmax(0, 1.4fr) minmax(12rem, 1fr);
-      grid-template-rows: minmax(0, 1fr) auto;
+      grid-template-rows: minmax(0, 1fr);
       height: 100%;
       max-height: 100%;
       overflow: hidden;
       gap: 0.35rem;
       padding: 0.2rem 0.4rem;
     }
-    .room--short-landscape .room-tv-col {
+    .room--short-landscape:not(.room--cinema) .room-tv-col {
       grid-column: 1;
-      grid-row: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .room--short-landscape:not(.room--cinema) .room-tv-stage {
+      flex: 1 1 auto;
       min-height: 0;
     }
-    .room--short-landscape .room-tv-stage {
-      height: calc(100% - 1.4rem);
-      min-height: 0;
-    }
-    .room--short-landscape .room-tv-col :global(.tv-slot) {
+    .room--short-landscape:not(.room--cinema) .room-tv-col :global(.tv-slot) {
       height: 100%;
       aspect-ratio: auto;
     }
-    .room--short-landscape .room-shell {
+    .room--short-landscape:not(.room--cinema) .room-lower {
       grid-column: 2;
-      grid-row: 1;
+      display: flex;
+      flex-direction: column;
       min-height: 0;
+      min-width: 0;
+      background: rgb(var(--card));
+      border-left: var(--pixel-edge) solid rgb(var(--ink));
+      padding: 0.3rem 0.4rem calc(0.3rem + env(safe-area-inset-bottom, 0px));
+      box-sizing: border-box;
     }
-    .room--short-landscape .room-dock {
-      grid-column: 1 / span 2;
-      grid-row: 2;
+    .room--short-landscape:not(.room--cinema) .room-dock {
+      flex: 0 0 auto;
+    }
+    .room--short-landscape:not(.room--cinema) .room-shell {
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 auto;
+      min-height: 0;
+      gap: 0.35rem;
+    }
+    .room--short-landscape:not(.room--cinema) .room-tabs {
+      display: flex;
+      flex: none;
+    }
+    .room--short-landscape:not(.room--cinema) .room-pane,
+    .room--short-landscape:not(.room--cinema) .room-pane--chat {
+      flex: 1 1 auto;
+      min-height: 0;
+      grid-area: auto;
     }
   }
   @media (min-width: 40rem) {
@@ -1660,7 +1878,7 @@
     grid-column: auto;
     grid-row: auto;
   }
-  .room.room--cinema > .err {
+  .room.room--cinema .room-live-err {
     position: absolute;
     left: 0.5rem;
     right: 0.5rem;
