@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { BOOTH_DOOR, BOOTH_SEATS, BOOTH_SHELF, BOOTH_TV_SCREEN } from "./goBoothLayout";
 import {
   GO_BOOTH_HOTSPOTS,
+  boothHotspotPanel,
+  boothSeatIndex,
   hitTestBoothHotspot,
   type BoothHotspotId,
 } from "./goBoothHotspots";
@@ -38,5 +40,19 @@ describe("goBoothHotspots", () => {
       BOOTH_TV_SCREEN.y + BOOTH_TV_SCREEN.h / 2
     );
     expect(id).toBe("tv");
+  });
+});
+
+describe("boothHotspotPanel", () => {
+  it("opens the TV panel, not the share catalog or invite sheet", () => {
+    expect(boothHotspotPanel("tv", { role: "host" })).toBe("tv");
+    expect(boothHotspotPanel("tv", { role: "guest" })).toBe("tv");
+    expect(boothHotspotPanel("shelf", { role: "host" })).toBe("files");
+    expect(boothHotspotPanel("shelf", { role: "guest" })).toBe("files");
+    expect(boothHotspotPanel("door", { role: "host" })).toBe("invite");
+    expect(boothHotspotPanel("door", { role: "guest" })).toBe("none");
+    expect(boothHotspotPanel("seat:2", { role: "host" })).toBe("seat");
+    expect(boothSeatIndex("seat:2")).toBe(2);
+    expect(boothSeatIndex("tv")).toBeNull();
   });
 });

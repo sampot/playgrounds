@@ -12,7 +12,7 @@
   import GoShareSheet from "$lib/GoShareSheet.svelte";
   import GoBoothStage from "$lib/GoBoothStage.svelte";
   import { chromeSession } from "$lib/chromeSession.svelte";
-  import type { BoothHotspotId } from "$lib/goBoothHotspots";
+  import { boothHotspotPanel, boothSeatIndex, type BoothHotspotId } from "$lib/goBoothHotspots";
   import {
     GO_ROOM_CAMERA_STOP_WATCH,
     GO_ROOM_CAST_STOP_WATCH,
@@ -23,11 +23,22 @@
     GO_ROOM_PUT_ON_TV,
     GO_ROOM_SHARE_HINT,
     GO_ROOM_SHARE_TITLE,
+    GO_ROOM_TV_FULLSCREEN,
+    GO_ROOM_TV_HINT_GUEST,
+    GO_ROOM_TV_HINT_HOST,
     GO_ROOM_TV_OFF_BTN,
+    GO_ROOM_TV_TITLE,
     attachMediaStream,
     attachPlaybackUrl,
     canShareDisplay,
+    enterTvFullscreen,
     isRoomInviteShareable,
+    roomChatBoxFromRect,
+    roomChatBoxHasSize,
+    roomChatBoxesOverlap,
+    roomChatPredictedOverlayBox,
+    roomChatShouldCloseOnFocusMove,
+    roomChatShouldCloseOnOutsidePress,
     roomChatWhoLabel,
     roomOccupantRows,
     roomStageStatus,
@@ -99,8 +110,14 @@
   let now = $state(Date.now());
   let filesOpen = $state(false);
   let chatOpen = $state(false);
+  let coversCanvas = $state(true);
+  let canvasSlotEl = $state<HTMLElement | null>(null);
+  let chatPanelEl = $state<HTMLElement | null>(null);
+  let composerInputEl = $state<HTMLInputElement | null>(null);
+  let tvOpen = $state(false);
   let seatOverlay = $state<number | null>(null);
   let pendingShare = $state(false);
+  let expandedTvEl = $state<HTMLVideoElement | null>(null);
 
   const messages = $derived(goSessionChat.messages);
   const connected = $derived(goSessionChat.connected);
@@ -143,8 +160,8 @@
     )
   );
   const overlayOpen = $derived(
-    chatOpen ||
-      filesOpen ||
+    filesOpen ||
+      tvOpen ||
       seatOverlay !== null ||
       (role === "host" && !loggedIn && phase === "idle") ||
       phase === "connecting" ||
@@ -209,6 +226,73 @@
   });
 
   $effect(() => {
+    void chatOpen;
+    void showComposer;
+    const canvasSlot = canvasSlotEl;
+    const panel = chatPanelEl;
+    const sync = () => {
+      const canvas = canvasSlot?.querySelector("canvas");
+      const canvasBox = canvas
+        ? roomChatBoxFromRect(canvas.getBoundingClientRect())
+        : null;
+      const panelBox = panel
+        ? roomChatBoxFromRect(panel.getBoundingClientRect())
+        : null;
+      const overlayBox =
+        panelBox && roomChatBoxHasSize(panelBox)
+          ? panelBox
+          : roomChatPredictedOverlayBox({
+              viewportWidthPx: window.innerWidth,
+              viewportHeightPx: window.innerHeight,
+              chromeHeightPx: readChromeHeightPx(),
+              remPx: readRemPx(),
+            });
+      coversCanvas =
+        canvasBox && roomChatBoxHasSize(canvasBox)
+          ? roomChatBoxesOverlap(canvasBox, overlayBox)
+          : true;
+    };
+    sync();
+    void tick().then(sync);
+    const ro = new ResizeObserver(sync);
+    if (canvasSlot) ro.observe(canvasSlot);
+    if (panel) ro.observe(panel);
+    window.addEventListener("resize", sync);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", sync);
+    };
+  });
+
+  $effect(() => {
+    if (!chatOpen || !showComposer || !coversCanvas) return;
+    void tick().then(() => chatPanelEl?.focus());
+  });
+
+  $effect(() => {
+    if (!chatOpen || !showComposer || !coversCanvas) return;
+    const onPointerDown = (ev: Event) => {
+      const t = ev.target;
+      if (!(t instanceof Node)) return;
+      const inside = Boolean(chatPanelEl?.contains(t));
+      const onToggle =
+        t instanceof Element && Boolean(t.closest("[data-room-chat-toggle]"));
+      if (
+        !roomChatShouldCloseOnOutsidePress({
+          coversCanvas,
+          pressInsidePanel: inside,
+          pressOnToggle: onToggle,
+        })
+      ) {
+        return;
+      }
+      chatOpen = false;
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () => document.removeEventListener("pointerdown", onPointerDown, true);
+  });
+
+  $effect(() => {
     if (pendingShare && shareable && shortUrl) {
       shareOpen = true;
       pendingShare = false;
@@ -227,6 +311,10 @@
     chromeSession.escapeGuard = () => {
       if (chatOpen) {
         chatOpen = false;
+        return false;
+      }
+      if (tvOpen) {
+        tvOpen = false;
         return false;
       }
       if (filesOpen) {
@@ -261,6 +349,9 @@
     attachMediaStream(localPreviewEl, goRoomMedia.localPreviewStream);
   });
   $effect(() => {
+    attachMediaStream(expandedTvEl, tvStream);
+  });
+  $effect(() => {
     const el = filePlayEl;
     const url = goRoomFiles.playback?.url ?? null;
     void tick().then(() => {
@@ -289,7 +380,9 @@
   }
 
   function onQuick(q: string) {
-    if (goSessionChat.sendQuickReply(q)) quickOpen = false;
+    if (!goSessionChat.sendQuickReply(q)) return;
+    composerInputEl?.focus();
+    quickOpen = false;
   }
 
   async function shareFiles(list: FileList | File[]): Promise<void> {
@@ -366,6 +459,7 @@
   async function onPlayFile(id: string) {
     mediaError = "";
     fileError = "";
+    tvOpen = false;
     filesOpen = true;
     if (goRoomFiles.playback?.id === id) {
       goRoomFiles.stopPlay();
@@ -400,32 +494,46 @@
   function closePanels() {
     chatOpen = false;
     filesOpen = false;
+    tvOpen = false;
     seatOverlay = null;
+    shareOpen = false;
+    pendingShare = false;
   }
 
   function onBoothHotspot(id: BoothHotspotId) {
-    if (id === "tv") {
+    const panel = boothHotspotPanel(id, { role });
+    if (panel === "tv") {
       closePanels();
-      if (role === "host") filesOpen = true;
+      tvOpen = true;
       return;
     }
-    if (id === "door") {
+    if (panel === "invite") {
       closePanels();
-      if (role === "host") inviteInBooth();
+      inviteInBooth();
       return;
     }
-    if (id === "shelf") {
+    if (panel === "files") {
       chatOpen = false;
+      tvOpen = false;
       seatOverlay = null;
+      shareOpen = false;
+      pendingShare = false;
       filesOpen = true;
       return;
     }
-    if (id.startsWith("seat:")) {
-      const i = Number(id.slice(5));
+    if (panel === "seat") {
+      const i = boothSeatIndex(id);
       chatOpen = false;
       filesOpen = false;
-      seatOverlay = Number.isFinite(i) ? i : null;
+      tvOpen = false;
+      shareOpen = false;
+      pendingShare = false;
+      seatOverlay = i;
     }
+  }
+
+  async function onTvFullscreen() {
+    await enterTvFullscreen(expandedTvEl);
   }
 
   async function onUnshare(id: string) {
@@ -458,6 +566,45 @@
     onInvite?.();
   }
 
+  function readChromeHeightPx(): number {
+    const raw = getComputedStyle(document.documentElement)
+      .getPropertyValue("--go-chrome-height")
+      .trim();
+    const n = parseFloat(raw);
+    return Number.isFinite(n) ? n : 60;
+  }
+
+  function readRemPx(): number {
+    const n = parseFloat(getComputedStyle(document.documentElement).fontSize);
+    return Number.isFinite(n) && n > 0 ? n : 16;
+  }
+
+  function onChatFocusOut(ev: FocusEvent) {
+    const next = ev.relatedTarget;
+    const inside = next instanceof Node && Boolean(chatPanelEl?.contains(next));
+    const lost = ev.target;
+    if (
+      !roomChatShouldCloseOnFocusMove({
+        coversCanvas,
+        panelContainsNext: inside,
+        nextIsNull: next == null,
+        lostControlRemoved: lost instanceof Node && !lost.isConnected,
+      })
+    ) {
+      return;
+    }
+    if (next == null) {
+      queueMicrotask(() => {
+        const active = document.activeElement;
+        if (chatPanelEl && active && chatPanelEl.contains(active)) return;
+        if (!coversCanvas) return;
+        chatOpen = false;
+      });
+      return;
+    }
+    chatOpen = false;
+  }
+
   function formatSize(n: number): string {
     if (n < 1024) return `${n} B`;
     if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
@@ -465,9 +612,12 @@
   }
 </script>
 
+<div class="room">
+<div class="room-stage">
 <h1 class="sr-only">包廂</h1>
 <p class="sr-only" role="status">{statusLabel}</p>
 
+<div class="room-canvas-slot" bind:this={canvasSlotEl}>
 <GoBoothStage
   occupants={inBooth ? roster : []}
   {tvOn}
@@ -519,68 +669,38 @@
         </div>
       </div>
     </div>
-  {:else if chatOpen && showComposer}
-    <div class="booth-overlay" role="dialog" aria-modal="true" aria-label="包廂文字">
+  {:else if tvOpen && inBooth}
+    <div class="booth-overlay" role="dialog" aria-modal="true" aria-labelledby="room-tv-title">
       <div class="booth-sheet pixel-box">
         <div class="booth-sheet-bar">
-          <p class="booth-sheet-title pixel-text">文字</p>
-          <button type="button" class="pixel-btn" onclick={() => (chatOpen = false)}>關閉</button>
+          <p id="room-tv-title" class="booth-sheet-title pixel-text">{GO_ROOM_TV_TITLE}</p>
+          <button type="button" class="pixel-btn" onclick={() => (tvOpen = false)}>關閉</button>
         </div>
-        <div class="room-timeline" bind:this={listEl} role="log" aria-label="包廂文字">
-          {#if messages.length === 0}
-            <p class="muted">{GO_ROOM_EMPTY_TIMELINE}</p>
-          {/if}
-          {#each messages as m (m.id)}
-            <div
-              class={[
-                "bubble",
-                m.local && "bubble--local",
-                isHostMsg(m) && "bubble--host",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-            >
-              <span class="bubble-who">
-                {#if isHostMsg(m)}
-                  <span class="host-tag">主持</span>
-                {/if}
-                {#if who(m)}<span>{who(m)}</span>{/if}
-              </span>
-              <span class="bubble-text">{m.text}</span>
-            </div>
-          {/each}
-        </div>
-        {#if quickReplies.length > 0}
-          <button
-            type="button"
-            class="quick-toggle"
-            aria-expanded={quickOpen}
-            onclick={() => (quickOpen = !quickOpen)}
-          >
-            {quickOpen ? "▾" : "▸"} 快捷語
-          </button>
-          {#if quickOpen}
-            <div class="quick" role="group" aria-label="快捷語">
-              {#each quickReplies as q (q)}
-                <button type="button" class="pixel-btn" onclick={() => onQuick(q)}>{q}</button>
-              {/each}
-            </div>
-          {/if}
+        <p>{tvLabel}</p>
+        {#if tvOn}
+          <video
+            bind:this={expandedTvEl}
+            class="media-video media-video--program"
+            autoplay
+            playsinline
+            controls
+            aria-label={GO_ROOM_TV_TITLE}
+          ></video>
+          <div class="file-actions">
+            <button type="button" class="pixel-btn pixel-btn--primary" onclick={() => void onTvFullscreen()}>
+              {GO_ROOM_TV_FULLSCREEN}
+            </button>
+            {#if role === "host"}
+              <button type="button" class="pixel-btn" onclick={() => void onStopTv()}>
+                {GO_ROOM_TV_OFF_BTN}
+              </button>
+            {/if}
+          </div>
+        {:else}
+          <p class="muted">
+            {role === "host" ? GO_ROOM_TV_HINT_HOST : GO_ROOM_TV_HINT_GUEST}
+          </p>
         {/if}
-        <form class="composer" onsubmit={onSubmit}>
-          <input
-            class="pixel-input composer-input"
-            type="text"
-            maxlength={SESSION_CHAT_MAX_TEXT_CHARS}
-            placeholder="說點什麼…"
-            autocomplete="off"
-            enterkeyhint="send"
-            bind:value={draft}
-          />
-          <button type="submit" class="pixel-btn pixel-btn--primary" disabled={!draft.trim()}>
-            送出
-          </button>
-        </form>
       </div>
     </div>
   {:else if filesOpen && showComposer}
@@ -759,6 +879,7 @@
     </div>
   {/if}
 </GoBoothStage>
+</div>
 
 {#if inBooth}
   <nav class="room-dock" aria-label="包廂操作">
@@ -773,11 +894,13 @@
     <button
       type="button"
       class="pixel-btn"
+      data-room-chat-toggle
       aria-expanded={chatOpen}
       onclick={() => {
         chatOpen = !chatOpen;
         if (chatOpen) {
           filesOpen = false;
+          tvOpen = false;
           seatOverlay = null;
         }
       }}
@@ -833,6 +956,88 @@
   </nav>
 {/if}
 
+</div>
+
+{#if chatOpen && showComposer}
+  {#if coversCanvas}
+    <button
+      type="button"
+      class="room-chat-scrim"
+      aria-label="關閉文字"
+      onclick={() => (chatOpen = false)}
+    ></button>
+  {/if}
+  <aside
+    bind:this={chatPanelEl}
+    class="room-chat room-chat--overlay"
+    role={coversCanvas ? "dialog" : "complementary"}
+    aria-modal={coversCanvas ? "true" : undefined}
+    tabindex={coversCanvas ? -1 : undefined}
+    aria-label="包廂文字"
+    onfocusout={onChatFocusOut}
+  >
+    <div class="room-chat-bar">
+      <p class="room-chat-title pixel-text">文字</p>
+      <button type="button" class="pixel-btn" onclick={() => (chatOpen = false)}>關閉</button>
+    </div>
+    <div class="room-timeline" bind:this={listEl} role="log" aria-label="包廂文字">
+      {#if messages.length === 0}
+        <p class="muted">{GO_ROOM_EMPTY_TIMELINE}</p>
+      {/if}
+      {#each messages as m (m.id)}
+        <div
+          class={[
+            "bubble",
+            m.local && "bubble--local",
+            isHostMsg(m) && "bubble--host",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+        >
+          <span class="bubble-who">
+            {#if isHostMsg(m)}
+              <span class="host-tag">主持</span>
+            {/if}
+            {#if who(m)}<span>{who(m)}</span>{/if}
+          </span>
+          <span class="bubble-text">{m.text}</span>
+        </div>
+      {/each}
+    </div>
+    {#if quickReplies.length > 0}
+      <button
+        type="button"
+        class="quick-toggle"
+        aria-expanded={quickOpen}
+        onclick={() => (quickOpen = !quickOpen)}
+      >
+        {quickOpen ? "▾" : "▸"} 快捷語
+      </button>
+      {#if quickOpen}
+        <div class="quick" role="group" aria-label="快捷語">
+          {#each quickReplies as q (q)}
+            <button type="button" class="pixel-btn" onclick={() => onQuick(q)}>{q}</button>
+          {/each}
+        </div>
+      {/if}
+    {/if}
+    <form class="composer" onsubmit={onSubmit}>
+      <input
+        bind:this={composerInputEl}
+        class="pixel-input composer-input"
+        type="text"
+        maxlength={SESSION_CHAT_MAX_TEXT_CHARS}
+        placeholder="說點什麼…"
+        autocomplete="off"
+        enterkeyhint="send"
+        bind:value={draft}
+      />
+      <button type="submit" class="pixel-btn pixel-btn--primary" disabled={!draft.trim()}>
+        送出
+      </button>
+    </form>
+  </aside>
+{/if}
 
 <dialog
   bind:this={confirmDialog}
@@ -873,6 +1078,7 @@
     onFlash={(msg) => chromeSession.setFlash(msg)}
   />
 {/if}
+</div>
 
 <style>
   .sr-only {
@@ -885,6 +1091,65 @@
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
     border: 0;
+  }
+  .room {
+    width: 100%;
+    max-width: 40rem;
+    margin-inline: auto;
+  }
+  .room-stage {
+    width: 100%;
+    max-width: 40rem;
+    margin-inline: auto;
+  }
+  .room-canvas-slot {
+    width: 100%;
+  }
+  .room-chat-scrim {
+    position: fixed;
+    top: var(--go-chrome-height, 3.75rem);
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 14;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: color-mix(in oklab, rgb(var(--ink)) 28%, transparent);
+    cursor: pointer;
+  }
+  .room-chat {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: 0.65rem 0.75rem calc(0.65rem + env(safe-area-inset-bottom, 0px));
+    background: rgb(var(--card));
+    box-sizing: border-box;
+  }
+  .room-chat--overlay {
+    position: fixed;
+    top: var(--go-chrome-height, 3.75rem);
+    right: 0;
+    bottom: 0;
+    left: auto;
+    z-index: 15;
+    width: min(22rem, calc(100vw - 2.75rem));
+    border-left: var(--pixel-edge) solid rgb(var(--ink));
+  }
+  .room-chat-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    flex: 0 0 auto;
+    margin-bottom: 0.5rem;
+  }
+  .room-chat-title {
+    margin: 0;
+    font-size: 0.9rem;
+  }
+  .room-chat-bar .pixel-btn {
+    min-height: 44px;
   }
   .booth-overlay {
     position: absolute;
@@ -1029,8 +1294,8 @@
     padding: 0.65rem;
   }
   .room-timeline {
-    min-height: 6rem;
-    max-height: min(36vh, 16rem);
+    flex: 1 1 auto;
+    min-height: 0;
     overflow: auto;
     display: flex;
     flex-direction: column;
@@ -1240,6 +1505,7 @@
   }
   .quick-toggle {
     min-height: 44px;
+    flex: 0 0 auto;
     background: none;
     border: none;
     padding: 0;
@@ -1258,6 +1524,7 @@
     flex-wrap: wrap;
     gap: 0.4rem;
     margin: 0.5rem 0 0;
+    flex: 0 0 auto;
   }
   .composer-input {
     flex: 1 1 12rem;
@@ -1275,7 +1542,7 @@
   }
   .room-dock .pixel-btn {
     min-height: 44px;
-    flex: 1 1 auto;
+    flex: 0 1 auto;
   }
   .file-hidden {
     position: absolute;
@@ -1320,9 +1587,6 @@
     .room-col {
       flex: 1 1 auto;
       min-width: 0;
-    }
-    .room-timeline {
-      max-height: min(40vh, 18rem);
     }
     .room-head-actions {
       display: none;

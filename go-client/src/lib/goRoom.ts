@@ -8,6 +8,89 @@ export const GO_ROOM_SHARE_HINT =
 
 export const GO_ROOM_QUICK_REPLIES = ["在嗎", "等一下", "收到", "謝謝"] as const;
 
+/** Right overlay width in rem. Always overlay; never in-flow. */
+export const ROOM_CHAT_PANEL_REM = 22;
+/** Leave a sliver of the page visible beside a covering overlay. */
+export const ROOM_CHAT_PANEL_GUTTER_REM = 2.75;
+
+export type RoomChatLayout = "drawer" | "sidebar";
+
+export type RoomChatBox = {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+};
+
+/** Chat is always a fixed overlay. Drawer = it covers the canvas. */
+export function roomChatLayout(coversCanvas: boolean): RoomChatLayout {
+  return coversCanvas ? "drawer" : "sidebar";
+}
+
+export function roomChatBoxesOverlap(a: RoomChatBox, b: RoomChatBox): boolean {
+  return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+}
+
+export function roomChatBoxHasSize(box: RoomChatBox): boolean {
+  return box.right > box.left && box.bottom > box.top;
+}
+
+export function roomChatBoxFromRect(rect: {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+}): RoomChatBox {
+  return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
+}
+
+/** Right-edge overlay box before the panel is in the DOM. */
+export function roomChatPredictedOverlayBox(opts: {
+  viewportWidthPx: number;
+  viewportHeightPx: number;
+  chromeHeightPx: number;
+  remPx?: number;
+}): RoomChatBox {
+  const rem = opts.remPx ?? 16;
+  const width = Math.min(
+    ROOM_CHAT_PANEL_REM * rem,
+    Math.max(0, opts.viewportWidthPx - ROOM_CHAT_PANEL_GUTTER_REM * rem)
+  );
+  return {
+    left: opts.viewportWidthPx - width,
+    right: opts.viewportWidthPx,
+    top: opts.chromeHeightPx,
+    bottom: opts.viewportHeightPx,
+  };
+}
+
+export function roomChatDismissesOnFocusLoss(coversCanvas: boolean): boolean {
+  return coversCanvas;
+}
+
+export function roomChatShouldCloseOnFocusMove(opts: {
+  coversCanvas: boolean;
+  panelContainsNext: boolean;
+  nextIsNull: boolean;
+  /** Quick replies unmount the focused chip; that blur must not dismiss chat. */
+  lostControlRemoved?: boolean;
+}): boolean {
+  if (!roomChatDismissesOnFocusLoss(opts.coversCanvas)) return false;
+  if (opts.panelContainsNext) return false;
+  if (opts.lostControlRemoved) return false;
+  return true;
+}
+
+export function roomChatShouldCloseOnOutsidePress(opts: {
+  coversCanvas: boolean;
+  pressInsidePanel: boolean;
+  pressOnToggle: boolean;
+}): boolean {
+  if (!roomChatDismissesOnFocusLoss(opts.coversCanvas)) return false;
+  if (opts.pressInsidePanel || opts.pressOnToggle) return false;
+  return true;
+}
+
 export const GO_ROOM_EMPTY_TIMELINE = "還沒有訊息。";
 
 export const GO_ROOM_KEEP_OPEN = "這一間只在這個畫面開著的時候存在。";
@@ -26,6 +109,11 @@ export const GO_ROOM_CONNECT_FAILED =
 
 export const GO_ROOM_MEDIA_OFF = "鏡頭 · 未開";
 export const GO_ROOM_TV_OFF = "電視關機";
+export const GO_ROOM_TV_TITLE = "包廂電視";
+export const GO_ROOM_TV_FULLSCREEN = "全螢幕";
+export const GO_ROOM_TV_HINT_HOST =
+  "片子在分享區掛上後按放到電視上。鏡頭在座位上指定。";
+export const GO_ROOM_TV_HINT_GUEST = "電視畫面由主持指定。點全螢幕可放大。";
 export const GO_ROOM_PUT_ON_TV = "放到電視上";
 export const GO_ROOM_TV_OFF_BTN = "關掉電視";
 export const GO_ROOM_CAMERA_WATCH = "收看";
@@ -301,6 +389,41 @@ export function attachMediaStream(
   }
   el.srcObject = stream;
   if (stream) void tryPlay(el);
+}
+
+/** Expand the booth TV. Prefers standard Fullscreen, then iOS `<video>` fullscreen. */
+export async function enterTvFullscreen(
+  el:
+    | {
+        requestFullscreen?: () => Promise<void>;
+        webkitEnterFullscreen?: () => void;
+        webkitRequestFullscreen?: () => Promise<void>;
+      }
+    | null
+    | undefined
+): Promise<boolean> {
+  if (!el) return false;
+  try {
+    if (typeof el.requestFullscreen === "function") {
+      await el.requestFullscreen();
+      return true;
+    }
+  } catch {
+    /* iOS often exposes requestFullscreen but only webkitEnterFullscreen works. */
+  }
+  try {
+    if (typeof el.webkitEnterFullscreen === "function") {
+      el.webkitEnterFullscreen();
+      return true;
+    }
+    if (typeof el.webkitRequestFullscreen === "function") {
+      await el.webkitRequestFullscreen();
+      return true;
+    }
+  } catch {
+    return false;
+  }
+  return false;
 }
 
 function playbackSrcOf(el: { src: string; getAttribute?: (name: string) => string | null }): string {

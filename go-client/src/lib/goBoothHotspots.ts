@@ -9,6 +9,8 @@ import { pointInRect } from "./goShopHotspots";
 
 export type BoothHotspotId = "tv" | "door" | "shelf" | `seat:${number}`;
 
+export type BoothPanel = "tv" | "files" | "invite" | "seat" | "none";
+
 export type BoothHotspot = {
   id: BoothHotspotId;
   label: string;
@@ -44,4 +46,22 @@ export function hitTestBoothHotspot(
 export function boothHotspotRect(id: BoothHotspotId): BoothRect | null {
   const spot = GO_BOOTH_HOTSPOTS.find((s) => s.id === id);
   return spot ? { x: spot.x, y: spot.y, w: spot.w, h: spot.h } : null;
+}
+
+/** Furniture click → which overlay. TV is never the share catalog or invite sheet. */
+export function boothHotspotPanel(
+  id: BoothHotspotId,
+  opts: { role: "host" | "guest" }
+): BoothPanel {
+  if (id === "tv") return "tv";
+  if (id === "shelf") return "files";
+  if (id === "door") return opts.role === "host" ? "invite" : "none";
+  if (id.startsWith("seat:")) return "seat";
+  return "none";
+}
+
+export function boothSeatIndex(id: BoothHotspotId): number | null {
+  if (!id.startsWith("seat:")) return null;
+  const i = Number(id.slice(5));
+  return Number.isFinite(i) ? i : null;
 }

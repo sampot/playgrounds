@@ -21,6 +21,8 @@
   --pixel-inset: inset 0 2px 0 0 color-mix(in oklab, rgb(var(--ink)) 10%, transparent);
   /* 像素描邊：單向輕描邊，保留 8-bit 感但不壓字（CJK 不宜多向硬描邊）。 */
   --pixel-text-shadow: 1px 1px 0 rgb(var(--ink));
+  /* Header bar height; Chrome updates this from the live header box. */
+  --go-chrome-height: 3.75rem;
 }
 html[data-theme="dark"] {
   color-scheme: dark;

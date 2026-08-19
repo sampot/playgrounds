@@ -172,6 +172,8 @@
 <style>
   .booth-stage {
     width: 100%;
+    max-width: 640px;
+    margin-inline: auto;
     min-width: 0;
   }
   .booth-wrap {
@@ -210,6 +212,7 @@
     margin: 0.4rem 0 0;
   }
   .booth-hotspots .pixel-btn {
+    flex: 0 0 auto;
     min-height: 44px;
     font-size: 0.78rem;
     padding: 0.35rem 0.55rem;

@@ -38,6 +38,7 @@
   const CHROME_AUTO_HIDE_MS = 3000;
 
   let shareOpen = $state(false);
+  let chromeEl = $state<HTMLElement | null>(null);
   let recommends = $state<ReturnType<typeof recommendSameKind>>([]);
   let moreOpen = $state(false);
   let profileOpen = $state(false);
@@ -155,6 +156,24 @@
       chromeHidden = false;
       scheduleChromeAutoHide();
     }
+  });
+
+  $effect(() => {
+    const el = chromeEl;
+    if (!el) return;
+    const root = document.documentElement;
+    const apply = () => {
+      root.style.setProperty(
+        "--go-chrome-height",
+        `${Math.round(el.getBoundingClientRect().height)}px`
+      );
+    };
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+    };
   });
 
   /**
@@ -411,6 +430,7 @@
     .join(" ")}
 >
   <header
+    bind:this={chromeEl}
     class={[
       "chrome",
       canvasActive && "chrome--compact",

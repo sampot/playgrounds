@@ -8,9 +8,21 @@ import {
   GO_ROOM_SHARE_HINT,
   attachMediaStream,
   attachPlaybackUrl,
+  enterTvFullscreen,
+  GO_ROOM_TV_FULLSCREEN,
+  GO_ROOM_TV_HINT_GUEST,
+  GO_ROOM_TV_HINT_HOST,
   GO_ROOM_TV_OFF,
+  GO_ROOM_TV_TITLE,
   isRoomInviteShareable,
   mediaTrackHasFrames,
+  roomChatBoxesOverlap,
+  roomChatBoxHasSize,
+  roomChatDismissesOnFocusLoss,
+  roomChatLayout,
+  roomChatPredictedOverlayBox,
+  roomChatShouldCloseOnFocusMove,
+  roomChatShouldCloseOnOutsidePress,
   roomChatWhoLabel,
   roomHostDisplayName,
   roomInviteDoor,
@@ -370,6 +382,42 @@ describe("attachPlaybackUrl", () => {
   });
 });
 
+describe("enterTvFullscreen", () => {
+  it("uses the standard fullscreen API, then iOS video fullscreen", async () => {
+    const requestFullscreen = vi.fn(async () => {});
+    expect(await enterTvFullscreen({ requestFullscreen })).toBe(true);
+    expect(requestFullscreen).toHaveBeenCalledTimes(1);
+
+    const webkitEnterFullscreen = vi.fn();
+    expect(await enterTvFullscreen({ webkitEnterFullscreen })).toBe(true);
+    expect(webkitEnterFullscreen).toHaveBeenCalledTimes(1);
+
+    expect(await enterTvFullscreen(null)).toBe(false);
+
+    const denied = vi.fn(async () => {
+      throw new Error("denied");
+    });
+    const webkitEnterFullscreenFallback = vi.fn();
+    expect(
+      await enterTvFullscreen({
+        requestFullscreen: denied,
+        webkitEnterFullscreen: webkitEnterFullscreenFallback,
+      })
+    ).toBe(true);
+    expect(webkitEnterFullscreenFallback).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("room TV copy", () => {
+  it("names the booth TV panel, not the share catalog", () => {
+    expect(GO_ROOM_TV_TITLE).toBe("包廂電視");
+    expect(GO_ROOM_TV_FULLSCREEN).toBe("全螢幕");
+    expect(GO_ROOM_TV_HINT_HOST).toContain("分享區");
+    expect(GO_ROOM_TV_HINT_HOST).toContain("放到電視上");
+    expect(GO_ROOM_TV_HINT_GUEST).toContain("主持");
+  });
+});
+
 describe("attachMediaStream", () => {
   it("keeps the same srcObject and plays when the stream is unchanged", async () => {
     const stream = {} as MediaStream;
@@ -395,6 +443,117 @@ describe("attachMediaStream", () => {
       expect(el.muted).toBe(true);
     });
     expect(play).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("room chat overlay vs canvas", () => {
+  const phoneCanvas = { left: 16, right: 374, top: 80, bottom: 304 };
+  const wideCanvas = { left: 396, right: 1004, top: 80, bottom: 460 };
+
+  it("treats chat as a covering drawer when the overlay overlaps the canvas", () => {
+    const overlay = roomChatPredictedOverlayBox({
+      viewportWidthPx: 390,
+      viewportHeightPx: 844,
+      chromeHeightPx: 60,
+    });
+    expect(roomChatBoxesOverlap(phoneCanvas, overlay)).toBe(true);
+    expect(roomChatLayout(true)).toBe("drawer");
+  });
+
+  it("keeps a right overlay when the panel sits in the empty margin", () => {
+    const overlay = roomChatPredictedOverlayBox({
+      viewportWidthPx: 1400,
+      viewportHeightPx: 900,
+      chromeHeightPx: 60,
+    });
+    expect(overlay.left).toBe(1048);
+    expect(roomChatBoxesOverlap(wideCanvas, overlay)).toBe(false);
+    expect(roomChatLayout(false)).toBe("sidebar");
+  });
+
+  it("still covers a centered canvas at 1024px — a 22rem rail does not fit beside 40rem", () => {
+    const overlay = roomChatPredictedOverlayBox({
+      viewportWidthPx: 1024,
+      viewportHeightPx: 768,
+      chromeHeightPx: 60,
+    });
+    const canvas = { left: 208, right: 816, top: 80, bottom: 460 };
+    expect(roomChatBoxesOverlap(canvas, overlay)).toBe(true);
+  });
+
+  it("does not treat an unmeasured canvas as clear of the overlay", () => {
+    const empty = { left: 0, right: 0, top: 0, bottom: 0 };
+    expect(roomChatBoxHasSize(empty)).toBe(false);
+    expect(roomChatBoxHasSize(phoneCanvas)).toBe(true);
+  });
+
+  it("dismisses on focus loss only while the overlay covers the canvas", () => {
+    expect(roomChatDismissesOnFocusLoss(false)).toBe(false);
+    expect(roomChatDismissesOnFocusLoss(true)).toBe(true);
+    expect(
+      roomChatShouldCloseOnFocusMove({
+        coversCanvas: false,
+        panelContainsNext: false,
+        nextIsNull: true,
+      })
+    ).toBe(false);
+    expect(
+      roomChatShouldCloseOnFocusMove({
+        coversCanvas: true,
+        panelContainsNext: true,
+        nextIsNull: false,
+      })
+    ).toBe(false);
+    expect(
+      roomChatShouldCloseOnFocusMove({
+        coversCanvas: true,
+        panelContainsNext: false,
+        nextIsNull: false,
+      })
+    ).toBe(true);
+    expect(
+      roomChatShouldCloseOnFocusMove({
+        coversCanvas: true,
+        panelContainsNext: false,
+        nextIsNull: true,
+      })
+    ).toBe(true);
+    expect(
+      roomChatShouldCloseOnFocusMove({
+        coversCanvas: true,
+        panelContainsNext: false,
+        nextIsNull: true,
+        lostControlRemoved: true,
+      })
+    ).toBe(false);
+    expect(
+      roomChatShouldCloseOnOutsidePress({
+        coversCanvas: false,
+        pressInsidePanel: false,
+        pressOnToggle: false,
+      })
+    ).toBe(false);
+    expect(
+      roomChatShouldCloseOnOutsidePress({
+        coversCanvas: true,
+        pressInsidePanel: true,
+        pressOnToggle: false,
+      })
+    ).toBe(false);
+    expect(
+      roomChatShouldCloseOnOutsidePress({
+        coversCanvas: true,
+        pressInsidePanel: false,
+        pressOnToggle: true,
+      })
+    ).toBe(false);
+    expect(
+      roomChatShouldCloseOnOutsidePress({
+        coversCanvas: true,
+        pressInsidePanel: false,
+        pressOnToggle: false,
+      })
+    ).toBe(true);
   });
 });
 
