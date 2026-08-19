@@ -36,6 +36,7 @@ const EMPTY: RoomMediaState = {
   watchingProgram: false,
   remoteLives: [],
   tvSourcePeerId: null,
+  streamingFileId: null,
 };
 
 class GoRoomMedia {
@@ -63,6 +64,7 @@ class GoRoomMedia {
   watchingProgram = $state(false);
   remoteLives = $state<{ peerId: string; camera: boolean; mic: boolean }[]>([]);
   tvSourcePeerId = $state<string | null>(null);
+  streamingFileId = $state<string | null>(null);
   #media: RoomMedia | null = null;
   #unsub: (() => void) | null = null;
 
@@ -102,6 +104,7 @@ class GoRoomMedia {
       this.watchingProgram = s.watchingProgram;
       this.remoteLives = s.remoteLives;
       this.tvSourcePeerId = s.tvSourcePeerId;
+      this.streamingFileId = s.streamingFileId;
     });
   }
 
@@ -134,6 +137,7 @@ class GoRoomMedia {
     this.watchingProgram = false;
     this.remoteLives = [];
     this.tvSourcePeerId = null;
+    this.streamingFileId = null;
   }
 
   enableCamera() {
@@ -196,6 +200,13 @@ class GoRoomMedia {
 
   stopListening() {
     return this.#media?.stopListening() ?? Promise.resolve();
+  }
+
+  startListedProgram(id: string) {
+    return (
+      this.#media?.startListedProgram(id) ??
+      Promise.resolve({ ok: false as const, error: "尚未連線" })
+    );
   }
 
   startProgram(file: File) {

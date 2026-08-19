@@ -72,6 +72,10 @@ class GoRoomFiles {
     return this.#xfer?.unshareLocal(id) ?? false;
   }
 
+  unshare(id: string, opts?: { host?: boolean }): boolean {
+    return this.#xfer?.unshare(id, opts) ?? false;
+  }
+
   download(id: string, pickSave: RoomFilePickSave) {
     return (
       this.#xfer?.download(id, pickSave) ??

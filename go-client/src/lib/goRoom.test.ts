@@ -1018,6 +1018,9 @@ describe("room cinema shell", () => {
 describe("roomEscStep", () => {
   it("closes overlays before shrinking cinema, then asks to leave", () => {
     expect(roomEscStep({ shareOpen: true, cinema: true })).toBe("close-share");
+    expect(roomEscStep({ previewOpen: true, cinema: true })).toBe(
+      "close-preview"
+    );
     expect(roomEscStep({ tvHudOpen: true, cinema: true })).toBe("close-tv-hud");
     expect(roomEscStep({ selectedPeerId: "p", cinema: true })).toBe(
       "clear-peer"

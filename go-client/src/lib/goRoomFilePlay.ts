@@ -43,6 +43,59 @@ function blobUrl(mime: string): string {
   return URL.createObjectURL(new Blob([], { type: mime }));
 }
 
+export function createImagePreviewSink(opts: PlaySinkOpts = {}): RoomPlaySink {
+  const maxBytes = opts.maxBytes ?? SESSION_FILE_PLAY_BUFFER_MAX;
+  const mime = opts.mime || "image/jpeg";
+  let url = blobUrl(mime);
+  const parts: Uint8Array[] = [];
+  let bytes = 0;
+  let dead = false;
+
+  return {
+    get url() {
+      return url;
+    },
+    async append(chunk: Uint8Array) {
+      if (dead) return "low";
+      if (bytes + chunk.byteLength > maxBytes) return "high";
+      const copy = chunk.slice();
+      parts.push(copy);
+      bytes += copy.byteLength;
+      return pressureOf(bytes, maxBytes, 0);
+    },
+    async evictUntil() {
+      if (dead) return "low";
+      return pressureOf(bytes, maxBytes, 0);
+    },
+    end() {
+      if (dead) return;
+      if (url.startsWith("blob:")) {
+        try {
+          URL.revokeObjectURL(url);
+        } catch {
+          /* ignore */
+        }
+      }
+      url = URL.createObjectURL(new Blob(parts, { type: mime }));
+    },
+    destroy() {
+      dead = true;
+      parts.length = 0;
+      bytes = 0;
+      if (url.startsWith("blob:")) {
+        try {
+          URL.revokeObjectURL(url);
+        } catch {
+          /* ignore */
+        }
+      }
+    },
+    bufferedBytes() {
+      return bytes;
+    },
+  };
+}
+
 export function createPlayByteWindow(opts: PlaySinkOpts = {}): RoomPlaySink {
   const maxBytes = opts.maxBytes ?? SESSION_FILE_PLAY_BUFFER_MAX;
   const highBytes = opts.highBytes ?? SESSION_FILE_PLAY_BUFFER_HIGH;

@@ -457,4 +457,78 @@ describe("createRoomFileTransfer", () => {
       false
     );
   });
+
+  it("lets the owner download their own hanging file without a peer request", async () => {
+    const json: unknown[] = [];
+    const xfer = createRoomFileTransfer({
+      localAgentId: "h",
+      localName: "太郎",
+      sendJson: (m) => json.push(m),
+      sendBinary: () => {},
+      newId: () => "file-1",
+    });
+    expect((await xfer.shareLocalFile(fileOf("note.txt", 4))).ok).toBe(true);
+    const sink = mockWritable();
+    expect((await xfer.download("file-1", async () => sink.writable)).ok).toBe(
+      true
+    );
+    expect(json.some((m) => (m as { op?: string }).op === "request")).toBe(
+      false
+    );
+    expect(sink.isClosed()).toBe(true);
+    expect(sink.chunks.reduce((n, c) => n + c.byteLength, 0)).toBe(4);
+  });
+
+  it("lets a host drop someone else's listing and tells the owner to forget it", async () => {
+    const ownerJson: unknown[] = [];
+    const owner = createRoomFileTransfer({
+      localAgentId: "g",
+      localName: "訪客",
+      sendJson: (m) => ownerJson.push(m),
+      sendBinary: () => {},
+      newId: () => "file-1",
+    });
+    expect((await owner.shareLocalFile(fileOf("clip.mp4", 8, "video/mp4"))).ok).toBe(
+      true
+    );
+    const host = createRoomFileTransfer({
+      localAgentId: "h",
+      localName: "主持",
+      sendJson: (m) => owner.onControl(m),
+      sendBinary: () => {},
+    });
+    host.onControl({
+      type: SESSION_FILE_TYPE,
+      v: 1,
+      op: "share",
+      id: "file-1",
+      name: "clip.mp4",
+      size: 8,
+      mime: "video/mp4",
+      owner: "g",
+      ownerName: "訪客",
+    });
+    expect(host.unshare("file-1", { host: true })).toBe(true);
+    expect(host.getState().entries).toHaveLength(0);
+    expect(owner.getState().entries).toHaveLength(0);
+    expect(owner.localFile("file-1")).toBeNull();
+  });
+
+  it("opens a local image as an image preview, not a video sink", async () => {
+    const xfer = createRoomFileTransfer({
+      localAgentId: "h",
+      localName: "太郎",
+      sendJson: () => {},
+      sendBinary: () => {},
+      newId: () => "pic-1",
+    });
+    const pic = fileOf("shot.png", 6, "image/png");
+    expect((await xfer.shareLocalFile(pic)).ok).toBe(true);
+    expect((await xfer.play("pic-1")).ok).toBe(true);
+    expect(xfer.getState().playback).toMatchObject({
+      id: "pic-1",
+      kind: "image",
+      name: "shot.png",
+    });
+  });
 });

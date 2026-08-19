@@ -70,6 +70,8 @@ export type RoomMediaState = {
   remoteLives: RoomRemoteLive[];
   /** Occupant whose live is on the TV; null when TV is off or a file. */
   tvSourcePeerId: string | null;
+  /** Catalog file currently on the TV (local capture or remote offer id). */
+  streamingFileId: string | null;
 };
 
 export type RoomMediaResult =
@@ -149,6 +151,7 @@ export type RoomMedia = {
   enableMic(): Promise<RoomMediaResult>;
   disableMic(): Promise<void>;
   startProgram(file: File): Promise<RoomMediaResult>;
+  startListedProgram(id: string): Promise<RoomMediaResult>;
   stopProgram(): Promise<void>;
   pauseProgram(): void;
   playProgram(): void;
@@ -227,6 +230,7 @@ export function createRoomMedia(opts: {
   let programName: string | null = null;
   let remoteProgramName: string | null = null;
   let remoteProgramKind: "audio" | "video" | null = null;
+  let remoteProgramFileId: string | null = null;
   let remoteProgramFrom: string | null = null;
   let remoteCameraFrom: string | null = null;
   let remoteMicFrom: string | null = null;
@@ -313,6 +317,9 @@ export function createRoomMedia(opts: {
       watchingProgram,
       remoteLives: remoteLives.map((l) => ({ ...l })),
       tvSourcePeerId: programFromLive ? tvSourcePeerId : null,
+      streamingFileId: programFromLive
+        ? null
+        : streamingFileId || remoteProgramFileId,
     };
   }
 
@@ -442,6 +449,7 @@ export function createRoomMedia(opts: {
         from: opts.localAgentId,
         kind: program?.video ? "video" : "audio",
         name: programName ?? "節目",
+        id: streamingFileId ?? undefined,
       })
     );
   }
@@ -719,6 +727,16 @@ export function createRoomMedia(opts: {
     async startProgram(file) {
       const out = await captureLocalFile(file);
       if (!out.ok) return out;
+      streamingFileId = null;
+      markAll(programWatchers);
+      offerProgram();
+      await push();
+      emit();
+      return { ok: true };
+    },
+    async startListedProgram(id) {
+      const out = await ensureCaptured(id);
+      if (!out.ok) return out;
       markAll(programWatchers);
       offerProgram();
       await push();
@@ -791,6 +809,7 @@ export function createRoomMedia(opts: {
       programName = name?.trim() || "鏡頭";
       remoteProgramName = null;
       remoteProgramKind = null;
+      streamingFileId = null;
       error = null;
       markAll(programWatchers);
       offerProgram();
@@ -1094,6 +1113,7 @@ export function createRoomMedia(opts: {
       if (data.op === "offer") {
         remoteProgramName = data.name?.trim() || "節目";
         remoteProgramKind = data.kind ?? "video";
+        remoteProgramFileId = data.id?.trim() || null;
         remoteProgramFrom = data.from;
         emit();
         if (!watchingProgram) void this.watchProgram();
@@ -1106,6 +1126,7 @@ export function createRoomMedia(opts: {
       if (data.op === "unoffer") {
         remoteProgramName = null;
         remoteProgramKind = null;
+        remoteProgramFileId = null;
         remoteProgramFrom = null;
         watchingProgram = false;
         emit();

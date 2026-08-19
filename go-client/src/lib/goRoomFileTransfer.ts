@@ -19,9 +19,11 @@ import { ROOM_FILE_SAVE_UNSUPPORTED } from "./goRoomFileSave";
 import type { RoomFileWritable } from "./goRoomFileSave";
 import { GO_ROOM_HANG_FILES_ONLY } from "./goRoom";
 import {
+  createImagePreviewSink,
   createRoomPlaySink,
   type RoomPlaySink,
 } from "./goRoomFilePlay";
+import { fileShareKind } from "./goRoomFileShare";
 
 export type { RoomFileWritable };
 export { SESSION_FILE_PLAY_BUFFER_MAX } from "./goRoomFilePlay";
@@ -35,7 +37,7 @@ export type RoomFilePlayback = {
   url: string;
   name: string;
   mime: string;
-  kind: "audio" | "video";
+  kind: "audio" | "video" | "image";
 };
 
 export type RoomFileEntry = {
@@ -69,6 +71,7 @@ export type RoomFileTransfer = {
   shareLocalFile(file: File): Promise<RoomFileResult>;
   shareLocalDirectory(files: File[]): Promise<RoomFileResult>;
   unshareLocal(id: string): boolean;
+  unshare(id: string, opts?: { host?: boolean }): boolean;
   download(id: string, pickSave: RoomFilePickSave): Promise<RoomFileResult>;
   play(id: string): Promise<RoomFileResult>;
   stopPlay(): void;
@@ -108,11 +111,29 @@ type Inbound = {
   playPaused?: boolean;
 };
 
-function playbackKindOf(mime?: string, name?: string): "audio" | "video" {
-  const m = (mime ?? "").toLowerCase();
-  if (m.startsWith("audio/") && !m.startsWith("video/")) return "audio";
-  if (/\.(mp3|m4a|aac|wav|ogg|flac)$/i.test(name ?? "")) return "audio";
+function playbackKindOf(
+  mime?: string,
+  name?: string
+): "audio" | "video" | "image" {
+  const kind = fileShareKind({ mime, name });
+  if (kind === "image") return "image";
+  if (kind === "audio") return "audio";
   return "video";
+}
+
+async function writeLocalSlices(
+  file: File,
+  writable: RoomFileWritable
+): Promise<void> {
+  const chunk = SESSION_FILE_CHUNK_PAYLOAD_MAX;
+  let offset = 0;
+  while (offset < file.size) {
+    const piece = file.slice(offset, offset + chunk);
+    const buf = new Uint8Array(await piece.arrayBuffer());
+    await writable.write(buf);
+    offset += buf.byteLength;
+  }
+  await writable.close();
 }
 
 export function createRoomFileTransfer(
@@ -337,16 +358,59 @@ export function createRoomFileTransfer(
     return true;
   }
 
+  function unshare(id: string, opts?: { host?: boolean }): boolean {
+    const entry = entries.find((e) => e.id === id);
+    if (!entry) return false;
+    if (entry.mine) return unshareLocal(id);
+    if (!opts?.host) return false;
+    if (inbound && inbound.fileId === id) {
+      sendSafe(
+        buildSessionFileControl({
+          op: "cancel",
+          id: inbound.fileId,
+          transferId: inbound.transferId,
+        })
+      );
+      void closeInbound(false, "已撤回");
+    }
+    if (playback?.id === id) revokePlayback();
+    entries = entries.filter((e) => e.id !== id && e.parentId !== id);
+    emit();
+    sendSafe(buildSessionFileControl({ op: "unshare", id }));
+    return true;
+  }
+
   async function download(
     id: string,
     pickSave: RoomFilePickSave
   ): Promise<RoomFileResult> {
     const entry = entries.find((e) => e.id === id);
-    if (!entry || entry.mine) {
+    if (!entry) {
       return { ok: false, error: "找不到這個檔" };
     }
     if (entry.kind === "dir" || entry.kind === "device") {
       return { ok: false, error: GO_ROOM_HANG_FILES_ONLY };
+    }
+    if (entry.mine) {
+      const file = outboundFiles.get(id);
+      if (!file) return { ok: false, error: "找不到這個檔" };
+      let writable: RoomFileWritable | null;
+      try {
+        writable = await pickSave({ suggestedName: entry.name });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : ROOM_FILE_SAVE_UNSUPPORTED;
+        return { ok: false, error: msg };
+      }
+      if (!writable) {
+        return { ok: false, error: "已取消", cancelled: true };
+      }
+      try {
+        await writeLocalSlices(file, writable);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "下載失敗";
+        return { ok: false, error: msg };
+      }
+      return { ok: true, id };
     }
     if (busy()) {
       return { ok: false, error: "一次只能傳一個檔" };
@@ -409,7 +473,11 @@ export function createRoomFileTransfer(
       return { ok: false, error: "一次只能傳一個檔" };
     }
     revokePlayback();
-    playSink = makePlaySink({ mime: entry.mime, name: entry.name });
+    const playKind = playbackKindOf(entry.mime, entry.name);
+    playSink =
+      playKind === "image"
+        ? createImagePreviewSink({ mime: entry.mime, name: entry.name })
+        : makePlaySink({ mime: entry.mime, name: entry.name });
     playback = {
       id,
       url: playSink.url,
@@ -508,6 +576,9 @@ export function createRoomFileTransfer(
     }
     if (ok && cur.purpose === "play") {
       playSink?.end();
+      if (playback && playSink && playback.id === cur.fileId) {
+        playback = { ...playback, url: playSink.url };
+      }
     }
     if (ok) {
       patch(cur.fileId, {
@@ -556,6 +627,14 @@ export function createRoomFileTransfer(
       return;
     }
     if (data.op === "unshare") {
+      for (const e of entries) {
+        if (e.mine && (e.id === data.id || e.parentId === data.id)) {
+          outboundFiles.delete(e.id);
+        }
+      }
+      outboundFiles.delete(data.id);
+      if (outboundTransferId) pumpAbort = true;
+      if (playback?.id === data.id) revokePlayback();
       const inboundHit =
         inbound &&
         (inbound.fileId === data.id ||
@@ -715,6 +794,7 @@ export function createRoomFileTransfer(
     shareLocalFile,
     shareLocalDirectory,
     unshareLocal,
+    unshare,
     download,
     play,
     stopPlay,

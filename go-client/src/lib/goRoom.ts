@@ -207,6 +207,7 @@ export function roomShowAdSlot(opts: {
 
 export type RoomEscStep =
   | "close-share"
+  | "close-preview"
   | "close-tv-hud"
   | "clear-peer"
   | "close-drawer"
@@ -216,12 +217,14 @@ export type RoomEscStep =
 /** Esc: overlays first; cinema shrinks to hall; only then leave-confirm. */
 export function roomEscStep(opts: {
   shareOpen?: boolean;
+  previewOpen?: boolean;
   tvHudOpen?: boolean;
   selectedPeerId?: string | null;
   cinema?: boolean;
   drawerOpen?: boolean;
 }): RoomEscStep {
   if (opts.shareOpen) return "close-share";
+  if (opts.previewOpen) return "close-preview";
   if (opts.tvHudOpen) return "close-tv-hud";
   if (opts.selectedPeerId) return "clear-peer";
   if (opts.cinema && opts.drawerOpen) return "close-drawer";

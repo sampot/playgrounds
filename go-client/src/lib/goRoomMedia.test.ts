@@ -236,6 +236,55 @@ describe("createRoomMedia", () => {
     expect(pc.transceivers[3]!.sender.replaceTrack).toHaveBeenCalledWith(video);
     expect(media.getState().programName).toBe("MTV.mp4");
     expect(media.getState().localProgramStream).not.toBeNull();
+    expect(media.getState().streamingFileId).toBeNull();
+  });
+
+  it("tags the catalog file id when the host puts a hanging file on the TV", async () => {
+    const video = track("video", "prog-v");
+    const file = new File([new Uint8Array(4)], "MTV.mp4", { type: "video/mp4" });
+    const json: unknown[] = [];
+    const media = createRoomMedia({
+      localAgentId: "host",
+      occupantCount: () => 2,
+      peers: () => [{ peerId: "g-a", pc: mockPc(), via: "entrance" }],
+      sendJson: (m) => json.push(m),
+      resolveLocalFile: (id) => (id === "file-1" ? file : null),
+      captureProgram: async () => ({
+        audio: null,
+        video,
+        stop: vi.fn(),
+      }),
+    });
+    expect((await media.startListedProgram("file-1")).ok).toBe(true);
+    expect(media.getState().streamingFileId).toBe("file-1");
+    expect(json).toContainEqual({
+      type: SESSION_CAST_TYPE,
+      v: 1,
+      op: "offer",
+      from: "host",
+      kind: "video",
+      name: "MTV.mp4",
+      id: "file-1",
+    });
+  });
+
+  it("lets a guest mark on-air from the cast offer file id", async () => {
+    const media = createRoomMedia({
+      localAgentId: "g-a",
+      occupantCount: () => 2,
+      peers: () => [],
+      sendJson: () => {},
+    });
+    await media.onControl({
+      type: SESSION_CAST_TYPE,
+      v: 1,
+      op: "offer",
+      from: "host",
+      kind: "video",
+      name: "MTV.mp4",
+      id: "file-1",
+    });
+    expect(media.getState().streamingFileId).toBe("file-1");
   });
 
   it("lets the host pause and seek the file that is on the TV", async () => {

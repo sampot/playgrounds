@@ -23,7 +23,6 @@
   import { chromeSession } from "$lib/chromeSession.svelte";
   import {
     GO_ROOM_CAMERA_STOP_WATCH,
-    GO_ROOM_CAST_STOP_WATCH,
     GO_ROOM_EMPTY_TIMELINE,
     GO_ROOM_END_CONFIRM_HOST,
     GO_ROOM_KICK,
@@ -89,9 +88,26 @@
   } from "$lib/goRoom";
   import {
     catalogConsumes,
-    catalogPlayLabel,
     catalogTransferHint,
   } from "$lib/goRoomCatalog";
+  import {
+    GO_ROOM_FILE_CAST,
+    GO_ROOM_FILE_DELETE,
+    GO_ROOM_FILE_DELETE_CONFIRM,
+    GO_ROOM_FILE_DOWNLOAD,
+    GO_ROOM_FILE_FILTERS,
+    GO_ROOM_FILE_FILTER_LABEL,
+    GO_ROOM_FILE_ON_AIR,
+    GO_ROOM_FILE_PREVIEW,
+    fileShareIcon,
+    fileShareKind,
+    formatFileShareSize,
+    roomFileOnAir,
+    roomFileShareActions,
+    roomFileShareMatches,
+    roomFileShareProgress,
+    type RoomFileShareFilter,
+  } from "$lib/goRoomFileShare";
   import {
     formatRoomChatClock,
     newRoomSystemId,
@@ -170,6 +186,13 @@
   let presenceVideoEl = $state<HTMLVideoElement | null>(null);
   let localPreviewEl = $state<HTMLVideoElement | null>(null);
   let filePlayEl = $state<HTMLMediaElement | null>(null);
+  let filePreviewImg = $state<HTMLImageElement | null>(null);
+  let fileFilter = $state<RoomFileShareFilter>("all");
+  let shareHang = $state({ done: 0, total: 0 });
+  let previewOpen = $state(false);
+  let previewId = $state<string | null>(null);
+  let previewDialog = $state<HTMLDialogElement | null>(null);
+  let deleteFileId = $state<string | null>(null);
   let now = $state(Date.now());
   let pane = $state<RoomShellPane>(roomShellDefaultPane());
   let composerInputEl = $state<HTMLInputElement | null>(null);
@@ -211,6 +234,18 @@
   );
   const files = $derived(
     goRoomFiles.entries.filter((f) => f.kind !== "dir" && f.kind !== "device")
+  );
+  const filesShown = $derived(
+    files.filter((f) =>
+      roomFileShareMatches(fileFilter, fileShareKind({ mime: f.mime, name: f.name }))
+    )
+  );
+  const sharePct = $derived(roomFileShareProgress(shareHang.done, shareHang.total));
+  const previewFile = $derived(files.find((f) => f.id === previewId) ?? null);
+  const previewKind = $derived(
+    previewFile
+      ? fileShareKind({ mime: previewFile.mime, name: previewFile.name })
+      : "doc"
   );
   const roster = $derived(
     roomOccupantRows({
@@ -596,6 +631,7 @@
     chromeSession.escapeGuard = () => {
       const step = roomEscStep({
         shareOpen,
+        previewOpen,
         tvHudOpen,
         selectedPeerId,
         cinema,
@@ -605,12 +641,19 @@
         pendingShare = false;
         return false;
       }
+      if (step === "close-preview") {
+        closePreview();
+        return false;
+      }
       if (step === "close-tv-hud") {
         tvHudOpen = false;
         return false;
       }
       if (step === "clear-peer") {
         selectedPeerId = null;
+        return false;
+      }
+      if (step === "close-drawer") {
         return false;
       }
       if (step === "exit-cinema") {
@@ -631,8 +674,8 @@
   $effect(() => {
     const el = confirmDialog;
     if (!el) return;
-    if ((confirmEnd || kickTarget) && !el.open) el.showModal();
-    if (!confirmEnd && !kickTarget && el.open) el.close();
+    if ((confirmEnd || kickTarget || deleteFileId) && !el.open) el.showModal();
+    if (!confirmEnd && !kickTarget && !deleteFileId && el.open) el.close();
   });
 
   $effect(() => {
@@ -653,16 +696,30 @@
   });
 
   $effect(() => {
+    const el = previewDialog;
+    if (!el) return;
+    if (previewOpen && !el.open) el.showModal();
+    if (!previewOpen && el.open) el.close();
+  });
+  $effect(() => {
     attachMediaStream(presenceVideoEl, goRoomMedia.presenceStream);
   });
   $effect(() => {
     attachMediaStream(localPreviewEl, goRoomMedia.localPreviewStream);
   });
   $effect(() => {
-    const el = filePlayEl;
     const url = goRoomFiles.playback?.url ?? null;
+    const kind = goRoomFiles.playback?.kind;
+    const el = filePlayEl;
+    const img = filePreviewImg;
+    void previewOpen;
     void tick().then(() => {
       if ((goRoomFiles.playback?.url ?? null) !== url) return;
+      if (kind === "image") {
+        const target = filePreviewImg ?? img;
+        if (target) target.src = url ?? "";
+        return;
+      }
       attachPlaybackUrl(filePlayEl ?? el, url);
     });
   });
@@ -761,13 +818,17 @@
     const picked = Array.from(list);
     if (picked.length === 0) return;
     fileError = "";
+    shareHang = { done: 0, total: picked.length };
     for (const file of picked) {
       const result = await goRoomFiles.shareLocalFile(file);
+      shareHang = { done: shareHang.done + 1, total: shareHang.total };
       if (!result.ok) {
         fileError = result.error;
+        shareHang = { done: 0, total: 0 };
         return;
       }
     }
+    shareHang = { done: 0, total: 0 };
   }
 
   async function onPickFile(ev: Event) {
@@ -828,12 +889,25 @@
     if (!out.ok) mediaError = out.error;
   }
 
+  function closePreview() {
+    previewOpen = false;
+    previewId = null;
+    goRoomFiles.stopPlay();
+    if (filePreviewImg) filePreviewImg.src = "";
+  }
+
   async function onPlayFile(id: string) {
     mediaError = "";
     fileError = "";
     tvHudOpen = false;
     pane = "files";
-    if (goRoomFiles.playback?.id === id) {
+    const listed = files.find((f) => f.id === id);
+    const kind = listed
+      ? fileShareKind({ mime: listed.mime, name: listed.name })
+      : "doc";
+    previewId = id;
+    previewOpen = true;
+    if (kind === "doc") {
       goRoomFiles.stopPlay();
       return;
     }
@@ -843,12 +917,7 @@
 
   async function onPutOnTv(id: string) {
     mediaError = "";
-    const file = goRoomFiles.localFile(id);
-    if (!file) {
-      mediaError = "只有這台掛上的檔能放到電視上";
-      return;
-    }
-    const out = await goRoomMedia.startProgram(file);
+    const out = await goRoomMedia.startListedProgram(id);
     if (!out.ok) mediaError = out.error;
   }
 
@@ -917,13 +986,26 @@
     onCinemaToggle();
   }
 
+  function askDeleteFile(id: string) {
+    deleteFileId = id;
+  }
+
+  function confirmDeleteFile() {
+    const id = deleteFileId;
+    deleteFileId = null;
+    if (!id) return;
+    goRoomFiles.unshare(id, { host: role === "host" });
+    if (previewId === id) closePreview();
+  }
+
   async function onUnshare(id: string) {
-    goRoomFiles.unshareLocal(id);
+    askDeleteFile(id);
   }
 
   function dismissConfirm() {
     confirmEnd = false;
     kickTarget = null;
+    deleteFileId = null;
     pendingAdHref = null;
   }
 
@@ -994,9 +1076,26 @@
   }
 
   function formatSize(n: number): string {
-    if (n < 1024) return `${n} B`;
-    if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-    return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+    return formatFileShareSize(n);
+  }
+
+  function fileOwnerCard(f: (typeof files)[number]) {
+    if (f.mine) return memberCards.find((c) => c.mine) ?? null;
+    return (
+      memberCards.find((c) => c.peerId === f.ownerId) ??
+      memberCards.find((c) => c.name === f.ownerName) ??
+      null
+    );
+  }
+
+  function fileOnAir(f: (typeof files)[number]): boolean {
+    return roomFileOnAir({
+      fileId: f.id,
+      fileName: f.name,
+      streamingFileId: goRoomMedia.streamingFileId,
+      programName: goRoomMedia.remoteProgramName || goRoomMedia.programName,
+      liveOnTv: Boolean(goRoomMedia.tvSourcePeerId),
+    });
   }
 </script>
 
@@ -1311,33 +1410,32 @@
           {#if panesConcurrent || filesPinned}
             <p class="room-pane-title pixel-text">檔案</p>
           {/if}
-          {#if goRoomFiles.playback}
-            <div class="file-player">
-              {#if goRoomFiles.playback.kind === "audio"}
-                <audio
-                  bind:this={filePlayEl}
-                  class="file-player-audio"
-                  controls
-                  playsinline
-                  ontimeupdate={() => goRoomFiles.notePlayhead(filePlayEl?.currentTime ?? 0)}
-                  aria-label="播放 {goRoomFiles.playback.name}"
-                ></audio>
-              {:else}
-                <video
-                  bind:this={filePlayEl}
-                  class="media-video media-video--program"
-                  controls
-                  playsinline
-                  ontimeupdate={() => goRoomFiles.notePlayhead(filePlayEl?.currentTime ?? 0)}
-                  aria-label="播放 {goRoomFiles.playback.name}"
-                ></video>
-              {/if}
-              <button type="button" class="pixel-btn" onclick={() => goRoomFiles.stopPlay()}>
-                {GO_ROOM_CAST_STOP_WATCH}
+          <div class="file-filters" role="tablist" aria-label="檔案分類">
+            {#each GO_ROOM_FILE_FILTERS as tab (tab)}
+              <button
+                type="button"
+                class={["pixel-btn", "file-filter", fileFilter === tab && "pixel-btn--primary"]
+                  .filter(Boolean)
+                  .join(" ")}
+                role="tab"
+                aria-selected={fileFilter === tab}
+                onclick={() => (fileFilter = tab)}
+              >
+                {GO_ROOM_FILE_FILTER_LABEL[tab]}
               </button>
-            </div>
-          {/if}
-          <p class="muted">只掛檔；影音可私下播放或下載。放到電視上才是全場同一路。</p>
+            {/each}
+          </div>
+          <button
+            type="button"
+            class="file-drop"
+            onclick={() => fileInput?.click()}
+          >
+            <span class="file-drop-title">拖進來或點這裡掛上</span>
+            {#if shareHang.total > 0}
+              <progress class="file-drop-bar" max="100" value={sharePct}></progress>
+              <span class="muted">{shareHang.done}/{shareHang.total}</span>
+            {/if}
+          </button>
           {#if fileError}
             <p class="err" role="alert">{fileError}</p>
           {/if}
@@ -1348,60 +1446,92 @@
             multiple
             onchange={(e) => void onPickFile(e)}
           />
-          <div class="file-actions">
-            <button type="button" class="pixel-btn" onclick={() => fileInput?.click()}>
-              選擇檔案
-            </button>
-          </div>
-          {#if files.length === 0}
-            <p class="muted">把檔案拖到這裡，或按選擇檔案（可多選）。</p>
+          {#if filesShown.length === 0 && files.length > 0}
+            <p class="muted">這個分類還沒有檔。</p>
           {/if}
           <ul class="file-list">
-            {#each files as f (f.id)}
+            {#each filesShown as f (f.id)}
+              {@const kind = fileShareKind({ mime: f.mime, name: f.name })}
+              {@const acts = roomFileShareActions({ role, mine: f.mine, kind })}
+              {@const owner = fileOwnerCard(f)}
+              {@const onAir = fileOnAir(f)}
               {@const transferHint = catalogTransferHint({
                 status: f.status,
                 playing: goRoomFiles.playback?.id === f.id,
               })}
-              <li class="file-row">
-                <p class="file-name">{f.path || f.name}</p>
-                <p class="muted">
-                  {formatSize(f.size)} · {f.mine ? "我" : f.ownerName}
-                  {#if transferHint} · {transferHint} {formatSize(f.received)}
-                  {:else if f.status === "error"} · {f.error || "失敗"}
-                  {/if}
-                </p>
+              <li
+                class={["file-card", onAir && "file-card--on-air"].filter(Boolean).join(" ")}
+              >
+                <div class="file-card-head">
+                  <span class="file-type" aria-hidden="true">{fileShareIcon(kind)}</span>
+                  <div class="file-card-meta">
+                    <p class="file-name">{f.path || f.name}</p>
+                    <p class="muted">
+                      {formatSize(f.size)}
+                      {#if transferHint} · {transferHint} {formatSize(f.received)}
+                      {:else if f.status === "error"} · {f.error || "失敗"}
+                      {/if}
+                    </p>
+                  </div>
+                  <span class="file-owner">
+                    <span class="bubble-avatar" aria-hidden="true">
+                      {#if owner?.avatarUrl}
+                        <img
+                          class="bubble-avatar-img"
+                          src={owner.avatarUrl}
+                          alt=""
+                          width="32"
+                          height="32"
+                          referrerpolicy="no-referrer"
+                        />
+                      {:else}
+                        <span class="bubble-avatar-letter">
+                          {owner?.avatarInitial ?? (f.mine ? "我" : f.ownerName.slice(0, 1) || "?")}
+                        </span>
+                      {/if}
+                    </span>
+                    <span class="file-owner-name">{f.mine ? "我" : f.ownerName}</span>
+                  </span>
+                </div>
+                {#if onAir}
+                  <p class="file-on-air">
+                    <span class="file-on-air-wave" aria-hidden="true"></span>
+                    {GO_ROOM_FILE_ON_AIR}
+                  </p>
+                {/if}
                 <div class="file-actions">
-                  {#if catalogConsumes(f).includes("play")}
+                  {#if acts.preview}
                     <button
                       type="button"
                       class="pixel-btn"
                       disabled={f.status === "transferring" && goRoomFiles.playback?.id !== f.id}
                       onclick={() => void onPlayFile(f.id)}
                     >
-                      {goRoomFiles.playback?.id === f.id ? "停止播放" : catalogPlayLabel(f)}
+                      {GO_ROOM_FILE_PREVIEW}
                     </button>
                   {/if}
-                  {#if role === "host" && f.mine && catalogConsumes(f).includes("play")}
-                    <button
-                      type="button"
-                      class="pixel-btn pixel-btn--primary"
-                      onclick={() => void onPutOnTv(f.id)}
-                    >
-                      {GO_ROOM_PUT_ON_TV}
-                    </button>
-                  {/if}
-                  {#if f.mine}
-                    <button type="button" class="pixel-btn" onclick={() => void onUnshare(f.id)}>
-                      撤回
-                    </button>
-                  {:else if catalogConsumes(f).includes("download")}
+                  {#if acts.download}
                     <button
                       type="button"
                       class="pixel-btn pixel-btn--primary"
                       disabled={f.status === "transferring"}
                       onclick={() => void onDownload(f.id)}
                     >
-                      下載
+                      {GO_ROOM_FILE_DOWNLOAD}
+                    </button>
+                  {/if}
+                  {#if acts.cast}
+                    <button
+                      type="button"
+                      class="pixel-btn pixel-btn--primary"
+                      onclick={() => void onPutOnTv(f.id)}
+                    >
+                      {GO_ROOM_FILE_CAST}
+                    </button>
+                  {/if}
+                  {#if acts.remove}
+                    <button type="button" class="pixel-btn" onclick={() => void onUnshare(f.id)}>
+                      {GO_ROOM_FILE_DELETE}
                     </button>
                   {/if}
                 </div>
@@ -1759,6 +1889,70 @@
   {/if}
 
   <dialog
+    bind:this={previewDialog}
+    class="confirm-dialog file-preview-dialog"
+    aria-labelledby="file-preview-title"
+    oncancel={(e) => {
+      e.preventDefault();
+      closePreview();
+    }}
+    onclick={(e) => {
+      if (e.target === previewDialog) closePreview();
+    }}
+  >
+    <div class="confirm pixel-frame file-preview">
+      <h2 id="file-preview-title" class="confirm-title">
+        {GO_ROOM_FILE_PREVIEW}
+        {#if previewFile}
+          · {previewFile.name}
+        {/if}
+      </h2>
+      {#if previewKind === "image"}
+        <img
+          bind:this={filePreviewImg}
+          class="file-preview-img"
+          alt={previewFile?.name ?? ""}
+        />
+      {:else if previewKind === "audio"}
+        <audio
+          bind:this={filePlayEl}
+          class="file-player-audio"
+          controls
+          playsinline
+          ontimeupdate={() => goRoomFiles.notePlayhead(filePlayEl?.currentTime ?? 0)}
+          aria-label="播放 {previewFile?.name ?? ""}"
+        ></audio>
+      {:else if previewKind === "video"}
+        <video
+          bind:this={filePlayEl}
+          class="media-video media-video--program"
+          controls
+          playsinline
+          ontimeupdate={() => goRoomFiles.notePlayhead(filePlayEl?.currentTime ?? 0)}
+          aria-label="播放 {previewFile?.name ?? ""}"
+        ></video>
+      {:else}
+        <p class="muted">這個檔在本機預覽不了，請下載查看。</p>
+      {/if}
+      {#if fileError}
+        <p class="err" role="alert">{fileError}</p>
+      {/if}
+      <div class="confirm-actions">
+        <button type="button" class="pixel-btn" onclick={() => closePreview()}>關閉</button>
+        {#if previewId}
+          <button
+            type="button"
+            class="pixel-btn pixel-btn--primary"
+            onclick={() => void onDownload(previewId!)}
+          >
+            {GO_ROOM_FILE_DOWNLOAD}
+          </button>
+        {/if}
+      </div>
+    </div>
+  </dialog>
+
+  <dialog
     bind:this={confirmDialog}
     class="confirm-dialog"
     aria-labelledby="room-end-title"
@@ -1774,6 +1968,8 @@
       <h2 id="room-end-title" class="confirm-title">
         {#if kickTarget}
           {GO_ROOM_KICK}？
+        {:else if deleteFileId}
+          {GO_ROOM_FILE_DELETE}？
         {:else if pendingAdHref}
           {role === "host" ? "結束這一間並打開小品？" : "離開這一間並打開小品？"}
         {:else}
@@ -1783,6 +1979,8 @@
       <p class="confirm-body">
         {#if kickTarget}
           {GO_ROOM_KICK_CONFIRM}
+        {:else if deleteFileId}
+          {GO_ROOM_FILE_DELETE_CONFIRM}
         {:else}
           {role === "host" ? GO_ROOM_END_CONFIRM_HOST : GO_ROOM_LEAVE_CONFIRM_GUEST}
         {/if}
@@ -1792,6 +1990,10 @@
         {#if kickTarget}
           <button type="button" class="pixel-btn pixel-btn--danger" onclick={() => confirmKickNow()}>
             {GO_ROOM_KICK}
+          </button>
+        {:else if deleteFileId}
+          <button type="button" class="pixel-btn pixel-btn--danger" onclick={() => confirmDeleteFile()}>
+            {GO_ROOM_FILE_DELETE}
           </button>
         {:else}
           <button type="button" class="pixel-btn pixel-btn--danger" onclick={() => void confirmEndNow()}>
@@ -2244,23 +2446,140 @@
     list-style: none;
     margin: 0.5rem 0 0;
     padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
   }
-  .file-row {
-    padding: 0.45rem 0;
-    border-top: 1px solid color-mix(in oklab, rgb(var(--ink)) 18%, transparent);
+  .file-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin: 0.15rem 0 0.45rem;
+  }
+  .file-filter {
+    min-height: 44px;
+    flex: 1 1 auto;
+  }
+  .file-drop {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.25rem;
+    width: 100%;
+    min-height: 5.5rem;
+    margin: 0 0 0.45rem;
+    padding: 0.7rem 0.65rem;
+    border: 2px dashed color-mix(in oklab, rgb(var(--ink)) 45%, transparent);
+    border-radius: var(--radius);
+    background: color-mix(in oklab, rgb(var(--fill)) 88%, transparent);
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .room-pane--drop .file-drop {
+    border-style: solid;
+    background: color-mix(in oklab, rgb(var(--accent)) 14%, rgb(var(--fill)));
+  }
+  .file-drop-title {
+    font-weight: 700;
+  }
+  .file-drop-bar {
+    width: 100%;
+    height: 0.55rem;
+    accent-color: rgb(var(--accent));
+  }
+  .file-card {
+    padding: 0.55rem 0.5rem 0.5rem;
+    border: 2px solid color-mix(in oklab, rgb(var(--ink)) 22%, transparent);
+    border-radius: var(--radius);
+    background: rgb(var(--card));
+  }
+  .file-card--on-air {
+    border-color: #3dff8a;
+    box-shadow: 0 0 0 2px color-mix(in oklab, #3dff8a 55%, transparent);
+  }
+  .file-card-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.45rem;
+    min-width: 0;
+  }
+  .file-type {
+    flex: 0 0 auto;
+    font-size: 1.35rem;
+    line-height: 1.2;
+  }
+  .file-card-meta {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .file-owner {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.15rem;
+    max-width: 4.5rem;
+  }
+  .file-owner-name {
+    overflow: hidden;
+    max-width: 100%;
+    font-size: 0.7rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .file-on-air {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0.4rem 0 0;
+    font-weight: 700;
+    color: #146b3a;
+  }
+  .file-on-air-wave {
+    display: inline-block;
+    width: 0.85rem;
+    height: 0.85rem;
+    border-radius: 50%;
+    background: #3dff8a;
+    animation: file-on-air-pulse 1.1s ease-in-out infinite;
+  }
+  @keyframes file-on-air-pulse {
+    0%,
+    100% {
+      transform: scale(0.75);
+      opacity: 0.55;
+    }
+    50% {
+      transform: scale(1.15);
+      opacity: 1;
+    }
   }
   .file-name {
     margin: 0;
     font-weight: 700;
+    overflow-wrap: anywhere;
   }
   .file-actions {
     display: flex;
     flex-wrap: wrap;
     gap: 0.35rem;
-    margin-top: 0.35rem;
+    margin-top: 0.45rem;
   }
   .file-actions .pixel-btn {
     min-height: 44px;
+  }
+  .file-preview-img {
+    display: block;
+    width: 100%;
+    max-height: 16rem;
+    object-fit: contain;
+    background: #111;
+  }
+  .file-preview .file-player-audio,
+  .file-preview .media-video--program {
+    width: 100%;
   }
   .file-hidden {
     position: absolute;
