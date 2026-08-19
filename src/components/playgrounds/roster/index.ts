@@ -54,7 +54,10 @@ export {
   BOOTH_TRANSCEIVER_SLOTS,
   boothTransceiverIndex,
   boothSlotOfIndex,
+  boothTransceiverOf,
   replaceBoothTrack,
+  applyBoothVideoCodecPreferences,
+  boothVideoCodecPreferences,
 } from "./rosterBoothMedia";
 export type {
   BoothMediaLayer,

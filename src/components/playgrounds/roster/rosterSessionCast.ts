@@ -1,12 +1,18 @@
 /**
- * Program control plane over Roster DataChannel (PG-GO-ROOM-PLAN §9.6).
- * JSON only — never carries media bytes. Host fans out like session_chat.
+ * Hang／pull like session_file: offering a program does not send RTP until
+ * a peer requests to watch (PG-GO-ROOM-PLAN §9.6). JSON only — never media bytes.
  */
 
 export const SESSION_CAST_TYPE = "session_cast" as const;
 export const SESSION_CAST_VERSION = 1 as const;
 
-export type SessionCastOp = "start" | "stop" | "state";
+export type SessionCastOp =
+  | "offer"
+  | "unoffer"
+  | "request"
+  | "release"
+  | "state"
+  | "reject";
 export type SessionCastKind = "audio" | "video";
 
 export type SessionCastMessage = {
@@ -18,9 +24,17 @@ export type SessionCastMessage = {
   name?: string;
   paused?: boolean;
   t?: number;
+  id?: string;
 };
 
-const CAST_OPS = new Set<SessionCastOp>(["start", "stop", "state"]);
+const CAST_OPS = new Set<SessionCastOp>([
+  "offer",
+  "unoffer",
+  "request",
+  "release",
+  "state",
+  "reject",
+]);
 const CAST_KINDS = new Set<SessionCastKind>(["audio", "video"]);
 const ID_MAX = 128;
 const NAME_MAX = 200;
@@ -48,7 +62,8 @@ export function isSessionCastMessage(data: unknown): data is SessionCastMessage 
   if (m.t !== undefined) {
     if (typeof m.t !== "number" || !Number.isFinite(m.t) || m.t < 0) return false;
   }
-  if (m.op === "start") return Boolean(m.kind);
+  if (m.id !== undefined && !isId(m.id)) return false;
+  if (m.op === "offer") return Boolean(m.kind);
   return true;
 }
 
@@ -59,6 +74,7 @@ export function buildSessionCastMessage(opts: {
   name?: string;
   paused?: boolean;
   t?: number;
+  id?: string;
 }): SessionCastMessage {
   const msg: SessionCastMessage = {
     type: SESSION_CAST_TYPE,
@@ -70,5 +86,6 @@ export function buildSessionCastMessage(opts: {
   if (opts.name) msg.name = opts.name;
   if (opts.paused !== undefined) msg.paused = opts.paused;
   if (opts.t !== undefined) msg.t = opts.t;
+  if (opts.id) msg.id = opts.id;
   return msg;
 }

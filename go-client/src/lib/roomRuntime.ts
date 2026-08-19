@@ -15,7 +15,10 @@ import {
 import { isSessionFileControl } from "@pg/roster/rosterSessionFile";
 import { isSessionMeshMessage } from "@pg/roster/rosterSessionMesh";
 import { isSessionCastMessage } from "@pg/roster/rosterSessionCast";
-import { isSessionCameraMessage } from "@pg/roster/rosterSessionCamera";
+import {
+  isSessionCameraMessage,
+  isSessionMicMessage,
+} from "@pg/roster/rosterSessionCamera";
 import { createRoomMeshBroker } from "./goRoomMeshBroker";
 import { startPlatformHostAnswerLoop } from "@pg/platform/platformHostLoop";
 import {
@@ -30,6 +33,7 @@ import { goRoomMedia } from "./goRoomMedia.svelte";
 import { createRoomFileStarHub, type RoomFileStarHub } from "./goRoomFileStar";
 import {
   GO_ROOM_QUICK_REPLIES,
+  GO_ROOM_MESH_ENABLED,
   roomHostDisplayName,
   roomOccupantSummary,
   type RoomInviteDoor,
@@ -52,6 +56,7 @@ export type RoomStatus = {
   peerName: string | null;
   guestCount: number;
   occupantNames: string[];
+  occupantPeers: { peerId: string; name: string }[];
 };
 
 type Listener = (s: RoomStatus) => void;
@@ -82,6 +87,7 @@ export function createRoomRuntime() {
     peerName: null,
     guestCount: 0,
     occupantNames: [],
+    occupantPeers: [],
   };
   const listeners = new Set<Listener>();
   let loop: ReturnType<typeof startPlatformHostAnswerLoop> | null = null;
@@ -138,10 +144,17 @@ export function createRoomRuntime() {
     const names = live
       .map((s) => s.displayName?.trim())
       .filter((n): n is string => Boolean(n));
+    const occupantPeers = live
+      .filter((s) => Boolean(s.peerId))
+      .map((s) => ({
+        peerId: s.peerId,
+        name: s.displayName?.trim() || "訪客",
+      }));
     set({
       guestCount: live.length,
       peerName: names[0] ?? null,
       occupantNames: names,
+      occupantPeers,
       message: roomOccupantSummary({ guestCount: live.length }),
     });
     void goRoomMedia.refresh();
@@ -204,6 +217,8 @@ export function createRoomRuntime() {
         }
       },
       forward: true,
+      resolveLocalFile: (id) => goRoomFiles.localFile(id),
+      ownerOf: (id) => goRoomFiles.listingOwner(id),
     });
   }
 
@@ -230,7 +245,7 @@ export function createRoomRuntime() {
     if (slot.lost) return;
     slot.lost = true;
     if (slot.peerId && fileHub) fileHub.removePeer(slot.peerId);
-    if (slot.peerId) meshBroker.removePeer(slot.peerId);
+    if (GO_ROOM_MESH_ENABLED && slot.peerId) meshBroker.removePeer(slot.peerId);
     const sess = slot.session;
     slot.session = null;
     if (sess) {
@@ -250,8 +265,10 @@ export function createRoomRuntime() {
           slot.peerId = data.agentId;
           slot.displayName = data.name;
           routeFilePeer(slot);
-          meshBroker.addPeer(data.agentId);
-          meshBroker.introduce(data.agentId);
+          if (GO_ROOM_MESH_ENABLED) {
+            meshBroker.addPeer(data.agentId);
+            meshBroker.introduce(data.agentId);
+          }
           refreshGuestSummary();
         } else if (isSessionChatMessage(data)) {
           const toast = goSessionChat.onIncoming(data);
@@ -262,11 +279,16 @@ export function createRoomRuntime() {
           if (!slot.peerId && data.from) slot.peerId = data.from;
           routeFilePeer(slot);
           if (slot.peerId && fileHub) fileHub.onPeerControl(slot.peerId, data);
-        } else if (isSessionMeshMessage(data) && slot.peerId) {
+        } else if (
+          GO_ROOM_MESH_ENABLED &&
+          isSessionMeshMessage(data) &&
+          slot.peerId
+        ) {
           meshBroker.forward(slot.peerId, data);
         } else if (
           isSessionCastMessage(data) ||
-          isSessionCameraMessage(data)
+          isSessionCameraMessage(data) ||
+          isSessionMicMessage(data)
         ) {
           void goRoomMedia.onCastControl(data);
           for (const sess of otherSessions(slot)) {
@@ -491,6 +513,7 @@ export function createRoomRuntime() {
           peerName: null,
           guestCount: 0,
           occupantNames: [],
+          occupantPeers: [],
         });
       }
       closing = false;
@@ -546,6 +569,7 @@ export function createRoomRuntime() {
       peerName: null,
       guestCount: 0,
       occupantNames: [],
+      occupantPeers: [],
     });
     closing = false;
   }

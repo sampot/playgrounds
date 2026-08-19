@@ -1,19 +1,23 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
-  GO_ROOM_CAMERA_PAIR_ONLY,
   GO_ROOM_END_CONFIRM_HOST,
+  GO_ROOM_LEAVE_CONFIRM_GUEST,
   GO_ROOM_LOGIN_HINT,
   GO_ROOM_MEDIA_OFF,
+  GO_ROOM_MESH_ENABLED,
   GO_ROOM_SHARE_HINT,
+  attachMediaStream,
   isRoomInviteShareable,
-  roomCameraAllowed,
+  mediaTrackHasFrames,
   roomChatWhoLabel,
   roomHostDisplayName,
   roomInviteDoor,
   roomInviteRemainLabel,
   roomMediaSummary,
   roomOccupantCount,
+  roomOccupantRows,
   roomOccupantSummary,
+  roomRemoteSinkVisible,
   takePickedFiles,
 } from "./goRoom";
 
@@ -55,39 +59,88 @@ describe("roomOccupantSummary", () => {
   });
 });
 
-describe("room camera occupancy", () => {
-  it("allows the camera only when exactly two people are in", () => {
+describe("room occupancy", () => {
+  it("counts Host plus guests, including three or more", () => {
     expect(roomOccupantCount(0)).toBe(1);
     expect(roomOccupantCount(1)).toBe(2);
-    expect(roomCameraAllowed(1)).toBe(false);
-    expect(roomCameraAllowed(2)).toBe(true);
-    expect(roomCameraAllowed(3)).toBe(false);
+    expect(roomOccupantCount(2)).toBe(3);
   });
 });
 
 describe("roomMediaSummary", () => {
-  it("prefers the program name over camera, and uses the off line when idle", () => {
-    expect(
-      roomMediaSummary({ camera: true, mic: true, programName: "片.mp4" })
-    ).toBe("正在播出 · 片.mp4");
-    expect(
-      roomMediaSummary({ camera: true, mic: false, programName: null })
-    ).toBe("鏡頭已開 · 等對方收看");
+  it("summarizes the local live stream, not a catalog file", () => {
+    expect(roomMediaSummary({ camera: true, mic: true })).toBe(
+      "鏡頭已開 · 等對方收看"
+    );
     expect(
       roomMediaSummary({
         camera: false,
         mic: false,
-        programName: null,
         watching: true,
       })
     ).toBe("正在收看鏡頭");
     expect(
-      roomMediaSummary({ camera: false, mic: true, programName: null })
-    ).toBe("麥克風開著");
+      roomMediaSummary({
+        camera: false,
+        mic: true,
+        listening: true,
+      })
+    ).toBe("正在收聽");
+    expect(roomMediaSummary({ camera: false, mic: true })).toBe(
+      "麥克風已開 · 等對方收聽"
+    );
+    expect(roomMediaSummary({ camera: false, mic: false })).toBe(
+      GO_ROOM_MEDIA_OFF
+    );
     expect(
-      roomMediaSummary({ camera: false, mic: false, programName: null })
-    ).toBe(GO_ROOM_MEDIA_OFF);
-    expect(GO_ROOM_CAMERA_PAIR_ONLY).toBe("鏡頭只在兩人時");
+      roomMediaSummary({ camera: false, mic: false, display: true })
+    ).toBe("畫面已開 · 等對方收看");
+  });
+});
+
+describe("roomRemoteSinkVisible", () => {
+  it("hides the bound remote live video until the user asks to watch", () => {
+    expect(roomRemoteSinkVisible({})).toBe(false);
+    expect(roomRemoteSinkVisible({ watching: false, listening: false })).toBe(
+      false
+    );
+    expect(roomRemoteSinkVisible({ watching: true })).toBe(true);
+    expect(roomRemoteSinkVisible({ listening: true })).toBe(true);
+  });
+});
+
+describe("roomOccupantRows", () => {
+  it("puts camera and mic on the person, not as catalog files", () => {
+    const rows = roomOccupantRows({
+      localPeerId: "host",
+      localName: "太郎",
+      localLiveVideo: true,
+      localLiveAudio: true,
+      others: [{ peerId: "g-a", name: "小明" }],
+      remoteLives: [{ peerId: "g-a", camera: true, mic: false }],
+    });
+    expect(rows).toEqual([
+      {
+        peerId: "host",
+        name: "太郎",
+        mine: true,
+        liveVideo: true,
+        liveAudio: true,
+      },
+      {
+        peerId: "g-a",
+        name: "小明",
+        mine: false,
+        liveVideo: true,
+        liveAudio: false,
+      },
+    ]);
+  });
+});
+
+describe("GO_ROOM_MESH_ENABLED", () => {
+  it("keeps Guest↔Guest mesh off so Hub star is the only path", () => {
+    expect(GO_ROOM_MESH_ENABLED).toBe(false);
   });
 });
 
@@ -179,10 +232,60 @@ describe("booth copy", () => {
     expect(GO_ROOM_LOGIN_HINT).toContain("另一台裝置請掃邀請進來。");
   });
 
-  it("warns that camera and cast stop when the Host ends the booth", () => {
+  it("warns that hung items and live pulls stop when the Host ends the booth", () => {
     expect(GO_ROOM_END_CONFIRM_HOST).toBe(
-      "關掉後在場的人會斷線，目錄會沒了，鏡頭與投放會停。已存到硬碟的檔不受影響。"
+      "關掉後在場的人會斷線，目錄會沒了，正在收看的鏡頭會停。已存到硬碟的檔不受影響。"
     );
+    expect(GO_ROOM_LEAVE_CONFIRM_GUEST).toBe(
+      "離開後你會斷線；其他人還在。你掛上的項目會從分享區拿掉。"
+    );
+  });
+});
+
+describe("mediaTrackHasFrames", () => {
+  it("treats a muted transceiver placeholder as empty", () => {
+    const t = {
+      readyState: "live",
+      muted: true,
+      getSettings: () => ({}),
+    } as MediaStreamTrack;
+    expect(mediaTrackHasFrames(t)).toBe(false);
+  });
+
+  it("treats an unmuted live track as having frames", () => {
+    const t = {
+      readyState: "live",
+      muted: false,
+    } as MediaStreamTrack;
+    expect(mediaTrackHasFrames(t)).toBe(true);
+  });
+});
+
+describe("attachMediaStream", () => {
+  it("keeps the same srcObject and plays when the stream is unchanged", async () => {
+    const stream = {} as MediaStream;
+    const play = vi.fn(async () => {});
+    const el = { srcObject: stream, paused: true, muted: false, play };
+    attachMediaStream(el, stream);
+    expect(el.srcObject).toBe(stream);
+    expect(play).toHaveBeenCalledTimes(1);
+    el.paused = false;
+    attachMediaStream(el, stream);
+    expect(play).toHaveBeenCalledTimes(1);
+  });
+
+  it("mutes and retries when autoplay with audio is blocked", async () => {
+    const stream = {} as MediaStream;
+    const play = vi
+      .fn()
+      .mockRejectedValueOnce(new DOMException("NotAllowedError"))
+      .mockResolvedValueOnce(undefined);
+    const el = { srcObject: null as MediaStream | null, paused: true, muted: false, play };
+    attachMediaStream(el, stream);
+    await vi.waitFor(() => {
+      expect(el.muted).toBe(true);
+    });
+    expect(play).toHaveBeenCalledTimes(2);
   });
 });
 

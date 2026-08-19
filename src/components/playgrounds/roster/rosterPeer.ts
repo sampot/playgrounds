@@ -13,6 +13,7 @@ import {
   encodeSessionSdpToRosterWire,
   decodeRosterWireToSdp,
 } from "./rosterWire";
+import { applyBoothVideoCodecPreferences } from "./rosterBoothMedia";
 
 export { sdpHasAvMediaLines, sdpHasBoothMediaLines };
 
@@ -337,7 +338,10 @@ export async function createRosterOffer(opts: {
   const lan = Boolean(opts.lan);
   const handlers = opts.handlers ?? {};
   const pc = createPc(lan, opts.iceServers);
-  if (opts.media === "ready") reserveBoothMediaTransceivers(pc);
+  if (opts.media === "ready") {
+    reserveBoothMediaTransceivers(pc);
+    applyBoothVideoCodecPreferences(pc);
+  }
   const channel = pc.createDataChannel("roster", { ordered: true });
   attachChannel(channel, handlers, opts.localPresence);
 
@@ -391,6 +395,7 @@ export async function acceptRosterOffer(opts: {
   });
 
   await pc.setRemoteDescription({ type: "offer", sdp: decoded.sdp });
+  if (opts.media === "ready") applyBoothVideoCodecPreferences(pc);
   const answer = await pc.createAnswer();
   await pc.setLocalDescription(answer);
   await waitIceComplete(pc, iceWaitOpts(opts.iceServers));

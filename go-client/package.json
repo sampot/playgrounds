@@ -18,6 +18,7 @@
     "deploy:dry": "npm run build && wrangler deploy --dry-run"
   },
   "dependencies": {
+    "mp4box": "^2.4.1",
     "qr": "^0.6.0",
     "sql.js": "^1.14.1"
   },

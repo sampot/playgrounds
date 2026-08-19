@@ -82,12 +82,114 @@ describe("session_file control", () => {
         id: "old",
       })
     ).toBe(false);
+    expect(
+      isSessionFileControl({
+        type: SESSION_FILE_TYPE,
+        v: 1,
+        op: "pause",
+        id: "file-1",
+        transferId: "tr-1",
+      })
+    ).toBe(true);
+    expect(
+      isSessionFileControl({
+        type: SESSION_FILE_TYPE,
+        v: 1,
+        op: "resume",
+        id: "file-1",
+        transferId: "tr-1",
+      })
+    ).toBe(true);
   });
 
   it("blocks typical executable names", () => {
     expect(isBlockedSessionFileName("Setup.exe")).toBe(true);
     expect(isBlockedSessionFileName("note.APK")).toBe(true);
     expect(isBlockedSessionFileName("photo.jpg")).toBe(false);
+  });
+
+  it("caps a share at 2 GiB", () => {
+    expect(SESSION_FILE_MAX_BYTES).toBe(2 * 1024 * 1024 * 1024);
+    expect(
+      normalizeSessionFileShare({
+        type: SESSION_FILE_TYPE,
+        v: 1,
+        op: "share",
+        id: "ok",
+        name: "film.mp4",
+        size: SESSION_FILE_MAX_BYTES,
+        owner: "h",
+      })
+    ).not.toBeNull();
+  });
+
+  it("accepts a directory share with size 0 and child path／parentId", () => {
+    const dir = normalizeSessionFileShare({
+      type: SESSION_FILE_TYPE,
+      v: 1,
+      op: "share",
+      id: "dir-1",
+      name: "album",
+      size: 0,
+      owner: "host-1",
+      kind: "dir",
+    });
+    expect(dir).toMatchObject({
+      id: "dir-1",
+      name: "album",
+      size: 0,
+      kind: "dir",
+      owner: "host-1",
+    });
+    const child = normalizeSessionFileShare({
+      type: SESSION_FILE_TYPE,
+      v: 1,
+      op: "share",
+      id: "file-2",
+      name: "a.jpg",
+      size: 12,
+      mime: "image/jpeg",
+      owner: "host-1",
+      path: "album/a.jpg",
+      parentId: "dir-1",
+    });
+    expect(child).toMatchObject({
+      id: "file-2",
+      path: "album/a.jpg",
+      parentId: "dir-1",
+    });
+    expect(
+      isSessionFileControl({
+        type: SESSION_FILE_TYPE,
+        v: 1,
+        op: "share",
+        id: "dir-1",
+        name: "album",
+        size: 0,
+        owner: "h",
+        kind: "dir",
+      })
+    ).toBe(true);
+  });
+
+  it("accepts a camera as a virtual device file", () => {
+    const cam = normalizeSessionFileShare({
+      type: SESSION_FILE_TYPE,
+      v: 1,
+      op: "share",
+      id: "dev-1",
+      name: "鏡頭",
+      size: 0,
+      owner: "host-1",
+      kind: "device",
+      device: "camera",
+    });
+    expect(cam).toMatchObject({
+      id: "dev-1",
+      kind: "device",
+      device: "camera",
+      size: 0,
+    });
   });
 });
 

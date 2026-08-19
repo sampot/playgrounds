@@ -3,17 +3,22 @@ import {
   BOOTH_TRANSCEIVER_SLOTS,
   boothSlotOfIndex,
   boothTransceiverIndex,
+  boothVideoCodecPreferences,
   replaceBoothTrack,
 } from "./rosterBoothMedia";
 
 function mockPc() {
   const transceivers = BOOTH_TRANSCEIVER_SLOTS.map((slot) => ({
+    direction: "sendrecv" as string,
     sender: {
       track: null as { kind: string } | null,
       replaceTrack: vi.fn(async (t: { kind: string } | null) => {
         transceivers[boothTransceiverIndex(slot.layer, slot.kind)]!.sender.track =
           t;
       }),
+    },
+    receiver: {
+      track: { kind: slot.kind },
     },
   }));
   return {
@@ -35,6 +40,19 @@ describe("booth transceiver slots", () => {
   });
 });
 
+describe("boothVideoCodecPreferences", () => {
+  it("keeps H264 and VP8 so Edge can decode a Chrome file stream", () => {
+    expect(
+      boothVideoCodecPreferences([
+        { mimeType: "video/AV1" },
+        { mimeType: "video/VP9" },
+        { mimeType: "video/VP8" },
+        { mimeType: "video/H264" },
+      ]).map((c) => c.mimeType)
+    ).toEqual(["video/H264", "video/VP8"]);
+  });
+});
+
 describe("replaceBoothTrack", () => {
   it("replaces the matching sender and ignores a missing slot", async () => {
     const pc = mockPc();
@@ -53,5 +71,13 @@ describe("replaceBoothTrack", () => {
         null
       )
     ).toBe(false);
+  });
+
+  it("turns the sender back to sendrecv so the answerer can push later", async () => {
+    const pc = mockPc();
+    pc.getTransceivers()[3]!.direction = "recvonly";
+    const track = { kind: "video" };
+    await replaceBoothTrack(pc, "program", "video", track as MediaStreamTrack);
+    expect(pc.getTransceivers()[3]!.direction).toBe("sendrecv");
   });
 });

@@ -16,6 +16,7 @@ export default defineConfig({
       "@data": path.resolve(root, "src/data"),
       "@utils": path.resolve(root, "src/utils"),
       "@pg": path.resolve(root, "src/components/playgrounds"),
+      mp4box: path.resolve(root, "go-client/src/lib/mp4box-stub.ts"),
     },
   },
   test: {

@@ -348,3 +348,4 @@ type SessionChatHints = {
 | 2026-08-16 | **Host 標記：** wire 可選 `role:"host"`；顯示名「主持」＋金色「主持」tag；不再用「玩家 A」 |
 | 2026-08-18 | 與 [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md) 切開：overlay 非目標的傳檔／語音**不**禁止包廂；用語勿把 overlay 叫包廂 |
 | 2026-08-18 | 包廂播出契約對齊：overlay 仍無鏡頭／投放；那些能力在包廂「在場／節目」 |
+| 2026-08-18 | 包廂改分享目錄＋按需拉；overlay 仍無鏡頭／傳檔 |

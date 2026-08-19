@@ -43,12 +43,15 @@ import {
 import { goSessionChat } from "./goSessionChat.svelte";
 import { goRoomFiles } from "./goRoomFiles.svelte";
 import { goRoomMedia } from "./goRoomMedia.svelte";
-import { GO_ROOM_CONNECT_FAILED, GO_ROOM_QUICK_REPLIES } from "./goRoom";
+import { GO_ROOM_CONNECT_FAILED, GO_ROOM_MESH_ENABLED, GO_ROOM_QUICK_REPLIES } from "./goRoom";
 import { chromeSession } from "./chromeSession.svelte";
 import { isSessionFileControl } from "@pg/roster/rosterSessionFile";
 import { isSessionMeshMessage } from "@pg/roster/rosterSessionMesh";
 import { isSessionCastMessage } from "@pg/roster/rosterSessionCast";
-import { isSessionCameraMessage } from "@pg/roster/rosterSessionCamera";
+import {
+  isSessionCameraMessage,
+  isSessionMicMessage,
+} from "@pg/roster/rosterSessionCamera";
 import { createRoomMeshClient } from "./goRoomMeshClient";
 import {
   SESSION_INVITE_ACCEPT_KIND,
@@ -118,6 +121,7 @@ export type GuestStatus = {
   surface: "sam" | "room" | null;
   /** Room surface: guests in the booth including self (Host not counted). */
   guestCount: number;
+  occupantPeers: { peerId: string; name: string }[];
 };
 
 type Listener = (s: GuestStatus) => void;
@@ -160,6 +164,7 @@ export function createGuestRuntime() {
     loadProgress: null,
     surface: null,
     guestCount: 0,
+    occupantPeers: [],
   };
   const listeners = new Set<Listener>();
   let localAgentId = newAgentId();
@@ -532,28 +537,30 @@ export function createGuestRuntime() {
         attached: false,
       };
       meshClient?.dispose();
-      meshClient = createRoomMeshClient({
-        localAgentId,
-        localName: name,
-        sendToHost: (msg) => {
-          try {
-            slot.s?.send(msg);
-          } catch {
-            /* ignore */
-          }
-        },
-        onBinary: (_peerId, buf) => goRoomFiles.onBinary(buf),
-        onRosterChange: () => {
-          set({ guestCount: 1 + (meshClient?.knownPeerIds().length ?? 0) });
-          void goRoomMedia.refresh();
-        },
-        onDirectOpen: (_peerId, session) => {
-          session.pc.addEventListener("track", (ev) => {
-            goRoomMedia.onRemoteTrack(ev, session.pc);
-          });
-          void goRoomMedia.refresh();
-        },
-      });
+      meshClient = GO_ROOM_MESH_ENABLED
+        ? createRoomMeshClient({
+            localAgentId,
+            localName: name,
+            sendToHost: (msg) => {
+              try {
+                slot.s?.send(msg);
+              } catch {
+                /* ignore */
+              }
+            },
+            onBinary: (_peerId, buf) => goRoomFiles.onBinary(buf),
+            onRosterChange: () => {
+              set({ guestCount: 1 + (meshClient?.knownPeerIds().length ?? 0) });
+              void goRoomMedia.refresh();
+            },
+            onDirectOpen: (_peerId, session) => {
+              session.pc.addEventListener("track", (ev) => {
+                goRoomMedia.onRemoteTrack(ev, session.pc);
+              });
+              void goRoomMedia.refresh();
+            },
+          })
+        : null;
 
       const attachRoomChannels = () => {
         const sess = slot.s;
@@ -583,11 +590,21 @@ export function createGuestRuntime() {
             }
           },
           sendBinary: (buf, destPeerId) => {
-            if (destPeerId && meshClient?.sendBinary(destPeerId, buf)) return;
+            if (
+              GO_ROOM_MESH_ENABLED &&
+              destPeerId &&
+              meshClient?.sendBinary(destPeerId, buf)
+            ) {
+              return;
+            }
             sendRoomBinary(buf);
           },
           bufferedAmount: (destPeerId) => {
-            if (destPeerId && meshClient?.hasDirect(destPeerId)) {
+            if (
+              GO_ROOM_MESH_ENABLED &&
+              destPeerId &&
+              meshClient?.hasDirect(destPeerId)
+            ) {
               return meshClient.bufferedAmount(destPeerId);
             }
             return peerSession?.getChannel()?.bufferedAmount ?? 0;
@@ -609,7 +626,9 @@ export function createGuestRuntime() {
                 via: "entrance",
               });
             }
-            for (const id of meshClient?.knownPeerIds() ?? []) {
+            for (const id of GO_ROOM_MESH_ENABLED
+              ? (meshClient?.knownPeerIds() ?? [])
+              : []) {
               const mesh = meshClient?.sessionFor(id);
               if (mesh?.pc) {
                 out.push({ peerId: id, pc: mesh.pc, via: "mesh" });
@@ -624,10 +643,13 @@ export function createGuestRuntime() {
               /* ignore */
             }
           },
+          resolveLocalFile: (id) => goRoomFiles.localFile(id),
+          ownerOf: (id) => goRoomFiles.listingOwner(id),
         });
         sess.pc.addEventListener("track", (ev) => {
           goRoomMedia.onRemoteTrack(ev, sess.pc);
         });
+        void goRoomMedia.refresh();
         set({
           phase: "ready",
           surface: "room",
@@ -648,15 +670,24 @@ export function createGuestRuntime() {
           onMessage: (data: unknown) => {
             if (isPresenceMessage(data)) {
               peerAgentId = data.agentId;
+              set({
+                occupantPeers: [
+                  {
+                    peerId: data.agentId,
+                    name: data.name?.trim() || "主持",
+                  },
+                ],
+              });
             } else if (isSessionChatMessage(data)) {
               goSessionChat.onIncoming(data);
             } else if (isSessionFileControl(data)) {
               goRoomFiles.onControl(data);
-            } else if (isSessionMeshMessage(data)) {
+            } else if (GO_ROOM_MESH_ENABLED && isSessionMeshMessage(data)) {
               void meshClient?.onHostMessage(data);
             } else if (
               isSessionCastMessage(data) ||
-              isSessionCameraMessage(data)
+              isSessionCameraMessage(data) ||
+              isSessionMicMessage(data)
             ) {
               void goRoomMedia.onCastControl(data);
             }

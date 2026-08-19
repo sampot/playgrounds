@@ -6,6 +6,7 @@ import {
   createRoomFileTransfer,
   type RoomFileEntry,
   type RoomFilePickSave,
+  type RoomFilePlayback,
   type RoomFileTransfer,
 } from "./goRoomFileTransfer";
 import type { SessionFileControl, SessionFileShareItem } from "@pg/roster/rosterSessionFile";
@@ -13,6 +14,7 @@ import type { SessionFileControl, SessionFileShareItem } from "@pg/roster/roster
 class GoRoomFiles {
   entries = $state<RoomFileEntry[]>([]);
   busy = $state(false);
+  playback = $state<RoomFilePlayback | null>(null);
   #xfer: RoomFileTransfer | null = null;
   #unsub: (() => void) | null = null;
 
@@ -28,6 +30,7 @@ class GoRoomFiles {
     this.#unsub = this.#xfer.subscribe((s) => {
       this.entries = s.entries;
       this.busy = s.busy;
+      this.playback = s.playback;
     });
   }
 
@@ -38,6 +41,7 @@ class GoRoomFiles {
     this.#xfer = null;
     this.entries = [];
     this.busy = false;
+    this.playback = null;
   }
 
   shareLocalFile(file: File) {
@@ -45,6 +49,17 @@ class GoRoomFiles {
       this.#xfer?.shareLocalFile(file) ??
       Promise.resolve({ ok: false as const, error: "尚未連線" })
     );
+  }
+
+  shareLocalDirectory(files: File[]) {
+    return (
+      this.#xfer?.shareLocalDirectory(files) ??
+      Promise.resolve({ ok: false as const, error: "尚未連線" })
+    );
+  }
+
+  localFile(id: string): File | null {
+    return this.#xfer?.localFile(id) ?? null;
   }
 
   unshareLocal(id: string): boolean {
@@ -56,6 +71,21 @@ class GoRoomFiles {
       this.#xfer?.download(id, pickSave) ??
       Promise.resolve({ ok: false as const, error: "尚未連線" })
     );
+  }
+
+  play(id: string) {
+    return (
+      this.#xfer?.play(id) ??
+      Promise.resolve({ ok: false as const, error: "尚未連線" })
+    );
+  }
+
+  stopPlay(): void {
+    this.#xfer?.stopPlay();
+  }
+
+  notePlayhead(seconds: number): void {
+    this.#xfer?.notePlayhead(seconds);
   }
 
   catalogItems(): SessionFileShareItem[] {

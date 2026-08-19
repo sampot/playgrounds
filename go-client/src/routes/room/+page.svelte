@@ -91,6 +91,7 @@
   peerName={status?.peerName ?? null}
   guestCount={status?.guestCount ?? 0}
   occupantNames={status?.occupantNames ?? []}
+  occupantPeers={status?.occupantPeers ?? []}
   onLogin={() => goAuth.login()}
   onInvite={() => void mint()}
   onEnd={() => runtime.close()}

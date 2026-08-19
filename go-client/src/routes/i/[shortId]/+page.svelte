@@ -267,6 +267,7 @@
     inviteExpiresAt={null}
     peerName={null}
     guestCount={status.guestCount ?? 0}
+    occupantPeers={status.occupantPeers ?? []}
     onEnd={() => runtime.leaveRoom()}
   />
 {:else if showCanvas}

@@ -190,7 +190,7 @@ describe("guestRuntime invite.room", () => {
     expect(rt.getStatus().error).toBeNull();
   });
 
-  it("offers a 2+2 mesh peer when Host introduces a larger agentId", async () => {
+  it("ignores session_mesh hello so Guest↔Guest stays on the Host hub", async () => {
     const { createGuestRuntime } = await import("./guestRuntime");
     const rt = createGuestRuntime();
     await rt.bootFromShortId("room1");
@@ -205,15 +205,8 @@ describe("guestRuntime invite.room", () => {
       op: "hello",
       peerId: "zz-peer",
     });
-    await vi.waitFor(() => {
-      expect(fixtures.createOffer).toHaveBeenCalled();
-    });
-    expect(fixtures.createOffer).toHaveBeenCalledWith(
-      expect.objectContaining({
-        transport: "signal",
-        media: "ready",
-      })
-    );
+    await new Promise((r) => setTimeout(r, 20));
+    expect(fixtures.createOffer).not.toHaveBeenCalled();
     expect(fixtures.postOffer).toHaveBeenCalledTimes(1);
   });
 

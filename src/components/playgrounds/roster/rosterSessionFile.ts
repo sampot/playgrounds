@@ -9,10 +9,13 @@
 export const SESSION_FILE_TYPE = "session_file" as const;
 export const SESSION_FILE_VERSION = 1 as const;
 export const SESSION_FILE_CATALOG_ID = "catalog" as const;
-/** Phase 1 cap (bytes). */
-export const SESSION_FILE_MAX_BYTES = 32 * 1024 * 1024;
+/** Phase 1 cap (bytes). Streamed in chunks — this is duration／abuse insurance, not RAM. */
+export const SESSION_FILE_MAX_BYTES = 2 * 1024 * 1024 * 1024;
 export const SESSION_FILE_CHUNK_PAYLOAD_MAX = 16 * 1024;
+/** Soft cap on files hung in one directory (not a RAM budget). */
+export const SESSION_FILE_DIR_MAX_FILES = 64;
 const SESSION_FILE_ID_MAX = 64;
+const SESSION_FILE_PATH_MAX = 512;
 const CHUNK_MAGIC = new Uint8Array([0x50, 0x47, 0x53, 0x46]); // PGSF
 
 const BLOCKED_FILE_EXT = new Set([
@@ -35,7 +38,9 @@ export type SessionFileOp =
   | "request"
   | "reject"
   | "done"
-  | "cancel";
+  | "cancel"
+  | "pause"
+  | "resume";
 
 export type SessionFileShareItem = {
   id: string;
@@ -44,6 +49,10 @@ export type SessionFileShareItem = {
   mime?: string;
   owner: string;
   ownerName?: string;
+  kind?: "file" | "dir" | "device";
+  device?: "camera" | "mic";
+  path?: string;
+  parentId?: string;
 };
 
 export type SessionFileControl = {
@@ -60,6 +69,10 @@ export type SessionFileControl = {
   transferId?: string;
   from?: string;
   items?: SessionFileShareItem[];
+  kind?: "file" | "dir" | "device";
+  device?: "camera" | "mic";
+  path?: string;
+  parentId?: string;
 };
 
 export type SessionFileChunk = {
@@ -76,6 +89,8 @@ const FILE_OPS = new Set<SessionFileOp>([
   "reject",
   "done",
   "cancel",
+  "pause",
+  "resume",
 ]);
 
 export function isSessionFileBroadcastOp(op: SessionFileOp): boolean {
@@ -98,11 +113,34 @@ function isShareItem(raw: unknown): raw is SessionFileShareItem {
   }
   if (typeof m.name !== "string" || !m.name.trim()) return false;
   if (typeof m.owner !== "string" || !m.owner.trim()) return false;
-  if (typeof m.size !== "number" || !Number.isFinite(m.size) || m.size <= 0) {
+  if (typeof m.size !== "number" || !Number.isFinite(m.size) || m.size < 0) {
+    return false;
+  }
+  if (m.kind === "file" || m.kind === undefined) {
+    if (m.size <= 0) return false;
+  } else if (m.kind === "dir") {
+    /* size 0 folder listing */
+  } else if (m.kind === "device") {
+    if (m.device !== "camera" && m.device !== "mic") return false;
+  } else {
     return false;
   }
   if (m.mime !== undefined && typeof m.mime !== "string") return false;
   if (m.ownerName !== undefined && typeof m.ownerName !== "string") return false;
+  if (m.path !== undefined) {
+    if (typeof m.path !== "string" || m.path.length > SESSION_FILE_PATH_MAX) {
+      return false;
+    }
+  }
+  if (m.parentId !== undefined) {
+    if (
+      typeof m.parentId !== "string" ||
+      !m.parentId ||
+      m.parentId.length > SESSION_FILE_ID_MAX
+    ) {
+      return false;
+    }
+  }
   return true;
 }
 
@@ -133,6 +171,31 @@ export function isSessionFileControl(
       return false;
     }
   }
+  if (
+    m.kind !== undefined &&
+    m.kind !== "file" &&
+    m.kind !== "dir" &&
+    m.kind !== "device"
+  ) {
+    return false;
+  }
+  if (m.device !== undefined && m.device !== "camera" && m.device !== "mic") {
+    return false;
+  }
+  if (m.path !== undefined) {
+    if (typeof m.path !== "string" || m.path.length > SESSION_FILE_PATH_MAX) {
+      return false;
+    }
+  }
+  if (m.parentId !== undefined) {
+    if (
+      typeof m.parentId !== "string" ||
+      !m.parentId ||
+      m.parentId.length > SESSION_FILE_ID_MAX
+    ) {
+      return false;
+    }
+  }
   if (m.items !== undefined) {
     if (!Array.isArray(m.items) || !m.items.every(isShareItem)) return false;
   }
@@ -147,8 +210,19 @@ export function normalizeSessionFileShare(
   const size = data.size;
   const owner = data.owner?.trim() || "";
   if (!name || typeof size !== "number" || !owner) return null;
-  if (size <= 0 || size > SESSION_FILE_MAX_BYTES) return null;
-  if (isBlockedSessionFileName(name)) return null;
+  const kind =
+    data.kind === "dir" || data.kind === "device" ? data.kind : undefined;
+  if (kind === "dir") {
+    if (size < 0) return null;
+  } else if (kind === "device") {
+    if (data.device !== "camera" && data.device !== "mic") return null;
+    if (size < 0) return null;
+  } else if (size <= 0 || size > SESSION_FILE_MAX_BYTES) {
+    return null;
+  }
+  if (kind !== "device" && isBlockedSessionFileName(name)) return null;
+  const path = data.path?.trim() || undefined;
+  const parentId = data.parentId?.trim() || undefined;
   return {
     type: SESSION_FILE_TYPE,
     v: SESSION_FILE_VERSION,
@@ -159,6 +233,10 @@ export function normalizeSessionFileShare(
     owner,
     mime: data.mime?.trim() || undefined,
     ownerName: data.ownerName?.trim() || undefined,
+    kind,
+    device: kind === "device" ? data.device : undefined,
+    path,
+    parentId,
   };
 }
 

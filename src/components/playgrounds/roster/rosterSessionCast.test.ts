@@ -6,44 +6,57 @@ import {
 } from "./rosterSessionCast";
 
 describe("session_cast", () => {
-  it("accepts start／stop／state from a named peer", () => {
-    const start = buildSessionCastMessage({
-      op: "start",
+  it("accepts offer／request／release like file hang／pull", () => {
+    const offer = buildSessionCastMessage({
+      op: "offer",
       from: "host-1",
       kind: "video",
       name: "clip.mp4",
     });
-    expect(isSessionCastMessage(start)).toBe(true);
-    expect(start).toMatchObject({
+    expect(isSessionCastMessage(offer)).toBe(true);
+    expect(offer).toMatchObject({
       type: SESSION_CAST_TYPE,
-      op: "start",
+      op: "offer",
       kind: "video",
       name: "clip.mp4",
     });
     expect(
       isSessionCastMessage(
-        buildSessionCastMessage({ op: "stop", from: "host-1" })
+        buildSessionCastMessage({
+          op: "request",
+          from: "g-a",
+          id: "file-1",
+        })
+      )
+    ).toBe(true);
+    expect(
+      isSessionCastMessage(
+        buildSessionCastMessage({ op: "release", from: "g-a" })
+      )
+    ).toBe(true);
+    expect(
+      isSessionCastMessage(
+        buildSessionCastMessage({ op: "unoffer", from: "host-1" })
       )
     ).toBe(true);
     expect(
       isSessionCastMessage(
         buildSessionCastMessage({
-          op: "state",
+          op: "reject",
           from: "host-1",
-          paused: true,
-          t: 12.5,
+          id: "file-1",
         })
       )
     ).toBe(true);
   });
 
-  it("rejects chat, missing from, or a start without kind", () => {
+  it("rejects chat, missing from, start／stop, or an offer without kind", () => {
     expect(isSessionCastMessage({ type: "session_chat" })).toBe(false);
     expect(
       isSessionCastMessage({
         type: SESSION_CAST_TYPE,
         v: 1,
-        op: "start",
+        op: "offer",
         from: "h",
       })
     ).toBe(false);
@@ -51,7 +64,16 @@ describe("session_cast", () => {
       isSessionCastMessage({
         type: SESSION_CAST_TYPE,
         v: 1,
-        op: "stop",
+        op: "start",
+        from: "h",
+        kind: "video",
+      })
+    ).toBe(false);
+    expect(
+      isSessionCastMessage({
+        type: SESSION_CAST_TYPE,
+        v: 1,
+        op: "unoffer",
       })
     ).toBe(false);
   });

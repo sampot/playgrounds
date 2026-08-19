@@ -12,24 +12,32 @@
   import GoShareSheet from "$lib/GoShareSheet.svelte";
   import { chromeSession } from "$lib/chromeSession.svelte";
   import {
-    GO_ROOM_CAMERA_PAIR_ONLY,
     GO_ROOM_CAMERA_STOP_WATCH,
-    GO_ROOM_CAMERA_WATCH,
+    GO_ROOM_CAST_STOP_WATCH,
     GO_ROOM_EMPTY_TIMELINE,
     GO_ROOM_END_CONFIRM_HOST,
     GO_ROOM_KEEP_OPEN,
     GO_ROOM_LEAVE_CONFIRM_GUEST,
     GO_ROOM_LOGIN_HINT,
+    GO_ROOM_MEDIA_OFF,
     GO_ROOM_SHARE_HINT,
     GO_ROOM_SHARE_TITLE,
+    attachMediaStream,
+    canShareDisplay,
     isRoomInviteShareable,
     roomChatWhoLabel,
     roomInviteRemainLabel,
     roomMediaSummary,
+    roomOccupantRows,
     roomOccupantSummary,
     takePickedFiles,
     type RoomInviteDoor,
+    type RoomOccupantPeer,
   } from "$lib/goRoom";
+  import {
+    catalogConsumes,
+    catalogPlayLabel,
+  } from "$lib/goRoomCatalog";
 
   type RoomUiPhase = "idle" | "open" | "ended" | "error" | "connecting" | "ready";
 
@@ -45,6 +53,7 @@
     peerName: string | null;
     guestCount?: number;
     occupantNames?: string[];
+    occupantPeers?: RoomOccupantPeer[];
     onLogin?: () => void;
     onInvite?: () => void;
     onEnd?: () => void | Promise<void>;
@@ -63,6 +72,7 @@
     peerName = null,
     guestCount = 0,
     occupantNames = [],
+    occupantPeers = [],
     onLogin,
     onInvite,
     onEnd,
@@ -77,13 +87,11 @@
   let leaveAfterEnd = $state(false);
   let confirmDialog = $state<HTMLDialogElement | null>(null);
   let fileInput = $state<HTMLInputElement | null>(null);
-  let programInput = $state<HTMLInputElement | null>(null);
   let fileError = $state("");
   let mediaError = $state("");
-  let mediaOpen = $state(false);
   let presenceVideoEl = $state<HTMLVideoElement | null>(null);
   let localPreviewEl = $state<HTMLVideoElement | null>(null);
-  let programVideoEl = $state<HTMLVideoElement | null>(null);
+  let filePlayEl = $state<HTMLMediaElement | null>(null);
   let now = $state(Date.now());
   let filesOpen = $state(false);
   let pendingShare = $state(false);
@@ -92,13 +100,32 @@
   const connected = $derived(goSessionChat.connected);
   const freeText = $derived(goSessionChat.freeTextAllowed);
   const quickReplies = $derived(goSessionChat.quickReplies);
-  const files = $derived(goRoomFiles.entries);
+  const files = $derived(
+    goRoomFiles.entries.filter((f) => f.kind !== "dir" && f.kind !== "device")
+  );
   const mediaSummary = $derived(
     roomMediaSummary({
       camera: goRoomMedia.camera,
       mic: goRoomMedia.mic,
-      programName: goRoomMedia.programName ?? goRoomMedia.remoteProgramName,
+      display: goRoomMedia.display,
       watching: goRoomMedia.watching,
+      listening: goRoomMedia.listening,
+    })
+  );
+  const roster = $derived(
+    roomOccupantRows({
+      localPeerId: "local",
+      localName: "我",
+      localLiveVideo: goRoomMedia.camera || goRoomMedia.display,
+      localLiveAudio: goRoomMedia.mic,
+      others:
+        occupantPeers.length > 0
+          ? occupantPeers
+          : occupantNames.map((name, i) => ({
+              peerId: `name-${i}-${name}`,
+              name,
+            })),
+      remoteLives: goRoomMedia.remoteLives,
     })
   );
   let dropping = $state(false);
@@ -134,12 +161,13 @@
 
   const statusLabel = $derived.by(() => {
     if (error) return error;
-    if (phase === "ready" && role === "guest") {
-      return peerName ? `已連線 · ${peerName}` : "已連線";
-    }
     if (phase === "connecting") return message || "正在進包廂…";
     if (phase === "ended") return message || "這一間已結束";
-    if (inBooth) return message || roomOccupantSummary({ guestCount });
+    if (inBooth) {
+      const people = roomOccupantSummary({ guestCount });
+      if (role === "guest" && peerName) return `${people} · ${peerName}`;
+      return message || people;
+    }
     return message;
   });
 
@@ -192,13 +220,10 @@
   });
 
   $effect(() => {
-    if (presenceVideoEl) presenceVideoEl.srcObject = goRoomMedia.presenceStream;
+    attachMediaStream(presenceVideoEl, goRoomMedia.presenceStream);
   });
   $effect(() => {
-    if (localPreviewEl) localPreviewEl.srcObject = goRoomMedia.localPreviewStream;
-  });
-  $effect(() => {
-    if (programVideoEl) programVideoEl.srcObject = goRoomMedia.programStream;
+    attachMediaStream(localPreviewEl, goRoomMedia.localPreviewStream);
   });
 
   function isHostMsg(m: (typeof messages)[number]): boolean {
@@ -260,22 +285,29 @@
       return;
     }
     const out = await goRoomMedia.enableCamera();
-    if (!out.ok) {
-      mediaError = out.error;
-      mediaOpen = true;
-    }
+    if (!out.ok) mediaError = out.error;
   }
 
-  async function onWatchCamera() {
+  async function onWatchOccupant(peerId: string) {
     mediaError = "";
-    mediaOpen = true;
-    const out = await goRoomMedia.watchCamera();
+    const out = await goRoomMedia.watchLive(peerId);
     if (!out.ok) mediaError = out.error;
   }
 
   async function onStopWatching() {
     mediaError = "";
     await goRoomMedia.stopWatching();
+    await goRoomMedia.stopListening();
+  }
+
+  async function onToggleDisplay() {
+    mediaError = "";
+    if (goRoomMedia.display) {
+      await goRoomMedia.disableDisplay();
+      return;
+    }
+    const out = await goRoomMedia.enableDisplay();
+    if (!out.ok) mediaError = out.error;
   }
 
   async function onToggleMic() {
@@ -285,39 +317,23 @@
       return;
     }
     const out = await goRoomMedia.enableMic();
-    if (!out.ok) {
-      mediaError = out.error;
-      mediaOpen = true;
-    }
-  }
-
-  async function onPickProgram(ev: Event) {
-    const picked = takePickedFiles(ev.currentTarget as HTMLInputElement);
-    const file = picked[0];
-    if (!file) return;
-    mediaError = "";
-    mediaOpen = true;
-    const out = await goRoomMedia.startProgram(file);
     if (!out.ok) mediaError = out.error;
   }
 
-  async function onStopProgram() {
+  async function onPlayFile(id: string) {
     mediaError = "";
-    await goRoomMedia.stopProgram();
+    fileError = "";
+    filesOpen = true;
+    if (goRoomFiles.playback?.id === id) {
+      goRoomFiles.stopPlay();
+      return;
+    }
+    const out = await goRoomFiles.play(id);
+    if (!out.ok) fileError = out.error;
   }
 
-  async function onFullscreenProgram() {
-    const el = programVideoEl;
-    if (!el) return;
-    try {
-      if (el.requestFullscreen) await el.requestFullscreen();
-      else
-        await (
-          el as HTMLVideoElement & { webkitEnterFullscreen?: () => void }
-        ).webkitEnterFullscreen?.();
-    } catch {
-      /* ignore */
-    }
+  async function onUnshare(id: string) {
+    goRoomFiles.unshareLocal(id);
   }
 
   function askEnd(leaveHome = false) {
@@ -382,6 +398,101 @@
     {/if}
   </div>
   <p class="room-status" role="status">{statusLabel || "臨時隔間：對話只在在場者之間；檔案點下載才存到你選的位置。"}</p>
+  {#if inBooth}
+    <ul class="occupant-chips" aria-label="在場">
+      {#each roster as o (o.peerId)}
+        <li class="occupant-chip">
+          <span class="occupant-avatar" aria-hidden="true">{o.name.slice(0, 1)}</span>
+          <span class="occupant-name">{o.name}</span>
+          {#if o.liveVideo || o.liveAudio}
+            <span
+              class="occupant-live"
+              title={o.liveVideo
+                ? o.mine && goRoomMedia.display
+                  ? "畫面已開"
+                  : "鏡頭已開"
+                : "麥克風已開"}
+            >
+              {o.liveVideo
+                ? o.mine && goRoomMedia.display
+                  ? "畫面"
+                  : "鏡頭"
+                : "麥"}
+            </span>
+            {#if !o.mine}
+              {#if goRoomMedia.watching || goRoomMedia.listening}
+                <button
+                  type="button"
+                  class="pixel-btn occupant-watch"
+                  onclick={() => void onStopWatching()}
+                >
+                  {GO_ROOM_CAMERA_STOP_WATCH}
+                </button>
+              {:else}
+                <button
+                  type="button"
+                  class="pixel-btn pixel-btn--primary occupant-watch"
+                  onclick={() => void onWatchOccupant(o.peerId)}
+                >
+                  收看
+                </button>
+              {/if}
+            {/if}
+          {/if}
+        </li>
+      {/each}
+    </ul>
+      <div class="live-toolbar">
+        <button type="button" class="pixel-btn" onclick={() => void onToggleCamera()}>
+          {goRoomMedia.camera ? "關鏡頭" : "開鏡頭"}
+        </button>
+        <button type="button" class="pixel-btn" onclick={() => void onToggleMic()}>
+          {goRoomMedia.mic ? "關麥克風" : "開麥克風"}
+        </button>
+        {#if canShareDisplay()}
+          <button type="button" class="pixel-btn" onclick={() => void onToggleDisplay()}>
+            {goRoomMedia.display ? "停止畫面" : "分享畫面"}
+          </button>
+        {/if}
+      </div>
+      {#if mediaError}
+        <p class="err" role="alert">{mediaError}</p>
+      {/if}
+      {#if goRoomMedia.error && goRoomMedia.error !== mediaError}
+        <p class="err" role="alert">{goRoomMedia.error}</p>
+      {/if}
+      {#if goRoomMedia.localPreviewStream}
+        <video
+          bind:this={localPreviewEl}
+          class="media-video"
+          autoplay
+          muted
+          playsinline
+          aria-label={goRoomMedia.display ? "我的畫面" : "我的鏡頭"}
+        ></video>
+      {/if}
+      <video
+        bind:this={presenceVideoEl}
+        class={[
+          "media-video",
+          !goRoomMedia.watching && "media-video--idle",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+        autoplay
+        playsinline
+        muted={!goRoomMedia.listening}
+        aria-hidden={!goRoomMedia.watching}
+        aria-label="正在收看"
+      ></video>
+      {#if goRoomMedia.watching || goRoomMedia.listening}
+        <div class="live-toolbar">
+          <button type="button" class="pixel-btn" onclick={() => void onStopWatching()}>
+            {GO_ROOM_CAMERA_STOP_WATCH}
+          </button>
+        </div>
+      {/if}
+  {/if}
 </header>
 
 {#if role === "host" && !loggedIn && phase === "idle"}
@@ -456,125 +567,6 @@
     </div>
 
     {#if showComposer}
-    <section class="file-tray pixel-frame" aria-labelledby="room-media-title">
-      <button
-        type="button"
-        id="room-media-title"
-        class="file-toggle"
-        aria-expanded={mediaOpen}
-        onclick={() => (mediaOpen = !mediaOpen)}
-      >
-        {mediaOpen ? "▾" : "▸"} {mediaSummary}
-      </button>
-      {#if mediaOpen}
-        {#if mediaError}
-          <p class="err" role="alert">{mediaError}</p>
-        {/if}
-        {#if goRoomMedia.error && goRoomMedia.error !== mediaError}
-          <p class="err" role="alert">{goRoomMedia.error}</p>
-        {/if}
-        <p class="muted">開鏡頭只在這台預覽。對方要按收看，才看得到。</p>
-        <div class="media-previews">
-          {#if goRoomMedia.localPreviewStream}
-            <video
-              bind:this={localPreviewEl}
-              class="media-video"
-              autoplay
-              muted
-              playsinline
-              aria-label="我的鏡頭"
-            ></video>
-          {/if}
-          {#if goRoomMedia.presenceStream}
-            <video
-              bind:this={presenceVideoEl}
-              class="media-video"
-              autoplay
-              playsinline
-              aria-label="對方鏡頭"
-            ></video>
-          {/if}
-          {#if goRoomMedia.programStream}
-            <video
-              bind:this={programVideoEl}
-              class="media-video media-video--program"
-              autoplay
-              playsinline
-              aria-label="正在播出"
-            ></video>
-          {/if}
-        </div>
-        <div class="file-actions">
-          <button
-            type="button"
-            class="pixel-btn"
-            onclick={() => void onToggleCamera()}
-          >
-            {goRoomMedia.camera ? "關鏡頭" : goRoomMedia.cameraBlocked ? GO_ROOM_CAMERA_PAIR_ONLY : "開鏡頭"}
-          </button>
-          {#if goRoomMedia.watching}
-            <button
-              type="button"
-              class="pixel-btn"
-              onclick={() => void onStopWatching()}
-            >
-              {GO_ROOM_CAMERA_STOP_WATCH}
-            </button>
-          {:else if goRoomMedia.remoteCameraOffered}
-            <button
-              type="button"
-              class="pixel-btn pixel-btn--primary"
-              onclick={() => void onWatchCamera()}
-            >
-              {GO_ROOM_CAMERA_WATCH}
-            </button>
-          {/if}
-          <button
-            type="button"
-            class="pixel-btn"
-            onclick={() => void onToggleMic()}
-          >
-            {goRoomMedia.mic ? "關麥克風" : "開麥克風"}
-          </button>
-          {#if goRoomMedia.programName}
-            <button
-              type="button"
-              class="pixel-btn"
-              onclick={() => void onStopProgram()}
-            >
-              停止播出
-            </button>
-          {:else}
-            <input
-              bind:this={programInput}
-              class="file-hidden"
-              type="file"
-              accept="video/*,audio/*"
-              onchange={(e) => void onPickProgram(e)}
-            />
-            <button
-              type="button"
-              class="pixel-btn pixel-btn--primary"
-              onclick={() => programInput?.click()}
-            >
-              播出影片或音樂
-            </button>
-          {/if}
-          {#if goRoomMedia.programStream}
-            <button
-              type="button"
-              class="pixel-btn"
-              onclick={() => void onFullscreenProgram()}
-            >
-              全螢幕收看
-            </button>
-          {/if}
-        </div>
-      {/if}
-    </section>
-    {/if}
-
-    {#if showComposer}
     <section
       class={["file-tray", "pixel-frame", dropping && "file-tray--drop"]
         .filter(Boolean)
@@ -594,6 +586,40 @@
         if (list) void shareFiles(list);
       }}
     >
+      {#if goRoomFiles.playback}
+        <div class="file-player">
+          {#if goRoomFiles.playback.kind === "audio"}
+            <audio
+              bind:this={filePlayEl}
+              class="file-player-audio"
+              src={goRoomFiles.playback.url}
+              controls
+              playsinline
+              ontimeupdate={() =>
+                goRoomFiles.notePlayhead(filePlayEl?.currentTime ?? 0)}
+              aria-label="播放 {goRoomFiles.playback.name}"
+            ></audio>
+          {:else}
+            <video
+              bind:this={filePlayEl}
+              class="media-video media-video--program"
+              src={goRoomFiles.playback.url}
+              controls
+              playsinline
+              ontimeupdate={() =>
+                goRoomFiles.notePlayhead(filePlayEl?.currentTime ?? 0)}
+              aria-label="播放 {goRoomFiles.playback.name}"
+            ></video>
+          {/if}
+          <button
+            type="button"
+            class="pixel-btn"
+            onclick={() => goRoomFiles.stopPlay()}
+          >
+            {GO_ROOM_CAST_STOP_WATCH}
+          </button>
+        </div>
+      {/if}
       <button
         type="button"
         id="room-files-title"
@@ -601,16 +627,19 @@
         aria-expanded={filesOpen}
         onclick={() => (filesOpen = !filesOpen)}
       >
-        {filesOpen ? "▾" : "▸"} 檔案分享區
+        {filesOpen ? "▾" : "▸"} 分享區
         {#if files.length > 0}
           · {files.length}
         {:else}
-          · 尚未掛檔
+          · 尚未掛上
+        {/if}
+        {#if mediaSummary !== GO_ROOM_MEDIA_OFF}
+          · {mediaSummary}
         {/if}
       </button>
       {#if filesOpen}
       <p class="muted">
-        檔案還在分享者這台裝置上。點下載才會存到你選的位置。關包廂，目錄就沒了。
+        這是這一間的共用目錄。只掛檔；影音可下載或在本機播放。鏡頭開在上面的在場名單，不進目錄。
       </p>
       {#if fileError}
         <p class="err" role="alert">{fileError}</p>
@@ -622,6 +651,7 @@
         multiple
         onchange={(e) => void onPickFile(e)}
       />
+      <div class="file-actions">
       <button
         type="button"
         class="pixel-btn"
@@ -629,13 +659,14 @@
       >
         選擇檔案
       </button>
+      </div>
       {#if files.length === 0}
-        <p class="muted">把檔案拖到這裡，或按選擇檔案。</p>
+        <p class="muted">把檔案拖到這裡，或按選擇檔案（可多選）。鏡頭開在上面的名單。</p>
       {/if}
       <ul class="file-list">
         {#each files as f (f.id)}
           <li class="file-row">
-            <p class="file-name">{f.name}</p>
+            <p class="file-name">{f.path || f.name}</p>
             <p class="muted">
               {formatSize(f.size)} · {f.mine ? "我" : f.ownerName}
               {#if f.status === "transferring"} · 傳送中 {formatSize(f.received)}
@@ -643,15 +674,27 @@
               {/if}
             </p>
             <div class="file-actions">
+              {#if catalogConsumes(f).includes("play")}
+                <button
+                  type="button"
+                  class="pixel-btn pixel-btn--primary"
+                  disabled={f.status === "transferring" && goRoomFiles.playback?.id !== f.id}
+                  onclick={() => void onPlayFile(f.id)}
+                >
+                  {goRoomFiles.playback?.id === f.id
+                    ? "停止播放"
+                    : catalogPlayLabel(f)}
+                </button>
+              {/if}
               {#if f.mine}
                 <button
                   type="button"
                   class="pixel-btn"
-                  onclick={() => goRoomFiles.unshareLocal(f.id)}
+                  onclick={() => void onUnshare(f.id)}
                 >
                   撤回
                 </button>
-              {:else}
+              {:else if catalogConsumes(f).includes("download")}
                 <button
                   type="button"
                   class="pixel-btn pixel-btn--primary"
@@ -672,15 +715,19 @@
     <aside class="room-side pixel-frame">
       <p class="side-title">這一間</p>
       <p class="room-status">{statusLabel}</p>
+      <p class="muted">{GO_ROOM_KEEP_OPEN}</p>
+      {#if roster.length > 0}
+        <ul class="occupant-list">
+          {#each roster as o (o.peerId)}
+            <li>
+              {o.name}{#if o.liveVideo || o.liveAudio}
+                · {o.liveVideo ? "鏡頭" : "麥"}
+              {/if}
+            </li>
+          {/each}
+        </ul>
+      {/if}
       {#if role === "host"}
-        <p class="muted">{GO_ROOM_KEEP_OPEN}</p>
-        {#if occupantNames.length > 0}
-          <ul class="occupant-list">
-            {#each occupantNames as n (n)}
-              <li>{n}</li>
-            {/each}
-          </ul>
-        {/if}
         {#if door === "none"}
           <p class="muted">還沒發邀請</p>
         {:else if door === "live"}
@@ -914,6 +961,7 @@
     background: rgb(var(--fill));
   }
   .file-tray {
+    position: relative;
     margin: 0;
     min-height: 0;
   }
@@ -937,6 +985,31 @@
     flex-wrap: wrap;
     gap: 0.5rem;
     margin: 0.5rem 0;
+  }
+  .media-previews--idle:empty {
+    display: none;
+    margin: 0;
+  }
+  .media-video--idle {
+    position: absolute;
+    width: 2px;
+    height: 2px;
+    opacity: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .owner-decode {
+    display: grid;
+    gap: 0.4rem;
+    margin: 0.6rem 0 0.4rem;
+  }
+  .owner-decode-video {
+    width: 100%;
+    max-width: 100%;
+  }
+  .owner-decode-audio {
+    width: 100%;
+    min-height: 44px;
   }
   .media-video {
     width: 100%;
@@ -1001,6 +1074,60 @@
   .occupant-list {
     margin: 0.35rem 0 0.5rem;
     padding-left: 1.1rem;
+  }
+  .occupant-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    list-style: none;
+    margin: 0.5rem 0 0;
+    padding: 0;
+  }
+  .occupant-chip {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+    min-height: 44px;
+    padding: 0.2rem 0.45rem;
+    border: 1px solid rgb(var(--line));
+    background: rgb(var(--panel));
+  }
+  .occupant-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    font-weight: 700;
+    background: rgb(var(--ink) / 0.12);
+  }
+  .occupant-live {
+    font-size: 0.8rem;
+    font-weight: 700;
+  }
+  .occupant-watch {
+    min-height: 44px;
+    margin: 0;
+  }
+  .live-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin: 0.45rem 0 0;
+  }
+  .live-toolbar .pixel-btn {
+    min-height: 44px;
+    margin: 0;
+  }
+  .file-player {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin-bottom: 0.5rem;
+  }
+  .file-player-audio {
+    width: 100%;
   }
   .quick-toggle {
     min-height: 44px;
@@ -1084,6 +1211,7 @@
     .room-side {
       display: block;
       flex: 0 0 16rem;
+      flex-shrink: 0;
     }
     .room-side .pixel-btn {
       margin-top: 0.5rem;

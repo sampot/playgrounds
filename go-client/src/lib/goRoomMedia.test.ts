@@ -1,8 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { BOOTH_TRANSCEIVER_SLOTS } from "@pg/roster/rosterBoothMedia";
 import { SESSION_CAST_TYPE } from "@pg/roster/rosterSessionCast";
-import { SESSION_CAMERA_TYPE } from "@pg/roster/rosterSessionCamera";
-import { GO_ROOM_CAMERA_PAIR_ONLY } from "./goRoom";
+import { SESSION_CAMERA_TYPE, SESSION_MIC_TYPE } from "@pg/roster/rosterSessionCamera";
 import { createRoomMedia } from "./goRoomMedia";
 
 function track(kind: "audio" | "video", id = kind) {
@@ -35,18 +34,26 @@ function mockPc() {
 }
 
 describe("createRoomMedia", () => {
-  it("refuses the camera unless exactly two people are in", async () => {
+  it("lets a lone host hang a camera without sending RTP", async () => {
+    const json: unknown[] = [];
+    const cam = track("video", "cam");
     const media = createRoomMedia({
       localAgentId: "host",
       occupantCount: () => 1,
       peers: () => [],
-      sendJson: () => {},
-      getUserMedia: vi.fn(),
+      sendJson: (m) => json.push(m),
+      getUserMedia: async () =>
+        ({ getVideoTracks: () => [cam], getAudioTracks: () => [] }) as unknown as MediaStream,
     });
     const out = await media.enableCamera();
-    expect(out.ok).toBe(false);
-    expect(out.error).toBe(GO_ROOM_CAMERA_PAIR_ONLY);
-    expect(media.getState().cameraBlocked).toBe(true);
+    expect(out.ok).toBe(true);
+    expect(media.getState().cameraBlocked).toBe(false);
+    expect(json).toContainEqual({
+      type: SESSION_CAMERA_TYPE,
+      v: 1,
+      op: "offer",
+      from: "host",
+    });
   });
 
   it("does not push camera RTP until the other person requests to watch", async () => {
@@ -81,7 +88,7 @@ describe("createRoomMedia", () => {
     expect(pc.transceivers[1]!.sender.replaceTrack).toHaveBeenCalledWith(cam);
   });
 
-  it("places camera on presence video after a watch request and clears it when a third person joins", async () => {
+  it("keeps a requested camera up when a third person joins", async () => {
     let occupants = 2;
     const pc = mockPc();
     const cam = track("video", "cam");
@@ -104,15 +111,25 @@ describe("createRoomMedia", () => {
     occupants = 3;
     await media.refresh();
     expect(pc.transceivers[1]!.sender.replaceTrack).toHaveBeenLastCalledWith(
-      null
+      cam
     );
-    expect(cam.stop).toHaveBeenCalled();
-    expect(media.getState().camera).toBe(false);
+    expect(cam.stop).not.toHaveBeenCalled();
+    expect(media.getState().camera).toBe(true);
   });
 
-  it("does not attach a remote camera until local watch is requested", async () => {
+  it("binds a remote camera to the sink as soon as the peer is up, before watch", async () => {
+    class FakeStream {
+      constructor(public tracks: MediaStreamTrack[]) {}
+    }
+    vi.stubGlobal("MediaStream", FakeStream);
     const pc = mockPc();
     const remote = track("video", "their-cam");
+    Object.defineProperty(remote, "muted", { value: true, configurable: true });
+    pc.transceivers[1]!.receiver.track = remote as unknown as {
+      kind: "video";
+      id: string;
+      readyState: "live";
+    };
     const json: unknown[] = [];
     const media = createRoomMedia({
       localAgentId: "g-a",
@@ -127,8 +144,9 @@ describe("createRoomMedia", () => {
       from: "host",
     });
     expect(media.getState().remoteCameraOffered).toBe(true);
-    media.onRemoteTrack({ track: remote }, pc);
-    expect(media.getState().presenceStream).toBeNull();
+    await media.refresh();
+    expect(media.getState().watching).toBe(false);
+    expect(media.getState().presenceStream).not.toBeNull();
 
     expect((await media.watchCamera()).ok).toBe(true);
     expect(json).toContainEqual({
@@ -137,47 +155,229 @@ describe("createRoomMedia", () => {
       op: "request",
       from: "g-a",
     });
-    media.onRemoteTrack({ track: remote }, pc);
     expect(media.getState().watching).toBe(true);
+    expect(media.getState().presenceStream).not.toBeNull();
   });
 
-  it("sends session_cast.start and puts capture tracks on program senders", async () => {
+  it("does not push mic RTP until a peer requests to listen", async () => {
     const json: unknown[] = [];
     const pc = mockPc();
-    const video = track("video", "prog-v");
-    const audio = track("audio", "prog-a");
+    const mic = track("audio", "mic");
+    const media = createRoomMedia({
+      localAgentId: "host",
+      occupantCount: () => 3,
+      peers: () => [{ peerId: "g-a", pc, via: "entrance" }],
+      sendJson: (m) => json.push(m),
+      getUserMedia: async () =>
+        ({ getVideoTracks: () => [], getAudioTracks: () => [mic] }) as unknown as MediaStream,
+    });
+    expect((await media.enableMic()).ok).toBe(true);
+    expect(json).toContainEqual({
+      type: SESSION_MIC_TYPE,
+      v: 1,
+      op: "offer",
+      from: "host",
+    });
+    expect(pc.transceivers[0]!.sender.replaceTrack).not.toHaveBeenCalledWith(
+      mic
+    );
+
+    await media.onControl({
+      type: SESSION_MIC_TYPE,
+      v: 1,
+      op: "request",
+      from: "g-a",
+    });
+    expect(pc.transceivers[0]!.sender.replaceTrack).toHaveBeenCalledWith(mic);
+  });
+
+  it("lets display media replace the camera on the same live video slot", async () => {
+    const pc = mockPc();
+    const cam = track("video", "cam");
+    const screen = track("video", "screen");
     const media = createRoomMedia({
       localAgentId: "host",
       occupantCount: () => 2,
       peers: () => [{ peerId: "g-a", pc, via: "entrance" }],
-      sendJson: (m) => json.push(m),
+      sendJson: () => {},
+      getUserMedia: async () =>
+        ({
+          getVideoTracks: () => [cam],
+          getAudioTracks: () => [],
+        }) as unknown as MediaStream,
+      getDisplayMedia: async () =>
+        ({
+          getVideoTracks: () => [screen],
+          getAudioTracks: () => [],
+        }) as unknown as MediaStream,
+    });
+    expect((await media.enableCamera()).ok).toBe(true);
+    expect(media.getState().camera).toBe(true);
+    expect(media.getState().display).toBe(false);
+
+    expect((await media.enableDisplay()).ok).toBe(true);
+    expect(cam.stop).toHaveBeenCalled();
+    expect(media.getState().display).toBe(true);
+    expect(media.getState().camera).toBe(false);
+
+    await media.onControl({
+      type: SESSION_CAMERA_TYPE,
+      v: 1,
+      op: "request",
+      from: "g-a",
+    });
+    expect(pc.transceivers[1]!.sender.replaceTrack).toHaveBeenCalledWith(screen);
+    expect(pc.transceivers[1]!.sender.replaceTrack).not.toHaveBeenLastCalledWith(
+      cam
+    );
+  });
+
+  it("lets the camera replace display media on the same live video slot", async () => {
+    const cam = track("video", "cam");
+    const screen = track("video", "screen");
+    const media = createRoomMedia({
+      localAgentId: "host",
+      occupantCount: () => 1,
+      peers: () => [],
+      sendJson: () => {},
+      getUserMedia: async () =>
+        ({
+          getVideoTracks: () => [cam],
+          getAudioTracks: () => [],
+        }) as unknown as MediaStream,
+      getDisplayMedia: async () =>
+        ({
+          getVideoTracks: () => [screen],
+          getAudioTracks: () => [],
+        }) as unknown as MediaStream,
+    });
+    expect((await media.enableDisplay()).ok).toBe(true);
+    expect((await media.enableCamera()).ok).toBe(true);
+    expect(screen.stop).toHaveBeenCalled();
+    expect(media.getState().camera).toBe(true);
+    expect(media.getState().display).toBe(false);
+  });
+
+  it("keeps camera and mic on the same live stream", async () => {
+    const pc = mockPc();
+    const cam = track("video", "cam");
+    const mic = track("audio", "mic");
+    const media = createRoomMedia({
+      localAgentId: "host",
+      occupantCount: () => 2,
+      peers: () => [{ peerId: "g-a", pc, via: "entrance" }],
+      sendJson: () => {},
+      getUserMedia: async (c) =>
+        ({
+          getVideoTracks: () => (c.video ? [cam] : []),
+          getAudioTracks: () => (c.audio ? [mic] : []),
+        }) as unknown as MediaStream,
+    });
+    expect((await media.enableCamera()).ok).toBe(true);
+    expect((await media.enableMic()).ok).toBe(true);
+    await media.onControl({
+      type: SESSION_CAMERA_TYPE,
+      v: 1,
+      op: "request",
+      from: "g-a",
+    });
+    await media.onControl({
+      type: SESSION_MIC_TYPE,
+      v: 1,
+      op: "request",
+      from: "g-a",
+    });
+    expect(pc.transceivers[1]!.sender.replaceTrack).toHaveBeenCalledWith(cam);
+    expect(pc.transceivers[0]!.sender.replaceTrack).toHaveBeenCalledWith(mic);
+  });
+
+  it("lists remote live offers on occupants, not as catalog files", () => {
+    const media = createRoomMedia({
+      localAgentId: "host",
+      occupantCount: () => 3,
+      peers: () => [],
+      sendJson: () => {},
+    });
+    media.onControl({
+      type: SESSION_CAMERA_TYPE,
+      v: 1,
+      op: "offer",
+      from: "g-a",
+    });
+    media.onControl({
+      type: SESSION_MIC_TYPE,
+      v: 1,
+      op: "offer",
+      from: "g-b",
+    });
+    expect(media.getState().remoteLives).toEqual([
+      { peerId: "g-a", camera: true, mic: false },
+      { peerId: "g-b", camera: false, mic: true },
+    ]);
+  });
+
+  it("does not start file RTP when a catalog video is requested", async () => {
+    const pc = mockPc();
+    const cam = track("video", "cam");
+    const video = track("video", "prog-v");
+    const file = new File([new Uint8Array(4)], "clip.mp4", { type: "video/mp4" });
+    const media = createRoomMedia({
+      localAgentId: "host",
+      occupantCount: () => 2,
+      peers: () => [{ peerId: "g-a", pc, via: "entrance" }],
+      sendJson: () => {},
+      getUserMedia: async () =>
+        ({ getVideoTracks: () => [cam], getAudioTracks: () => [] }) as unknown as MediaStream,
+      resolveLocalFile: (id) => (id === "file-1" ? file : null),
       captureProgram: async () => ({
-        audio,
+        audio: null,
         video,
         stop: vi.fn(),
       }),
     });
-    const file = new File([new Uint8Array(4)], "clip.mp4", {
-      type: "video/mp4",
+    expect((await media.enableCamera()).ok).toBe(true);
+    await media.onControl({
+      type: SESSION_CAMERA_TYPE,
+      v: 1,
+      op: "request",
+      from: "g-a",
     });
-    expect((await media.startProgram(file)).ok).toBe(true);
-    expect(json[0]).toMatchObject({
+    await media.onControl({
       type: SESSION_CAST_TYPE,
-      op: "start",
-      from: "host",
-      kind: "video",
-      name: "clip.mp4",
+      v: 1,
+      op: "request",
+      from: "g-a",
+      id: "file-1",
     });
-    expect(pc.transceivers[2]!.sender.replaceTrack).toHaveBeenCalledWith(audio);
-    expect(pc.transceivers[3]!.sender.replaceTrack).toHaveBeenCalledWith(video);
-    expect(media.getState().programName).toBe("clip.mp4");
+    expect(pc.transceivers[3]!.sender.replaceTrack).not.toHaveBeenCalledWith(
+      video
+    );
+    expect(pc.transceivers[1]!.sender.replaceTrack).toHaveBeenLastCalledWith(
+      cam
+    );
   });
 
-  it("forwards a guest program track onto other entrance senders", async () => {
+  it("does not drop a live watch when a catalog file asks to play", async () => {
+    const json: unknown[] = [];
+    const media = createRoomMedia({
+      localAgentId: "g-a",
+      occupantCount: () => 2,
+      peers: () => [],
+      sendJson: (m) => json.push(m),
+    });
+    expect((await media.watchCamera()).ok).toBe(true);
+    expect((await media.watchProgram("file-1")).ok).toBe(false);
+    expect(media.getState().watching).toBe(true);
+    expect(json.some((m) => (m as { op?: string }).op === "release")).toBe(
+      false
+    );
+  });
+
+  it("forwards a guest camera track only to peers that requested it", async () => {
     const a = mockPc();
     const b = mockPc();
-    const prog = track("video", "from-a");
-    a.transceivers[3]!.receiver.track = prog as unknown as {
+    const cam = track("video", "from-a");
+    a.transceivers[1]!.receiver.track = cam as unknown as {
       kind: string;
       id: string;
       readyState: "live" | "ended";
@@ -192,8 +392,56 @@ describe("createRoomMedia", () => {
       sendJson: () => {},
       forward: true,
     });
-    await media.forwardFrom("g-a");
-    expect(b.transceivers[3]!.sender.replaceTrack).toHaveBeenCalledWith(prog);
-    expect(a.transceivers[3]!.sender.replaceTrack).not.toHaveBeenCalled();
+    media.onControl({
+      type: SESSION_CAMERA_TYPE,
+      v: 1,
+      op: "offer",
+      from: "g-a",
+    });
+    await media.onControl({
+      type: SESSION_CAMERA_TYPE,
+      v: 1,
+      op: "request",
+      from: "g-b",
+    });
+    expect(b.transceivers[1]!.sender.replaceTrack).toHaveBeenCalledWith(cam);
+    expect(a.transceivers[1]!.sender.replaceTrack).not.toHaveBeenCalled();
+  });
+
+  it("lets a watcher pull one occupant's live from the roster", async () => {
+    const json: unknown[] = [];
+    const media = createRoomMedia({
+      localAgentId: "g-a",
+      occupantCount: () => 2,
+      peers: () => [],
+      sendJson: (m) => json.push(m),
+    });
+    media.onControl({
+      type: SESSION_CAMERA_TYPE,
+      v: 1,
+      op: "offer",
+      from: "host",
+    });
+    media.onControl({
+      type: SESSION_MIC_TYPE,
+      v: 1,
+      op: "offer",
+      from: "host",
+    });
+    expect((await media.watchLive("host")).ok).toBe(true);
+    expect(json).toContainEqual({
+      type: SESSION_CAMERA_TYPE,
+      v: 1,
+      op: "request",
+      from: "g-a",
+    });
+    expect(json).toContainEqual({
+      type: SESSION_MIC_TYPE,
+      v: 1,
+      op: "request",
+      from: "g-a",
+    });
+    expect(media.getState().watching).toBe(true);
+    expect(media.getState().listening).toBe(true);
   });
 });

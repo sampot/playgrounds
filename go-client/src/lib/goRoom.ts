@@ -16,44 +16,112 @@ export const GO_ROOM_LOGIN_HINT =
   "被請進來的人不必有通行證；開這一間的人要留在這個畫面。另一台裝置請掃邀請進來。";
 
 export const GO_ROOM_END_CONFIRM_HOST =
-  "關掉後在場的人會斷線，目錄會沒了，鏡頭與投放會停。已存到硬碟的檔不受影響。";
+  "關掉後在場的人會斷線，目錄會沒了，正在收看的鏡頭會停。已存到硬碟的檔不受影響。";
 
 export const GO_ROOM_LEAVE_CONFIRM_GUEST =
-  "離開後你會斷線；其他人還在。你掛上的檔會從分享區拿掉。";
+  "離開後你會斷線；其他人還在。你掛上的項目會從分享區拿掉。";
 
 export const GO_ROOM_CONNECT_FAILED =
   "連線失敗。請靠近同一網路，或請對方再發一次邀請。";
 
-export const GO_ROOM_MEDIA_OFF = "鏡頭與投放 · 關";
-export const GO_ROOM_CAMERA_PAIR_ONLY = "鏡頭只在兩人時";
-export const GO_ROOM_CAMERA_WATCH = "收看鏡頭";
+export const GO_ROOM_MEDIA_OFF = "鏡頭 · 未開";
+export const GO_ROOM_CAMERA_WATCH = "收看";
 export const GO_ROOM_CAMERA_STOP_WATCH = "停止收看";
+export const GO_ROOM_MIC_LISTEN = "收聽";
+export const GO_ROOM_MIC_STOP_LISTEN = "停止收聽";
+export const GO_ROOM_CAST_WATCH = "播放";
+export const GO_ROOM_CAST_STOP_WATCH = "停止播放";
+export const GO_ROOM_HANG_FILES_ONLY = "只能掛檔，不掛資料夾";
 export const GO_ROOM_CAST_UNSUPPORTED =
-  "這台裝置播不出這份影片。請換電腦播出，或改掛在分享區。";
+  "播不了這份檔。請改用電腦再掛一次，或改下載。";
+export const GO_ROOM_OWNER_DECODE =
+  "這一頁正在解碼這份檔。請留著這個畫面，對方才能收看。";
 export const GO_ROOM_MEDIA_PERM_DENIED = "沒有鏡頭或麥克風權限。";
+export const GO_ROOM_DISPLAY_PERM_DENIED = "沒有畫面分享權限。";
+
+/** Guest↔Guest mesh is postponed; Hub star carries files and media. */
+export const GO_ROOM_MESH_ENABLED = false;
 
 /** Host plus guests currently in the booth. */
 export function roomOccupantCount(guestCount: number): number {
   return Math.max(0, Math.floor(guestCount)) + 1;
 }
 
-/** 在場視訊僅恰好兩人（主持＋一位 Guest，含自己的第二台）。 */
-export function roomCameraAllowed(occupantCount: number): boolean {
-  return occupantCount === 2;
+/** Remote live sink is bound as soon as the PC exists; show it only after 收看. */
+export function roomRemoteSinkVisible(opts: {
+  watching?: boolean;
+  listening?: boolean;
+}): boolean {
+  return Boolean(opts.watching || opts.listening);
 }
 
 export function roomMediaSummary(opts: {
   camera: boolean;
   mic: boolean;
-  programName: string | null;
+  display?: boolean;
   watching?: boolean;
+  listening?: boolean;
 }): string {
-  const name = opts.programName?.trim();
-  if (name) return `正在播出 · ${name}`;
   if (opts.watching) return "正在收看鏡頭";
+  if (opts.listening) return "正在收聽";
+  if (opts.display) return "畫面已開 · 等對方收看";
   if (opts.camera) return "鏡頭已開 · 等對方收看";
-  if (opts.mic) return "麥克風開著";
+  if (opts.mic) return "麥克風已開 · 等對方收聽";
   return GO_ROOM_MEDIA_OFF;
+}
+
+export type RoomOccupantPeer = {
+  peerId: string;
+  name: string;
+};
+
+export type RoomRemoteLive = {
+  peerId: string;
+  camera?: boolean;
+  mic?: boolean;
+};
+
+export type RoomOccupant = {
+  peerId: string;
+  name: string;
+  mine: boolean;
+  liveVideo: boolean;
+  liveAudio: boolean;
+};
+
+/** In-booth roster: live camera／mic sit on the person, not in the share catalog. */
+export function roomOccupantRows(opts: {
+  localPeerId: string;
+  localName: string;
+  localLiveVideo: boolean;
+  localLiveAudio: boolean;
+  others: RoomOccupantPeer[];
+  remoteLives?: RoomRemoteLive[];
+}): RoomOccupant[] {
+  const lives = new Map(
+    (opts.remoteLives ?? []).map((l) => [l.peerId, l] as const)
+  );
+  return [
+    {
+      peerId: opts.localPeerId,
+      name: opts.localName,
+      mine: true,
+      liveVideo: opts.localLiveVideo,
+      liveAudio: opts.localLiveAudio,
+    },
+    ...opts.others
+      .filter((o) => o.peerId && o.peerId !== opts.localPeerId)
+      .map((o) => {
+        const live = lives.get(o.peerId);
+        return {
+          peerId: o.peerId,
+          name: o.name,
+          mine: false,
+          liveVideo: Boolean(live?.camera),
+          liveAudio: Boolean(live?.mic),
+        };
+      }),
+  ];
 }
 
 export type RoomInviteDoor = "none" | "live" | "expired";
@@ -136,4 +204,54 @@ export function takePickedFiles(input: {
   const picked = Array.from(input.files ?? []);
   input.value = "";
   return picked;
+}
+
+export function canShareDisplay(): boolean {
+  return (
+    typeof navigator !== "undefined" &&
+    typeof navigator.mediaDevices?.getDisplayMedia === "function"
+  );
+}
+
+export function mediaTrackHasFrames(t: MediaStreamTrack): boolean {
+  if (t.readyState === "ended") return false;
+  if (!t.muted) return true;
+  const settings =
+    typeof t.getSettings === "function" ? t.getSettings() : undefined;
+  return (settings?.width ?? 0) > 0 || (settings?.height ?? 0) > 0;
+}
+
+/** Bind a stream to a media element without resetting srcObject on every emit. */
+export function attachMediaStream(
+  el: {
+    srcObject: MediaStream | null;
+    paused: boolean;
+    muted: boolean;
+    play: () => Promise<void>;
+  } | null | undefined,
+  stream: MediaStream | null
+): void {
+  if (!el) return;
+  if (el.srcObject === stream) {
+    if (stream && el.paused) void tryPlay(el);
+    return;
+  }
+  el.srcObject = stream;
+  if (stream) void tryPlay(el);
+}
+
+async function tryPlay(el: {
+  muted: boolean;
+  play: () => Promise<void>;
+}): Promise<void> {
+  try {
+    await el.play();
+  } catch {
+    el.muted = true;
+    try {
+      await el.play();
+    } catch {
+      /* autoplay still blocked */
+    }
+  }
 }

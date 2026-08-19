@@ -1,43 +1,56 @@
 /**
- * 包廂鏡頭／投放 UI state — attach from guest/host room runtimes.
+ * 包廂鏡頭／節目 UI state — attach from guest/host room runtimes.
  */
 
 import {
   createRoomMedia,
   type RoomMedia,
+  type RoomMediaControl,
   type RoomMediaPeer,
   type RoomMediaState,
 } from "./goRoomMedia";
-import type { SessionCastMessage } from "@pg/roster/rosterSessionCast";
-import type { SessionCameraMessage } from "@pg/roster/rosterSessionCamera";
 
 const EMPTY: RoomMediaState = {
   camera: false,
   mic: false,
+  display: false,
   programName: null,
   remoteProgramName: null,
   remoteProgramKind: null,
   presenceStream: null,
   programStream: null,
   localPreviewStream: null,
+  ownerDecodeUrl: null,
+  ownerDecodeKind: null,
   error: null,
-  cameraBlocked: true,
+  cameraBlocked: false,
   remoteCameraOffered: false,
   watching: false,
+  remoteMicOffered: false,
+  listening: false,
+  watchingProgram: false,
+  remoteLives: [],
 };
 
 class GoRoomMedia {
   camera = $state(false);
   mic = $state(false);
+  display = $state(false);
   programName = $state<string | null>(null);
   remoteProgramName = $state<string | null>(null);
   presenceStream = $state<MediaStream | null>(null);
   programStream = $state<MediaStream | null>(null);
   localPreviewStream = $state<MediaStream | null>(null);
+  ownerDecodeUrl = $state<string | null>(null);
+  ownerDecodeKind = $state<"audio" | "video" | null>(null);
   error = $state<string | null>(null);
-  cameraBlocked = $state(true);
+  cameraBlocked = $state(false);
   remoteCameraOffered = $state(false);
   watching = $state(false);
+  remoteMicOffered = $state(false);
+  listening = $state(false);
+  watchingProgram = $state(false);
+  remoteLives = $state<{ peerId: string; camera: boolean; mic: boolean }[]>([]);
   #media: RoomMedia | null = null;
   #unsub: (() => void) | null = null;
 
@@ -45,23 +58,32 @@ class GoRoomMedia {
     localAgentId: string;
     occupantCount: () => number;
     peers: () => RoomMediaPeer[];
-    sendJson: (msg: SessionCastMessage | SessionCameraMessage) => void;
+    sendJson: (msg: RoomMediaControl) => void;
     forward?: boolean;
+    resolveLocalFile?: (id: string) => File | null;
+    ownerOf?: (id: string) => string | null;
   }): void {
     this.detach();
     this.#media = createRoomMedia(opts);
     this.#unsub = this.#media.subscribe((s) => {
       this.camera = s.camera;
       this.mic = s.mic;
+      this.display = s.display;
       this.programName = s.programName;
       this.remoteProgramName = s.remoteProgramName;
       this.presenceStream = s.presenceStream;
       this.programStream = s.programStream;
       this.localPreviewStream = s.localPreviewStream;
+      this.ownerDecodeUrl = s.ownerDecodeUrl;
+      this.ownerDecodeKind = s.ownerDecodeKind;
       this.error = s.error;
       this.cameraBlocked = s.cameraBlocked;
       this.remoteCameraOffered = s.remoteCameraOffered;
       this.watching = s.watching;
+      this.remoteMicOffered = s.remoteMicOffered;
+      this.listening = s.listening;
+      this.watchingProgram = s.watchingProgram;
+      this.remoteLives = s.remoteLives;
     });
   }
 
@@ -72,15 +94,22 @@ class GoRoomMedia {
     this.#media = null;
     this.camera = EMPTY.camera;
     this.mic = EMPTY.mic;
+    this.display = EMPTY.display;
     this.programName = EMPTY.programName;
     this.remoteProgramName = EMPTY.remoteProgramName;
     this.presenceStream = null;
     this.programStream = null;
     this.localPreviewStream = null;
+    this.ownerDecodeUrl = null;
+    this.ownerDecodeKind = null;
     this.error = null;
-    this.cameraBlocked = true;
+    this.cameraBlocked = false;
     this.remoteCameraOffered = false;
     this.watching = false;
+    this.remoteMicOffered = false;
+    this.listening = false;
+    this.watchingProgram = false;
+    this.remoteLives = [];
   }
 
   enableCamera() {
@@ -94,9 +123,27 @@ class GoRoomMedia {
     return this.#media?.disableCamera() ?? Promise.resolve();
   }
 
+  enableDisplay() {
+    return (
+      this.#media?.enableDisplay() ??
+      Promise.resolve({ ok: false as const, error: "尚未連線" })
+    );
+  }
+
+  disableDisplay() {
+    return this.#media?.disableDisplay() ?? Promise.resolve();
+  }
+
   watchCamera() {
     return (
       this.#media?.watchCamera() ??
+      Promise.resolve({ ok: false as const, error: "尚未連線" })
+    );
+  }
+
+  watchLive(peerId: string) {
+    return (
+      this.#media?.watchLive(peerId) ??
       Promise.resolve({ ok: false as const, error: "尚未連線" })
     );
   }
@@ -116,6 +163,17 @@ class GoRoomMedia {
     return this.#media?.disableMic() ?? Promise.resolve();
   }
 
+  listenMic() {
+    return (
+      this.#media?.listenMic() ??
+      Promise.resolve({ ok: false as const, error: "尚未連線" })
+    );
+  }
+
+  stopListening() {
+    return this.#media?.stopListening() ?? Promise.resolve();
+  }
+
   startProgram(file: File) {
     return (
       this.#media?.startProgram(file) ??
@@ -125,6 +183,35 @@ class GoRoomMedia {
 
   stopProgram() {
     return this.#media?.stopProgram() ?? Promise.resolve();
+  }
+
+  warmProgram(id: string) {
+    return (
+      this.#media?.warmProgram(id) ??
+      Promise.resolve({ ok: false as const, error: "尚未連線" })
+    );
+  }
+
+  stopStreamingFile(id: string) {
+    return this.#media?.stopStreamingFile(id) ?? Promise.resolve();
+  }
+
+  captureFromElement(el: HTMLMediaElement) {
+    return (
+      this.#media?.captureFromElement(el) ??
+      Promise.resolve({ ok: false as const, error: "尚未連線" })
+    );
+  }
+
+  watchProgram(id?: string) {
+    return (
+      this.#media?.watchProgram(id) ??
+      Promise.resolve({ ok: false as const, error: "尚未連線" })
+    );
+  }
+
+  stopWatchingProgram() {
+    return this.#media?.stopWatchingProgram() ?? Promise.resolve();
   }
 
   refresh() {
