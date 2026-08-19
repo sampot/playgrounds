@@ -34,7 +34,16 @@ import {
   roomMediaSummary,
   roomOccupantCount,
   roomOccupancyFromSnapshot,
+  roomHostMemberMenu,
+  roomMemberAvatarInitial,
+  roomMemberCard,
+  roomMemberCardsSorted,
+  roomMemberOnAir,
   roomOccupantRows,
+  GO_ROOM_FORCE_CAMERA_OFF,
+  GO_ROOM_FORCE_MUTE,
+  GO_ROOM_KICK,
+  GO_ROOM_PUT_ON_TV,
   roomOccupantSummary,
   roomRemoteSinkVisible,
   roomShortLandscape,
@@ -247,6 +256,231 @@ describe("roomOccupantRows", () => {
         liveAudio: false,
       },
     ]);
+  });
+});
+
+describe("roomMemberCard", () => {
+  const host = {
+    peerId: "local",
+    name: "太郎",
+    mine: true,
+    liveVideo: false,
+    liveAudio: true,
+  };
+  const guest = {
+    peerId: "g-a",
+    name: "小明",
+    mine: false,
+    liveVideo: true,
+    liveAudio: false,
+  };
+
+  it("labels 主持人 and 主講人, not a conference seat name", () => {
+    expect(
+      roomMemberCard({
+        occupant: host,
+        hostPeerId: "local",
+        tvSourcePeerId: "host-agent",
+        localAgentId: "host-agent",
+      })
+    ).toMatchObject({
+      name: "太郎",
+      host: true,
+      presenter: true,
+      onAir: true,
+      micOn: true,
+      cameraOn: false,
+    });
+    expect(
+      roomMemberCard({
+        occupant: guest,
+        hostPeerId: "local",
+        tvSourcePeerId: "g-a",
+      })
+    ).toMatchObject({
+      host: false,
+      presenter: true,
+      onAir: true,
+      micOn: false,
+      cameraOn: true,
+    });
+  });
+
+  it("keeps LIVE off when the TV is a file, not this person's live", () => {
+    expect(
+      roomMemberOnAir({
+        peerId: "g-a",
+        mine: false,
+        tvSourcePeerId: null,
+      })
+    ).toBe(false);
+    expect(
+      roomMemberCard({
+        occupant: guest,
+        hostPeerId: "local",
+        tvSourcePeerId: null,
+      }).onAir
+    ).toBe(false);
+  });
+
+  it("shows a yellow 舉手 mark only while the hand is up", () => {
+    expect(
+      roomMemberCard({ occupant: guest, hostPeerId: "local" }).handRaised
+    ).toBe(false);
+    expect(
+      roomMemberCard({
+        occupant: guest,
+        hostPeerId: "local",
+        handRaised: true,
+      }).handRaised
+    ).toBe(true);
+  });
+
+  it("animates the mic only when the open mic is speaking", () => {
+    expect(
+      roomMemberCard({
+        occupant: host,
+        hostPeerId: "local",
+        speaking: true,
+      }).speaking
+    ).toBe(true);
+    expect(
+      roomMemberCard({
+        occupant: guest,
+        hostPeerId: "local",
+        speaking: true,
+      }).speaking
+    ).toBe(false);
+  });
+
+  it("takes the first grapheme for a fallback avatar", () => {
+    expect(roomMemberAvatarInitial("太郎")).toBe("太");
+    expect(roomMemberAvatarInitial("  ")).toBe("?");
+  });
+});
+
+function memberStub(
+  patch: Partial<ReturnType<typeof roomMemberCard>> & {
+    name: string;
+    peerId: string;
+  }
+): ReturnType<typeof roomMemberCard> {
+  return {
+    mine: false,
+    avatarUrl: null,
+    avatarInitial: roomMemberAvatarInitial(patch.name),
+    host: false,
+    presenter: false,
+    micOn: false,
+    cameraOn: false,
+    speaking: false,
+    onAir: false,
+    handRaised: false,
+    ...patch,
+  };
+}
+
+describe("roomMemberCardsSorted", () => {
+  it("orders host, on-stage LIVE, 舉手, speaking, then name", () => {
+    const zebra = memberStub({ peerId: "z", name: "Zebra" });
+    const speaking = memberStub({
+      peerId: "s",
+      name: "Sam",
+      speaking: true,
+    });
+    const hand = memberStub({
+      peerId: "h",
+      name: "Hana",
+      handRaised: true,
+    });
+    const live = memberStub({
+      peerId: "l",
+      name: "Live",
+      onAir: true,
+      presenter: true,
+    });
+    const host = memberStub({
+      peerId: "host",
+      name: "我",
+      host: true,
+    });
+    const apple = memberStub({ peerId: "a", name: "Apple" });
+    expect(
+      roomMemberCardsSorted([
+        zebra,
+        apple,
+        speaking,
+        hand,
+        live,
+        host,
+      ]).map((c) => c.peerId)
+    ).toEqual(["host", "l", "h", "s", "a", "z"]);
+  });
+
+  it("keeps the Host first even when someone else is LIVE or speaking", () => {
+    expect(
+      roomMemberCardsSorted([
+        memberStub({
+          peerId: "g",
+          name: "甲",
+          onAir: true,
+          handRaised: true,
+          speaking: true,
+        }),
+        memberStub({ peerId: "host", name: "乙", host: true }),
+      ]).map((c) => c.peerId)
+    ).toEqual(["host", "g"]);
+  });
+});
+
+describe("roomHostMemberMenu", () => {
+  it("lets the Host put a live occupant on the TV, mute, close camera, or kick", () => {
+    const items = roomHostMemberMenu({
+      mine: false,
+      liveAudio: true,
+      liveVideo: true,
+    });
+    expect(items.map((i) => i.action)).toEqual([
+      "putOnTv",
+      "forceMute",
+      "forceCameraOff",
+      "kick",
+    ]);
+    expect(items.find((i) => i.action === "putOnTv")).toMatchObject({
+      label: GO_ROOM_PUT_ON_TV,
+      enabled: true,
+    });
+    expect(items.find((i) => i.action === "forceMute")).toMatchObject({
+      label: GO_ROOM_FORCE_MUTE,
+      enabled: true,
+    });
+    expect(items.find((i) => i.action === "forceCameraOff")).toMatchObject({
+      label: GO_ROOM_FORCE_CAMERA_OFF,
+      enabled: true,
+    });
+    expect(items.find((i) => i.action === "kick")).toMatchObject({
+      label: GO_ROOM_KICK,
+      enabled: true,
+      danger: true,
+    });
+  });
+
+  it("does not let the Host kick themselves, and disables mute when the mic is already off", () => {
+    const items = roomHostMemberMenu({
+      mine: true,
+      liveAudio: false,
+      liveVideo: true,
+    });
+    expect(items.map((i) => i.action)).toEqual([
+      "putOnTv",
+      "forceMute",
+      "forceCameraOff",
+    ]);
+    expect(items.find((i) => i.action === "forceMute")?.enabled).toBe(false);
+    expect(items.find((i) => i.action === "forceCameraOff")?.enabled).toBe(
+      true
+    );
+    expect(items.find((i) => i.action === "putOnTv")?.enabled).toBe(true);
   });
 });
 

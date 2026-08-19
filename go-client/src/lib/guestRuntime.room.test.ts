@@ -217,6 +217,27 @@ describe("guestRuntime invite.room", () => {
     ]);
   });
 
+  it("leaves the booth when the Host kicks this seat", async () => {
+    const { createGuestRuntime } = await import("./guestRuntime");
+    const rt = createGuestRuntime();
+    await rt.bootFromShortId("room1");
+    await rt.consentAndPlay("訪客甲");
+    const offerOpts = fixtures.createOffer.mock.calls[0]![0] as {
+      localPresence?: { agentId: string };
+      handlers?: { onMessage?: (data: unknown) => void };
+    };
+    const localId = offerOpts.localPresence?.agentId;
+    offerOpts.handlers?.onMessage?.({
+      type: "session_booth",
+      v: 1,
+      op: "kick",
+      from: "host-1",
+      to: localId,
+    });
+    expect(rt.getStatus().phase).toBe("ended");
+    expect(rt.getStatus().error).toMatch(/請你離開/);
+  });
+
   it("ignores session_mesh hello so Guest↔Guest stays on the Host hub", async () => {
     const { createGuestRuntime } = await import("./guestRuntime");
     const rt = createGuestRuntime();

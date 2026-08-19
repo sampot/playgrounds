@@ -17,6 +17,9 @@ import { isSessionMeshMessage } from "@pg/roster/rosterSessionMesh";
 import { isSessionCastMessage } from "@pg/roster/rosterSessionCast";
 import { buildSessionOccupancyMessage } from "@pg/roster/rosterSessionOccupancy";
 import {
+  buildSessionBoothMessage,
+} from "@pg/roster/rosterSessionBooth";
+import {
   isSessionCameraMessage,
   isSessionMicMessage,
 } from "@pg/roster/rosterSessionCamera";
@@ -280,6 +283,26 @@ export function createRoomRuntime() {
       }
     }
     refreshGuestSummary();
+  }
+
+  function kickPeer(peerId: string): boolean {
+    const id = peerId?.trim();
+    if (!id || id === "local") return false;
+    const slot = slots.find((s) => !s.lost && s.peerId === id && s.session);
+    if (!slot?.session) return false;
+    try {
+      slot.session.send(
+        buildSessionBoothMessage({
+          op: "kick",
+          from: localAgentId,
+          to: id,
+        })
+      );
+    } catch {
+      /* still drop */
+    }
+    dropPeer(slot);
+    return true;
   }
 
   function handlers(slot: PeerSlot): RosterPeerHandlers {
@@ -610,6 +633,7 @@ export function createRoomRuntime() {
     },
     openBooth,
     mintInviteAndAnswer,
+    kickPeer,
     close,
   };
 }

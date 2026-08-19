@@ -95,5 +95,6 @@
   onLogin={() => goAuth.login()}
   onInvite={() => void mint()}
   onEnd={() => runtime.close()}
+  onKick={(peerId) => runtime.kickPeer(peerId)}
   onReissue={() => void runtime.openBooth({ afterEnd: true })}
 />

@@ -319,6 +319,57 @@ describe("roomRuntime", () => {
     );
   });
 
+  it("kicks one guest without ending the booth", async () => {
+    let loopOpts: {
+      prepareHandlers: () => {
+        handlers: {
+          onMessage: (data: unknown) => void;
+          onChannelClose: () => void;
+        };
+        attachSession: (s: ReturnType<typeof mockSession>) => void;
+      };
+    } | null = null;
+    fixtures.startLoop.mockImplementation((opts: typeof loopOpts) => {
+      loopOpts = opts;
+      return { stop: vi.fn(), inviteId: "inv-room" };
+    });
+    const { createRoomRuntime } = await import("./roomRuntime");
+    const rt = createRoomRuntime();
+    await rt.openBooth();
+    await rt.mintInviteAndAnswer();
+    const a = mockSession();
+    const b = mockSession();
+    const first = loopOpts!.prepareHandlers();
+    first.attachSession(a);
+    first.handlers.onMessage({
+      type: "presence",
+      agentId: "g-a",
+      name: "甲",
+    });
+    const second = loopOpts!.prepareHandlers();
+    second.attachSession(b);
+    second.handlers.onMessage({
+      type: "presence",
+      agentId: "g-b",
+      name: "乙",
+    });
+    expect(rt.kickPeer("g-a")).toBe(true);
+    expect(a.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "session_booth",
+        op: "kick",
+        to: "g-a",
+      })
+    );
+    expect(a.close).toHaveBeenCalled();
+    expect(b.close).not.toHaveBeenCalled();
+    expect(rt.getStatus().phase).toBe("open");
+    expect(rt.getStatus().occupantPeers).toEqual([
+      { peerId: "g-b", name: "乙" },
+    ]);
+    expect(rt.kickPeer("local")).toBe(false);
+  });
+
   it("does not mint when the Host is not logged in", async () => {
     fixtures.mint.mockRejectedValue(
       Object.assign(new Error("尚未登入遊樂場通行證，請先登入"), {

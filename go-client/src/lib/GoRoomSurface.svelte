@@ -12,6 +12,8 @@
   import GoShareSheet from "$lib/GoShareSheet.svelte";
   import GoAdSlot from "$lib/GoAdSlot.svelte";
   import GoRoomTvSlot from "$lib/GoRoomTvSlot.svelte";
+  import GoRoomMemberCard from "$lib/GoRoomMemberCard.svelte";
+  import { goAuth } from "$lib/goAuth.svelte";
   import { roomAdClickAction } from "$lib/goAds";
   import { chromeSession } from "$lib/chromeSession.svelte";
   import {
@@ -19,6 +21,8 @@
     GO_ROOM_CAST_STOP_WATCH,
     GO_ROOM_EMPTY_TIMELINE,
     GO_ROOM_END_CONFIRM_HOST,
+    GO_ROOM_KICK,
+    GO_ROOM_KICK_CONFIRM,
     GO_ROOM_LEAVE_CONFIRM_GUEST,
     GO_ROOM_LOGIN_HINT,
     GO_ROOM_PUT_ON_TV,
@@ -41,6 +45,9 @@
     roomEscStep,
     roomInviteDoorRow,
     roomInviteRemainLabel,
+    roomHostMemberMenu,
+    roomMemberCard,
+    roomMemberCardsSorted,
     roomOccupantRows,
     roomShowAdSlot,
     roomShellActiveTab,
@@ -61,6 +68,7 @@
     tvFullscreenElement,
     tvIsFullscreen,
     takePickedFiles,
+    type RoomHostMenuAction,
     type RoomInviteDoor,
     type RoomOccupantPeer,
     type RoomShellPane,
@@ -90,6 +98,7 @@
     onInvite?: () => void;
     onEnd?: () => void | Promise<void>;
     onReissue?: () => void;
+    onKick?: (peerId: string) => void;
   };
 
   let {
@@ -109,6 +118,7 @@
     onInvite,
     onEnd,
     onReissue,
+    onKick,
   }: Props = $props();
 
   let draft = $state("");
@@ -135,6 +145,8 @@
   let tvHudOpen = $state(false);
   let tvSlotFullscreen = $state(false);
   let selectedPeerId = $state<string | null>(null);
+  let hostMenuPeerId = $state<string | null>(null);
+  let kickTarget = $state<{ peerId: string; name: string } | null>(null);
   let pendingShare = $state(false);
   let tvVideoEl = $state<HTMLVideoElement | null>(null);
   let tvSlotEl = $state<HTMLElement | null>(null);
@@ -162,6 +174,21 @@
             })),
       remoteLives: goRoomMedia.remoteLives,
     })
+  );
+  const hostPeerId = $derived(
+    role === "host" ? "local" : occupantPeers[0]?.peerId ?? null
+  );
+  const memberCards = $derived(
+    roomMemberCardsSorted(
+      roster.map((person) =>
+        roomMemberCard({
+          occupant: person,
+          hostPeerId,
+          tvSourcePeerId: goRoomMedia.tvSourcePeerId,
+          avatarUrl: person.mine ? goAuth.profile?.avatar_url : null,
+        })
+      )
+    )
   );
   const tvLabel = $derived(
     roomTvLabel({
@@ -347,8 +374,8 @@
   $effect(() => {
     chromeSession.holdAutoHide = roomChromeShouldHold({
       shareOpen,
-      confirmOpen: confirmEnd,
-      overlayOpen,
+      confirmOpen: confirmEnd || Boolean(kickTarget),
+      overlayOpen: overlayOpen || Boolean(hostMenuPeerId),
     });
     return () => {
       chromeSession.holdAutoHide = false;
@@ -452,8 +479,25 @@
   $effect(() => {
     const el = confirmDialog;
     if (!el) return;
-    if (confirmEnd && !el.open) el.showModal();
-    if (!confirmEnd && el.open) el.close();
+    if ((confirmEnd || kickTarget) && !el.open) el.showModal();
+    if (!confirmEnd && !kickTarget && el.open) el.close();
+  });
+
+  $effect(() => {
+    const openId = hostMenuPeerId;
+    if (!openId) return;
+    const onPtr = (e: PointerEvent) => {
+      const t = e.target;
+      if (
+        t instanceof Element &&
+        t.closest(`[data-member-peer="${CSS.escape(openId)}"]`)
+      ) {
+        return;
+      }
+      hostMenuPeerId = null;
+    };
+    document.addEventListener("pointerdown", onPtr);
+    return () => document.removeEventListener("pointerdown", onPtr);
   });
 
   $effect(() => {
@@ -597,6 +641,32 @@
     if (!out.ok) mediaError = out.error;
   }
 
+  async function onHostMemberAction(
+    card: (typeof memberCards)[number],
+    action: RoomHostMenuAction
+  ) {
+    hostMenuPeerId = null;
+    const peerId = card.mine ? "local" : card.peerId;
+    mediaError = "";
+    if (action === "putOnTv") {
+      await onPutLiveOnTv(peerId, card.name);
+      return;
+    }
+    if (action === "forceMute") {
+      const out = await goRoomMedia.haltLive(peerId, "audio");
+      if (!out.ok) mediaError = out.error;
+      return;
+    }
+    if (action === "forceCameraOff") {
+      const out = await goRoomMedia.haltLive(peerId, "video");
+      if (!out.ok) mediaError = out.error;
+      return;
+    }
+    if (action === "kick" && !card.mine) {
+      kickTarget = { peerId: card.peerId, name: card.name };
+    }
+  }
+
   async function onStopTv() {
     mediaError = "";
     await goRoomMedia.stopProgram();
@@ -636,6 +706,7 @@
 
   function dismissConfirm() {
     confirmEnd = false;
+    kickTarget = null;
     pendingAdHref = null;
   }
 
@@ -658,6 +729,12 @@
     if (adHref) void goto(adHref);
     else if (leaveAfterEnd) void goto("/");
     leaveAfterEnd = false;
+  }
+
+  function confirmKickNow() {
+    const target = kickTarget;
+    kickTarget = null;
+    if (target) onKick?.(target.peerId);
   }
 
   function onAdNavigate(href: string) {
@@ -935,27 +1012,27 @@
             </div>
           {/if}
           <ul class="member-list">
-            {#each roster as person, i (person.peerId)}
+            {#each memberCards as card (card.peerId)}
               <li>
-                <button
-                  type="button"
-                  class="member-row"
+                <GoRoomMemberCard
+                  {card}
+                  selected={selectedPeerId === card.peerId}
+                  hostMenu={role === "host"
+                    ? roomHostMemberMenu({
+                        mine: card.mine,
+                        liveAudio: card.micOn,
+                        liveVideo: card.cameraOn,
+                      })
+                    : undefined}
+                  hostMenuOpen={hostMenuPeerId === card.peerId}
                   onclick={() =>
                     (selectedPeerId =
-                      selectedPeerId === person.peerId ? null : person.peerId)}
-                >
-                  <span>
-                    {#if i === 0 && role === "host"}
-                      <span class="host-tag">主持</span>
-                    {/if}
-                    {person.name}
-                  </span>
-                  <span class="muted">
-                    {#if person.liveVideo}鏡頭{/if}
-                    {#if person.liveAudio}{#if person.liveVideo} · {/if}麥{/if}
-                    {#if !person.liveVideo && !person.liveAudio}—{/if}
-                  </span>
-                </button>
+                      selectedPeerId === card.peerId ? null : card.peerId)}
+                  onHostMenuToggle={() =>
+                    (hostMenuPeerId =
+                      hostMenuPeerId === card.peerId ? null : card.peerId)}
+                  onHostAction={(action) => void onHostMemberAction(card, action)}
+                />
               </li>
             {/each}
           </ul>
@@ -971,18 +1048,8 @@
                 </p>
               {/if}
               <div class="file-actions">
-                {#if role === "host" && (selectedPerson.liveVideo || selectedPerson.liveAudio)}
-                  <button
-                    type="button"
-                    class="pixel-btn pixel-btn--primary"
-                    onclick={() =>
-                      void onPutLiveOnTv(
-                        selectedPerson.mine ? "local" : selectedPerson.peerId,
-                        selectedPerson.name
-                      )}
-                  >
-                    {GO_ROOM_PUT_ON_TV}
-                  </button>
+                {#if role === "host"}
+                  <p class="muted">主持操作在卡片旁的更多。</p>
                 {:else if !selectedPerson.mine && (selectedPerson.liveVideo || selectedPerson.liveAudio)}
                   {#if goRoomMedia.watching || goRoomMedia.listening}
                     <button type="button" class="pixel-btn" onclick={() => void onStopWatching()}>
@@ -1264,20 +1331,32 @@
   >
     <div class="confirm pixel-frame">
       <h2 id="room-end-title" class="confirm-title">
-        {#if pendingAdHref}
+        {#if kickTarget}
+          {GO_ROOM_KICK}？
+        {:else if pendingAdHref}
           {role === "host" ? "結束這一間並打開小品？" : "離開這一間並打開小品？"}
         {:else}
           {role === "host" ? "結束這一間？" : "離開這一間？"}
         {/if}
       </h2>
       <p class="confirm-body">
-        {role === "host" ? GO_ROOM_END_CONFIRM_HOST : GO_ROOM_LEAVE_CONFIRM_GUEST}
+        {#if kickTarget}
+          {GO_ROOM_KICK_CONFIRM}
+        {:else}
+          {role === "host" ? GO_ROOM_END_CONFIRM_HOST : GO_ROOM_LEAVE_CONFIRM_GUEST}
+        {/if}
       </p>
       <div class="confirm-actions">
         <button type="button" class="pixel-btn" onclick={() => dismissConfirm()}>取消</button>
-        <button type="button" class="pixel-btn pixel-btn--danger" onclick={() => void confirmEndNow()}>
-          {role === "host" ? "結束" : "離開"}
-        </button>
+        {#if kickTarget}
+          <button type="button" class="pixel-btn pixel-btn--danger" onclick={() => confirmKickNow()}>
+            {GO_ROOM_KICK}
+          </button>
+        {:else}
+          <button type="button" class="pixel-btn pixel-btn--danger" onclick={() => void confirmEndNow()}>
+            {role === "host" ? "結束" : "離開"}
+          </button>
+        {/if}
       </div>
     </div>
   </dialog>
@@ -1467,20 +1546,6 @@
     list-style: none;
     margin: 0.4rem 0 0;
     padding: 0;
-  }
-  .member-row {
-    display: flex;
-    width: 100%;
-    min-height: 44px;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    padding: 0.35rem 0;
-    border: none;
-    background: none;
-    font: inherit;
-    text-align: left;
-    cursor: pointer;
   }
   .member-detail {
     margin-top: 0.4rem;

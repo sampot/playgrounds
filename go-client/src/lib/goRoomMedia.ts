@@ -12,6 +12,11 @@ import {
   type BoothTransceiverPc,
 } from "@pg/roster/rosterBoothMedia";
 import {
+  buildSessionBoothMessage,
+  isSessionBoothMessage,
+  type SessionBoothMessage,
+} from "@pg/roster/rosterSessionBooth";
+import {
   buildSessionCastMessage,
   isSessionCastMessage,
   type SessionCastMessage,
@@ -63,6 +68,8 @@ export type RoomMediaState = {
   listening: boolean;
   watchingProgram: boolean;
   remoteLives: RoomRemoteLive[];
+  /** Occupant whose live is on the TV; null when TV is off or a file. */
+  tvSourcePeerId: string | null;
 };
 
 export type RoomMediaResult =
@@ -131,7 +138,8 @@ function transportFromElement(el: HTMLMediaElement): Pick<
 export type RoomMediaControl =
   | SessionCastMessage
   | SessionCameraMessage
-  | SessionMicMessage;
+  | SessionMicMessage
+  | SessionBoothMessage;
 
 export type RoomMedia = {
   enableCamera(): Promise<RoomMediaResult>;
@@ -146,6 +154,10 @@ export type RoomMedia = {
   playProgram(): void;
   seekProgram(seconds: number): void;
   putLiveOnTv(peerId: string, name?: string): Promise<RoomMediaResult>;
+  haltLive(
+    peerId: string,
+    layer: "audio" | "video"
+  ): Promise<RoomMediaResult>;
   warmProgram(id: string): Promise<RoomMediaResult>;
   captureFromElement(el: HTMLMediaElement): Promise<RoomMediaResult>;
   stopStreamingFile(id: string): Promise<void>;
@@ -300,6 +312,7 @@ export function createRoomMedia(opts: {
       listening,
       watchingProgram,
       remoteLives: remoteLives.map((l) => ({ ...l })),
+      tvSourcePeerId: programFromLive ? tvSourcePeerId : null,
     };
   }
 
@@ -754,7 +767,7 @@ export function createRoomMedia(opts: {
           return { ok: false, error: "先開鏡頭或麥克風" };
         }
         if (!programFromLive) program?.stop();
-        tvSourcePeerId = opts.localAgentId;
+        tvSourcePeerId = "local";
         programFromLive = true;
         program = {
           audio: mic,
@@ -783,6 +796,33 @@ export function createRoomMedia(opts: {
       offerProgram();
       await push();
       if (!local) await this.forwardFrom(peerId);
+      emit();
+      return { ok: true };
+    },
+    async haltLive(peerId, layer) {
+      const local =
+        !peerId ||
+        peerId === "local" ||
+        peerId === opts.localAgentId;
+      if (local) {
+        if (layer === "audio") await this.disableMic();
+        else {
+          await this.disableCamera();
+          await this.disableDisplay();
+        }
+        return { ok: true };
+      }
+      opts.sendJson(
+        buildSessionBoothMessage({
+          op: layer === "audio" ? "mute" : "camera_off",
+          from: opts.localAgentId,
+          to: peerId,
+        })
+      );
+      setRemoteLive(
+        peerId,
+        layer === "audio" ? { mic: false } : { camera: false }
+      );
       emit();
       return { ok: true };
     },
@@ -973,6 +1013,16 @@ export function createRoomMedia(opts: {
       }
     },
     async onControl(data) {
+      if (isSessionBoothMessage(data)) {
+        if (opts.forward) return;
+        if (data.to !== opts.localAgentId) return;
+        if (data.op === "mute") await this.disableMic();
+        if (data.op === "camera_off") {
+          await this.disableCamera();
+          await this.disableDisplay();
+        }
+        return;
+      }
       if (isSessionCameraMessage(data)) {
         if (data.from === opts.localAgentId) return;
         if (data.op === "offer") {

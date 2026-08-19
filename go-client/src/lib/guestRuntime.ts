@@ -45,6 +45,7 @@ import { goRoomFiles } from "./goRoomFiles.svelte";
 import { goRoomMedia } from "./goRoomMedia.svelte";
 import {
   GO_ROOM_CONNECT_FAILED,
+  GO_ROOM_KICKED,
   GO_ROOM_MESH_ENABLED,
   GO_ROOM_QUICK_REPLIES,
   roomOccupancyFromSnapshot,
@@ -55,6 +56,7 @@ import { isSessionFileControl } from "@pg/roster/rosterSessionFile";
 import { isSessionMeshMessage } from "@pg/roster/rosterSessionMesh";
 import { isSessionCastMessage } from "@pg/roster/rosterSessionCast";
 import { isSessionOccupancyMessage } from "@pg/roster/rosterSessionOccupancy";
+import { isSessionBoothMessage } from "@pg/roster/rosterSessionBooth";
 import {
   isSessionCameraMessage,
   isSessionMicMessage,
@@ -703,6 +705,12 @@ export function createGuestRuntime() {
               goRoomFiles.onControl(data);
             } else if (GO_ROOM_MESH_ENABLED && isSessionMeshMessage(data)) {
               void meshClient?.onHostMessage(data);
+            } else if (isSessionBoothMessage(data)) {
+              if (data.op === "kick" && data.to === localAgentId) {
+                markHostEnded(GO_ROOM_KICKED);
+                return;
+              }
+              void goRoomMedia.onCastControl(data);
             } else if (
               isSessionCastMessage(data) ||
               isSessionCameraMessage(data) ||

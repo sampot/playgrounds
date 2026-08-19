@@ -345,6 +345,7 @@ describe("createRoomMedia", () => {
       forward: true,
     });
     await media.putLiveOnTv("g-a", "小明");
+    expect(media.getState().tvSourcePeerId).toBe("g-a");
     expect(json).toContainEqual({
       type: SESSION_CAMERA_TYPE,
       v: 1,
@@ -608,5 +609,93 @@ describe("createRoomMedia", () => {
     });
     expect(media.getState().watching).toBe(true);
     expect(media.getState().listening).toBe(true);
+  });
+
+  it("asks a guest to drop the mic and camera from the Host menu", async () => {
+    const json: unknown[] = [];
+    const media = createRoomMedia({
+      localAgentId: "host",
+      occupantCount: () => 2,
+      peers: () => [],
+      sendJson: (m) => json.push(m),
+    });
+    media.onControl({
+      type: SESSION_MIC_TYPE,
+      v: 1,
+      op: "offer",
+      from: "g-a",
+    });
+    media.onControl({
+      type: SESSION_CAMERA_TYPE,
+      v: 1,
+      op: "offer",
+      from: "g-a",
+    });
+    expect((await media.haltLive("g-a", "audio")).ok).toBe(true);
+    expect((await media.haltLive("g-a", "video")).ok).toBe(true);
+    expect(json).toContainEqual({
+      type: "session_booth",
+      v: 1,
+      op: "mute",
+      from: "host",
+      to: "g-a",
+    });
+    expect(json).toContainEqual({
+      type: "session_booth",
+      v: 1,
+      op: "camera_off",
+      from: "host",
+      to: "g-a",
+    });
+    expect(media.getState().remoteLives).toEqual([]);
+  });
+
+  it("turns off the local mic when the Host sends mute", async () => {
+    const mic = track("audio", "mic");
+    const media = createRoomMedia({
+      localAgentId: "g-a",
+      occupantCount: () => 2,
+      peers: () => [],
+      sendJson: () => {},
+      getUserMedia: async () =>
+        ({
+          getVideoTracks: () => [],
+          getAudioTracks: () => [mic],
+        }) as unknown as MediaStream,
+    });
+    expect((await media.enableMic()).ok).toBe(true);
+    await media.onControl({
+      type: "session_booth",
+      v: 1,
+      op: "mute",
+      from: "host",
+      to: "g-a",
+    });
+    expect(media.getState().mic).toBe(false);
+  });
+
+  it("does not let a guest mute the Host over booth control", async () => {
+    const mic = track("audio", "mic");
+    const media = createRoomMedia({
+      localAgentId: "host",
+      occupantCount: () => 2,
+      peers: () => [],
+      sendJson: () => {},
+      forward: true,
+      getUserMedia: async () =>
+        ({
+          getVideoTracks: () => [],
+          getAudioTracks: () => [mic],
+        }) as unknown as MediaStream,
+    });
+    expect((await media.enableMic()).ok).toBe(true);
+    await media.onControl({
+      type: "session_booth",
+      v: 1,
+      op: "mute",
+      from: "g-a",
+      to: "host",
+    });
+    expect(media.getState().mic).toBe(true);
   });
 });

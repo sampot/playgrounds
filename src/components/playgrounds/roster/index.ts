@@ -315,3 +315,14 @@ export type {
   SessionCameraOp,
   SessionCameraMessage,
 } from "./rosterSessionCamera";
+
+export {
+  SESSION_BOOTH_TYPE,
+  SESSION_BOOTH_VERSION,
+  isSessionBoothMessage,
+  buildSessionBoothMessage,
+} from "./rosterSessionBooth";
+export type {
+  SessionBoothOp,
+  SessionBoothMessage,
+} from "./rosterSessionBooth";

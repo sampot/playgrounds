@@ -342,6 +342,13 @@ export const GO_ROOM_TV_HINT_HOST =
   "片子在檔案區掛上後按放到電視上。鏡頭在成員區指定。";
 export const GO_ROOM_TV_HINT_GUEST = "電視畫面由主持指定。點全螢幕可放大。";
 export const GO_ROOM_PUT_ON_TV = "放到電視上";
+export const GO_ROOM_FORCE_MUTE = "強制靜音";
+export const GO_ROOM_FORCE_CAMERA_OFF = "關閉鏡頭";
+export const GO_ROOM_KICK = "踢出包廂";
+export const GO_ROOM_MEMBER_MORE = "更多";
+export const GO_ROOM_KICK_CONFIRM =
+  "要把這個人請出這一間？對方會斷線；其他人還在。";
+export const GO_ROOM_KICKED = "主持請你離開這一間";
 export const GO_ROOM_TV_OFF_BTN = "關掉電視";
 export const GO_ROOM_TV_PLAY = "播放";
 export const GO_ROOM_TV_PAUSE = "暫停";
@@ -566,6 +573,156 @@ export function roomOccupantRows(opts: {
         };
       }),
   ];
+}
+
+export const GO_ROOM_ROLE_HOST = "主持人";
+export const GO_ROOM_ROLE_PRESENTER = "主講人";
+export const GO_ROOM_ON_AIR = "LIVE";
+export const GO_ROOM_HAND_RAISE = "舉手";
+
+export type RoomMemberCardView = {
+  peerId: string;
+  name: string;
+  mine: boolean;
+  avatarUrl: string | null;
+  avatarInitial: string;
+  host: boolean;
+  presenter: boolean;
+  micOn: boolean;
+  cameraOn: boolean;
+  speaking: boolean;
+  onAir: boolean;
+  handRaised: boolean;
+};
+
+/** First visible grapheme for a letter avatar when there is no photo. */
+export function roomMemberAvatarInitial(name: string): string {
+  const t = name.trim();
+  if (!t) return "?";
+  const first = [...t][0];
+  return first || "?";
+}
+
+/** True when this occupant's live is the designated TV source. */
+export function roomMemberOnAir(opts: {
+  peerId: string;
+  mine: boolean;
+  tvSourcePeerId: string | null;
+  localAgentId?: string | null;
+}): boolean {
+  const src = opts.tvSourcePeerId?.trim();
+  if (!src) return false;
+  if (src === opts.peerId) return true;
+  if (!opts.mine) return false;
+  if (src === "local") return true;
+  const localId = opts.localAgentId?.trim();
+  return Boolean(localId) && src === localId;
+}
+
+/** Member-list card model: roles, mic／camera, LIVE, 舉手. */
+export function roomMemberCard(opts: {
+  occupant: RoomOccupant;
+  hostPeerId?: string | null;
+  tvSourcePeerId?: string | null;
+  localAgentId?: string | null;
+  speaking?: boolean;
+  handRaised?: boolean;
+  avatarUrl?: string | null;
+}): RoomMemberCardView {
+  const hostId = opts.hostPeerId?.trim() || "";
+  const host = Boolean(hostId) && opts.occupant.peerId === hostId;
+  const onAir = roomMemberOnAir({
+    peerId: opts.occupant.peerId,
+    mine: opts.occupant.mine,
+    tvSourcePeerId: opts.tvSourcePeerId ?? null,
+    localAgentId: opts.localAgentId,
+  });
+  const micOn = opts.occupant.liveAudio;
+  return {
+    peerId: opts.occupant.peerId,
+    name: opts.occupant.name,
+    mine: opts.occupant.mine,
+    avatarUrl: opts.avatarUrl?.trim() || null,
+    avatarInitial: roomMemberAvatarInitial(opts.occupant.name),
+    host,
+    presenter: onAir,
+    micOn,
+    cameraOn: opts.occupant.liveVideo,
+    speaking: Boolean(opts.speaking) && micOn,
+    onAir,
+    handRaised: Boolean(opts.handRaised),
+  };
+}
+
+function memberRankBit(on: boolean): number {
+  return on ? 0 : 1;
+}
+
+/**
+ * Roster order: 主持人 → 播送中 LIVE → 舉手 → 發言中 → 名稱.
+ * Does not mutate the input.
+ */
+export function roomMemberCardsSorted(
+  cards: readonly RoomMemberCardView[]
+): RoomMemberCardView[] {
+  return [...cards].sort((a, b) => {
+    const rank =
+      memberRankBit(a.host) - memberRankBit(b.host) ||
+      memberRankBit(a.onAir) - memberRankBit(b.onAir) ||
+      memberRankBit(a.handRaised) - memberRankBit(b.handRaised) ||
+      memberRankBit(a.speaking) - memberRankBit(b.speaking);
+    if (rank !== 0) return rank;
+    const byName = a.name.localeCompare(b.name, "zh-Hant");
+    if (byName !== 0) return byName;
+    return a.peerId.localeCompare(b.peerId);
+  });
+}
+
+export type RoomHostMenuAction =
+  | "putOnTv"
+  | "forceMute"
+  | "forceCameraOff"
+  | "kick";
+
+export type RoomHostMenuItem = {
+  action: RoomHostMenuAction;
+  label: string;
+  enabled: boolean;
+  danger?: boolean;
+};
+
+/** Host-only overflow next to a member card. Kick is never for the local row. */
+export function roomHostMemberMenu(opts: {
+  mine: boolean;
+  liveAudio: boolean;
+  liveVideo: boolean;
+}): RoomHostMenuItem[] {
+  const items: RoomHostMenuItem[] = [
+    {
+      action: "putOnTv",
+      label: GO_ROOM_PUT_ON_TV,
+      enabled: opts.liveAudio || opts.liveVideo,
+    },
+    {
+      action: "forceMute",
+      label: GO_ROOM_FORCE_MUTE,
+      enabled: opts.liveAudio,
+    },
+    {
+      action: "forceCameraOff",
+      label: GO_ROOM_FORCE_CAMERA_OFF,
+      enabled: opts.liveVideo,
+    },
+  ];
+  if (!opts.mine) {
+    items.push({
+      action: "kick",
+      label: GO_ROOM_KICK,
+      enabled: true,
+      danger: true,
+    });
+  }
+  return items;
 }
 
 export type RoomInviteDoor = "none" | "live" | "expired";
