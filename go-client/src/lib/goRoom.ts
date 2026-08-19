@@ -134,10 +134,11 @@ export function roomChromeHideable(opts: {
   return true;
 }
 
-/** Pause chrome 3s hide while a sheet or the composer is in the way. */
+/** Pause chrome 3s hide while a sheet／overlay is in the way. Chat composer does not. */
 export function roomChromeShouldHold(opts: {
   shareOpen?: boolean;
   confirmOpen?: boolean;
+  /** Ignored: typing in 文字 must not reveal or pin the playground header. */
   composerFocused?: boolean;
   overlayOpen?: boolean;
   drawerOpen?: boolean;
@@ -145,7 +146,6 @@ export function roomChromeShouldHold(opts: {
   return Boolean(
     opts.shareOpen ||
       opts.confirmOpen ||
-      opts.composerFocused ||
       opts.overlayOpen ||
       opts.drawerOpen
   );
@@ -199,7 +199,7 @@ export function roomShowAdSlot(opts: {
 
 export type RoomEscStep =
   | "close-share"
-  | "close-tv-sheet"
+  | "close-tv-hud"
   | "clear-peer"
   | "close-drawer"
   | "exit-cinema"
@@ -208,13 +208,13 @@ export type RoomEscStep =
 /** Esc: overlays first; cinema shrinks to hall; only then leave-confirm. */
 export function roomEscStep(opts: {
   shareOpen?: boolean;
-  tvOpen?: boolean;
+  tvHudOpen?: boolean;
   selectedPeerId?: string | null;
   cinema?: boolean;
   drawerOpen?: boolean;
 }): RoomEscStep {
   if (opts.shareOpen) return "close-share";
-  if (opts.tvOpen) return "close-tv-sheet";
+  if (opts.tvHudOpen) return "close-tv-hud";
   if (opts.selectedPeerId) return "clear-peer";
   if (opts.cinema && opts.drawerOpen) return "close-drawer";
   if (opts.cinema) return "exit-cinema";
@@ -336,11 +336,15 @@ export const GO_ROOM_MEDIA_OFF = "鏡頭 · 未開";
 export const GO_ROOM_TV_OFF = "電視關機";
 export const GO_ROOM_TV_TITLE = "包廂電視";
 export const GO_ROOM_TV_FULLSCREEN = "全螢幕";
+export const GO_ROOM_TV_EXIT_FULLSCREEN = "離開全螢幕";
+export const GO_ROOM_TV_VOLUME = "音量";
 export const GO_ROOM_TV_HINT_HOST =
   "片子在檔案區掛上後按放到電視上。鏡頭在成員區指定。";
 export const GO_ROOM_TV_HINT_GUEST = "電視畫面由主持指定。點全螢幕可放大。";
 export const GO_ROOM_PUT_ON_TV = "放到電視上";
 export const GO_ROOM_TV_OFF_BTN = "關掉電視";
+export const GO_ROOM_TV_PLAY = "播放";
+export const GO_ROOM_TV_PAUSE = "暫停";
 export const GO_ROOM_CINEMA_ENTER = "隱藏控制面板";
 export const GO_ROOM_CINEMA_EXIT = "顯示控制面板";
 export const GO_ROOM_CAMERA_WATCH = "收看";
@@ -407,6 +411,68 @@ export function roomTvStream(opts: {
   localProgramStream?: MediaStream | null;
 }): MediaStream | null {
   return opts.programStream ?? opts.localProgramStream ?? null;
+}
+
+export type RoomTvHudKind = "none" | "host-file" | "watch";
+
+/** Host file clock lives on the picture; guests only watch. Off TV has no HUD. */
+export function roomTvHudKind(opts: {
+  tvOn: boolean;
+  role?: "host" | "guest";
+  fileTransport?: boolean;
+}): RoomTvHudKind {
+  if (!opts.tvOn) return "none";
+  if (opts.role === "host" && opts.fileTransport) return "host-file";
+  return "watch";
+}
+
+export function roomTvHudHasTransport(kind: RoomTvHudKind): boolean {
+  return kind === "host-file";
+}
+
+/** System slot fullscreen or in-app cinema both already fill the screen. */
+export function roomTvHudRestore(opts: {
+  slotFullscreen?: boolean;
+  cinema?: boolean;
+}): boolean {
+  return Boolean(opts.slotFullscreen || opts.cinema);
+}
+
+/** Speaker tap reveals／hides the volume slider; it is not inline on the bar. */
+export function roomTvVolumePanelAfterIconClick(open: boolean): boolean {
+  return !open;
+}
+
+export function roomTvVolumeFromInput(raw: number): number {
+  if (!Number.isFinite(raw)) return 0;
+  return Math.min(1, Math.max(0, raw));
+}
+
+/** HUD speaker and slider share this; never mute while the bar still reads 100%. */
+export function roomTvHudDefaultSink(): { volume: number; muted: boolean } {
+  return { volume: 1, muted: false };
+}
+
+export function roomTvSinkMuted(volume: number, muted: boolean): boolean {
+  return Boolean(muted) || roomTvVolumeFromInput(volume) <= 0;
+}
+
+export function applyTvSinkVolume(
+  el: { volume: number; muted: boolean } | null | undefined,
+  opts: { volume: number; muted: boolean }
+): void {
+  if (!el) return;
+  const volume = roomTvVolumeFromInput(opts.volume);
+  el.volume = volume;
+  el.muted = roomTvSinkMuted(volume, opts.muted);
+}
+
+export function roomTvClockLabel(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
+  const total = Math.floor(seconds);
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
 }
 
 /** Status line: who is in + what the TV is doing. Never a door-code countdown. */
@@ -604,29 +670,39 @@ export type AttachMediaEl = {
   srcObject: MediaStream | null;
   paused: boolean;
   muted: boolean;
+  volume?: number;
   play: () => Promise<void>;
 };
 
+export type TvSinkVolume = { volume: number; muted: boolean };
+
 export function attachMediaStream(
   el: AttachMediaEl | HTMLMediaElement | null | undefined,
-  stream: MediaStream | null
+  stream: MediaStream | null,
+  sink?: TvSinkVolume
 ): void {
   if (!el) return;
   const media = el as AttachMediaEl;
+  const play = () => {
+    if (!stream) return;
+    void tryPlay(media).finally(() => {
+      if (sink) applyTvSinkVolume(media as { volume: number; muted: boolean }, sink);
+    });
+  };
   if (media.srcObject === stream) {
-    if (stream && media.paused) void tryPlay(media);
+    if (stream && media.paused) play();
+    else if (sink) applyTvSinkVolume(media as { volume: number; muted: boolean }, sink);
     return;
   }
   media.srcObject = stream;
-  if (stream) void tryPlay(media);
+  play();
 }
 
-/** Expand the booth TV. Prefers standard Fullscreen, then iOS `<video>` fullscreen. */
+/** Expand the booth TV slot (HUD included). Never the native `<video>` player. */
 export async function enterTvFullscreen(
   el:
     | {
         requestFullscreen?: () => Promise<void>;
-        webkitEnterFullscreen?: () => void;
         webkitRequestFullscreen?: () => Promise<void>;
       }
     | null
@@ -639,13 +715,9 @@ export async function enterTvFullscreen(
       return true;
     }
   } catch {
-    /* iOS often exposes requestFullscreen but only webkitEnterFullscreen works. */
+    /* try the webkit prefix next */
   }
   try {
-    if (typeof el.webkitEnterFullscreen === "function") {
-      el.webkitEnterFullscreen();
-      return true;
-    }
     if (typeof el.webkitRequestFullscreen === "function") {
       await el.webkitRequestFullscreen();
       return true;
@@ -654,6 +726,92 @@ export async function enterTvFullscreen(
     return false;
   }
   return false;
+}
+
+export async function exitTvFullscreen(
+  doc:
+    | {
+        exitFullscreen?: () => Promise<void>;
+        webkitExitFullscreen?: () => Promise<void>;
+      }
+    | null
+    | undefined
+): Promise<boolean> {
+  if (!doc) return false;
+  try {
+    if (typeof doc.exitFullscreen === "function") {
+      await doc.exitFullscreen();
+      return true;
+    }
+  } catch {
+    /* try the webkit prefix next */
+  }
+  try {
+    if (typeof doc.webkitExitFullscreen === "function") {
+      await doc.webkitExitFullscreen();
+      return true;
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+
+export function tvFullscreenElement(
+  doc:
+    | {
+        fullscreenElement?: Element | null;
+        webkitFullscreenElement?: Element | null;
+      }
+    | null
+    | undefined
+): Element | null {
+  if (!doc) return null;
+  return doc.fullscreenElement ?? doc.webkitFullscreenElement ?? null;
+}
+
+export function tvIsFullscreen(
+  container: object | null | undefined,
+  fullscreenElement: object | null | undefined
+): boolean {
+  return Boolean(container && fullscreenElement && container === fullscreenElement);
+}
+
+export async function toggleTvFullscreen(opts: {
+  container:
+    | {
+        requestFullscreen?: () => Promise<void>;
+        webkitRequestFullscreen?: () => Promise<void>;
+      }
+    | null
+    | undefined;
+  fullscreenElement?: object | null;
+  exitFullscreen?: () => Promise<void>;
+}): Promise<"entered" | "exited" | "failed"> {
+  if (tvIsFullscreen(opts.container, opts.fullscreenElement)) {
+    if (opts.exitFullscreen) {
+      try {
+        await opts.exitFullscreen();
+        return "exited";
+      } catch {
+        return "failed";
+      }
+    }
+    const ok = await exitTvFullscreen(
+      typeof document !== "undefined" ? document : null
+    );
+    return ok ? "exited" : "failed";
+  }
+  const ok = await enterTvFullscreen(opts.container);
+  return ok ? "entered" : "failed";
+}
+
+/** Keep showing the program after leaving fullscreen; do not change the host clock. */
+export function syncTvSinkPlayback(
+  el: { paused?: boolean; play?: () => Promise<void> } | null | undefined
+): void {
+  if (!el || !el.paused || typeof el.play !== "function") return;
+  void el.play().catch(() => {});
 }
 
 function playbackSrcOf(el: { src: string; getAttribute?: (name: string) => string | null }): string {

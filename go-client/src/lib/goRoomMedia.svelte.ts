@@ -23,6 +23,10 @@ const EMPTY: RoomMediaState = {
   localPreviewStream: null,
   ownerDecodeUrl: null,
   ownerDecodeKind: null,
+  programTransport: false,
+  programPaused: true,
+  programTime: 0,
+  programDuration: 0,
   error: null,
   cameraBlocked: false,
   remoteCameraOffered: false,
@@ -45,6 +49,10 @@ class GoRoomMedia {
   localPreviewStream = $state<MediaStream | null>(null);
   ownerDecodeUrl = $state<string | null>(null);
   ownerDecodeKind = $state<"audio" | "video" | null>(null);
+  programTransport = $state(false);
+  programPaused = $state(true);
+  programTime = $state(0);
+  programDuration = $state(0);
   error = $state<string | null>(null);
   cameraBlocked = $state(false);
   remoteCameraOffered = $state(false);
@@ -79,6 +87,10 @@ class GoRoomMedia {
       this.localPreviewStream = s.localPreviewStream;
       this.ownerDecodeUrl = s.ownerDecodeUrl;
       this.ownerDecodeKind = s.ownerDecodeKind;
+      this.programTransport = s.programTransport;
+      this.programPaused = s.programPaused;
+      this.programTime = s.programTime;
+      this.programDuration = s.programDuration;
       this.error = s.error;
       this.cameraBlocked = s.cameraBlocked;
       this.remoteCameraOffered = s.remoteCameraOffered;
@@ -106,6 +118,10 @@ class GoRoomMedia {
     this.localPreviewStream = null;
     this.ownerDecodeUrl = null;
     this.ownerDecodeKind = null;
+    this.programTransport = false;
+    this.programPaused = true;
+    this.programTime = 0;
+    this.programDuration = 0;
     this.error = null;
     this.cameraBlocked = false;
     this.remoteCameraOffered = false;
@@ -187,6 +203,18 @@ class GoRoomMedia {
 
   stopProgram() {
     return this.#media?.stopProgram() ?? Promise.resolve();
+  }
+
+  pauseProgram() {
+    this.#media?.pauseProgram();
+  }
+
+  playProgram() {
+    this.#media?.playProgram();
+  }
+
+  seekProgram(seconds: number) {
+    this.#media?.seekProgram(seconds);
   }
 
   putLiveOnTv(peerId: string, name?: string) {

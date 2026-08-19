@@ -13,7 +13,7 @@ class ChromeSession {
   mode = $state<ChromePlayMode>(null);
   /** True when SAM canvas fills the viewport — chrome overlays, does not steal height. */
   canvasActive = $state(false);
-  /** Pause the 3s auto-hide while a sheet／composer is open (包廂). */
+  /** Pause the 3s auto-hide while a sheet／overlay is open (包廂). */
   holdAutoHide = $state(false);
   /** Overlay chrome (and 包廂劇院態 HUD) slid off-screen. */
   chromeHidden = $state(false);

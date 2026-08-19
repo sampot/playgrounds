@@ -24,15 +24,10 @@
     GO_ROOM_PUT_ON_TV,
     GO_ROOM_SHARE_HINT,
     GO_ROOM_SHARE_TITLE,
-    GO_ROOM_TV_FULLSCREEN,
-    GO_ROOM_TV_HINT_GUEST,
-    GO_ROOM_TV_HINT_HOST,
     GO_ROOM_TV_OFF_BTN,
-    GO_ROOM_TV_TITLE,
     attachMediaStream,
     attachPlaybackUrl,
     canShareDisplay,
-    enterTvFullscreen,
     isRoomInviteShareable,
     roomChatWhoLabel,
     roomChromeHideable,
@@ -56,8 +51,15 @@
     roomShellShowPane,
     roomShellTabPanes,
     roomStageStatus,
+    roomTvHudHasTransport,
+    roomTvHudKind,
+    roomTvHudRestore,
     roomTvLabel,
     roomTvStream,
+    syncTvSinkPlayback,
+    toggleTvFullscreen,
+    tvFullscreenElement,
+    tvIsFullscreen,
     takePickedFiles,
     type RoomInviteDoor,
     type RoomOccupantPeer,
@@ -125,16 +127,17 @@
   let filePlayEl = $state<HTMLMediaElement | null>(null);
   let now = $state(Date.now());
   let pane = $state<RoomShellPane>(roomShellDefaultPane());
-  let composerFocused = $state(false);
   let composerInputEl = $state<HTMLInputElement | null>(null);
   let roomEl = $state<HTMLElement | null>(null);
   let railEl = $state<HTMLElement | null>(null);
   let shellBox = $state({ widthPx: 0, heightPx: 0 });
   let railLeftPx = $state(0);
-  let tvOpen = $state(false);
+  let tvHudOpen = $state(false);
+  let tvSlotFullscreen = $state(false);
   let selectedPeerId = $state<string | null>(null);
   let pendingShare = $state(false);
   let tvVideoEl = $state<HTMLVideoElement | null>(null);
+  let tvSlotEl = $state<HTMLElement | null>(null);
   let cinemaUserEnter = $state(false);
 
   const messages = $derived(goSessionChat.messages);
@@ -178,11 +181,17 @@
     )
   );
   const overlayOpen = $derived(
-    tvOpen ||
-      (role === "host" && !loggedIn && phase === "idle") ||
+    (role === "host" && !loggedIn && phase === "idle") ||
       phase === "connecting" ||
       phase === "error" ||
       phase === "ended"
+  );
+  const tvHudKind = $derived(
+    roomTvHudKind({
+      tvOn,
+      role,
+      fileTransport: goRoomMedia.programTransport,
+    })
   );
   const shellMode = $derived(roomShellMode(shellBox));
   const selectedPerson = $derived(
@@ -339,7 +348,6 @@
     chromeSession.holdAutoHide = roomChromeShouldHold({
       shareOpen,
       confirmOpen: confirmEnd,
-      composerFocused,
       overlayOpen,
     });
     return () => {
@@ -363,7 +371,35 @@
   });
 
   $effect(() => {
+    if (tvHudKind === "none") tvHudOpen = false;
+  });
+
+  $effect(() => {
+    if (!tvHudOpen || tvHudKind === "none" || tvSlotFullscreen) return;
+    if (roomTvHudHasTransport(tvHudKind) && goRoomMedia.programPaused) return;
+    const t = window.setTimeout(() => {
+      tvHudOpen = false;
+    }, 3200);
+    return () => window.clearTimeout(t);
+  });
+
+  $effect(() => {
     if (!cinemaAllowed) cinemaUserEnter = false;
+  });
+
+  $effect(() => {
+    const onFs = () => {
+      const on = tvIsFullscreen(tvSlotEl, tvFullscreenElement(document));
+      tvSlotFullscreen = on;
+      if (on) tvHudOpen = true;
+      else syncTvSinkPlayback(tvVideoEl);
+    };
+    document.addEventListener("fullscreenchange", onFs);
+    document.addEventListener("webkitfullscreenchange", onFs);
+    return () => {
+      document.removeEventListener("fullscreenchange", onFs);
+      document.removeEventListener("webkitfullscreenchange", onFs);
+    };
   });
 
   $effect(() => {
@@ -381,7 +417,7 @@
     chromeSession.escapeGuard = () => {
       const step = roomEscStep({
         shareOpen,
-        tvOpen,
+        tvHudOpen,
         selectedPeerId,
         cinema,
       });
@@ -390,8 +426,8 @@
         pendingShare = false;
         return false;
       }
-      if (step === "close-tv-sheet") {
-        tvOpen = false;
+      if (step === "close-tv-hud") {
+        tvHudOpen = false;
         return false;
       }
       if (step === "clear-peer") {
@@ -534,7 +570,7 @@
   async function onPlayFile(id: string) {
     mediaError = "";
     fileError = "";
-    tvOpen = false;
+    tvHudOpen = false;
     pane = "files";
     if (goRoomFiles.playback?.id === id) {
       goRoomFiles.stopPlay();
@@ -567,7 +603,31 @@
   }
 
   async function onTvFullscreen() {
-    await enterTvFullscreen(tvVideoEl);
+    if (tvSlotFullscreen) {
+      const result = await toggleTvFullscreen({
+        container: tvSlotEl,
+        fullscreenElement: tvFullscreenElement(document),
+      });
+      if (result === "exited" || result === "failed") {
+        tvSlotFullscreen = false;
+        syncTvSinkPlayback(tvVideoEl);
+      }
+      return;
+    }
+    if (cinema) {
+      onCinemaToggle();
+      return;
+    }
+    const result = await toggleTvFullscreen({
+      container: tvSlotEl,
+      fullscreenElement: tvFullscreenElement(document),
+    });
+    if (result === "entered") {
+      tvSlotFullscreen = true;
+      tvHudOpen = true;
+      return;
+    }
+    onCinemaToggle();
   }
 
   async function onUnshare(id: string) {
@@ -611,7 +671,8 @@
   }
 
   function onTvHit() {
-    tvOpen = true;
+    if (tvHudKind === "none") return;
+    tvHudOpen = !tvHudOpen;
   }
 
   function onCinemaToggle() {
@@ -661,7 +722,31 @@
 
   <div class="room-tv-col">
     <div class="room-tv-stage">
-      <GoRoomTvSlot {tvOn} {tvStream} bind:videoEl={tvVideoEl} onOpen={onTvHit} />
+      <GoRoomTvSlot
+        {tvOn}
+        {tvStream}
+        hudOpen={tvHudOpen}
+        hudKind={tvHudKind}
+        isHost={role === "host"}
+        slotFullscreen={tvSlotFullscreen}
+        restore={roomTvHudRestore({
+          slotFullscreen: tvSlotFullscreen,
+          cinema,
+        })}
+        paused={goRoomMedia.programPaused}
+        currentTime={goRoomMedia.programTime}
+        duration={goRoomMedia.programDuration}
+        bind:videoEl={tvVideoEl}
+        bind:slotEl={tvSlotEl}
+        onToggle={onTvHit}
+        onPlayPause={() =>
+          goRoomMedia.programPaused
+            ? goRoomMedia.playProgram()
+            : goRoomMedia.pauseProgram()}
+        onSeek={(seconds) => goRoomMedia.seekProgram(seconds)}
+        onFullscreen={() => void onTvFullscreen()}
+        onPower={() => void onStopTv()}
+      />
       {#if showAd}
         <div class="room-ad">
           <GoAdSlot onNavigate={onAdNavigate} />
@@ -1090,8 +1175,6 @@
               autocomplete="off"
               enterkeyhint="send"
               bind:value={draft}
-              onfocus={() => (composerFocused = true)}
-              onblur={() => (composerFocused = false)}
             />
             <button type="submit" class="pixel-btn pixel-btn--primary" disabled={!draft.trim()}>
               送出
@@ -1162,30 +1245,6 @@
             {/if}
             <a class="pixel-btn" href="/">回遊樂場大廳</a>
           </div>
-        </div>
-      {:else if tvOpen && inBooth}
-        <div class="booth-sheet pixel-box">
-          <div class="booth-sheet-bar">
-            <p class="booth-sheet-title pixel-text">{GO_ROOM_TV_TITLE}</p>
-            <button type="button" class="pixel-btn" onclick={() => (tvOpen = false)}>關閉</button>
-          </div>
-          <p>{tvLabel}</p>
-          {#if tvOn}
-            <div class="file-actions">
-              <button type="button" class="pixel-btn pixel-btn--primary" onclick={() => void onTvFullscreen()}>
-                {GO_ROOM_TV_FULLSCREEN}
-              </button>
-              {#if role === "host"}
-                <button type="button" class="pixel-btn" onclick={() => void onStopTv()}>
-                  {GO_ROOM_TV_OFF_BTN}
-                </button>
-              {/if}
-            </div>
-          {:else}
-            <p class="muted">
-              {role === "host" ? GO_ROOM_TV_HINT_HOST : GO_ROOM_TV_HINT_GUEST}
-            </p>
-          {/if}
         </div>
       {/if}
     </div>

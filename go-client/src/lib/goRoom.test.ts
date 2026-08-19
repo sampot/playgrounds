@@ -6,9 +6,13 @@ import {
   GO_ROOM_MEDIA_OFF,
   GO_ROOM_MESH_ENABLED,
   GO_ROOM_SHARE_HINT,
+  applyTvSinkVolume,
   attachMediaStream,
   attachPlaybackUrl,
   enterTvFullscreen,
+  syncTvSinkPlayback,
+  toggleTvFullscreen,
+  tvIsFullscreen,
   GO_ROOM_TV_FULLSCREEN,
   GO_ROOM_TV_HINT_GUEST,
   GO_ROOM_TV_HINT_HOST,
@@ -45,6 +49,14 @@ import {
   roomCinemaHudVisible,
   roomCinemaToggleLabel,
   roomEscStep,
+  roomTvClockLabel,
+  roomTvHudKind,
+  roomTvHudHasTransport,
+  roomTvHudRestore,
+  roomTvHudDefaultSink,
+  roomTvVolumePanelAfterIconClick,
+  roomTvSinkMuted,
+  roomTvVolumeFromInput,
   roomInviteDoorRow,
   roomShowAdSlot,
   roomShellActiveTab,
@@ -402,28 +414,60 @@ describe("attachPlaybackUrl", () => {
 });
 
 describe("enterTvFullscreen", () => {
-  it("uses the standard fullscreen API, then iOS video fullscreen", async () => {
+  it("fullscreens the TV slot so the same HUD stays on top", async () => {
     const requestFullscreen = vi.fn(async () => {});
     expect(await enterTvFullscreen({ requestFullscreen })).toBe(true);
     expect(requestFullscreen).toHaveBeenCalledTimes(1);
 
-    const webkitEnterFullscreen = vi.fn();
-    expect(await enterTvFullscreen({ webkitEnterFullscreen })).toBe(true);
-    expect(webkitEnterFullscreen).toHaveBeenCalledTimes(1);
+    const webkitRequestFullscreen = vi.fn(async () => {});
+    expect(await enterTvFullscreen({ webkitRequestFullscreen })).toBe(true);
+    expect(webkitRequestFullscreen).toHaveBeenCalledTimes(1);
 
     expect(await enterTvFullscreen(null)).toBe(false);
+  });
 
-    const denied = vi.fn(async () => {
-      throw new Error("denied");
-    });
-    const webkitEnterFullscreenFallback = vi.fn();
+  it("does not open the native video player", async () => {
+    const webkitEnterFullscreen = vi.fn();
     expect(
       await enterTvFullscreen({
-        requestFullscreen: denied,
-        webkitEnterFullscreen: webkitEnterFullscreenFallback,
+        requestFullscreen: async () => {
+          throw new Error("denied");
+        },
+        webkitEnterFullscreen,
       })
-    ).toBe(true);
-    expect(webkitEnterFullscreenFallback).toHaveBeenCalledTimes(1);
+    ).toBe(false);
+    expect(webkitEnterFullscreen).not.toHaveBeenCalled();
+    expect(await enterTvFullscreen({ webkitEnterFullscreen })).toBe(false);
+  });
+
+  it("exits the same slot fullscreen it entered", async () => {
+    const slot = { requestFullscreen: vi.fn(async () => {}) };
+    const exitFullscreen = vi.fn(async () => {});
+    expect(
+      await toggleTvFullscreen({
+        container: slot,
+        fullscreenElement: slot,
+        exitFullscreen,
+      })
+    ).toBe("exited");
+    expect(exitFullscreen).toHaveBeenCalledTimes(1);
+    expect(
+      await toggleTvFullscreen({
+        container: slot,
+        fullscreenElement: null,
+      })
+    ).toBe("entered");
+    expect(tvIsFullscreen(slot, slot)).toBe(true);
+    expect(tvIsFullscreen(slot, {})).toBe(false);
+  });
+
+  it("resumes the TV sink after native pause without touching the program clock", () => {
+    const play = vi.fn(async () => {});
+    const el = { paused: true, play };
+    syncTvSinkPlayback(el);
+    expect(play).toHaveBeenCalledTimes(1);
+    syncTvSinkPlayback({ paused: false, play });
+    expect(play).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -657,13 +701,19 @@ describe("roomChromeHideable", () => {
 });
 
 describe("roomChromeShouldHold", () => {
-  it("pauses auto-hide while a sheet or composer is in the way", () => {
+  it("pauses auto-hide while a sheet or overlay is in the way", () => {
     expect(roomChromeShouldHold({ shareOpen: true })).toBe(true);
     expect(roomChromeShouldHold({ confirmOpen: true })).toBe(true);
-    expect(roomChromeShouldHold({ composerFocused: true })).toBe(true);
     expect(roomChromeShouldHold({ overlayOpen: true })).toBe(true);
     expect(roomChromeShouldHold({ drawerOpen: true })).toBe(true);
     expect(roomChromeShouldHold({})).toBe(false);
+  });
+
+  it("does not pause auto-hide when the chat composer is focused", () => {
+    expect(roomChromeShouldHold({ composerFocused: true })).toBe(false);
+    expect(
+      roomChromeShouldHold({ composerFocused: true, shareOpen: true })
+    ).toBe(true);
   });
 });
 
@@ -734,7 +784,7 @@ describe("room cinema shell", () => {
 describe("roomEscStep", () => {
   it("closes overlays before shrinking cinema, then asks to leave", () => {
     expect(roomEscStep({ shareOpen: true, cinema: true })).toBe("close-share");
-    expect(roomEscStep({ tvOpen: true, cinema: true })).toBe("close-tv-sheet");
+    expect(roomEscStep({ tvHudOpen: true, cinema: true })).toBe("close-tv-hud");
     expect(roomEscStep({ selectedPeerId: "p", cinema: true })).toBe(
       "clear-peer"
     );
@@ -743,6 +793,61 @@ describe("roomEscStep", () => {
     );
     expect(roomEscStep({ cinema: true })).toBe("exit-cinema");
     expect(roomEscStep({})).toBe("confirm-end");
+  });
+});
+
+describe("room TV HUD", () => {
+  it("keeps host file transport on the picture, not a bottom sheet", () => {
+    expect(roomTvHudKind({ tvOn: false })).toBe("none");
+    expect(
+      roomTvHudKind({ tvOn: true, role: "host", fileTransport: true })
+    ).toBe("host-file");
+    expect(
+      roomTvHudKind({ tvOn: true, role: "host", fileTransport: false })
+    ).toBe("watch");
+    expect(roomTvHudKind({ tvOn: true, role: "guest" })).toBe("watch");
+    expect(roomTvHudHasTransport("host-file")).toBe(true);
+    expect(roomTvHudHasTransport("watch")).toBe(false);
+    expect(roomTvHudHasTransport("none")).toBe(false);
+  });
+
+  it("shows restore while the TV already fills the screen", () => {
+    expect(roomTvHudRestore({ slotFullscreen: true })).toBe(true);
+    expect(roomTvHudRestore({ cinema: true })).toBe(true);
+    expect(roomTvHudRestore({})).toBe(false);
+  });
+
+  it("keeps the volume slider behind the speaker until that control is used", () => {
+    expect(roomTvVolumePanelAfterIconClick(false)).toBe(true);
+    expect(roomTvVolumePanelAfterIconClick(true)).toBe(false);
+  });
+
+  it("starts the speaker at full volume, matching the slider", () => {
+    const sink = roomTvHudDefaultSink();
+    expect(sink.volume).toBe(1);
+    expect(sink.muted).toBe(false);
+    expect(roomTvSinkMuted(sink.volume, sink.muted)).toBe(false);
+  });
+
+  it("clamps local TV volume and treats zero as muted", () => {
+    expect(roomTvVolumeFromInput(0.4)).toBe(0.4);
+    expect(roomTvVolumeFromInput(1.8)).toBe(1);
+    expect(roomTvVolumeFromInput(-2)).toBe(0);
+    expect(roomTvSinkMuted(0.5, false)).toBe(false);
+    expect(roomTvSinkMuted(0, false)).toBe(true);
+    expect(roomTvSinkMuted(1, true)).toBe(true);
+    const el = { volume: 1, muted: false };
+    applyTvSinkVolume(el, { volume: 0.25, muted: false });
+    expect(el.volume).toBe(0.25);
+    expect(el.muted).toBe(false);
+    applyTvSinkVolume(el, { volume: 0, muted: false });
+    expect(el.muted).toBe(true);
+  });
+
+  it("formats a compact clock without stacking titles on the picture", () => {
+    expect(roomTvClockLabel(0)).toBe("0:00");
+    expect(roomTvClockLabel(65.2)).toBe("1:05");
+    expect(roomTvClockLabel(Number.NaN)).toBe("0:00");
   });
 });
 

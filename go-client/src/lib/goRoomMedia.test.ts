@@ -238,6 +238,42 @@ describe("createRoomMedia", () => {
     expect(media.getState().localProgramStream).not.toBeNull();
   });
 
+  it("lets the host pause and seek the file that is on the TV", async () => {
+    const clock = { paused: false, currentTime: 12, duration: 90 };
+    const video = track("video", "prog-v");
+    const file = new File([new Uint8Array(4)], "MTV.mp4", { type: "video/mp4" });
+    const media = createRoomMedia({
+      localAgentId: "host",
+      occupantCount: () => 1,
+      peers: () => [],
+      sendJson: () => {},
+      captureProgram: async () => ({
+        audio: null,
+        video,
+        stop: vi.fn(),
+        play() {
+          clock.paused = false;
+        },
+        pause() {
+          clock.paused = true;
+        },
+        seek(seconds: number) {
+          clock.currentTime = seconds;
+        },
+        clock: () => ({ ...clock }),
+      }),
+    });
+    expect((await media.startProgram(file)).ok).toBe(true);
+    expect(media.getState().programTransport).toBe(true);
+    expect(media.getState().programPaused).toBe(false);
+    media.pauseProgram();
+    expect(media.getState().programPaused).toBe(true);
+    media.playProgram();
+    expect(media.getState().programPaused).toBe(false);
+    media.seekProgram(40);
+    expect(media.getState().programTime).toBe(40);
+  });
+
   it("auto-pulls program RTP when the TV is offered", async () => {
     const json: unknown[] = [];
     const media = createRoomMedia({

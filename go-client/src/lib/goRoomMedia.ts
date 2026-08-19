@@ -51,6 +51,10 @@ export type RoomMediaState = {
   localPreviewStream: MediaStream | null;
   ownerDecodeUrl: string | null;
   ownerDecodeKind: "audio" | "video" | null;
+  programTransport: boolean;
+  programPaused: boolean;
+  programTime: number;
+  programDuration: number;
   error: string | null;
   cameraBlocked: boolean;
   remoteCameraOffered: boolean;
@@ -65,11 +69,64 @@ export type RoomMediaResult =
   | { ok: true }
   | { ok: false; error: string };
 
+export type RoomProgramClock = {
+  paused: boolean;
+  currentTime: number;
+  duration: number;
+};
+
 type CapturedProgram = {
   audio: MediaStreamTrack | null;
   video: MediaStreamTrack | null;
   stop: () => void;
+  play?: () => void;
+  pause?: () => void;
+  seek?: (seconds: number) => void;
+  clock?: () => RoomProgramClock | null;
+  mediaEl?: HTMLMediaElement;
 };
+
+function clockFromElement(el: HTMLMediaElement): RoomProgramClock {
+  const d = el.duration;
+  return {
+    paused: el.paused,
+    currentTime: Number.isFinite(el.currentTime) ? el.currentTime : 0,
+    duration: Number.isFinite(d) ? d : 0,
+  };
+}
+
+function transportFromElement(el: HTMLMediaElement): Pick<
+  CapturedProgram,
+  "play" | "pause" | "seek" | "clock" | "mediaEl"
+> {
+  return {
+    mediaEl: el,
+    play() {
+      try {
+        const played = el.play();
+        if (played && typeof played.catch === "function") void played.catch(() => {});
+      } catch {
+        /* ignore */
+      }
+    },
+    pause() {
+      try {
+        el.pause();
+      } catch {
+        /* ignore */
+      }
+    },
+    seek(seconds) {
+      if (!Number.isFinite(seconds)) return;
+      try {
+        el.currentTime = Math.max(0, seconds);
+      } catch {
+        /* ignore */
+      }
+    },
+    clock: () => clockFromElement(el),
+  };
+}
 
 export type RoomMediaControl =
   | SessionCastMessage
@@ -85,6 +142,9 @@ export type RoomMedia = {
   disableMic(): Promise<void>;
   startProgram(file: File): Promise<RoomMediaResult>;
   stopProgram(): Promise<void>;
+  pauseProgram(): void;
+  playProgram(): void;
+  seekProgram(seconds: number): void;
   putLiveOnTv(peerId: string, name?: string): Promise<RoomMediaResult>;
   warmProgram(id: string): Promise<RoomMediaResult>;
   captureFromElement(el: HTMLMediaElement): Promise<RoomMediaResult>;
@@ -180,6 +240,27 @@ export function createRoomMedia(opts: {
   let localProgramCache: { ids: string; stream: MediaStream } | null = null;
   let localCache: { ids: string; stream: MediaStream } | null = null;
 
+  function programClockState(): Pick<
+    RoomMediaState,
+    "programTransport" | "programPaused" | "programTime" | "programDuration"
+  > {
+    const clock = program?.clock?.() ?? null;
+    if (!clock) {
+      return {
+        programTransport: false,
+        programPaused: true,
+        programTime: 0,
+        programDuration: 0,
+      };
+    }
+    return {
+      programTransport: true,
+      programPaused: clock.paused,
+      programTime: clock.currentTime,
+      programDuration: clock.duration,
+    };
+  }
+
   function snap(): RoomMediaState {
     const presenceTracks = [
       isLiveTrack(remotePresenceVideo) ? remotePresenceVideo : null,
@@ -210,6 +291,7 @@ export function createRoomMedia(opts: {
       localPreviewStream: localCache?.stream ?? null,
       ownerDecodeUrl,
       ownerDecodeKind,
+      ...programClockState(),
       error,
       cameraBlocked: false,
       remoteCameraOffered,
@@ -389,6 +471,15 @@ export function createRoomMedia(opts: {
   let ownerDecodeKind: "audio" | "video" | null = null;
   let ownerDecodeEl: HTMLMediaElement | null = null;
 
+  function bindProgramClock(next: CapturedProgram | null): void {
+    const el = next?.mediaEl;
+    if (!el) return;
+    el.addEventListener("timeupdate", emit);
+    el.addEventListener("play", emit);
+    el.addEventListener("pause", emit);
+    el.addEventListener("seeked", emit);
+  }
+
   function revokeOwnerDecode(): void {
     if (ownerDecodeUrl) {
       try {
@@ -423,6 +514,7 @@ export function createRoomMedia(opts: {
     remoteProgramName = null;
     remoteProgramKind = null;
     error = null;
+    bindProgramClock(next);
     return { ok: true };
   }
 
@@ -438,6 +530,7 @@ export function createRoomMedia(opts: {
     program?.stop();
     program = next;
     error = null;
+    bindProgramClock(next);
     return { ok: true };
   }
 
@@ -618,6 +711,18 @@ export function createRoomMedia(opts: {
       await push();
       emit();
       return { ok: true };
+    },
+    pauseProgram() {
+      program?.pause?.();
+      emit();
+    },
+    playProgram() {
+      program?.play?.();
+      emit();
+    },
+    seekProgram(seconds) {
+      program?.seek?.(seconds);
+      emit();
     },
     async stopProgram() {
       if (program || programName) {
@@ -1156,6 +1261,7 @@ function captureFromMediaElement(el: HTMLMediaElement): CapturedProgram | null {
   return {
     audio: captured.getAudioTracks()[0] ?? null,
     video: videoTrack,
+    ...transportFromElement(el),
     stop() {
       if (raf && typeof window !== "undefined") window.cancelAnimationFrame(raf);
       if (drawTimer && typeof window !== "undefined") window.clearInterval(drawTimer);
@@ -1302,6 +1408,7 @@ async function captureProgramFromFile(file: File): Promise<CapturedProgram | nul
   return {
     audio: captured.getAudioTracks()[0] ?? null,
     video: captured.getVideoTracks()[0] ?? null,
+    ...transportFromElement(el),
     stop() {
       if (raf) window.cancelAnimationFrame(raf);
       if (drawTimer) window.clearInterval(drawTimer);
