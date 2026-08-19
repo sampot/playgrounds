@@ -13,6 +13,15 @@ class ChromeSession {
   mode = $state<ChromePlayMode>(null);
   /** True when SAM canvas fills the viewport — chrome overlays, does not steal height. */
   canvasActive = $state(false);
+  /** Pause the 3s auto-hide while a sheet／composer is open (包廂). */
+  holdAutoHide = $state(false);
+  /**
+   * Shrink the top-edge peek from the right so a hall side-rail (short
+   * landscape tabs, desktop members) stays tappable.
+   */
+  peekInsetEndPx = $state(0);
+  /** Bump to reveal overlay chrome (top-edge hit). */
+  revealRequest = $state(0);
   /** Monotonic signal for remounting the active solo game after an update. */
   gameReloadRequest = $state(0);
   flash = $state("");
@@ -51,6 +60,10 @@ class ChromeSession {
     this.canvasActive = active;
   }
 
+  requestChromeReveal(): void {
+    this.revealRequest += 1;
+  }
+
   requestGameReload(): void {
     this.gameReloadRequest += 1;
   }
@@ -61,6 +74,8 @@ class ChromeSession {
     this.kind = null;
     this.mode = null;
     this.canvasActive = false;
+    this.holdAutoHide = false;
+    this.peekInsetEndPx = 0;
     this.flash = "";
   }
 

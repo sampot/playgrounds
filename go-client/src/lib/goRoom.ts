@@ -17,12 +17,173 @@ export const ROOM_CHAT_PANEL_GUTTER_REM = 2.75;
 export const ROOM_SHORT_LANDSCAPE_MAX_HEIGHT_PX = 560;
 export const ROOM_SHORT_LANDSCAPE_MQ = `(orientation: landscape) and (max-height: ${ROOM_SHORT_LANDSCAPE_MAX_HEIGHT_PX}px)`;
 
+/** 40rem — tablet concurrent panes. Keep in sync with CSS min-width. */
+export const ROOM_SHELL_TABLET_MIN_PX = 640;
+/** 64rem — desktop TV + rail. Keep in sync with CSS min-width. */
+export const ROOM_SHELL_DESKTOP_MIN_PX = 1024;
+
+export type RoomShellMode =
+  | "portrait"
+  | "short-landscape"
+  | "tablet"
+  | "desktop";
+
+export type RoomShellPane = "members" | "files" | "chat";
+
+export type RoomUiPhase = "idle" | "open" | "ended" | "error" | "connecting" | "ready";
+
 /** Stacked portrait chrome vs a short-landscape stage+rail. */
 export function roomShortLandscape(opts: {
   widthPx: number;
   heightPx: number;
 }): boolean {
   return opts.widthPx > opts.heightPx && opts.heightPx <= ROOM_SHORT_LANDSCAPE_MAX_HEIGHT_PX;
+}
+
+export function roomShellMode(opts: {
+  widthPx: number;
+  heightPx: number;
+}): RoomShellMode {
+  if (roomShortLandscape(opts)) return "short-landscape";
+  if (opts.widthPx >= ROOM_SHELL_DESKTOP_MIN_PX) return "desktop";
+  if (opts.widthPx >= ROOM_SHELL_TABLET_MIN_PX) return "tablet";
+  return "portrait";
+}
+
+export function roomShellPanesConcurrent(
+  mode: RoomShellMode,
+  cinema = false
+): boolean {
+  if (cinema) return false;
+  return mode === "tablet" || mode === "desktop";
+}
+
+export function roomShellDefaultPane(): RoomShellPane {
+  return "members";
+}
+
+/**
+ * Top-edge chrome peek is 44px full-width by default. Hall side-rails put
+ * 成員／檔案／文字 under that strip — inset the peek so tabs stay tappable.
+ */
+export function roomChromePeekInsetEndPx(opts: {
+  mode: RoomShellMode;
+  cinema: boolean;
+  viewportWidthPx: number;
+  railLeftPx: number;
+}): number {
+  if (opts.cinema) return 0;
+  if (opts.mode !== "short-landscape" && opts.mode !== "desktop") return 0;
+  if (opts.railLeftPx <= 0) return 0;
+  return Math.max(0, Math.round(opts.viewportWidthPx - opts.railLeftPx));
+}
+
+/** Overlay chrome auto-hide only on the live booth main surface. */
+export function roomChromeHideable(opts: {
+  role: "host" | "guest";
+  phase: RoomUiPhase;
+  loggedIn: boolean;
+  inBooth: boolean;
+}): boolean {
+  if (!opts.inBooth) return false;
+  if (
+    opts.phase === "connecting" ||
+    opts.phase === "error" ||
+    opts.phase === "ended"
+  ) {
+    return false;
+  }
+  if (opts.role === "host" && !opts.loggedIn) return false;
+  return true;
+}
+
+/** Pause chrome 3s hide while a sheet or the composer is in the way. */
+export function roomChromeShouldHold(opts: {
+  shareOpen?: boolean;
+  confirmOpen?: boolean;
+  composerFocused?: boolean;
+  overlayOpen?: boolean;
+  drawerOpen?: boolean;
+}): boolean {
+  return Boolean(
+    opts.shareOpen ||
+      opts.confirmOpen ||
+      opts.composerFocused ||
+      opts.overlayOpen ||
+      opts.drawerOpen
+  );
+}
+
+/** Theatre mode: app-level fullscreen video. Not the browser Fullscreen API. */
+export function roomCinemaAllowed(opts: {
+  inBooth: boolean;
+  phase: RoomUiPhase;
+}): boolean {
+  if (!opts.inBooth) return false;
+  return (
+    opts.phase !== "connecting" &&
+    opts.phase !== "error" &&
+    opts.phase !== "ended"
+  );
+}
+
+export function roomCinemaActive(opts: {
+  allowed: boolean;
+  tvOn: boolean;
+  userExit: boolean;
+}): boolean {
+  if (!opts.allowed || !opts.tvOn || opts.userExit) return false;
+  return true;
+}
+
+/** House ad floats on the idle TV; hide once a program is streaming. */
+export function roomShowAdSlot(opts: {
+  inBooth?: boolean;
+  tvOn?: boolean;
+}): boolean {
+  if (opts.inBooth === false) return false;
+  return !opts.tvOn;
+}
+
+export type RoomEscStep =
+  | "close-share"
+  | "close-tv-sheet"
+  | "clear-peer"
+  | "close-drawer"
+  | "exit-cinema"
+  | "confirm-end";
+
+/** Esc: overlays first; cinema shrinks to hall; only then leave-confirm. */
+export function roomEscStep(opts: {
+  shareOpen?: boolean;
+  tvOpen?: boolean;
+  selectedPeerId?: string | null;
+  cinema?: boolean;
+  drawerOpen?: boolean;
+}): RoomEscStep {
+  if (opts.shareOpen) return "close-share";
+  if (opts.tvOpen) return "close-tv-sheet";
+  if (opts.selectedPeerId) return "clear-peer";
+  if (opts.cinema && opts.drawerOpen) return "close-drawer";
+  if (opts.cinema) return "exit-cinema";
+  return "confirm-end";
+}
+
+export function roomInviteDoorRow(opts: {
+  door: RoomInviteDoor;
+  remainLabel?: string;
+}): { label: string; action: string } {
+  if (opts.door === "live") {
+    const remain = opts.remainLabel?.trim();
+    return {
+      label: remain ? `邀請有效 · ${remain}` : "邀請有效",
+      action: "顯示邀請",
+    };
+  }
+  if (opts.door === "expired") {
+    return { label: "邀請已過期", action: "再發一張" };
+  }
+  return { label: "還沒發邀請", action: "請人進來" };
 }
 
 export type RoomChatLayout = "drawer" | "sidebar";
@@ -111,7 +272,7 @@ export const GO_ROOM_LOGIN_HINT =
   "被請進來的人不必有通行證；開這一間的人要留在這個畫面。另一台裝置請掃邀請進來。";
 
 export const GO_ROOM_END_CONFIRM_HOST =
-  "關掉後在場的人會斷線，目錄會沒了，電視與鏡頭會停。已存到硬碟的檔不受影響。";
+  "關掉後在場的人會斷線，目錄會沒了，電視與鏡頭會停，進行中的遊戲會停。已存到硬碟的檔不受影響。";
 
 export const GO_ROOM_LEAVE_CONFIRM_GUEST =
   "離開後你會斷線；其他人還在。你掛上的項目會從分享區拿掉。";
@@ -124,7 +285,7 @@ export const GO_ROOM_TV_OFF = "電視關機";
 export const GO_ROOM_TV_TITLE = "包廂電視";
 export const GO_ROOM_TV_FULLSCREEN = "全螢幕";
 export const GO_ROOM_TV_HINT_HOST =
-  "片子在分享區掛上後按放到電視上。鏡頭在座位上指定。";
+  "片子在檔案區掛上後按放到電視上。鏡頭在成員區指定。";
 export const GO_ROOM_TV_HINT_GUEST = "電視畫面由主持指定。點全螢幕可放大。";
 export const GO_ROOM_PUT_ON_TV = "放到電視上";
 export const GO_ROOM_TV_OFF_BTN = "關掉電視";
@@ -385,22 +546,25 @@ export function mediaTrackHasFrames(t: MediaStreamTrack): boolean {
 }
 
 /** Bind a stream to a media element without resetting srcObject on every emit. */
+export type AttachMediaEl = {
+  srcObject: MediaStream | null;
+  paused: boolean;
+  muted: boolean;
+  play: () => Promise<void>;
+};
+
 export function attachMediaStream(
-  el: {
-    srcObject: MediaStream | null;
-    paused: boolean;
-    muted: boolean;
-    play: () => Promise<void>;
-  } | null | undefined,
+  el: AttachMediaEl | HTMLMediaElement | null | undefined,
   stream: MediaStream | null
 ): void {
   if (!el) return;
-  if (el.srcObject === stream) {
-    if (stream && el.paused) void tryPlay(el);
+  const media = el as AttachMediaEl;
+  if (media.srcObject === stream) {
+    if (stream && media.paused) void tryPlay(media);
     return;
   }
-  el.srcObject = stream;
-  if (stream) void tryPlay(el);
+  media.srcObject = stream;
+  if (stream) void tryPlay(media);
 }
 
 /** Expand the booth TV. Prefers standard Fullscreen, then iOS `<video>` fullscreen. */

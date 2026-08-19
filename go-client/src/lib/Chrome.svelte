@@ -69,12 +69,20 @@
       moreOpen ||
       profileOpen ||
       drawerOpen ||
-      chatOpen
+      chatOpen ||
+      chromeSession.holdAutoHide
     )
       return;
     chromeAutoHideTimer = setTimeout(() => {
       chromeAutoHideTimer = null;
-      if (shareOpen || moreOpen || profileOpen || chatOpen) return;
+      if (
+        shareOpen ||
+        moreOpen ||
+        profileOpen ||
+        chatOpen ||
+        chromeSession.holdAutoHide
+      )
+        return;
       chromeHidden = true;
     }, CHROME_AUTO_HIDE_MS);
   }
@@ -152,10 +160,17 @@
 
   /** Drawer／對話面板展開時強制顯示 header（即便之前因 auto-hide 已隱藏）。 */
   $effect(() => {
-    if ((drawerOpen || chatOpen) && chromeHidden) {
+    if ((drawerOpen || chatOpen || chromeSession.holdAutoHide) && chromeHidden) {
       chromeHidden = false;
       scheduleChromeAutoHide();
     }
+  });
+
+  $effect(() => {
+    const n = chromeSession.revealRequest;
+    if (n === 0 || !chromeHideable) return;
+    chromeHidden = false;
+    scheduleChromeAutoHide();
   });
 
   $effect(() => {
@@ -184,7 +199,12 @@
    */
   $effect(() => {
     const panelOpen =
-      shareOpen || moreOpen || profileOpen || drawerOpen || chatOpen;
+      shareOpen ||
+      moreOpen ||
+      profileOpen ||
+      drawerOpen ||
+      chatOpen ||
+      chromeSession.holdAutoHide;
     if (!chromeHideable || chromeHidden || panelOpen) {
       clearChromeAutoHide();
       if (!chromeHideable) chromeHidden = false;
@@ -193,7 +213,15 @@
     if (chromeAutoHideTimer == null) {
       chromeAutoHideTimer = setTimeout(() => {
         chromeAutoHideTimer = null;
-        if (!(shareOpen || moreOpen || profileOpen || chatOpen))
+        if (
+          !(
+            shareOpen ||
+            moreOpen ||
+            profileOpen ||
+            chatOpen ||
+            chromeSession.holdAutoHide
+          )
+        )
           chromeHidden = true;
       }, CHROME_AUTO_HIDE_MS);
     }
@@ -429,6 +457,18 @@
     .filter(Boolean)
     .join(" ")}
 >
+  {#if chromeHideable && chromeHidden}
+    <button
+      type="button"
+      class="chrome-peek"
+      style:right="{chromeSession.peekInsetEndPx}px"
+      aria-label="顯示選單"
+      onclick={() => {
+        chromeHidden = false;
+        scheduleChromeAutoHide();
+      }}
+    ></button>
+  {/if}
   <header
     bind:this={chromeEl}
     class={[

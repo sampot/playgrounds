@@ -43,6 +43,7 @@
 - **不**做多 peer／觀戰／完美斷線重連／雲存棋譜（對齊 E2E 鎖 1 Guest；go `/i/` 臨時生命週期）。
 - **不**承諾 `/i/` 離線可玩（go 既有硬規則）。
 - 本刀**不**改 `sampot/pg-gomoku` 的 `app.js` 流程（§7 只**補** go 畫布橋）；gomoku 的「邀請對手」CTA 已存在——它在 go 只需 `/api/shell/platform/invite` 能成功回應即可照走。
+- **不**把包廂裡的開局做成 `invite.compose`（見 [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md) §5.9；本刀仍是「從遊戲中鑄門牌拉還沒在包廂的人」）。
 
 ---
 
@@ -226,3 +227,4 @@ go 目前只有 Guest runtime（`guestRuntime.ts`）。玩家 A 開局須在 go 
 | 日期 | 變更 |
 | --- | --- |
 | 2026-08-11 | 初版 Draft：GO-INVITE 化實（DEC-052 §5.3）；go 玩家以記憶體 field API key 走 `invite.compose`；go 側主持 `gomoku.v1` Host session；完成依據＝go A↔B 入座對弈至終局 |
+| 2026-08-19 | 劃清：包廂內開局不走本刀 compose（見 [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md) §5.9） |

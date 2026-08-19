@@ -13,3 +13,24 @@ describe("chromeSession game reload requests", () => {
     expect(chromeSession.gameReloadRequest).toBe(initial + 2);
   });
 });
+
+describe("chromeSession booth overlay chrome", () => {
+  beforeEach(() => chromeSession.clear());
+
+  it("bumps revealRequest so overlay chrome can come back", () => {
+    const initial = chromeSession.revealRequest;
+    chromeSession.requestChromeReveal();
+    chromeSession.requestChromeReveal();
+    expect(chromeSession.revealRequest).toBe(initial + 2);
+  });
+
+  it("clears holdAutoHide with the rest of the session", () => {
+    chromeSession.holdAutoHide = true;
+    chromeSession.peekInsetEndPx = 320;
+    chromeSession.setCanvasActive(true);
+    chromeSession.clear();
+    expect(chromeSession.holdAutoHide).toBe(false);
+    expect(chromeSession.peekInsetEndPx).toBe(0);
+    expect(chromeSession.canvasActive).toBe(false);
+  });
+});

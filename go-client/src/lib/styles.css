@@ -363,8 +363,23 @@ a {
   pointer-events: none;
 }
 .chrome-root--overlay .chrome,
-.chrome-root--overlay .chrome-flash--toast {
+.chrome-root--overlay .chrome-flash--toast,
+.chrome-root--overlay .chrome-peek {
   pointer-events: auto;
+}
+.chrome-peek {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 21;
+  height: 44px;
+  min-height: 44px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
 }
 .chrome-flash--toast-alone {
   /* Header auto-hidden: keep the boss bubble readable near the top edge. */
@@ -943,6 +958,11 @@ a {
   flex: 1;
   min-height: 0;
   height: 100%;
+}
+.site--playing .page-stack,
+.site--playing .page-wipe {
+  height: 100%;
+  min-height: 0;
 }
 @media (orientation: landscape) and (max-height: 560px) {
   .site:has(.room) .chrome {

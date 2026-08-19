@@ -34,6 +34,17 @@ import {
   roomOccupantSummary,
   roomRemoteSinkVisible,
   roomShortLandscape,
+  roomChromeHideable,
+  roomChromePeekInsetEndPx,
+  roomChromeShouldHold,
+  roomCinemaActive,
+  roomCinemaAllowed,
+  roomEscStep,
+  roomInviteDoorRow,
+  roomShowAdSlot,
+  roomShellDefaultPane,
+  roomShellMode,
+  roomShellPanesConcurrent,
   roomStageStatus,
   roomTvLabel,
   roomTvStream,
@@ -316,7 +327,7 @@ describe("booth copy", () => {
 
   it("warns that hung items and live pulls stop when the Host ends the booth", () => {
     expect(GO_ROOM_END_CONFIRM_HOST).toBe(
-      "關掉後在場的人會斷線，目錄會沒了，電視與鏡頭會停。已存到硬碟的檔不受影響。"
+      "關掉後在場的人會斷線，目錄會沒了，電視與鏡頭會停，進行中的遊戲會停。已存到硬碟的檔不受影響。"
     );
     expect(GO_ROOM_LEAVE_CONFIRM_GUEST).toBe(
       "離開後你會斷線；其他人還在。你掛上的項目會從分享區拿掉。"
@@ -413,7 +424,7 @@ describe("room TV copy", () => {
   it("names the booth TV panel, not the share catalog", () => {
     expect(GO_ROOM_TV_TITLE).toBe("包廂電視");
     expect(GO_ROOM_TV_FULLSCREEN).toBe("全螢幕");
-    expect(GO_ROOM_TV_HINT_HOST).toContain("分享區");
+    expect(GO_ROOM_TV_HINT_HOST).toContain("檔案區");
     expect(GO_ROOM_TV_HINT_HOST).toContain("放到電視上");
     expect(GO_ROOM_TV_HINT_GUEST).toContain("主持");
   });
@@ -456,6 +467,206 @@ describe("roomShortLandscape", () => {
   it("stays stacked on phone portrait and laptop height", () => {
     expect(roomShortLandscape({ widthPx: 390, heightPx: 844 })).toBe(false);
     expect(roomShortLandscape({ widthPx: 1440, heightPx: 900 })).toBe(false);
+  });
+});
+
+describe("roomShellMode", () => {
+  it("defaults to portrait on a phone", () => {
+    expect(roomShellMode({ widthPx: 390, heightPx: 844 })).toBe("portrait");
+    expect(roomShellPanesConcurrent("portrait")).toBe(false);
+    expect(roomShellDefaultPane()).toBe("members");
+  });
+
+  it("uses a short-landscape split on a phone on its side", () => {
+    expect(roomShellMode({ widthPx: 844, heightPx: 390 })).toBe(
+      "short-landscape"
+    );
+    expect(roomShellPanesConcurrent("short-landscape")).toBe(false);
+  });
+
+  it("shows all three panes on tablet and desktop", () => {
+    expect(roomShellMode({ widthPx: 768, heightPx: 1024 })).toBe("tablet");
+    expect(roomShellMode({ widthPx: 1440, heightPx: 900 })).toBe("desktop");
+    expect(roomShellPanesConcurrent("tablet")).toBe(true);
+    expect(roomShellPanesConcurrent("desktop")).toBe(true);
+  });
+});
+
+describe("roomChromePeekInsetEndPx", () => {
+  it("keeps the top-edge peek off the short-landscape tab rail", () => {
+    expect(
+      roomChromePeekInsetEndPx({
+        mode: "short-landscape",
+        cinema: false,
+        viewportWidthPx: 844,
+        railLeftPx: 500,
+      })
+    ).toBe(344);
+  });
+
+  it("stays full-width when tabs are not under the peek", () => {
+    expect(
+      roomChromePeekInsetEndPx({
+        mode: "short-landscape",
+        cinema: true,
+        viewportWidthPx: 844,
+        railLeftPx: 500,
+      })
+    ).toBe(0);
+    expect(
+      roomChromePeekInsetEndPx({
+        mode: "portrait",
+        cinema: false,
+        viewportWidthPx: 390,
+        railLeftPx: 0,
+      })
+    ).toBe(0);
+    expect(
+      roomChromePeekInsetEndPx({
+        mode: "tablet",
+        cinema: false,
+        viewportWidthPx: 768,
+        railLeftPx: 0,
+      })
+    ).toBe(0);
+  });
+
+  it("also leaves the desktop right rail uncovered", () => {
+    expect(
+      roomChromePeekInsetEndPx({
+        mode: "desktop",
+        cinema: false,
+        viewportWidthPx: 1440,
+        railLeftPx: 1120,
+      })
+    ).toBe(320);
+  });
+});
+
+describe("roomChromeHideable", () => {
+  it("hides chrome only on the live booth surface", () => {
+    expect(
+      roomChromeHideable({
+        role: "host",
+        phase: "open",
+        loggedIn: true,
+        inBooth: true,
+      })
+    ).toBe(true);
+    expect(
+      roomChromeHideable({
+        role: "guest",
+        phase: "ready",
+        loggedIn: false,
+        inBooth: true,
+      })
+    ).toBe(true);
+  });
+
+  it("keeps chrome up for login, connecting, and ended", () => {
+    expect(
+      roomChromeHideable({
+        role: "host",
+        phase: "idle",
+        loggedIn: false,
+        inBooth: false,
+      })
+    ).toBe(false);
+    expect(
+      roomChromeHideable({
+        role: "guest",
+        phase: "connecting",
+        loggedIn: false,
+        inBooth: false,
+      })
+    ).toBe(false);
+    expect(
+      roomChromeHideable({
+        role: "host",
+        phase: "ended",
+        loggedIn: true,
+        inBooth: false,
+      })
+    ).toBe(false);
+  });
+});
+
+describe("roomChromeShouldHold", () => {
+  it("pauses auto-hide while a sheet or composer is in the way", () => {
+    expect(roomChromeShouldHold({ shareOpen: true })).toBe(true);
+    expect(roomChromeShouldHold({ confirmOpen: true })).toBe(true);
+    expect(roomChromeShouldHold({ composerFocused: true })).toBe(true);
+    expect(roomChromeShouldHold({ overlayOpen: true })).toBe(true);
+    expect(roomChromeShouldHold({ drawerOpen: true })).toBe(true);
+    expect(roomChromeShouldHold({})).toBe(false);
+  });
+});
+
+describe("room cinema shell", () => {
+  it("stays in the hall until the booth is live", () => {
+    expect(
+      roomCinemaAllowed({ inBooth: false, phase: "connecting" })
+    ).toBe(false);
+    expect(roomCinemaAllowed({ inBooth: true, phase: "open" })).toBe(true);
+  });
+
+  it("fills the window when the TV is on, and leaves when the user exits", () => {
+    expect(
+      roomCinemaActive({ allowed: true, tvOn: true, userExit: false })
+    ).toBe(true);
+    expect(
+      roomCinemaActive({ allowed: true, tvOn: false, userExit: false })
+    ).toBe(false);
+    expect(
+      roomCinemaActive({ allowed: true, tvOn: true, userExit: true })
+    ).toBe(false);
+  });
+
+  it("floats on the TV when idle, and hides while the program is streaming", () => {
+    expect(roomShowAdSlot({})).toBe(true);
+    expect(roomShowAdSlot({ inBooth: true, tvOn: false })).toBe(true);
+    expect(roomShowAdSlot({ tvOn: true })).toBe(false);
+    expect(roomShowAdSlot({ inBooth: false })).toBe(false);
+    expect(roomShowAdSlot({ shortLandscape: true })).toBe(true);
+  });
+
+  it("does not keep three in-flow panes while cinema is on", () => {
+    expect(roomShellPanesConcurrent("desktop", true)).toBe(false);
+    expect(roomShellPanesConcurrent("desktop")).toBe(true);
+  });
+});
+
+describe("roomEscStep", () => {
+  it("closes overlays before shrinking cinema, then asks to leave", () => {
+    expect(roomEscStep({ shareOpen: true, cinema: true })).toBe("close-share");
+    expect(roomEscStep({ tvOpen: true, cinema: true })).toBe("close-tv-sheet");
+    expect(roomEscStep({ selectedPeerId: "p", cinema: true })).toBe(
+      "clear-peer"
+    );
+    expect(roomEscStep({ cinema: true, drawerOpen: true })).toBe(
+      "close-drawer"
+    );
+    expect(roomEscStep({ cinema: true })).toBe("exit-cinema");
+    expect(roomEscStep({})).toBe("confirm-end");
+  });
+});
+
+describe("roomInviteDoorRow", () => {
+  it("keeps the door as a small status, not a hero QR", () => {
+    expect(roomInviteDoorRow({ door: "none" })).toEqual({
+      label: "還沒發邀請",
+      action: "請人進來",
+    });
+    expect(
+      roomInviteDoorRow({ door: "live", remainLabel: "還有 4:32" })
+    ).toEqual({
+      label: "邀請有效 · 還有 4:32",
+      action: "顯示邀請",
+    });
+    expect(roomInviteDoorRow({ door: "expired" })).toEqual({
+      label: "邀請已過期",
+      action: "再發一張",
+    });
   });
 });
 

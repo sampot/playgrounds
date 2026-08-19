@@ -93,10 +93,12 @@
     /* 沿用原 `.page-wipe` 的高度契約：遊玩態撐滿（畫布 `height: 100%` 靠此解析），
        其餘頁面隨內容成長。 */
     min-height: 100%;
+    height: 100%;
   }
   .page-wipe {
     grid-area: 1 / 1;
     min-width: 0;
     min-height: 100%;
+    height: 100%;
   }
 </style>

@@ -51,14 +51,16 @@
   );
 
   $effect(() => {
+    // 包廂主面自己管 overlay chrome；不要當遊戲邀請設 catalog，
+    // 也不要 clear() 把 canvasActive／holdAutoHide 清掉。
+    if (isRoom) return;
     const source = samSource;
     if (
       !status ||
       status.phase === "idle" ||
       status.phase === "cancelled" ||
       status.phase === "ended" ||
-      status.phase === "left" ||
-      isRoom
+      status.phase === "left"
     ) {
       chromeSession.clear();
       return;
@@ -78,8 +80,8 @@
   }
 
   $effect(() => {
+    if (isRoom || !status) return;
     chromeSession.setCanvasActive(showCanvas);
-    return () => chromeSession.setCanvasActive(false);
   });
 
   onMount(() => {
