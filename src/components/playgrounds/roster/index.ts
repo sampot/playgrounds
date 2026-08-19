@@ -276,6 +276,18 @@ export {
   buildSessionMeshMessage,
   shouldOfferMesh,
 } from "./rosterSessionMesh";
+
+export {
+  SESSION_OCCUPANCY_TYPE,
+  SESSION_OCCUPANCY_VERSION,
+  SESSION_OCCUPANCY_MAX_PEERS,
+  isSessionOccupancyMessage,
+  buildSessionOccupancyMessage,
+} from "./rosterSessionOccupancy";
+export type {
+  SessionOccupancyPeer,
+  SessionOccupancyMessage,
+} from "./rosterSessionOccupancy";
 export type {
   SessionMeshOp,
   SessionMeshMessage,

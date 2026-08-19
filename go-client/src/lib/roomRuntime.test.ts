@@ -254,6 +254,71 @@ describe("roomRuntime", () => {
     );
   });
 
+  it("fans out occupancy so guests see the third person, not only the Host", async () => {
+    let loopOpts: {
+      prepareHandlers: () => {
+        handlers: {
+          onMessage: (data: unknown) => void;
+          onChannelClose: () => void;
+        };
+        attachSession: (s: ReturnType<typeof mockSession>) => void;
+      };
+    } | null = null;
+    fixtures.startLoop.mockImplementation((opts: typeof loopOpts) => {
+      loopOpts = opts;
+      return { stop: vi.fn(), inviteId: "inv-room" };
+    });
+    const { createRoomRuntime } = await import("./roomRuntime");
+    const rt = createRoomRuntime();
+    await rt.openBooth();
+    await rt.mintInviteAndAnswer();
+    const a = mockSession();
+    const b = mockSession();
+    const first = loopOpts!.prepareHandlers();
+    first.attachSession(a);
+    first.handlers.onMessage({
+      type: "presence",
+      agentId: "g-a",
+      name: "甲",
+    });
+    const second = loopOpts!.prepareHandlers();
+    second.attachSession(b);
+    second.handlers.onMessage({
+      type: "presence",
+      agentId: "g-b",
+      name: "乙",
+    });
+    const occupancyOf = (sess: ReturnType<typeof mockSession>) =>
+      sess.send.mock.calls
+        .map((c) => c[0] as { type?: string; occupants?: unknown[] })
+        .filter((m) => m?.type === "session_occupancy");
+    const lastA = occupancyOf(a).at(-1);
+    const lastB = occupancyOf(b).at(-1);
+    expect(lastA?.occupants).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ peerId: "g-a", name: "甲" }),
+        expect.objectContaining({ peerId: "g-b", name: "乙" }),
+      ])
+    );
+    expect(lastA?.occupants).toHaveLength(3);
+    expect(lastB?.occupants).toEqual(lastA?.occupants);
+
+    a.send.mockClear();
+    first.handlers.onChannelClose();
+    const afterLeave = occupancyOf(b).at(-1);
+    expect(afterLeave?.occupants).toHaveLength(2);
+    expect(afterLeave?.occupants).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ peerId: "g-b", name: "乙" }),
+      ])
+    );
+    expect(afterLeave?.occupants).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ peerId: "g-a" }),
+      ])
+    );
+  });
+
   it("does not mint when the Host is not logged in", async () => {
     fixtures.mint.mockRejectedValue(
       Object.assign(new Error("尚未登入遊樂場通行證，請先登入"), {

@@ -190,6 +190,33 @@ describe("guestRuntime invite.room", () => {
     expect(rt.getStatus().error).toBeNull();
   });
 
+  it("applies Host occupancy so a third person appears on the roster", async () => {
+    const { createGuestRuntime } = await import("./guestRuntime");
+    const rt = createGuestRuntime();
+    await rt.bootFromShortId("room1");
+    await rt.consentAndPlay("訪客甲");
+    const offerOpts = fixtures.createOffer.mock.calls[0]![0] as {
+      localPresence?: { agentId: string };
+      handlers?: { onMessage?: (data: unknown) => void };
+    };
+    const localId = offerOpts.localPresence?.agentId;
+    expect(localId).toBeTruthy();
+    offerOpts.handlers?.onMessage?.({
+      type: "session_occupancy",
+      v: 1,
+      occupants: [
+        { peerId: "host-1", name: "太郎" },
+        { peerId: localId, name: "訪客甲" },
+        { peerId: "g-b", name: "乙" },
+      ],
+    });
+    expect(rt.getStatus().guestCount).toBe(2);
+    expect(rt.getStatus().occupantPeers).toEqual([
+      { peerId: "host-1", name: "太郎" },
+      { peerId: "g-b", name: "乙" },
+    ]);
+  });
+
   it("ignores session_mesh hello so Guest↔Guest stays on the Host hub", async () => {
     const { createGuestRuntime } = await import("./guestRuntime");
     const rt = createGuestRuntime();

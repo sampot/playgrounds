@@ -17,6 +17,7 @@ import {
   roomInviteRemainLabel,
   roomMediaSummary,
   roomOccupantCount,
+  roomOccupancyFromSnapshot,
   roomOccupantRows,
   roomOccupantSummary,
   roomRemoteSinkVisible,
@@ -69,6 +70,27 @@ describe("room occupancy", () => {
     expect(roomOccupantCount(0)).toBe(1);
     expect(roomOccupantCount(1)).toBe(2);
     expect(roomOccupantCount(2)).toBe(3);
+  });
+});
+
+describe("roomOccupancyFromSnapshot", () => {
+  it("lets a Guest count the third person without listing themselves twice", () => {
+    expect(
+      roomOccupancyFromSnapshot({
+        localPeerId: "g-a",
+        occupants: [
+          { peerId: "host-1", name: "太郎" },
+          { peerId: "g-a", name: "甲" },
+          { peerId: "g-b", name: "乙" },
+        ],
+      })
+    ).toEqual({
+      guestCount: 2,
+      occupantPeers: [
+        { peerId: "host-1", name: "太郎" },
+        { peerId: "g-b", name: "乙" },
+      ],
+    });
   });
 });
 

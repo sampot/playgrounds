@@ -15,6 +15,7 @@ import {
 import { isSessionFileControl } from "@pg/roster/rosterSessionFile";
 import { isSessionMeshMessage } from "@pg/roster/rosterSessionMesh";
 import { isSessionCastMessage } from "@pg/roster/rosterSessionCast";
+import { buildSessionOccupancyMessage } from "@pg/roster/rosterSessionOccupancy";
 import {
   isSessionCameraMessage,
   isSessionMicMessage,
@@ -157,7 +158,30 @@ export function createRoomRuntime() {
       occupantPeers,
       message: roomOccupantSummary({ guestCount: live.length }),
     });
+    fanoutOccupancy();
     void goRoomMedia.refresh();
+  }
+
+  function occupancyRows(): { peerId: string; name: string }[] {
+    const host = hostName().slice(0, 64) || "主持";
+    const guests = slots
+      .filter((s) => !s.lost && s.session && s.peerId)
+      .map((s) => ({
+        peerId: s.peerId as string,
+        name: (s.displayName?.trim() || "訪客").slice(0, 64),
+      }));
+    return [{ peerId: localAgentId, name: host }, ...guests];
+  }
+
+  function fanoutOccupancy(): void {
+    const msg = buildSessionOccupancyMessage({ occupants: occupancyRows() });
+    for (const sess of liveSessions()) {
+      try {
+        sess.send(msg);
+      } catch {
+        /* ignore */
+      }
+    }
   }
 
   function hostName(): string {
@@ -305,6 +329,7 @@ export function createRoomRuntime() {
       },
       onChannelOpen: () => {
         if (status.phase !== "ended") {
+          fanoutOccupancy();
           set({
             phase: "open",
             error: null,

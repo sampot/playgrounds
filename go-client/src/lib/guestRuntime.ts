@@ -43,11 +43,18 @@ import {
 import { goSessionChat } from "./goSessionChat.svelte";
 import { goRoomFiles } from "./goRoomFiles.svelte";
 import { goRoomMedia } from "./goRoomMedia.svelte";
-import { GO_ROOM_CONNECT_FAILED, GO_ROOM_MESH_ENABLED, GO_ROOM_QUICK_REPLIES } from "./goRoom";
+import {
+  GO_ROOM_CONNECT_FAILED,
+  GO_ROOM_MESH_ENABLED,
+  GO_ROOM_QUICK_REPLIES,
+  roomOccupancyFromSnapshot,
+  roomOccupantCount,
+} from "./goRoom";
 import { chromeSession } from "./chromeSession.svelte";
 import { isSessionFileControl } from "@pg/roster/rosterSessionFile";
 import { isSessionMeshMessage } from "@pg/roster/rosterSessionMesh";
 import { isSessionCastMessage } from "@pg/roster/rosterSessionCast";
+import { isSessionOccupancyMessage } from "@pg/roster/rosterSessionOccupancy";
 import {
   isSessionCameraMessage,
   isSessionMicMessage,
@@ -612,7 +619,7 @@ export function createGuestRuntime() {
         });
         goRoomMedia.attach({
           localAgentId,
-          occupantCount: () => 2 + (meshClient?.knownPeerIds().length ?? 0),
+          occupantCount: () => roomOccupantCount(status.guestCount),
           peers: () => {
             const out: {
               peerId: string;
@@ -653,7 +660,7 @@ export function createGuestRuntime() {
         set({
           phase: "ready",
           surface: "room",
-          message: "已連線",
+          message: "",
           error: null,
           guestCount: 1 + (meshClient?.knownPeerIds().length ?? 0),
         });
@@ -670,14 +677,26 @@ export function createGuestRuntime() {
           onMessage: (data: unknown) => {
             if (isPresenceMessage(data)) {
               peerAgentId = data.agentId;
-              set({
-                occupantPeers: [
-                  {
-                    peerId: data.agentId,
-                    name: data.name?.trim() || "主持",
-                  },
-                ],
+              if (status.occupantPeers.length === 0) {
+                set({
+                  occupantPeers: [
+                    {
+                      peerId: data.agentId,
+                      name: data.name?.trim() || "主持",
+                    },
+                  ],
+                });
+              }
+            } else if (isSessionOccupancyMessage(data)) {
+              const view = roomOccupancyFromSnapshot({
+                localPeerId: localAgentId,
+                occupants: data.occupants,
               });
+              set({
+                occupantPeers: view.occupantPeers,
+                guestCount: view.guestCount,
+              });
+              void goRoomMedia.refresh();
             } else if (isSessionChatMessage(data)) {
               goSessionChat.onIncoming(data);
             } else if (isSessionFileControl(data)) {

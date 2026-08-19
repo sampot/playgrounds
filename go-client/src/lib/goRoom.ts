@@ -113,6 +113,31 @@ export type RoomOccupantPeer = {
   name: string;
 };
 
+/**
+ * Guest view of a Host occupancy snapshot: everyone else, including Host.
+ * `guestCount` matches Host (guests including self; Host not counted).
+ */
+export function roomOccupancyFromSnapshot(opts: {
+  localPeerId: string;
+  occupants: readonly RoomOccupantPeer[];
+}): { guestCount: number; occupantPeers: RoomOccupantPeer[] } {
+  const seen = new Set<string>();
+  const occupantPeers: RoomOccupantPeer[] = [];
+  for (const row of opts.occupants) {
+    const peerId = row.peerId?.trim();
+    if (!peerId || peerId === opts.localPeerId || seen.has(peerId)) continue;
+    seen.add(peerId);
+    occupantPeers.push({
+      peerId,
+      name: row.name?.trim() || "訪客",
+    });
+  }
+  return {
+    guestCount: occupantPeers.length,
+    occupantPeers,
+  };
+}
+
 export type RoomRemoteLive = {
   peerId: string;
   camera?: boolean;

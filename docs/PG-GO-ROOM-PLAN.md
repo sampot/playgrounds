@@ -362,6 +362,7 @@ pc.createDataChannel("roster", { ordered: true });
 | `presence` | 用 | 既有 |
 | `session_chat` | **用** | 文字；重用 [`rosterSessionChat.ts`](../src/components/playgrounds/roster/rosterSessionChat.ts) |
 | `session_file` | **用** | 分享目錄（**檔** metadata）＋按需串流（見 §8.2）；**不是**聊天附件 push；**不是**未 request 就送 bytes；**不掛資料夾** |
+| `session_occupancy` | **用** | 主持把在場名單 snapshot fanout（Hub 星狀；mesh 延後後人數不能再靠 `session_mesh.hello`） |
 | `session_mesh` | **延後** | 主持轉送任兩 peer 的 O／A；**不**經 Platform；**不**載檔 bytes／RTP。現況不介紹、不建 mesh 邊 |
 | `session_cast` | 媒體階段 | **電視控制面**（指定來源／關機；可選 name／paused／t 當標籤）；**不**承載影音 bytes；節目 RTP 走 Hub |
 | `session_camera` | Phase 2 | 鏡頭項：offer＝掛上；`request` 才送 RTP |
@@ -905,3 +906,4 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 | 2026-08-19 | **播放可用 SW：** 遠端影音播放若需要，可用 go 既有 Service Worker 攔截播放 URL、把 DC chunk 編成媒體 `Response`（含 Range）。下載仍禁止 SW／Cache 整檔 |
 | 2026-08-19 | **包廂電視主面：** 靜態內景（不走動）；主面＝電視不是時間線；兩層螢幕（電視 RTP ≠ 私下播 DC）；主持指定來源；電影廣播＝節目 RTP／`captureStream`；房級收電視與開麥聲；文字＝輔助抽屜。凍結 #18–#28 |
 | 2026-08-19 | **2c 落地：** `goBoothLayout`／`GoBoothStage`；節目槽＝電視（`startProgram`／`putLiveOnTv`）；房級收節目與麥；文字／分享抽屜；私下播留在分享區 |
+| 2026-08-19 | **在場名單 fanout：** mesh 延後後 Guest 只看得到主持；改走 `session_occupancy` snapshot，第三人加入時每人名單一致 |
