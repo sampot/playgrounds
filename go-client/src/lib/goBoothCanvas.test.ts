@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { BOOTH_TV_SCREEN, GO_BOOTH_WORLD } from "./goBoothLayout";
+import {
+  BOOTH_AD_LEFT,
+  BOOTH_AD_RIGHT,
+  BOOTH_TV_SCREEN,
+  GO_BOOTH_WORLD,
+} from "./goBoothLayout";
 import {
   boothTvOverlay,
   computeBoothCanvasLayout,
@@ -73,6 +78,14 @@ describe("drawBoothFrame", () => {
     drawBoothFrame(ctx, { occupants: [], hoverHotspot: null });
     expect(drawImage).not.toHaveBeenCalled();
     expect(fillRect.mock.calls.length).toBeGreaterThan(20);
+  });
+
+  it("paints wall ad posters beside the TV", () => {
+    const { ctx, fillRect } = mockCtx();
+    drawBoothFrame(ctx, { occupants: [], hoverHotspot: null });
+    const origins = fillRect.mock.calls.map((c) => `${c[0]},${c[1]}`);
+    expect(origins).toContain(`${BOOTH_AD_LEFT.x},${BOOTH_AD_LEFT.y}`);
+    expect(origins).toContain(`${BOOTH_AD_RIGHT.x},${BOOTH_AD_RIGHT.y}`);
   });
 
   it("draws a seated figure for each occupant", () => {

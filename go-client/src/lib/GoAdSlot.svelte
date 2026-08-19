@@ -18,11 +18,14 @@
     excludeCatalogId?: string | null;
     /** When true (canvas booted), slot hides. */
     canvasActive?: boolean;
+    /** If set, the slot does not navigate; caller handles (e.g. booth leave confirm). */
+    onNavigate?: (href: string) => void;
   };
 
   let {
     excludeCatalogId = null,
     canvasActive = false,
+    onNavigate,
   }: Props = $props();
 
   let entry = $state<GoCatalogEntry | null>(null);
@@ -60,6 +63,11 @@
       class="go-ad-slot-link"
       href={`/s/${encodeURIComponent(entry.id)}`}
       data-go-ad="house"
+      onclick={(e) => {
+        if (!onNavigate) return;
+        e.preventDefault();
+        onNavigate(`/s/${encodeURIComponent(entry.id)}`);
+      }}
     >
       <span class="go-ad-slot-art" aria-hidden="true">
         <GoEntryCover

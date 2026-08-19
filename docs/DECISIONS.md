@@ -1130,7 +1130,7 @@
 - **Status:** Proposed（2026-08-17；契約見 [PG-GO-ADS-PLAN.md](./PG-GO-ADS-PLAN.md)；Phase 1 house 已落地）
 - **Context:** `go.samkuo.me` 是玩家主場與型錄傳閱入口（DEC-050）；點數制只回收官方 TURN 成本。需要一條不擋玩的維持／變現路徑，且對齊 DEC-004（非產品腔）與 DEC-007（勿預設塞追蹤）。廣告必須是 shell 能力，不得進入 SAM iframe／可攜契約（DEC-053）。
 - **Decision:**
-  1. **投放面：** `/`、**`/s/<id>` 載入等待面**（一級）、**`/apps` 列表下方**；**不**掛 `/help`、`/i/`、畫布遊玩中（`canvasActive`）；**永不**進 SAM iframe。
+  1. **投放面：** `/`、**`/s/<id>` 載入等待面**（一級）、**`/apps` 列表下方**、**包廂主面**（主持 `/room` 與 Guest 同意後的包廂 UI，網址可仍是 `/i/`）；**不**掛 `/help`、**遊戲** Invite `/i/`（同意／對弈／SAM 等待）、畫布遊玩中（`canvasActive`）；**永不**進 SAM iframe。包廂 live 時 house 點擊須頁內確認再結束／離開。
   2. **尺寸：** 窄屏 **320×100**；寬屏 **728×90**（`min-width` 升階）。
   3. **Phase 1：** **house**——單則自推其他 `kind: game`（同源 cover／title → `/s/<id>`）；IAB 形單槽，**不是**「試試這些」迷你型錄；零第三方腳本；與 SAM fetch **並行**、不拖延 boot。
   4. **Phase 2：** **EthicalAds／Carbon 類**（否決 AdSense）；同一 `GoAdSlot` 換 provider；失敗可回退 house。
@@ -1144,6 +1144,7 @@
 - **Revision（2026-08-17）：** 初版 Proposed。
 - **Revision（2026-08-17）：** 投放面補 **`/apps` 列表中段** banner（撤回「/apps 不掛」）。
 - **Revision（2026-08-17）：** `/apps` 改為**列表下方**一格；每頁 **5** 款；分頁控制在列表上方。
+- **Revision（2026-08-19）：** 投放面補 **包廂主面**；遊戲 Invite `/i/` 仍不掛；live 點擊須確認。
 
 ---
 

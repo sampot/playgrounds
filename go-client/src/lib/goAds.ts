@@ -66,3 +66,8 @@ export function shouldShowGoAdSlot(opts?: {
   if (opts?.enabled === false) return false;
   return goAdsEnabled();
 }
+
+/** Live booth: house ad → `/s/` must confirm (ends / leaves). Idle chrome may navigate. */
+export function roomAdClickAction(live: boolean): "goto" | "confirm" {
+  return live ? "confirm" : "goto";
+}

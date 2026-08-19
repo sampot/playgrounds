@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  BOOTH_AD_LEFT,
+  BOOTH_AD_RIGHT,
   BOOTH_DOOR,
   BOOTH_SEATS,
   BOOTH_SHELF,
@@ -57,6 +59,19 @@ describe("goBoothLayout", () => {
       expect(rectsOverlap(seat, BOOTH_TV)).toBe(false);
       expect(seat.y).toBeGreaterThan(BOOTH_TV.y + BOOTH_TV.h);
     }
+  });
+
+  it("places wall ad posters beside the TV without covering furniture", () => {
+    for (const poster of [BOOTH_AD_LEFT, BOOTH_AD_RIGHT]) {
+      expect(rectsOverlap(poster, BOOTH_TV)).toBe(false);
+      expect(rectsOverlap(poster, BOOTH_DOOR)).toBe(false);
+      expect(rectsOverlap(poster, BOOTH_SHELF)).toBe(false);
+      for (const seat of BOOTH_SEATS) {
+        expect(rectsOverlap(poster, seat)).toBe(false);
+      }
+    }
+    expect(BOOTH_AD_LEFT.x + BOOTH_AD_LEFT.w).toBeLessThan(BOOTH_TV.x);
+    expect(BOOTH_AD_RIGHT.x).toBeGreaterThan(BOOTH_TV.x + BOOTH_TV.w);
   });
 
   it("centers a seat on its cushion", () => {

@@ -24,6 +24,10 @@ export const BOOTH_DOOR: BoothRect = { x: 8, y: 118, w: 32, h: 56 };
 /** Share shelf on the right wall. */
 export const BOOTH_SHELF: BoothRect = { x: 280, y: 108, w: 32, h: 60 };
 
+/** House ad posters on the back wall (decorative; not furniture hotspots). */
+export const BOOTH_AD_LEFT: BoothRect = { x: 12, y: 24, w: 44, h: 56 };
+export const BOOTH_AD_RIGHT: BoothRect = { x: 264, y: 24, w: 44, h: 56 };
+
 /** Six cushions in front of the TV (soft cap). */
 export const BOOTH_SEATS: readonly BoothRect[] = [
   { x: 40, y: 168, w: 36, h: 20 },

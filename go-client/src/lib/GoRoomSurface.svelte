@@ -10,7 +10,9 @@
   import { goRoomMedia } from "$lib/goRoomMedia.svelte";
   import { pickRoomFileSave } from "$lib/goRoomFileSave";
   import GoShareSheet from "$lib/GoShareSheet.svelte";
+  import GoAdSlot from "$lib/GoAdSlot.svelte";
   import GoBoothStage from "$lib/GoBoothStage.svelte";
+  import { roomAdClickAction } from "$lib/goAds";
   import { chromeSession } from "$lib/chromeSession.svelte";
   import { boothHotspotPanel, boothSeatIndex, type BoothHotspotId } from "$lib/goBoothHotspots";
   import {
@@ -100,6 +102,7 @@
   let shareOpen = $state(false);
   let confirmEnd = $state(false);
   let leaveAfterEnd = $state(false);
+  let pendingAdHref = $state<string | null>(null);
   let confirmDialog = $state<HTMLDialogElement | null>(null);
   let fileInput = $state<HTMLInputElement | null>(null);
   let fileError = $state("");
@@ -540,7 +543,13 @@
     goRoomFiles.unshareLocal(id);
   }
 
+  function dismissConfirm() {
+    confirmEnd = false;
+    pendingAdHref = null;
+  }
+
   function askEnd(leaveHome = false) {
+    pendingAdHref = null;
     if (!live) {
       if (leaveHome) void goto("/");
       else void onEnd?.();
@@ -552,9 +561,22 @@
 
   async function confirmEndNow() {
     confirmEnd = false;
+    const adHref = pendingAdHref;
+    pendingAdHref = null;
     await onEnd?.();
-    if (leaveAfterEnd) void goto("/");
+    if (adHref) void goto(adHref);
+    else if (leaveAfterEnd) void goto("/");
     leaveAfterEnd = false;
+  }
+
+  function onAdNavigate(href: string) {
+    if (roomAdClickAction(live) === "goto") {
+      void goto(href);
+      return;
+    }
+    pendingAdHref = href;
+    leaveAfterEnd = false;
+    confirmEnd = true;
   }
 
   function inviteInBooth() {
@@ -948,6 +970,10 @@
   ></video>
 {/if}
 
+<div class="room-ad">
+  <GoAdSlot onNavigate={onAdNavigate} />
+</div>
+
 {#if chatOpen && showComposer}
   {#if coversCanvas}
     <button
@@ -1035,21 +1061,25 @@
   aria-labelledby="room-end-title"
   oncancel={(e) => {
     e.preventDefault();
-    confirmEnd = false;
+    dismissConfirm();
   }}
   onclick={(e) => {
-    if (e.target === confirmDialog) confirmEnd = false;
+    if (e.target === confirmDialog) dismissConfirm();
   }}
 >
   <div class="confirm pixel-frame">
     <h2 id="room-end-title" class="confirm-title">
-      {role === "host" ? "結束這一間？" : "離開這一間？"}
+      {#if pendingAdHref}
+        {role === "host" ? "結束這一間並打開小品？" : "離開這一間並打開小品？"}
+      {:else}
+        {role === "host" ? "結束這一間？" : "離開這一間？"}
+      {/if}
     </h2>
     <p class="confirm-body">
       {role === "host" ? GO_ROOM_END_CONFIRM_HOST : GO_ROOM_LEAVE_CONFIRM_GUEST}
     </p>
     <div class="confirm-actions">
-      <button type="button" class="pixel-btn" onclick={() => (confirmEnd = false)}>取消</button>
+      <button type="button" class="pixel-btn" onclick={() => dismissConfirm()}>取消</button>
       <button type="button" class="pixel-btn pixel-btn--danger" onclick={() => void confirmEndNow()}>
         {role === "host" ? "結束" : "離開"}
       </button>
@@ -1534,6 +1564,12 @@
     min-height: 44px;
     flex: 0 1 auto;
   }
+  .room-ad {
+    margin: 0.35rem 0 0;
+  }
+  .room-ad :global(.go-ad-slot) {
+    margin-top: 0;
+  }
   .file-hidden {
     position: absolute;
     width: 1px;
@@ -1653,6 +1689,9 @@
       padding: 0.3rem 0.25rem;
       white-space: normal;
       line-height: 1.15;
+    }
+    .room-ad {
+      display: none;
     }
     .err {
       position: absolute;

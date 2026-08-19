@@ -215,6 +215,7 @@ peer { peerId }             // 該人當下的在場 live（鏡頭或畫面）�
 - 清單永遠可及：canvas 失敗、`prefers-reduced-motion`、讀屏 → 電視仍是 DOM `<video>`，分享／開口／文字仍可用（大廳雙模式的包廂版，但**沒有**走路開關）。
 - 舞台＝頁面主內容（大廳同級 canvas 尺寸 320×200）；**不要**旁邊再加時間線。熱點按鈕在舞台下。寬屏遞增，禁止桌面先做再 `max-width` 縮小。
 - Guest `/i/` 不經大廳；內景本身須讀成「你在一間包廂」。可選極短 pixel wipe（不擋進門）。
+- **廣告版位：** 後牆電視兩側畫 house 看板（裝飾，**不**進家具熱點／捷徑，不搶電視／門／架）。DOM 同一 `GoAdSlot` 掛在舞台／操作列下方（窄屏）；短橫屏可藏 DOM 槽以免擠電視。點進 `/s/` 若包廂仍 live → **頁內確認**後結束／離開。遊戲 Invite 同意面與對弈中仍不掛（見 [PG-GO-ADS-PLAN.md](./PG-GO-ADS-PLAN.md)）。
 
 ---
 
@@ -895,6 +896,7 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 | 2026-08-18 | **1b／1c 實作：** `reserveBoothMediaTransceivers`（2+2）；`session_mesh` Host 轉 O／A；Guest↔Guest 檔 chunk 直連優先／star 備援；分享面第二台掃碼文案 |
 | 2026-08-18 | **2a／2b：** 鏡頭僅兩人、`session_cast`、本機 `captureStream` 播出；Host 轉 program track；播出條可收合 |
 | 2026-08-18 | **鏡頭＝掛／拉：** 開鏡頭不自動廣播 RTP；對方按收看才 `session_camera.request` |
+| 2026-08-19 | **廣告版位：** 包廂主面掛 house `GoAdSlot`＋內景後牆看板；live 點擊頁內確認後進 `/s/`；遊戲 Invite `/i/` 不掛 |
 | 2026-08-18 | **預設分享模型：** 目錄＝授權、內容永遠按需拉（檔／子目錄／鏡頭／麥／節目同一張目錄）。撤「在場視訊僅 1:1」。動詞改 **說／掛／要**。房級自動拉規則有需求再定義。掛子目錄僅瀏覽器支援時 |
 | 2026-08-18 | **實作對齊按需拉：** 人數不關鏡頭；麥／節目 offer 後等 `request` 才 `replaceTrack`；Host 轉節目只給請求者；`session_cast` 改 offer／request；支援時可掛子目錄 |
 | 2026-08-18 | **虛擬檔案系統：** 分享目錄掛檔／資料夾／裝置；影片下載或串流、不另掛節目；鏡頭＝裝置虛擬檔；`session_cast.request { id }` |

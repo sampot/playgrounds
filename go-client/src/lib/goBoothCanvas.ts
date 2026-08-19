@@ -1,4 +1,6 @@
 import {
+  BOOTH_AD_LEFT,
+  BOOTH_AD_RIGHT,
   BOOTH_DOOR,
   BOOTH_SEATS,
   BOOTH_SHELF,
@@ -9,6 +11,7 @@ import {
   BOOTH_WALL_TOP,
   GO_BOOTH_WORLD,
   boothSeatCenter,
+  type BoothRect,
 } from "./goBoothLayout";
 import type { BoothHotspotId } from "./goBoothHotspots";
 import {
@@ -140,6 +143,20 @@ function drawSnow(
   }
 }
 
+function drawWallPoster(
+  ctx: CanvasRenderingContext2D,
+  r: BoothRect,
+  accent: string
+) {
+  px(ctx, "#0a1018", r.x, r.y, r.w, r.h);
+  px(ctx, accent, r.x + 2, r.y + 2, r.w - 4, r.h - 4);
+  px(ctx, "#071018", r.x + 4, r.y + 4, r.w - 8, r.h - 8);
+  for (let y = r.y + 6; y < r.y + r.h - 8; y += 2) {
+    px(ctx, "#0c2430", r.x + 6, y, r.w - 12, 1);
+  }
+  px(ctx, "#c8b070", r.x + 8, r.y + r.h - 8, r.w - 16, 2);
+}
+
 export function drawBoothFrame(
   ctx: CanvasRenderingContext2D,
   state: BoothDrawState
@@ -162,6 +179,9 @@ export function drawBoothFrame(
   px(ctx, colors.wall, 0, 0, width, BOOTH_WALL_TOP + 10);
   px(ctx, colors.wallDark, 0, 0, width, 6);
   px(ctx, colors.highlight, 0, BOOTH_WALL_TOP + 8, width, 2);
+
+  drawWallPoster(ctx, BOOTH_AD_LEFT, colors.accent);
+  drawWallPoster(ctx, BOOTH_AD_RIGHT, colors.highlight);
 
   const tv = BOOTH_TV;
   const hoverTv = state.hoverHotspot === "tv";

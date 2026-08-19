@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  BOOTH_AD_LEFT,
   BOOTH_DOOR,
   BOOTH_SEATS,
   BOOTH_SHELF,
@@ -41,6 +42,13 @@ describe("goBoothHotspots", () => {
 
   it("returns null on empty floor", () => {
     expect(hitTestBoothHotspot(160, 140)).toBeNull();
+  });
+
+  it("does not steal furniture hits for wall ad posters", () => {
+    expect(
+      hitTestBoothHotspot(BOOTH_AD_LEFT.x + 4, BOOTH_AD_LEFT.y + 4)
+    ).toBeNull();
+    expect(GO_BOOTH_HOTSPOTS.map((h) => h.id)).not.toContain("ad");
   });
 
   it("prefers the TV over a seat if they ever overlap", () => {

@@ -5,6 +5,7 @@ import {
   goAdsEnabled,
   goAdsProvider,
   isStandaloneDisplay,
+  roomAdClickAction,
   shouldShowGoAdSlot,
 } from "./goAds";
 
@@ -26,6 +27,11 @@ describe("goAds", () => {
   it("hides when canvas is active", () => {
     expect(shouldShowGoAdSlot({ canvasActive: true })).toBe(false);
     expect(shouldShowGoAdSlot({ canvasActive: false })).toBe(true);
+  });
+
+  it("live booth ad clicks confirm before leaving for /s/", () => {
+    expect(roomAdClickAction(false)).toBe("goto");
+    expect(roomAdClickAction(true)).toBe("confirm");
   });
 
   it("detects standalone via matchMedia", () => {
