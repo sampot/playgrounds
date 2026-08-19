@@ -10,7 +10,11 @@
     hitTestBoothHotspot,
     type BoothHotspotId,
   } from "$lib/goBoothHotspots";
-  import { attachMediaStream, type RoomOccupant } from "$lib/goRoom";
+  import {
+    attachMediaStream,
+    ROOM_SHORT_LANDSCAPE_MQ,
+    type RoomOccupant,
+  } from "$lib/goRoom";
   import {
     screenToWorld,
     type CanvasLayout,
@@ -36,6 +40,7 @@
     children?: Snippet;
   } = $props();
 
+  let frameEl = $state<HTMLDivElement | null>(null);
   let wrapEl = $state<HTMLDivElement | null>(null);
   let canvasEl = $state<HTMLCanvasElement | null>(null);
   let tvEl = $state<HTMLVideoElement | null>(null);
@@ -47,9 +52,19 @@
   const overlay = $derived(layout ? boothTvOverlay(layout) : null);
 
   function applyLayout() {
-    if (!wrapEl || !canvasEl) return;
+    const box = frameEl ?? wrapEl;
+    if (!box || !wrapEl || !canvasEl) return;
     const dpr = window.devicePixelRatio || 1;
-    layout = computeBoothCanvasLayout(wrapEl.clientWidth, dpr);
+    const compact =
+      typeof window.matchMedia === "function" &&
+      window.matchMedia(ROOM_SHORT_LANDSCAPE_MQ).matches;
+    layout = computeBoothCanvasLayout(
+      box.clientWidth,
+      dpr,
+      compact ? box.clientHeight : undefined
+    );
+    wrapEl.style.width = `${layout.cssWidth}px`;
+    wrapEl.style.height = `${layout.cssHeight}px`;
     canvasEl.width = Math.round(layout.cssWidth * layout.dpr);
     canvasEl.height = Math.round(layout.cssHeight * layout.dpr);
     canvasEl.style.width = `${layout.cssWidth}px`;
@@ -125,12 +140,18 @@
     reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     applyLayout();
     const ro = new ResizeObserver(() => applyLayout());
-    if (wrapEl) ro.observe(wrapEl);
-    return () => ro.disconnect();
+    if (frameEl) ro.observe(frameEl);
+    const mq = window.matchMedia(ROOM_SHORT_LANDSCAPE_MQ);
+    mq.addEventListener("change", applyLayout);
+    return () => {
+      ro.disconnect();
+      mq.removeEventListener("change", applyLayout);
+    };
   });
 </script>
 
 <div class="booth-stage">
+  <div class="booth-frame" bind:this={frameEl}>
   <div
     class={["booth-wrap", overlayOpen && "booth-wrap--chrome"].filter(Boolean).join(" ")}
     bind:this={wrapEl}
@@ -158,6 +179,7 @@
     {/if}
     {@render children?.()}
   </div>
+  </div>
   {#if showTools}
   <nav class="booth-hotspots" aria-label="包廂捷徑">
     {#each GO_BOOTH_HOTSPOTS.filter((s) => s.id === "tv" || s.id === "shelf" || (s.id === "door" && inviteEnabled)) as spot (spot.id)}
@@ -175,6 +197,10 @@
     max-width: 640px;
     margin-inline: auto;
     min-width: 0;
+  }
+  .booth-frame {
+    position: relative;
+    width: 100%;
   }
   .booth-wrap {
     position: relative;
@@ -216,5 +242,31 @@
     min-height: 44px;
     font-size: 0.78rem;
     padding: 0.35rem 0.55rem;
+  }
+  @media (orientation: landscape) and (max-height: 560px) {
+    .booth-stage {
+      height: 100%;
+      max-width: none;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    .booth-frame {
+      flex: 1 1 auto;
+      min-height: 0;
+      height: 100%;
+      display: flex;
+      align-items: flex-start;
+      justify-content: flex-start;
+    }
+    .booth-wrap {
+      width: auto;
+      max-width: 100%;
+      max-height: 100%;
+      margin: 0;
+    }
+    .booth-hotspots {
+      display: none;
+    }
   }
 </style>

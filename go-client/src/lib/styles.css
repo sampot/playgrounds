@@ -944,6 +944,19 @@ a {
   min-height: 0;
   height: 100%;
 }
+@media (orientation: landscape) and (max-height: 560px) {
+  .site:has(.room) .chrome {
+    padding-block: 0.22rem;
+    flex-wrap: nowrap;
+    row-gap: 0;
+  }
+  .site:has(.room) .main {
+    padding: 0;
+    max-width: none;
+    min-height: 0;
+    overflow: hidden;
+  }
+}
 h1 {
   margin: 0 0 0.5rem;
   font-family: var(--pixel);

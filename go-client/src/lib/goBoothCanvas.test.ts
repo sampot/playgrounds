@@ -24,6 +24,24 @@ describe("computeBoothCanvasLayout", () => {
     expect(overlay.width).toBeCloseTo(BOOTH_TV_SCREEN.w * layout.scale, 5);
     expect(overlay.height).toBeCloseTo(BOOTH_TV_SCREEN.h * layout.scale, 5);
   });
+
+  it("letterboxes into a short landscape box without overflowing", () => {
+    const layout = computeBoothCanvasLayout(844, 2, 280);
+    expect(layout.cssHeight).toBeLessThanOrEqual(280);
+    expect(layout.cssWidth).toBeLessThanOrEqual(844);
+    expect(layout.cssHeight / layout.cssWidth).toBeCloseTo(
+      GO_BOOTH_WORLD.height / GO_BOOTH_WORLD.width,
+      2
+    );
+  });
+
+  it("still fills width when height is ample", () => {
+    const layout = computeBoothCanvasLayout(400, 1, 800);
+    expect(layout.cssWidth).toBe(400);
+    expect(layout.cssHeight).toBe(
+      Math.round(400 * (GO_BOOTH_WORLD.height / GO_BOOTH_WORLD.width))
+    );
+  });
 });
 
 describe("drawBoothFrame", () => {

@@ -13,6 +13,18 @@ export const ROOM_CHAT_PANEL_REM = 22;
 /** Leave a sliver of the page visible beside a covering overlay. */
 export const ROOM_CHAT_PANEL_GUTTER_REM = 2.75;
 
+/** Phone landscape: height is the scarce axis. Keep in sync with CSS max-height. */
+export const ROOM_SHORT_LANDSCAPE_MAX_HEIGHT_PX = 560;
+export const ROOM_SHORT_LANDSCAPE_MQ = `(orientation: landscape) and (max-height: ${ROOM_SHORT_LANDSCAPE_MAX_HEIGHT_PX}px)`;
+
+/** Stacked portrait chrome vs a short-landscape stage+rail. */
+export function roomShortLandscape(opts: {
+  widthPx: number;
+  heightPx: number;
+}): boolean {
+  return opts.widthPx > opts.heightPx && opts.heightPx <= ROOM_SHORT_LANDSCAPE_MAX_HEIGHT_PX;
+}
+
 export type RoomChatLayout = "drawer" | "sidebar";
 
 export type RoomChatBox = {

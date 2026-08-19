@@ -33,6 +33,7 @@ import {
   roomOccupantRows,
   roomOccupantSummary,
   roomRemoteSinkVisible,
+  roomShortLandscape,
   roomStageStatus,
   roomTvLabel,
   roomTvStream,
@@ -443,6 +444,18 @@ describe("attachMediaStream", () => {
       expect(el.muted).toBe(true);
     });
     expect(play).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("roomShortLandscape", () => {
+  it("is compact on a phone landscape viewport", () => {
+    expect(roomShortLandscape({ widthPx: 844, heightPx: 390 })).toBe(true);
+    expect(roomShortLandscape({ widthPx: 667, heightPx: 375 })).toBe(true);
+  });
+
+  it("stays stacked on phone portrait and laptop height", () => {
+    expect(roomShortLandscape({ widthPx: 390, heightPx: 844 })).toBe(false);
+    expect(roomShortLandscape({ widthPx: 1440, heightPx: 900 })).toBe(false);
   });
 });
 

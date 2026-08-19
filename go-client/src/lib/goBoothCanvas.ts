@@ -50,12 +50,35 @@ function px(
   ctx.fillRect(x, y, w, h);
 }
 
-/** Fit booth world into container width; preserve aspect. */
+/** Fit booth world into the box; preserve aspect. Height letterboxes landscape. */
 export function computeBoothCanvasLayout(
   containerWidth: number,
-  dpr: number = 1
+  dpr: number = 1,
+  containerHeight?: number
 ): CanvasLayout {
   const aspect = GO_BOOTH_WORLD.height / GO_BOOTH_WORLD.width;
+  if (containerHeight != null && Number.isFinite(containerHeight) && containerHeight > 0) {
+    const capW = Math.max(1, Math.min(containerWidth || 1, 640));
+    const capH = Math.max(1, containerHeight);
+    let cssWidth = capW;
+    let cssHeight = cssWidth * aspect;
+    if (cssHeight > capH) {
+      cssHeight = capH;
+      cssWidth = cssHeight / aspect;
+    }
+    cssWidth = Math.max(1, Math.round(cssWidth));
+    cssHeight = Math.max(1, Math.round(cssWidth * aspect));
+    if (cssHeight > capH) {
+      cssHeight = Math.max(1, Math.round(capH));
+      cssWidth = Math.max(1, Math.round(cssHeight / aspect));
+    }
+    return {
+      cssWidth,
+      cssHeight,
+      dpr: Math.max(1, dpr),
+      scale: cssWidth / GO_BOOTH_WORLD.width,
+    };
+  }
   const cssWidth = Math.max(280, Math.min(containerWidth, 640));
   const cssHeight = Math.round(cssWidth * aspect);
   const scale = cssWidth / GO_BOOTH_WORLD.width;

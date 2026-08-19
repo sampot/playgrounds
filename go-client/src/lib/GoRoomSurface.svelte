@@ -880,6 +880,7 @@
   {/if}
 </GoBoothStage>
 </div>
+</div>
 
 {#if inBooth}
   <nav class="room-dock" aria-label="包廂操作">
@@ -955,8 +956,6 @@
     {/if}
   </nav>
 {/if}
-
-</div>
 
 {#if chatOpen && showComposer}
   {#if coversCanvas}
@@ -1604,6 +1603,88 @@
     .room-actions,
     .confirm-actions {
       flex-direction: row;
+    }
+  }
+  @media (orientation: landscape) and (max-height: 560px) {
+    .room {
+      position: relative;
+      max-width: none;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr);
+      align-items: start;
+      box-sizing: border-box;
+      height: calc(100dvh - var(--go-chrome-height, 3.75rem));
+      max-height: calc(100dvh - var(--go-chrome-height, 3.75rem));
+      overflow: hidden;
+      gap: 0.35rem;
+      padding: 0.15rem 0.4rem 0.15rem;
+      padding-left: max(0.35rem, env(safe-area-inset-left, 0px));
+      padding-right: max(0.4rem, env(safe-area-inset-right, 0px));
+    }
+    .room-stage {
+      grid-column: 2;
+      grid-row: 1;
+      max-width: none;
+      min-width: 0;
+      min-height: 0;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+    .room-canvas-slot {
+      flex: 1 1 auto;
+      min-height: 0;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+    .room-dock {
+      grid-column: 1;
+      grid-row: 1;
+      align-self: start;
+      flex-direction: column;
+      flex-wrap: nowrap;
+      align-items: stretch;
+      justify-content: flex-start;
+      overflow-x: hidden;
+      overflow-y: auto;
+      margin: 0;
+      width: 5.75rem;
+      max-height: 100%;
+      gap: 0.3rem;
+      padding: 0;
+    }
+    .room-dock .pixel-btn {
+      width: 100%;
+      min-height: 44px;
+      font-size: 0.72rem;
+      padding: 0.3rem 0.25rem;
+      white-space: normal;
+      line-height: 1.15;
+    }
+    .err {
+      position: absolute;
+      left: 6.2rem;
+      right: 0.4rem;
+      bottom: 0.25rem;
+      z-index: 5;
+      margin: 0;
+    }
+    .booth-overlay {
+      flex-direction: row;
+      justify-content: flex-end;
+    }
+    .booth-sheet {
+      width: min(22rem, 52%);
+      max-height: 100%;
+      height: 100%;
+      border-radius: 0;
+      border-top: none;
+      border-left: var(--pixel-edge) solid rgb(var(--ink));
+    }
+    .room-chat--overlay {
+      width: min(18rem, 42vw);
     }
   }
 </style>
