@@ -5,8 +5,11 @@
     computeBoothCanvasLayout,
     drawBoothFrame,
   } from "$lib/goBoothCanvas";
+  import { GO_BOOTH_WORLD } from "$lib/goBoothLayout";
   import {
+    BOOTH_HOTSPOT_HIT_SLOP,
     GO_BOOTH_HOTSPOTS,
+    boothHotspotScreenHit,
     hitTestBoothHotspot,
     type BoothHotspotId,
   } from "$lib/goBoothHotspots";
@@ -16,7 +19,7 @@
     type RoomOccupant,
   } from "$lib/goRoom";
   import {
-    screenToWorld,
+    canvasContentPointerToWorld,
     type CanvasLayout,
   } from "$lib/goShopCanvas";
 
@@ -48,8 +51,28 @@
   let hoverHotspot = $state<BoothHotspotId | null>(null);
   let nowMs = $state(0);
   let reducedMotion = $state(false);
+  let contentBox = $state({ width: 0, height: 0 });
 
   const overlay = $derived(layout ? boothTvOverlay(layout) : null);
+
+  const furnitureHits = $derived.by(() => {
+    if (contentBox.width <= 0 || contentBox.height <= 0) return [];
+    const scale = contentBox.width / GO_BOOTH_WORLD.width;
+    return GO_BOOTH_HOTSPOTS.filter(
+      (s) =>
+        s.id === "tv" ||
+        s.id === "shelf" ||
+        (s.id === "door" && inviteEnabled)
+    ).map((spot) => ({
+      spot,
+      hit: boothHotspotScreenHit(spot, scale, {
+        expand:
+          spot.id === "door" ? "left" : spot.id === "shelf" ? "right" : "center",
+        canvasCssWidth: contentBox.width,
+        canvasCssHeight: contentBox.height,
+      }),
+    }));
+  });
 
   function applyLayout() {
     const box = frameEl ?? wrapEl;
@@ -69,6 +92,10 @@
     canvasEl.height = Math.round(layout.cssHeight * layout.dpr);
     canvasEl.style.width = `${layout.cssWidth}px`;
     canvasEl.style.height = `${layout.cssHeight}px`;
+    contentBox = {
+      width: canvasEl.clientWidth,
+      height: canvasEl.clientHeight,
+    };
   }
 
   function paint() {
@@ -96,19 +123,35 @@
   }
 
   function worldFromPointer(ev: PointerEvent): { x: number; y: number } | null {
-    if (!canvasEl || !layout) return null;
+    if (!canvasEl) return null;
     const rect = canvasEl.getBoundingClientRect();
-    return screenToWorld(ev.clientX - rect.left, ev.clientY - rect.top, layout);
+    return canvasContentPointerToWorld(
+      { clientX: ev.clientX, clientY: ev.clientY },
+      {
+        rectLeft: rect.left,
+        rectTop: rect.top,
+        clientLeft: canvasEl.clientLeft,
+        clientTop: canvasEl.clientTop,
+        clientWidth: canvasEl.clientWidth,
+        clientHeight: canvasEl.clientHeight,
+      },
+      GO_BOOTH_WORLD
+    );
   }
 
   function onPointerMove(ev: PointerEvent) {
     const world = worldFromPointer(ev);
-    hoverHotspot = world ? hitTestBoothHotspot(world.x, world.y) : null;
+    hoverHotspot = world
+      ? hitTestBoothHotspot(world.x, world.y, BOOTH_HOTSPOT_HIT_SLOP)
+      : null;
   }
 
   function onPointerUp(ev: PointerEvent) {
+    if (ev.button !== 0) return;
     const world = worldFromPointer(ev);
-    const id = world ? hitTestBoothHotspot(world.x, world.y) : null;
+    const id = world
+      ? hitTestBoothHotspot(world.x, world.y, BOOTH_HOTSPOT_HIT_SLOP)
+      : null;
     if (id) onHotspot(id);
   }
 
@@ -177,6 +220,20 @@
         aria-label="包廂電視"
       ></video>
     {/if}
+    <div class="booth-hits">
+      {#each furnitureHits as { spot, hit } (spot.id)}
+        <button
+          type="button"
+          class="booth-hit"
+          style:left={`${hit.left}px`}
+          style:top={`${hit.top}px`}
+          style:width={`${hit.width}px`}
+          style:height={`${hit.height}px`}
+          aria-label={spot.label}
+          onclick={() => onHotspot(spot.id)}
+        ></button>
+      {/each}
+    </div>
     {@render children?.()}
   </div>
   </div>
@@ -230,6 +287,22 @@
   }
   .booth-tv--off {
     opacity: 0;
+  }
+  .booth-hits {
+    position: absolute;
+    inset: var(--pixel-edge);
+    pointer-events: none;
+  }
+  .booth-hit {
+    position: absolute;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    pointer-events: auto;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
   .booth-hotspots {
     display: flex;

@@ -222,9 +222,11 @@
     border: none;
     max-width: none;
     width: 100%;
-    max-height: min(92svh, 40rem);
+    max-height: 100dvh;
+    max-height: 100svh;
     background: transparent;
     color: rgb(var(--ss-ink));
+    box-sizing: border-box;
   }
   .share-sheet::backdrop {
     background: color-mix(in oklab, rgb(var(--ss-ink)) 45%, transparent);
@@ -242,6 +244,10 @@
     gap: 0.75rem;
     width: 100%;
     max-width: 28rem;
+    max-height: 100%;
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
     margin: 0 auto;
     padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px));
     border: 1px solid rgb(var(--ss-line));
@@ -250,12 +256,17 @@
       calc(var(--ss-radius) + 0.35rem) 0 0;
     background: rgb(var(--ss-fill));
     box-shadow: 0 -8px 28px color-mix(in oklab, rgb(var(--ss-ink)) 16%, transparent);
+    box-sizing: border-box;
   }
   .share-sheet-head {
     display: flex;
     align-items: center;
     gap: 0.5rem;
     min-width: 0;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: rgb(var(--ss-fill));
   }
   .share-sheet-title {
     margin: 0;
@@ -376,7 +387,7 @@
     background: color-mix(in oklab, rgb(var(--ss-accent)) 16%, rgb(var(--ss-fill)));
     color: rgb(var(--ss-ink));
   }
-  @media (min-width: 40rem) {
+  @media (min-width: 40rem) and (min-height: 561px) {
     .share-sheet[open] {
       justify-content: center;
       padding: 1rem;
@@ -391,6 +402,59 @@
     }
     .share-sheet-btn {
       flex: 1;
+    }
+  }
+  @media (orientation: landscape) and (max-height: 560px) {
+    .share-sheet[open] {
+      justify-content: stretch;
+      padding: 0.35rem;
+      padding-left: max(0.35rem, env(safe-area-inset-left, 0px));
+      padding-right: max(0.35rem, env(safe-area-inset-right, 0px));
+    }
+    .share-sheet-panel {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      grid-template-areas:
+        "head head"
+        "qr hint"
+        "qr url"
+        "qr actions";
+      gap: 0.4rem 0.75rem;
+      max-width: min(36rem, 100%);
+      width: 100%;
+      margin: auto 0;
+      padding: 0.5rem 0.65rem;
+      border-radius: calc(var(--ss-radius) + 0.2rem);
+      border-bottom: 1px solid rgb(var(--ss-line));
+    }
+    .share-sheet-head {
+      grid-area: head;
+    }
+    .share-sheet-hint {
+      grid-area: hint;
+      font-size: 0.8rem;
+    }
+    .share-sheet-qr-wrap {
+      grid-area: qr;
+      min-height: 0;
+      width: min(32dvh, 9rem);
+      padding: 0.35rem;
+      align-self: start;
+    }
+    .share-sheet-qr {
+      width: min(32dvh, 9rem);
+    }
+    .share-sheet-spoken,
+    .share-sheet-url {
+      grid-area: url;
+    }
+    .share-sheet-actions {
+      grid-area: actions;
+      flex-direction: row;
+    }
+    .share-sheet-btn {
+      flex: 1;
+      min-height: 2.75rem;
     }
   }
 </style>

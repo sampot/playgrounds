@@ -201,6 +201,28 @@ export function screenToWorld(
   };
 }
 
+/** Map a pointer through the canvas content box so CSS borders do not shift hotspots. */
+export function canvasContentPointerToWorld(
+  pointer: { clientX: number; clientY: number },
+  canvas: {
+    rectLeft: number;
+    rectTop: number;
+    clientLeft: number;
+    clientTop: number;
+    clientWidth: number;
+    clientHeight: number;
+  },
+  world: { width: number; height: number }
+): Vec2 | null {
+  if (canvas.clientWidth <= 0 || canvas.clientHeight <= 0) return null;
+  const x = pointer.clientX - canvas.rectLeft - canvas.clientLeft;
+  const y = pointer.clientY - canvas.rectTop - canvas.clientTop;
+  return {
+    x: (x / canvas.clientWidth) * world.width,
+    y: (y / canvas.clientHeight) * world.height,
+  };
+}
+
 export function worldToScreen(x: number, y: number, layout: CanvasLayout): Vec2 {
   return { x: x * layout.scale, y: y * layout.scale };
 }

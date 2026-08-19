@@ -12,6 +12,7 @@ import {
   LOBBY_ATTRACT_FRAME_MS,
   PLAYER_HAIR,
   PLAYER_HAIR_HL,
+  canvasContentPointerToWorld,
   screenToWorld,
   worldToScreen,
 } from "./goShopCanvas";
@@ -37,6 +38,26 @@ describe("computeLobbyCanvasLayout", () => {
     const back = worldToScreen(world.x, world.y, layout);
     expect(back.x).toBeCloseTo(160, 5);
     expect(back.y).toBeCloseTo(100, 5);
+  });
+});
+
+describe("canvasContentPointerToWorld", () => {
+  it("maps through the content box so a 3px border does not shift hotspots", () => {
+    const world = canvasContentPointerToWorld(
+      { clientX: 103, clientY: 53 },
+      {
+        rectLeft: 100,
+        rectTop: 50,
+        clientLeft: 3,
+        clientTop: 3,
+        clientWidth: 314,
+        clientHeight: 194,
+      },
+      { width: 320, height: 200 }
+    );
+    expect(world).not.toBeNull();
+    expect(world!.x).toBeCloseTo(0, 5);
+    expect(world!.y).toBeCloseTo(0, 5);
   });
 });
 

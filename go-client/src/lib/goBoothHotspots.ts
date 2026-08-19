@@ -33,14 +33,88 @@ export const GO_BOOTH_HOTSPOTS: readonly BoothHotspot[] = [
   ),
 ];
 
+/** World-px padding so a phone-landscape door still meets a 44px finger. */
+export const BOOTH_HOTSPOT_HIT_SLOP = 12;
+/** Minimum CSS hit box for furniture overlays. */
+export const BOOTH_HOTSPOT_MIN_HIT_CSS_PX = 44;
+
+function distToRect(
+  x: number,
+  y: number,
+  rect: Pick<BoothHotspot, "x" | "y" | "w" | "h">
+): number {
+  const dx = x < rect.x ? rect.x - x : x > rect.x + rect.w ? x - (rect.x + rect.w) : 0;
+  const dy = y < rect.y ? rect.y - y : y > rect.y + rect.h ? y - (rect.y + rect.h) : 0;
+  return Math.hypot(dx, dy);
+}
+
 export function hitTestBoothHotspot(
   worldX: number,
-  worldY: number
+  worldY: number,
+  slop = 0
 ): BoothHotspotId | null {
   for (const spot of GO_BOOTH_HOTSPOTS) {
     if (pointInRect(worldX, worldY, spot)) return spot.id;
   }
-  return null;
+  if (slop <= 0) return null;
+  let best: BoothHotspotId | null = null;
+  let bestDist = Infinity;
+  for (const spot of GO_BOOTH_HOTSPOTS) {
+    const d = distToRect(worldX, worldY, spot);
+    if (d <= slop && d < bestDist) {
+      bestDist = d;
+      best = spot.id;
+    }
+  }
+  return best;
+}
+
+export type BoothHotspotScreenHit = {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+};
+
+/** CSS hit box for a furniture overlay. Door expands left so it does not cover seat 0. */
+export function boothHotspotScreenHit(
+  rect: Pick<BoothHotspot, "x" | "y" | "w" | "h">,
+  scale: number,
+  opts: {
+    expand?: "left" | "right" | "center";
+    canvasCssWidth: number;
+    canvasCssHeight: number;
+    minCssPx?: number;
+  }
+): BoothHotspotScreenHit {
+  const minCss = opts.minCssPx ?? BOOTH_HOTSPOT_MIN_HIT_CSS_PX;
+  const expand = opts.expand ?? "center";
+  let left = rect.x * scale;
+  let top = rect.y * scale;
+  let width = rect.w * scale;
+  let height = rect.h * scale;
+  if (width < minCss) {
+    const extra = minCss - width;
+    if (expand === "left") left -= extra;
+    else if (expand === "center") left -= extra / 2;
+    width = minCss;
+  }
+  if (height < minCss) {
+    const extra = minCss - height;
+    top -= extra / 2;
+    height = minCss;
+  }
+  if (left < 0) left = 0;
+  if (top < 0) top = 0;
+  if (left + width > opts.canvasCssWidth) {
+    left = Math.max(0, opts.canvasCssWidth - width);
+  }
+  if (top + height > opts.canvasCssHeight) {
+    top = Math.max(0, opts.canvasCssHeight - height);
+  }
+  width = Math.min(width, opts.canvasCssWidth);
+  height = Math.min(height, opts.canvasCssHeight);
+  return { left, top, width, height };
 }
 
 export function boothHotspotRect(id: BoothHotspotId): BoothRect | null {

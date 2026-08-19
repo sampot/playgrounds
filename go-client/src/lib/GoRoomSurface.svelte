@@ -884,7 +884,6 @@
 
 {#if inBooth}
   <nav class="room-dock" aria-label="包廂操作">
-    <button type="button" class="pixel-btn" onclick={() => askEnd(true)}>回大廳</button>
     <button
       type="button"
       class="pixel-btn pixel-btn--primary"
@@ -947,14 +946,6 @@
     muted={!goRoomMedia.listening}
     aria-hidden="true"
   ></video>
-{:else}
-  <nav class="room-dock" aria-label="包廂操作">
-    {#if live}
-      <button type="button" class="pixel-btn" onclick={() => askEnd(true)}>回大廳</button>
-    {:else}
-      <a class="pixel-btn" href="/">回大廳</a>
-    {/if}
-  </nav>
 {/if}
 
 {#if chatOpen && showComposer}

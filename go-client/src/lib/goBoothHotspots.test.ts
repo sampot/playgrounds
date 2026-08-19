@@ -1,8 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { BOOTH_DOOR, BOOTH_SEATS, BOOTH_SHELF, BOOTH_TV_SCREEN } from "./goBoothLayout";
 import {
+  BOOTH_DOOR,
+  BOOTH_SEATS,
+  BOOTH_SHELF,
+  BOOTH_TV_SCREEN,
+  GO_BOOTH_WORLD,
+} from "./goBoothLayout";
+import {
+  BOOTH_HOTSPOT_HIT_SLOP,
+  BOOTH_HOTSPOT_MIN_HIT_CSS_PX,
   GO_BOOTH_HOTSPOTS,
   boothHotspotPanel,
+  boothHotspotScreenHit,
   boothSeatIndex,
   hitTestBoothHotspot,
   type BoothHotspotId,
@@ -40,6 +49,40 @@ describe("goBoothHotspots", () => {
       BOOTH_TV_SCREEN.y + BOOTH_TV_SCREEN.h / 2
     );
     expect(id).toBe("tv");
+  });
+
+  it("hits the door with fat-finger slop to the left, not empty floor", () => {
+    const x = BOOTH_DOOR.x - 8;
+    const y = BOOTH_DOOR.y + BOOTH_DOOR.h / 2;
+    expect(hitTestBoothHotspot(x, y)).toBeNull();
+    expect(hitTestBoothHotspot(x, y, BOOTH_HOTSPOT_HIT_SLOP)).toBe("door");
+  });
+
+  it("does not let door slop steal a tap on seat 0", () => {
+    const seat = BOOTH_SEATS[0]!;
+    expect(
+      hitTestBoothHotspot(
+        seat.x + 4,
+        seat.y + 4,
+        BOOTH_HOTSPOT_HIT_SLOP
+      )
+    ).toBe("seat:0");
+  });
+});
+
+describe("boothHotspotScreenHit", () => {
+  it("expands the door to at least 44 CSS px without covering seat 0's center", () => {
+    const scale = 0.84;
+    const hit = boothHotspotScreenHit(BOOTH_DOOR, scale, {
+      expand: "left",
+      canvasCssWidth: Math.round(GO_BOOTH_WORLD.width * scale),
+      canvasCssHeight: Math.round(GO_BOOTH_WORLD.height * scale),
+    });
+    expect(hit.width).toBeGreaterThanOrEqual(BOOTH_HOTSPOT_MIN_HIT_CSS_PX);
+    expect(hit.height).toBeGreaterThanOrEqual(BOOTH_HOTSPOT_MIN_HIT_CSS_PX);
+    const seatCenterX =
+      (BOOTH_SEATS[0]!.x + BOOTH_SEATS[0]!.w / 2) * scale;
+    expect(hit.left + hit.width).toBeLessThan(seatCenterX);
   });
 });
 
