@@ -37,8 +37,13 @@ import {
   roomChromeHideable,
   roomChromePeekInsetEndPx,
   roomChromeShouldHold,
+  GO_ROOM_CINEMA_ENTER,
+  GO_ROOM_CINEMA_EXIT,
   roomCinemaActive,
   roomCinemaAllowed,
+  roomCinemaExitOnChromeReveal,
+  roomCinemaHudVisible,
+  roomCinemaToggleLabel,
   roomEscStep,
   roomInviteDoorRow,
   roomShowAdSlot,
@@ -564,13 +569,21 @@ describe("roomChromePeekInsetEndPx", () => {
     ).toBe(344);
   });
 
-  it("stays full-width when tabs are not under the peek", () => {
+  it("stays full-width in cinema", () => {
     expect(
       roomChromePeekInsetEndPx({
         mode: "short-landscape",
         cinema: true,
         viewportWidthPx: 844,
         railLeftPx: 500,
+      })
+    ).toBe(0);
+    expect(
+      roomChromePeekInsetEndPx({
+        mode: "desktop",
+        cinema: true,
+        viewportWidthPx: 1440,
+        railLeftPx: 1120,
       })
     ).toBe(0);
     expect(
@@ -662,15 +675,37 @@ describe("room cinema shell", () => {
     expect(roomCinemaAllowed({ inBooth: true, phase: "open" })).toBe(true);
   });
 
-  it("fills the window when the TV is on, and leaves when the user exits", () => {
+  it("stays in the hall until the user hides the control panel", () => {
     expect(
-      roomCinemaActive({ allowed: true, tvOn: true, userExit: false })
-    ).toBe(true);
-    expect(
-      roomCinemaActive({ allowed: true, tvOn: false, userExit: false })
+      roomCinemaActive({ allowed: true, userEnter: false })
     ).toBe(false);
     expect(
-      roomCinemaActive({ allowed: true, tvOn: true, userExit: true })
+      roomCinemaActive({ allowed: true, userEnter: true })
+    ).toBe(true);
+    expect(
+      roomCinemaActive({ allowed: false, userEnter: true })
+    ).toBe(false);
+  });
+
+  it("labels the dock toggle as hide vs show the control panel", () => {
+    expect(roomCinemaToggleLabel(false)).toBe(GO_ROOM_CINEMA_ENTER);
+    expect(roomCinemaToggleLabel(true)).toBe(GO_ROOM_CINEMA_EXIT);
+  });
+
+  it("hides the hall panel while cinema is on", () => {
+    expect(roomCinemaHudVisible({ cinema: false })).toBe(true);
+    expect(roomCinemaHudVisible({ cinema: true })).toBe(false);
+  });
+
+  it("leaves cinema when overlay chrome comes back", () => {
+    expect(
+      roomCinemaExitOnChromeReveal({ cinema: true, chromeHidden: true })
+    ).toBe(false);
+    expect(
+      roomCinemaExitOnChromeReveal({ cinema: true, chromeHidden: false })
+    ).toBe(true);
+    expect(
+      roomCinemaExitOnChromeReveal({ cinema: false, chromeHidden: false })
     ).toBe(false);
   });
 
@@ -682,16 +717,17 @@ describe("room cinema shell", () => {
     expect(roomShowAdSlot({ shortLandscape: true })).toBe(true);
   });
 
-  it("does not keep three in-flow panes while cinema is on", () => {
+  it("keeps hall pane geometry independent of cinema", () => {
     expect(roomShellPanesConcurrent("desktop", true)).toBe(false);
-    expect(roomShellFilesPinned("desktop", true)).toBe(false);
-    expect(roomShellTabPanes("desktop", true)).toEqual([
+    expect(roomShellFilesPinned("desktop", true)).toBe(true);
+    expect(roomShellTabPanes("desktop", true)).toEqual(["members", "chat"]);
+    expect(roomShellPanesConcurrent("desktop")).toBe(false);
+    expect(roomShellFilesPinned("desktop")).toBe(true);
+    expect(roomShellTabPanes("portrait", true)).toEqual([
       "members",
       "files",
       "chat",
     ]);
-    expect(roomShellPanesConcurrent("desktop")).toBe(false);
-    expect(roomShellFilesPinned("desktop")).toBe(true);
   });
 });
 

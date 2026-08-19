@@ -15,6 +15,8 @@ class ChromeSession {
   canvasActive = $state(false);
   /** Pause the 3s auto-hide while a sheet／composer is open (包廂). */
   holdAutoHide = $state(false);
+  /** Overlay chrome (and 包廂劇院態 HUD) slid off-screen. */
+  chromeHidden = $state(false);
   /**
    * Shrink the top-edge peek from the right so a hall side-rail (short
    * landscape tabs, desktop members) stays tappable.
@@ -75,6 +77,7 @@ class ChromeSession {
     this.mode = null;
     this.canvasActive = false;
     this.holdAutoHide = false;
+    this.chromeHidden = false;
     this.peekInsetEndPx = 0;
     this.flash = "";
   }

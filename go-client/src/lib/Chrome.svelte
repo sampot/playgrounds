@@ -46,7 +46,6 @@
   let drawerOpen = $state(false);
   const chatOpen = $derived(goSessionChat.panelOpen);
   /** Canvas play: hide chrome on scroll-down, show on scroll-up. */
-  let chromeHidden = $state(false);
   let chromeAutoHideTimer: ReturnType<typeof setTimeout> | null = null;
 
   function clearChromeAutoHide() {
@@ -83,7 +82,7 @@
         chromeSession.holdAutoHide
       )
         return;
-      chromeHidden = true;
+      chromeSession.chromeHidden = true;
     }, CHROME_AUTO_HIDE_MS);
   }
 
@@ -94,6 +93,7 @@
   const catalogId = $derived(chromeSession.catalogId);
   const mode = $derived(chromeSession.mode);
   const canvasActive = $derived(chromeSession.canvasActive);
+  const chromeHidden = $derived(chromeSession.chromeHidden);
   /**
    * Header auto-hide applies when the canvas is active (canvas play or solo
    * game page after the game has booted). Using `canvasActive` ensures the
@@ -161,7 +161,7 @@
   /** Drawer／對話面板展開時強制顯示 header（即便之前因 auto-hide 已隱藏）。 */
   $effect(() => {
     if ((drawerOpen || chatOpen || chromeSession.holdAutoHide) && chromeHidden) {
-      chromeHidden = false;
+      chromeSession.chromeHidden = false;
       scheduleChromeAutoHide();
     }
   });
@@ -169,7 +169,7 @@
   $effect(() => {
     const n = chromeSession.revealRequest;
     if (n === 0 || !chromeHideable) return;
-    chromeHidden = false;
+    chromeSession.chromeHidden = false;
     scheduleChromeAutoHide();
   });
 
@@ -207,7 +207,7 @@
       chromeSession.holdAutoHide;
     if (!chromeHideable || chromeHidden || panelOpen) {
       clearChromeAutoHide();
-      if (!chromeHideable) chromeHidden = false;
+      if (!chromeHideable) chromeSession.chromeHidden = false;
       return;
     }
     if (chromeAutoHideTimer == null) {
@@ -222,7 +222,7 @@
             chromeSession.holdAutoHide
           )
         )
-          chromeHidden = true;
+          chromeSession.chromeHidden = true;
       }, CHROME_AUTO_HIDE_MS);
     }
   });
@@ -252,7 +252,7 @@
 
     function setHidden(hidden: boolean) {
       const wasHidden = chromeHidden;
-      chromeHidden = hidden;
+      chromeSession.chromeHidden = hidden;
       if (hidden) {
         clearChromeAutoHide();
       } else if (wasHidden) {
@@ -365,7 +365,7 @@
       const t = e.target as Node | null;
       if (t && document.querySelector(".chrome")?.contains(t)) return;
       if (chromeHidden) {
-        chromeHidden = false;
+        chromeSession.chromeHidden = false;
         scheduleChromeAutoHide();
       }
     }
@@ -378,7 +378,7 @@
     moreOpen = false;
     profileOpen = false;
     clearChromeAutoHide();
-    chromeHidden = false;
+    chromeSession.chromeHidden = false;
     shareOpen = true;
   }
 
@@ -386,7 +386,7 @@
     shareOpen = false;
     profileOpen = false;
     clearChromeAutoHide();
-    chromeHidden = false;
+    chromeSession.chromeHidden = false;
     moreOpen = true;
   }
 
@@ -394,7 +394,7 @@
     shareOpen = false;
     moreOpen = false;
     clearChromeAutoHide();
-    chromeHidden = false;
+    chromeSession.chromeHidden = false;
     profileOpen = true;
   }
 
@@ -464,7 +464,7 @@
       style:right="{chromeSession.peekInsetEndPx}px"
       aria-label="顯示選單"
       onclick={() => {
-        chromeHidden = false;
+        chromeSession.chromeHidden = false;
         scheduleChromeAutoHide();
       }}
     ></button>

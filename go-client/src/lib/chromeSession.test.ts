@@ -27,10 +27,12 @@ describe("chromeSession booth overlay chrome", () => {
   it("clears holdAutoHide with the rest of the session", () => {
     chromeSession.holdAutoHide = true;
     chromeSession.peekInsetEndPx = 320;
+    chromeSession.chromeHidden = true;
     chromeSession.setCanvasActive(true);
     chromeSession.clear();
     expect(chromeSession.holdAutoHide).toBe(false);
     expect(chromeSession.peekInsetEndPx).toBe(0);
+    expect(chromeSession.chromeHidden).toBe(false);
     expect(chromeSession.canvasActive).toBe(false);
   });
 });

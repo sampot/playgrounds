@@ -952,6 +952,7 @@ a {
   min-height: 0;
 }
 .main--playing {
+  position: relative;
   padding: 0;
   max-width: none;
   margin: 0;
@@ -961,6 +962,7 @@ a {
 }
 .site--playing .page-stack,
 .site--playing .page-wipe {
+  position: relative;
   height: 100%;
   min-height: 0;
 }

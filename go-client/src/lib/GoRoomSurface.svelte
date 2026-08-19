@@ -40,6 +40,9 @@
     roomChromeShouldHold,
     roomCinemaActive,
     roomCinemaAllowed,
+    roomCinemaExitOnChromeReveal,
+    roomCinemaHudVisible,
+    roomCinemaToggleLabel,
     roomEscStep,
     roomInviteDoorRow,
     roomInviteRemainLabel,
@@ -132,8 +135,7 @@
   let selectedPeerId = $state<string | null>(null);
   let pendingShare = $state(false);
   let tvVideoEl = $state<HTMLVideoElement | null>(null);
-  let cinemaUserExit = $state(false);
-  let cinemaDrawer = $state(false);
+  let cinemaUserEnter = $state(false);
 
   const messages = $derived(goSessionChat.messages);
   const connected = $derived(goSessionChat.connected);
@@ -230,10 +232,11 @@
   const cinema = $derived(
     roomCinemaActive({
       allowed: cinemaAllowed,
-      tvOn,
-      userExit: cinemaUserExit,
+      userEnter: cinemaUserEnter,
     })
   );
+  const cinemaToggleLabel = $derived(roomCinemaToggleLabel(cinema));
+  const cinemaHud = $derived(roomCinemaHudVisible({ cinema }));
   const showAd = $derived(
     roomShowAdSlot({
       inBooth,
@@ -245,33 +248,29 @@
   );
   const filesPinned = $derived(roomShellFilesPinned(shellMode, cinema));
   const tabPanes = $derived(roomShellTabPanes(shellMode, cinema));
-  const showPaneBody = $derived(!cinema || cinemaDrawer);
   const showMembers = $derived(
-    showPaneBody &&
-      roomShellShowPane({
-        target: "members",
-        pane,
-        concurrent: panesConcurrent,
-        filesPinned,
-      })
+    roomShellShowPane({
+      target: "members",
+      pane,
+      concurrent: panesConcurrent,
+      filesPinned,
+    })
   );
   const showFiles = $derived(
-    showPaneBody &&
-      roomShellShowPane({
-        target: "files",
-        pane,
-        concurrent: panesConcurrent,
-        filesPinned,
-      })
+    roomShellShowPane({
+      target: "files",
+      pane,
+      concurrent: panesConcurrent,
+      filesPinned,
+    })
   );
   const showChat = $derived(
-    showPaneBody &&
-      roomShellShowPane({
-        target: "chat",
-        pane,
-        concurrent: panesConcurrent,
-        filesPinned,
-      })
+    roomShellShowPane({
+      target: "chat",
+      pane,
+      concurrent: panesConcurrent,
+      filesPinned,
+    })
   );
 
   const statusLabel = $derived.by(() => {
@@ -342,7 +341,6 @@
       confirmOpen: confirmEnd,
       composerFocused,
       overlayOpen,
-      drawerOpen: cinema && cinemaDrawer,
     });
     return () => {
       chromeSession.holdAutoHide = false;
@@ -365,11 +363,18 @@
   });
 
   $effect(() => {
-    if (!tvOn) cinemaUserExit = false;
+    if (!cinemaAllowed) cinemaUserEnter = false;
   });
 
   $effect(() => {
-    if (!cinema) cinemaDrawer = false;
+    if (
+      roomCinemaExitOnChromeReveal({
+        cinema,
+        chromeHidden: chromeSession.chromeHidden,
+      })
+    ) {
+      cinemaUserEnter = false;
+    }
   });
 
   $effect(() => {
@@ -379,7 +384,6 @@
         tvOpen,
         selectedPeerId,
         cinema,
-        drawerOpen: cinemaDrawer,
       });
       if (step === "close-share") {
         shareOpen = false;
@@ -394,12 +398,9 @@
         selectedPeerId = null;
         return false;
       }
-      if (step === "close-drawer") {
-        cinemaDrawer = false;
-        return false;
-      }
       if (step === "exit-cinema") {
-        cinemaUserExit = true;
+        cinemaUserEnter = false;
+        chromeSession.chromeHidden = false;
         return false;
       }
       if (!live) return true;
@@ -610,30 +611,22 @@
   }
 
   function onTvHit() {
-    if (!cinema && tvOn && cinemaAllowed) {
-      cinemaUserExit = false;
-      return;
-    }
     tvOpen = true;
   }
 
+  function onCinemaToggle() {
+    if (!cinemaAllowed) return;
+    const next = !cinemaUserEnter;
+    cinemaUserEnter = next;
+    chromeSession.chromeHidden = next;
+  }
+
   function onPaneTab(id: RoomShellPane) {
-    if (cinema) {
-      if (cinemaDrawer && pane === id) {
-        cinemaDrawer = false;
-        return;
-      }
-      pane = id;
-      cinemaDrawer = true;
-      return;
-    }
     pane = id;
   }
 
   function paneTabOn(id: RoomShellPane): boolean {
-    return (
-      roomShellActiveTab(pane, filesPinned) === id && (!cinema || cinemaDrawer)
-    );
+    return roomShellActiveTab(pane, filesPinned) === id;
   }
 
   function inviteInBooth() {
@@ -675,22 +668,35 @@
         </div>
       {/if}
     </div>
-    {#if statusLabel}
+    {#if statusLabel && cinemaHud}
       <p class="room-status">{statusLabel}</p>
     {/if}
   </div>
 
   {#if inBooth}
-    {#if cinema && cinemaDrawer}
-      <button
-        type="button"
-        class="cinema-scrim"
-        aria-label="關閉分區"
-        onclick={() => (cinemaDrawer = false)}
-      ></button>
-    {/if}
+    {#if cinemaHud}
     <div class="room-lower">
     <nav class="room-dock" aria-label="包廂操作">
+      <button
+        type="button"
+        class={["pixel-btn", "room-dock-btn", cinema && "pixel-btn--primary"]
+          .filter(Boolean)
+          .join(" ")}
+        aria-label={cinemaToggleLabel}
+        aria-pressed={cinema}
+        title={cinemaToggleLabel}
+        onclick={() => onCinemaToggle()}
+      >
+        <svg class="dock-icon" viewBox="0 0 24 24" aria-hidden="true">
+          {#if cinema}
+            <rect x="3" y="4" width="18" height="10" rx="1" />
+            <rect x="3" y="16" width="18" height="4" rx="1" />
+          {:else}
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <path d="M8 8h8v8H8z" />
+          {/if}
+        </svg>
+      </button>
       <button
         type="button"
         class={["pixel-btn", "room-dock-btn", goRoomMedia.mic && "pixel-btn--primary"]
@@ -792,9 +798,7 @@
       </button>
     </nav>
     <div
-      class={["room-shell", cinema && cinemaDrawer && "room-shell--drawer"]
-        .filter(Boolean)
-        .join(" ")}
+      class="room-shell"
       bind:this={railEl}
     >
       {#if tabPanes.length > 0}
@@ -804,7 +808,6 @@
               type="button"
               class={["pixel-btn", paneTabOn("members") && "pixel-btn--primary"].filter(Boolean).join(" ")}
               aria-pressed={paneTabOn("members")}
-              aria-expanded={cinema ? cinemaDrawer && pane === "members" : undefined}
               onclick={() => onPaneTab("members")}
             >
               成員
@@ -815,7 +818,6 @@
               type="button"
               class={["pixel-btn", paneTabOn("files") && "pixel-btn--primary"].filter(Boolean).join(" ")}
               aria-pressed={paneTabOn("files")}
-              aria-expanded={cinema ? cinemaDrawer && pane === "files" : undefined}
               onclick={() => onPaneTab("files")}
             >
               檔案
@@ -826,7 +828,6 @@
               type="button"
               class={["pixel-btn", paneTabOn("chat") && "pixel-btn--primary"].filter(Boolean).join(" ")}
               aria-pressed={paneTabOn("chat")}
-              aria-expanded={cinema ? cinemaDrawer && pane === "chat" : undefined}
               onclick={() => onPaneTab("chat")}
             >
               文字{#if messages.length > 0} · {messages.length}{/if}
@@ -1107,6 +1108,7 @@
       <p class="err room-live-err" role="alert">{goRoomMedia.error}</p>
     {/if}
     </div>
+  {/if}
     <video
       bind:this={localPreviewEl}
       class="media-video media-video--idle"
@@ -1280,21 +1282,22 @@
     height: 100%;
     aspect-ratio: auto;
   }
-  .room--portrait.room--chrome-overlay:not(.room--cinema) .room-lower {
+  .room--portrait.room--chrome-overlay .room-lower {
     min-height: 0;
     overflow: hidden;
   }
-  .room--portrait.room--chrome-overlay:not(.room--cinema) .room-shell {
+  .room--portrait.room--chrome-overlay .room-shell {
     flex: 1 1 auto;
     min-height: 0;
   }
-  .room--portrait.room--chrome-overlay:not(.room--cinema) .room-pane--chat {
+  .room--portrait.room--chrome-overlay .room-pane--chat {
     min-height: 0;
   }
   .room--cinema {
-    position: relative;
-    height: 100%;
-    min-height: 100%;
+    position: absolute;
+    inset: 0;
+    height: auto;
+    min-height: 0;
     overflow: hidden;
     padding: 0;
     gap: 0;
@@ -1324,54 +1327,6 @@
     pointer-events: none;
     text-shadow: 0 1px 0 #000;
     color: #f4efe4;
-  }
-  .cinema-scrim {
-    position: absolute;
-    inset: 0;
-    z-index: 4;
-    margin: 0;
-    padding: 0;
-    border: none;
-    background: color-mix(in oklab, rgb(var(--ink)) 28%, transparent);
-    cursor: pointer;
-  }
-  .room--cinema .room-shell {
-    position: absolute;
-    left: 0.4rem;
-    right: 0.4rem;
-    bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px));
-    z-index: 5;
-    flex: none;
-    min-height: 0;
-  }
-  .room--cinema .room-shell--drawer {
-    max-height: min(70dvh, 28rem);
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    padding: 0.45rem 0.55rem 0.35rem;
-    background: rgb(var(--card));
-    border: var(--pixel-edge) solid rgb(var(--ink));
-    border-radius: var(--radius);
-    box-shadow: var(--pixel-shadow);
-  }
-  .room--cinema .room-shell--drawer .room-pane {
-    flex: 1 1 auto;
-  }
-  .room--cinema .room-tabs {
-    padding: 0.2rem;
-    background: color-mix(in oklab, rgb(var(--card)) 88%, transparent);
-    border-radius: var(--radius);
-  }
-  .room--cinema .room-dock {
-    position: absolute;
-    left: 0.4rem;
-    right: 0.4rem;
-    bottom: calc(0.3rem + env(safe-area-inset-bottom, 0px));
-    z-index: 5;
-    padding: 0.2rem;
-    background: color-mix(in oklab, rgb(var(--card)) 88%, transparent);
-    border-radius: var(--radius);
   }
   .room-tv-col {
     flex: 0 0 auto;
@@ -1421,9 +1376,6 @@
     min-height: 0;
     flex: 1 1 auto;
     gap: 0.35rem;
-  }
-  .room--cinema .room-lower {
-    display: contents;
   }
   .room-tabs {
     display: flex;
@@ -1712,8 +1664,7 @@
       height: 100%;
       aspect-ratio: auto;
     }
-    .room--desktop:not(.room--cinema) .room-lower {
-      grid-column: 2;
+    .room--desktop .room-lower {
       display: flex;
       flex-direction: column;
       min-height: 0;
@@ -1724,12 +1675,15 @@
       border-left: var(--pixel-edge) solid rgb(var(--ink));
       box-sizing: border-box;
     }
-    .room--desktop:not(.room--cinema) .room-dock {
+    .room--desktop:not(.room--cinema) .room-lower {
+      grid-column: 2;
+    }
+    .room--desktop .room-dock {
       flex: 0 0 auto;
       padding-bottom: 0.35rem;
       border-bottom: 1px solid color-mix(in oklab, rgb(var(--ink)) 18%, transparent);
     }
-    .room--desktop:not(.room--cinema) .room-shell {
+    .room--desktop .room-shell {
       flex: 1 1 auto;
       display: grid;
       grid-template-columns: 1fr;
@@ -1741,18 +1695,18 @@
       min-height: 0;
       gap: 0;
     }
-    .room--desktop:not(.room--cinema) .room-tabs {
+    .room--desktop .room-tabs {
       display: flex;
       grid-area: tabs;
       flex: none;
       padding: 0.25rem 0 0.15rem;
     }
-    .room--desktop:not(.room--cinema) .room-pane--files {
+    .room--desktop .room-pane--files {
       grid-area: files;
       border-bottom: 1px solid color-mix(in oklab, rgb(var(--ink)) 18%, transparent);
     }
-    .room--desktop:not(.room--cinema) .room-pane--members,
-    .room--desktop:not(.room--cinema) .room-pane--chat {
+    .room--desktop .room-pane--members,
+    .room--desktop .room-pane--chat {
       grid-area: lower;
     }
   }
@@ -1781,8 +1735,7 @@
       height: 100%;
       aspect-ratio: auto;
     }
-    .room--short-landscape:not(.room--cinema) .room-lower {
-      grid-column: 2;
+    .room--short-landscape .room-lower {
       display: flex;
       flex-direction: column;
       min-height: 0;
@@ -1792,22 +1745,25 @@
       padding: 0.3rem 0.4rem calc(0.3rem + env(safe-area-inset-bottom, 0px));
       box-sizing: border-box;
     }
-    .room--short-landscape:not(.room--cinema) .room-dock {
+    .room--short-landscape:not(.room--cinema) .room-lower {
+      grid-column: 2;
+    }
+    .room--short-landscape .room-dock {
       flex: 0 0 auto;
     }
-    .room--short-landscape:not(.room--cinema) .room-shell {
+    .room--short-landscape .room-shell {
       display: flex;
       flex-direction: column;
       flex: 1 1 auto;
       min-height: 0;
       gap: 0.35rem;
     }
-    .room--short-landscape:not(.room--cinema) .room-tabs {
+    .room--short-landscape .room-tabs {
       display: flex;
       flex: none;
     }
-    .room--short-landscape:not(.room--cinema) .room-pane,
-    .room--short-landscape:not(.room--cinema) .room-pane--chat {
+    .room--short-landscape .room-pane,
+    .room--short-landscape .room-pane--chat {
       flex: 1 1 auto;
       min-height: 0;
       grid-area: auto;
@@ -1819,13 +1775,16 @@
       flex-direction: row;
     }
   }
-  /* Cinema wins over hall RWD grids: always app-level fullscreen + overlay. */
+  /* Cinema: video fills the playing surface; HUD overlays hall geometry. */
   .room.room--cinema {
     display: block;
-    position: relative;
-    height: 100%;
-    min-height: 100%;
-    max-height: 100%;
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    height: auto;
+    min-height: 0;
+    max-height: none;
+    width: 100%;
     overflow: hidden;
     padding: 0;
     gap: 0;
@@ -1849,42 +1808,10 @@
   .room.room--cinema .room-tv-stage {
     height: 100%;
   }
-  .room.room--cinema .room-tabs {
-    display: flex;
-  }
-  .room.room--cinema .room-shell {
-    display: flex;
-    flex-direction: column;
-    position: absolute;
-    top: auto;
-    left: 0.4rem;
-    right: 0.4rem;
-    bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px));
-    z-index: 5;
-    flex: none;
-    height: auto;
-    min-height: 0;
-    grid-column: auto;
-    grid-row: auto;
-    grid-template-columns: none;
-    grid-template-rows: none;
-  }
-  .room.room--cinema .room-dock {
-    position: absolute;
-    left: 0.4rem;
-    right: 0.4rem;
-    bottom: calc(0.3rem + env(safe-area-inset-bottom, 0px));
-    z-index: 5;
-    grid-column: auto;
-    grid-row: auto;
-  }
   .room.room--cinema .room-live-err {
-    position: absolute;
-    left: 0.5rem;
-    right: 0.5rem;
-    bottom: calc(4.2rem + env(safe-area-inset-bottom, 0px));
+    position: relative;
     z-index: 6;
-    margin: 0;
+    margin: 0.35rem 0 0;
   }
 </style>
 

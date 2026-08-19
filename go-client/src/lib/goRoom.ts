@@ -57,17 +57,16 @@ export function roomShellPanesConcurrent(
 /** Desktop hall: files stay on the rail; members/chat share the lower half. */
 export function roomShellFilesPinned(
   mode: RoomShellMode,
-  cinema = false
+  _cinema = false
 ): boolean {
-  return !cinema && mode === "desktop";
+  return mode === "desktop";
 }
 
 /** Tabs to render. Empty = all panes in flow. */
 export function roomShellTabPanes(
   mode: RoomShellMode,
-  cinema = false
+  _cinema = false
 ): RoomShellPane[] {
-  if (cinema) return ["members", "files", "chat"];
   if (mode === "desktop") return ["members", "chat"];
   return ["members", "files", "chat"];
 }
@@ -152,7 +151,7 @@ export function roomChromeShouldHold(opts: {
   );
 }
 
-/** Theatre mode: app-level fullscreen video. Not the browser Fullscreen API. */
+/** Theatre mode: user hid the control panel. Not auto-on when the TV plays. */
 export function roomCinemaAllowed(opts: {
   inBooth: boolean;
   phase: RoomUiPhase;
@@ -167,11 +166,26 @@ export function roomCinemaAllowed(opts: {
 
 export function roomCinemaActive(opts: {
   allowed: boolean;
-  tvOn: boolean;
-  userExit: boolean;
+  userEnter: boolean;
 }): boolean {
-  if (!opts.allowed || !opts.tvOn || opts.userExit) return false;
-  return true;
+  return Boolean(opts.allowed && opts.userEnter);
+}
+
+export function roomCinemaToggleLabel(cinema: boolean): string {
+  return cinema ? GO_ROOM_CINEMA_EXIT : GO_ROOM_CINEMA_ENTER;
+}
+
+/** Hall control panel is in-flow; cinema has no panel overlay. */
+export function roomCinemaHudVisible(opts: { cinema: boolean }): boolean {
+  return !opts.cinema;
+}
+
+/** Pull-down／peek／Esc revealing chrome leaves cinema for the hall. */
+export function roomCinemaExitOnChromeReveal(opts: {
+  cinema: boolean;
+  chromeHidden: boolean;
+}): boolean {
+  return opts.cinema && !opts.chromeHidden;
 }
 
 /** House ad floats on the idle TV; hide once a program is streaming. */
@@ -327,6 +341,8 @@ export const GO_ROOM_TV_HINT_HOST =
 export const GO_ROOM_TV_HINT_GUEST = "電視畫面由主持指定。點全螢幕可放大。";
 export const GO_ROOM_PUT_ON_TV = "放到電視上";
 export const GO_ROOM_TV_OFF_BTN = "關掉電視";
+export const GO_ROOM_CINEMA_ENTER = "隱藏控制面板";
+export const GO_ROOM_CINEMA_EXIT = "顯示控制面板";
 export const GO_ROOM_CAMERA_WATCH = "收看";
 export const GO_ROOM_CAMERA_STOP_WATCH = "停止收看";
 export const GO_ROOM_MIC_LISTEN = "收聽";
