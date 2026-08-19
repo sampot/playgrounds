@@ -203,7 +203,7 @@ describe("roomTvStream", () => {
 });
 
 describe("roomStageStatus", () => {
-  it("hides the line when the Host is alone and the TV is off", () => {
+  it("hides the line when the Host is alone and there is no signal", () => {
     expect(
       roomStageStatus({ guestCount: 0, tvLabel: GO_ROOM_TV_OFF })
     ).toBe("");
@@ -212,7 +212,7 @@ describe("roomStageStatus", () => {
   it("appends the TV when people are in or the set is on", () => {
     expect(
       roomStageStatus({ guestCount: 2, tvLabel: GO_ROOM_TV_OFF })
-    ).toBe("3 人在 · 電視關機");
+    ).toBe("3 人在 · 沒訊號");
     expect(
       roomStageStatus({ guestCount: 0, tvLabel: "正在播 MTV.mp4" })
     ).toBe("正在播 MTV.mp4");

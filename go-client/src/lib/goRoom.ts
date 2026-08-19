@@ -344,7 +344,7 @@ export const GO_ROOM_CONNECT_FAILED =
   "連線失敗。請靠近同一網路，或請對方再發一次邀請。";
 
 export const GO_ROOM_MEDIA_OFF = "鏡頭 · 未開";
-export const GO_ROOM_TV_OFF = "電視關機";
+export const GO_ROOM_TV_OFF = "沒訊號";
 export const GO_ROOM_TV_TITLE = "包廂電視";
 export const GO_ROOM_TV_FULLSCREEN = "全螢幕";
 export const GO_ROOM_TV_EXIT_FULLSCREEN = "離開全螢幕";
@@ -360,7 +360,7 @@ export const GO_ROOM_MEMBER_MORE = "更多";
 export const GO_ROOM_KICK_CONFIRM =
   "要把這個人請出這一間？對方會斷線；其他人還在。";
 export const GO_ROOM_KICKED = "主持請你離開這一間";
-export const GO_ROOM_TV_OFF_BTN = "關掉電視";
+export const GO_ROOM_TV_OFF_BTN = "從電視拿掉";
 export const GO_ROOM_TV_PLAY = "播放";
 export const GO_ROOM_TV_PAUSE = "暫停";
 export const GO_ROOM_CINEMA_ENTER = "隱藏控制面板";
@@ -433,7 +433,7 @@ export function roomTvStream(opts: {
 
 export type RoomTvHudKind = "none" | "host-file" | "watch";
 
-/** Host file clock lives on the picture; guests only watch. Off TV has no HUD. */
+/** Host file clock lives on the picture; guests only watch. No-input snow has no HUD. */
 export function roomTvHudKind(opts: {
   tvOn: boolean;
   role?: "host" | "guest";

@@ -68,7 +68,7 @@ export type RoomMediaState = {
   listening: boolean;
   watchingProgram: boolean;
   remoteLives: RoomRemoteLive[];
-  /** Occupant whose live is on the TV; null when TV is off or a file. */
+  /** Occupant whose live is on the TV; null when no signal or a file. */
   tvSourcePeerId: string | null;
   /** Catalog file currently on the TV (local capture or remote offer id). */
   streamingFileId: string | null;
