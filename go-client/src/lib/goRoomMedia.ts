@@ -214,6 +214,7 @@ export function createRoomMedia(opts: {
   captureProgram?: (file: File) => Promise<CapturedProgram | null>;
   resolveLocalFile?: (id: string) => File | null;
   ownerOf?: (id: string) => string | null;
+  fileMeta?: (id: string) => { name: string; kind: "audio" | "video" } | null;
 }): RoomMedia {
   const getUserMedia =
     opts.getUserMedia ??
@@ -232,6 +233,11 @@ export function createRoomMedia(opts: {
   let remoteProgramKind: "audio" | "video" | null = null;
   let remoteProgramFileId: string | null = null;
   let remoteProgramFrom: string | null = null;
+  let remoteProgramPaused = true;
+  let remoteProgramTime = 0;
+  let remoteProgramDuration = 0;
+  let lastClockPublishMs = 0;
+  let lastClockPublishedPaused: boolean | null = null;
   let remoteCameraFrom: string | null = null;
   let remoteMicFrom: string | null = null;
   let programFromLive = false;
@@ -261,20 +267,118 @@ export function createRoomMedia(opts: {
     "programTransport" | "programPaused" | "programTime" | "programDuration"
   > {
     const clock = program?.clock?.() ?? null;
-    if (!clock) {
+    if (clock) {
       return {
+        programTransport: true,
+        programPaused: clock.paused,
+        programTime: clock.currentTime,
+        programDuration: clock.duration,
+      };
+    }
+    if (streamingFileId || remoteProgramFileId) {
+      return {
+        // Host HUD: remote file is host-directed even without local capture.
         programTransport: false,
-        programPaused: true,
-        programTime: 0,
-        programDuration: 0,
+        programPaused: remoteProgramPaused,
+        programTime: remoteProgramTime,
+        programDuration: remoteProgramDuration,
       };
     }
     return {
-      programTransport: true,
-      programPaused: clock.paused,
-      programTime: clock.currentTime,
-      programDuration: clock.duration,
+      programTransport: false,
+      programPaused: true,
+      programTime: 0,
+      programDuration: 0,
     };
+  }
+
+  function clearRemoteProgramClock(): void {
+    remoteProgramPaused = true;
+    remoteProgramTime = 0;
+    remoteProgramDuration = 0;
+    lastClockPublishMs = 0;
+    lastClockPublishedPaused = null;
+  }
+
+  function publishProgramClock(force = false): void {
+    const clock = program?.clock?.() ?? null;
+    if (!clock || !streamingFileId) return;
+    const now =
+      typeof performance !== "undefined" && performance.now
+        ? performance.now()
+        : Date.now();
+    // timeupdate is chatty; throttle so Hub DC stays free for files／control.
+    if (
+      !force &&
+      lastClockPublishMs > 0 &&
+      now - lastClockPublishMs < 500 &&
+      clock.paused === lastClockPublishedPaused
+    ) {
+      return;
+    }
+    lastClockPublishMs = now;
+    lastClockPublishedPaused = clock.paused;
+    opts.sendJson(
+      buildSessionCastMessage({
+        op: "state",
+        from: opts.localAgentId,
+        paused: clock.paused,
+        t: clock.currentTime,
+        duration: clock.duration,
+        id: streamingFileId,
+        name: programName ?? undefined,
+      })
+    );
+  }
+
+  function sendProgramControl(partial: {
+    paused?: boolean;
+    t?: number;
+  }): void {
+    opts.sendJson(
+      buildSessionCastMessage({
+        op: "state",
+        from: opts.localAgentId,
+        paused: partial.paused,
+        t: partial.t,
+        id: streamingFileId ?? remoteProgramFileId ?? undefined,
+        name: programName ?? remoteProgramName ?? undefined,
+      })
+    );
+  }
+
+  function applyProgramControl(data: {
+    paused?: boolean;
+    t?: number;
+  }): void {
+    if (!program) return;
+    if (data.t !== undefined) program.seek?.(data.t);
+    if (data.paused === true) program.pause?.();
+    if (data.paused === false) program.play?.();
+    publishProgramClock(true);
+    emit();
+  }
+
+  function ingestProgramClock(data: {
+    paused?: boolean;
+    t?: number;
+    duration?: number;
+  }): void {
+    if (data.paused !== undefined) remoteProgramPaused = data.paused;
+    if (data.t !== undefined) remoteProgramTime = data.t;
+    if (data.duration !== undefined) remoteProgramDuration = data.duration;
+    // replaceTrack often unmutes an existing transceiver track without a
+    // fresh `track` event — pull receivers whenever the owner reports clock.
+    collectRemoteFromPeers();
+    if (
+      opts.forward &&
+      remoteProgramFrom &&
+      remoteProgramFrom !== opts.localAgentId &&
+      !program
+    ) {
+      void thisForwardFrom(remoteProgramFrom);
+    }
+    emit();
   }
 
   function snap(): RoomMediaState {
@@ -356,6 +460,15 @@ export function createRoomMedia(opts: {
 
   function ingestNow() {
     collectRemoteFromPeers();
+    if (
+      opts.forward &&
+      remoteProgramFrom &&
+      remoteProgramFrom !== opts.localAgentId &&
+      !program &&
+      !programFromLive
+    ) {
+      void thisForwardFrom(remoteProgramFrom);
+    }
     emit();
   }
 
@@ -375,7 +488,7 @@ export function createRoomMedia(opts: {
   const ingestTimers: ReturnType<typeof setTimeout>[] = [];
   function scheduleIngest() {
     ingestNow();
-    for (const ms of [80, 250, 1000]) {
+    for (const ms of [80, 250, 1000, 2500, 5000]) {
       ingestTimers.push(setTimeout(ingestNow, ms));
     }
   }
@@ -460,7 +573,7 @@ export function createRoomMedia(opts: {
   }
 
   async function unofferProgram(): Promise<void> {
-    if (program || programName) {
+    if (program || programName || remoteProgramName) {
       opts.sendJson(
         buildSessionCastMessage({
           op: "unoffer",
@@ -474,6 +587,12 @@ export function createRoomMedia(opts: {
     programFromLive = false;
     tvSourcePeerId = null;
     programName = null;
+    remoteProgramName = null;
+    remoteProgramKind = null;
+    remoteProgramFileId = null;
+    remoteProgramFrom = null;
+    watchingProgram = false;
+    clearRemoteProgramClock();
     streamingFileId = null;
     revokeOwnerDecode();
     await push();
@@ -487,7 +606,7 @@ export function createRoomMedia(opts: {
     return true;
   }
 
-  function offerProgram(): void {
+  function offerProgram(fromPeer?: string): void {
     if (!program && !programName) return;
     opts.sendJson(
       buildSessionCastMessage({
@@ -496,8 +615,116 @@ export function createRoomMedia(opts: {
         kind: program?.video ? "video" : "audio",
         name: programName ?? "節目",
         id: streamingFileId ?? undefined,
+        fromPeer,
       })
     );
+  }
+
+  async function offerRemoteListedProgram(
+    id: string,
+    owner: string
+  ): Promise<RoomMediaResult> {
+    const meta = opts.fileMeta?.(id) ?? null;
+    const name = meta?.name?.trim() || "節目";
+    const kind = meta?.kind ?? "video";
+    if (!programFromLive) program?.stop();
+    program = null;
+    programFromLive = false;
+    tvSourcePeerId = null;
+    streamingFileId = id;
+    programName = name;
+    remoteProgramName = name;
+    remoteProgramKind = kind;
+    remoteProgramFileId = id;
+    remoteProgramFrom = owner;
+    watchingProgram = true;
+    clearRemoteProgramClock();
+    remoteProgramPaused = false;
+    error = null;
+    revokeOwnerDecode();
+    markAll(programWatchers);
+    opts.sendJson(
+      buildSessionCastMessage({
+        op: "offer",
+        from: opts.localAgentId,
+        kind,
+        name,
+        id,
+        fromPeer: owner,
+      })
+    );
+    // 2+2 placeholders unmute in place — bind receivers now and poll briefly.
+    collectRemoteFromPeers();
+    scheduleIngest();
+    await thisForwardFrom(owner);
+    collectRemoteFromPeers();
+    emit();
+    return { ok: true };
+  }
+
+  async function thisForwardFrom(fromPeerId: string): Promise<void> {
+    if (!opts.forward) return;
+    const peers = opts.peers();
+    const from = peers.find((p) => p.peerId === fromPeerId);
+    if (!from) return;
+    for (const dest of peers) {
+      if (dest.peerId === fromPeerId) continue;
+      if (!camera && cameraWatchers.has(dest.peerId)) {
+        const video = receiverTrack(from.pc, "presence", "video");
+        if (video) {
+          await replaceBoothTrack(dest.pc, "presence", "video", video);
+        }
+      }
+      if (!mic && micListeners.has(dest.peerId)) {
+        const audio = receiverTrack(from.pc, "presence", "audio");
+        if (audio) {
+          await replaceBoothTrack(dest.pc, "presence", "audio", audio);
+        }
+      }
+      if (programFromLive && programWatchers.has(dest.peerId)) {
+        const audio =
+          program?.audio ?? receiverTrack(from.pc, "presence", "audio");
+        const video =
+          program?.video ?? receiverTrack(from.pc, "presence", "video");
+        if (audio) await replaceBoothTrack(dest.pc, "program", "audio", audio);
+        if (video) await replaceBoothTrack(dest.pc, "program", "video", video);
+        continue;
+      }
+      if (program) continue;
+      if (!programWatchers.has(dest.peerId)) continue;
+      const audio = receiverTrack(from.pc, "program", "audio");
+      const video = receiverTrack(from.pc, "program", "video");
+      if (audio) await replaceBoothTrack(dest.pc, "program", "audio", audio);
+      if (video) await replaceBoothTrack(dest.pc, "program", "video", video);
+    }
+  }
+
+  async function becomeListedProgramSource(
+    id: string,
+    nameHint?: string
+  ): Promise<RoomMediaResult> {
+    const out = await ensureCaptured(id);
+    if (!out.ok) {
+      opts.sendJson(
+        buildSessionCastMessage({
+          op: "reject",
+          from: opts.localAgentId,
+          id,
+        })
+      );
+      return out;
+    }
+    remoteProgramName = null;
+    remoteProgramKind = null;
+    remoteProgramFileId = null;
+    remoteProgramFrom = null;
+    watchingProgram = false;
+    if (nameHint?.trim()) programName = nameHint.trim();
+    markAll(programWatchers);
+    await push();
+    publishProgramClock();
+    emit();
+    return { ok: true };
   }
 
   async function push(): Promise<void> {
@@ -541,10 +768,14 @@ export function createRoomMedia(opts: {
   function bindProgramClock(next: CapturedProgram | null): void {
     const el = next?.mediaEl;
     if (!el) return;
-    el.addEventListener("timeupdate", emit);
-    el.addEventListener("play", emit);
-    el.addEventListener("pause", emit);
-    el.addEventListener("seeked", emit);
+    const onTick = () => {
+      publishProgramClock();
+      emit();
+    };
+    el.addEventListener("timeupdate", onTick);
+    el.addEventListener("play", onTick);
+    el.addEventListener("pause", onTick);
+    el.addEventListener("seeked", onTick);
   }
 
   function revokeOwnerDecode(): void {
@@ -787,25 +1018,62 @@ export function createRoomMedia(opts: {
       return { ok: true };
     },
     async startListedProgram(id) {
-      const out = await ensureCaptured(id);
-      if (!out.ok) return out;
-      markAll(programWatchers);
-      offerProgram();
-      await push();
-      emit();
-      return { ok: true };
+      const local = opts.resolveLocalFile?.(id) ?? null;
+      if (local) {
+        const out = await ensureCaptured(id);
+        if (!out.ok) return out;
+        markAll(programWatchers);
+        offerProgram();
+        await push();
+        emit();
+        return { ok: true };
+      }
+      const owner = opts.ownerOf?.(id)?.trim() || "";
+      if (!owner || owner === opts.localAgentId) {
+        error = GO_ROOM_CAST_UNSUPPORTED;
+        emit();
+        return { ok: false, error: GO_ROOM_CAST_UNSUPPORTED };
+      }
+      return offerRemoteListedProgram(id, owner);
     },
     pauseProgram() {
-      program?.pause?.();
-      emit();
+      if (program?.pause) {
+        program.pause();
+        publishProgramClock(true);
+        emit();
+        return;
+      }
+      if (streamingFileId && remoteProgramFrom) {
+        remoteProgramPaused = true;
+        sendProgramControl({ paused: true, t: remoteProgramTime });
+        emit();
+      }
     },
     playProgram() {
-      program?.play?.();
-      emit();
+      if (program?.play) {
+        program.play();
+        publishProgramClock(true);
+        emit();
+        return;
+      }
+      if (streamingFileId && remoteProgramFrom) {
+        remoteProgramPaused = false;
+        sendProgramControl({ paused: false, t: remoteProgramTime });
+        emit();
+      }
     },
     seekProgram(seconds) {
-      program?.seek?.(seconds);
-      emit();
+      if (program?.seek) {
+        program.seek(seconds);
+        publishProgramClock(true);
+        emit();
+        return;
+      }
+      if (streamingFileId && remoteProgramFrom && Number.isFinite(seconds)) {
+        remoteProgramTime = Math.max(0, seconds);
+        sendProgramControl({ t: remoteProgramTime, paused: remoteProgramPaused });
+        emit();
+      }
     },
     async stopProgram() {
       await unofferProgram();
@@ -1035,46 +1303,20 @@ export function createRoomMedia(opts: {
       if (program) {
         const added = markAll(programWatchers);
         if (added > 0) offerProgram();
+      } else if (
+        opts.forward &&
+        remoteProgramFrom &&
+        remoteProgramFrom !== opts.localAgentId
+      ) {
+        markAll(programWatchers);
+        await thisForwardFrom(remoteProgramFrom);
       }
       if (mic) markAll(micListeners);
       await push();
       emit();
     },
     async forwardFrom(fromPeerId) {
-      if (!opts.forward) return;
-      const peers = opts.peers();
-      const from = peers.find((p) => p.peerId === fromPeerId);
-      if (!from) return;
-      for (const dest of peers) {
-        if (dest.peerId === fromPeerId) continue;
-        if (!camera && cameraWatchers.has(dest.peerId)) {
-          const video = receiverTrack(from.pc, "presence", "video");
-          if (video) {
-            await replaceBoothTrack(dest.pc, "presence", "video", video);
-          }
-        }
-        if (!mic && micListeners.has(dest.peerId)) {
-          const audio = receiverTrack(from.pc, "presence", "audio");
-          if (audio) {
-            await replaceBoothTrack(dest.pc, "presence", "audio", audio);
-          }
-        }
-        if (programFromLive && programWatchers.has(dest.peerId)) {
-          const audio =
-            program?.audio ?? receiverTrack(from.pc, "presence", "audio");
-          const video =
-            program?.video ?? receiverTrack(from.pc, "presence", "video");
-          if (audio) await replaceBoothTrack(dest.pc, "program", "audio", audio);
-          if (video) await replaceBoothTrack(dest.pc, "program", "video", video);
-          continue;
-        }
-        if (program) continue;
-        if (!programWatchers.has(dest.peerId)) continue;
-        const audio = receiverTrack(from.pc, "program", "audio");
-        const video = receiverTrack(from.pc, "program", "video");
-        if (audio) await replaceBoothTrack(dest.pc, "program", "audio", audio);
-        if (video) await replaceBoothTrack(dest.pc, "program", "video", video);
-      }
+      await thisForwardFrom(fromPeerId);
     },
     async onControl(data) {
       if (isSessionBoothMessage(data)) {
@@ -1165,19 +1407,48 @@ export function createRoomMedia(opts: {
       if (!isSessionCastMessage(data)) return;
       if (data.from === opts.localAgentId) return;
       if (data.op === "offer") {
+        const fileId = data.id?.trim() || "";
+        const fromPeer = data.fromPeer?.trim() || "";
+        const iAmSource =
+          Boolean(fileId) &&
+          (fromPeer === opts.localAgentId ||
+            (!fromPeer && Boolean(opts.resolveLocalFile?.(fileId)))) &&
+          Boolean(opts.resolveLocalFile?.(fileId));
+        if (iAmSource && fileId) {
+          await becomeListedProgramSource(fileId, data.name);
+          return;
+        }
+        if (fromPeer === opts.localAgentId && fileId) {
+          opts.sendJson(
+            buildSessionCastMessage({
+              op: "reject",
+              from: opts.localAgentId,
+              id: fileId,
+            })
+          );
+          return;
+        }
         remoteProgramName = data.name?.trim() || "節目";
         remoteProgramKind = data.kind ?? "video";
-        remoteProgramFileId = data.id?.trim() || null;
-        remoteProgramFrom = data.from;
+        remoteProgramFileId = fileId || null;
+        remoteProgramFrom = fromPeer || data.from;
         emit();
         if (!watchingProgram) void this.watchProgram();
         if (opts.forward) {
           markAll(programWatchers);
-          await this.forwardFrom(data.from);
+          await thisForwardFrom(remoteProgramFrom);
         }
         return;
       }
       if (data.op === "unoffer") {
+        if (program && streamingFileId && !programFromLive) {
+          program.stop();
+          program = null;
+          streamingFileId = null;
+          programName = null;
+          revokeOwnerDecode();
+          await push();
+        }
         remoteProgramName = null;
         remoteProgramKind = null;
         remoteProgramFileId = null;
@@ -1186,6 +1457,7 @@ export function createRoomMedia(opts: {
         remoteProgramVideo = null;
         remoteProgramAudio = null;
         programCache = null;
+        clearRemoteProgramClock();
         emit();
         return;
       }
@@ -1201,20 +1473,43 @@ export function createRoomMedia(opts: {
         if (program) await push();
         const owner = remoteProgramFrom;
         if (opts.forward && owner && owner !== opts.localAgentId) {
-          await this.forwardFrom(owner);
+          await thisForwardFrom(owner);
         }
         emit();
         return;
       }
       if (data.op === "reject") {
-        if (data.id && watchingProgram) {
+        if (data.id && (watchingProgram || streamingFileId === data.id)) {
           watchingProgram = false;
+          if (streamingFileId === data.id) {
+            streamingFileId = null;
+            programName = null;
+            remoteProgramName = null;
+            remoteProgramKind = null;
+            remoteProgramFileId = null;
+            remoteProgramFrom = null;
+          }
           error = GO_ROOM_CAST_UNSUPPORTED;
           emit();
         }
         return;
       }
       if (data.op === "state") {
+        if (program && data.from !== opts.localAgentId) {
+          applyProgramControl({
+            paused: data.paused,
+            t: data.t,
+          });
+          return;
+        }
+        if (!program && data.from !== opts.localAgentId) {
+          ingestProgramClock({
+            paused: data.paused,
+            t: data.t,
+            duration: data.duration,
+          });
+          return;
+        }
         if (watchingProgram) scheduleIngest();
         return;
       }
@@ -1243,6 +1538,13 @@ export function createRoomMedia(opts: {
       if (programFromLive) {
         syncLiveProgram();
         void push();
+      } else if (
+        opts.forward &&
+        remoteProgramFrom &&
+        remoteProgramFrom !== opts.localAgentId &&
+        !program
+      ) {
+        void thisForwardFrom(remoteProgramFrom);
       }
       emit();
     },

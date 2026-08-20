@@ -558,7 +558,7 @@ dash provision → 場殼記憶體 API key
 | **6b. 「更多」本機溢流** | Header「更多」＝已下載列表＋分層清除；試試這些可選第二段；Invite 不露（§6.6） | `/`／`/s/` 可開已下載面板；清除分層＋頁內確認；`/i/` 無本機選單；非迷你型錄 | **已落地**（`GoMorePanel`） |
 | **6c. 登入＋Header profile（DEC-052）** | go consume `#pg_provision=`（redeem→記憶體 key→`/v1/field/me`）；Header profile icon/avatar＋身分面板；Platform 放行 go＋`/v1/field/me` | dash 可登入 go；「已登入」avatar 顯示、可登出；key 關頁即失；未登入不阻玩（見 [PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md)） | 未排程（auth plan 本刀） |
 | **6d. 玩家主場互邀（GO-INVITE）** | 已登入玩家在單局內邀另一位玩家（回 `go/i/<short>`）；用同一把記憶體 field API key 走 `invite.compose`；**不**等同 author session | 玩家 A 在 go 開一局→邀玩家 B→B 入座對戰；A／B 不需作者面 | 未排程（後續；見 auth plan §5.3） |
-| **6e. 包廂（`/room`）** | 已登入進 `/room` **即包廂 UI**；Guest `/i/` 進同一間且**留在 `/i/`**；**入座不鎖 1:1**；**目錄只掛檔**；**live 在名單**；影音檔＝漸進下載播放；主視訊區（片子／live RTP；劇院態滿窗＋overlay；開局延後）；**現況 Hub**；包廂活著＝主持畫面開著 | 見 [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md) | 按需鑄／兩個時鐘／2c 大螢幕已落地；**2d 殼面進行中**（廳態＋劇院態已接）；**3 開局延後** |
+| **6e. 包廂（`/room`）** | 已登入進 `/room` **即包廂 UI**；Guest `/i/` 進同一間且**留在 `/i/`**；**入座不鎖 1:1**；**目錄只掛檔**；**live 在名單**；影音檔＝漸進下載播放；主視訊區（片子／live RTP；劇院態滿窗＋overlay；開局延後）；**放到大螢幕上**＝持檔端渲染（可別人掛的影音；2e）；**現況 Hub**；包廂活著＝主持畫面開著 | 見 [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md) | 按需鑄／兩個時鐘／2c 大螢幕已落地；**2d 殼面進行中**；**2e video／audio 已落地**；**3 開局延後** |
 | **7.（可選）** | short 不進 hash（B）；文件站導讀；場殼 `#pg=`／`view=canvas` 標「進階／除錯」或汰除 | 另議 | — |
 
 ---
@@ -697,3 +697,4 @@ dash provision → 場殼記憶體 API key
 | 2026-08-19 | 包廂：**一條 live**（名單上收看；鏡頭 XOR 畫面分享）；影音檔改漸進下載＋本機播放器，不佔 live |
 | 2026-08-19 | 包廂：**大螢幕主面**（節目 RTP、主持導播、兩層螢幕、文字為輔、靜態內景）。見 [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md) |
 | 2026-08-19 | 包廂：**劇院態**（主視訊應用內滿窗；三區 overlay；非系統全螢幕）。見 [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md) |
+| 2026-08-20 | 包廂：**別人掛的檔上大螢幕**（持檔端渲染→節目 RTP；影→音→圖；Phase 2e）。見 [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md) |

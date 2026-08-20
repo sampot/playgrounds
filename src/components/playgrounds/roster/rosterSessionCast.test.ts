@@ -48,6 +48,31 @@ describe("session_cast", () => {
         })
       )
     ).toBe(true);
+    expect(
+      isSessionCastMessage(
+        buildSessionCastMessage({
+          op: "offer",
+          from: "host-1",
+          kind: "video",
+          name: "clip.mp4",
+          id: "file-1",
+          fromPeer: "g-a",
+        })
+      )
+    ).toBe(true);
+  });
+
+  it("rejects offer with empty fromPeer", () => {
+    expect(
+      isSessionCastMessage({
+        type: SESSION_CAST_TYPE,
+        v: 1,
+        op: "offer",
+        from: "host-1",
+        kind: "video",
+        fromPeer: "",
+      })
+    ).toBe(false);
   });
 
   it("rejects chat, missing from, start／stop, or an offer without kind", () => {

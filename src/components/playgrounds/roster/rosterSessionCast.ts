@@ -24,7 +24,11 @@ export type SessionCastMessage = {
   name?: string;
   paused?: boolean;
   t?: number;
+  /** Source clock length for host HUD when owner ≠ host. */
+  duration?: number;
   id?: string;
+  /** Program RTP source peer when casting another occupant's file／live. */
+  fromPeer?: string;
 };
 
 const CAST_OPS = new Set<SessionCastOp>([
@@ -62,7 +66,17 @@ export function isSessionCastMessage(data: unknown): data is SessionCastMessage 
   if (m.t !== undefined) {
     if (typeof m.t !== "number" || !Number.isFinite(m.t) || m.t < 0) return false;
   }
+  if (m.duration !== undefined) {
+    if (
+      typeof m.duration !== "number" ||
+      !Number.isFinite(m.duration) ||
+      m.duration < 0
+    ) {
+      return false;
+    }
+  }
   if (m.id !== undefined && !isId(m.id)) return false;
+  if (m.fromPeer !== undefined && !isId(m.fromPeer)) return false;
   if (m.op === "offer") return Boolean(m.kind);
   return true;
 }
@@ -74,7 +88,9 @@ export function buildSessionCastMessage(opts: {
   name?: string;
   paused?: boolean;
   t?: number;
+  duration?: number;
   id?: string;
+  fromPeer?: string;
 }): SessionCastMessage {
   const msg: SessionCastMessage = {
     type: SESSION_CAST_TYPE,
@@ -86,6 +102,8 @@ export function buildSessionCastMessage(opts: {
   if (opts.name) msg.name = opts.name;
   if (opts.paused !== undefined) msg.paused = opts.paused;
   if (opts.t !== undefined) msg.t = opts.t;
+  if (opts.duration !== undefined) msg.duration = opts.duration;
   if (opts.id) msg.id = opts.id;
+  if (opts.fromPeer) msg.fromPeer = opts.fromPeer;
   return msg;
 }

@@ -414,6 +414,309 @@ describe("createRoomMedia", () => {
     });
   });
 
+  it("lets the host put a guest-hung file on the TV without pulling bytes", async () => {
+    const json: unknown[] = [];
+    const guestPc = mockPc();
+    const media = createRoomMedia({
+      localAgentId: "host",
+      occupantCount: () => 2,
+      peers: () => [{ peerId: "g-a", pc: guestPc, via: "entrance" }],
+      sendJson: (m) => json.push(m),
+      forward: true,
+      resolveLocalFile: () => null,
+      ownerOf: (id) => (id === "file-1" ? "g-a" : null),
+      fileMeta: (id) =>
+        id === "file-1"
+          ? { name: "guest-clip.mp4", kind: "video" as const }
+          : null,
+    });
+    expect((await media.startListedProgram("file-1")).ok).toBe(true);
+    expect(media.getState().streamingFileId).toBe("file-1");
+    expect(media.getState().programName).toBe("guest-clip.mp4");
+    expect(media.getState().localProgramStream).toBeNull();
+    expect(json).toContainEqual({
+      type: SESSION_CAST_TYPE,
+      v: 1,
+      op: "offer",
+      from: "host",
+      kind: "video",
+      name: "guest-clip.mp4",
+      id: "file-1",
+      fromPeer: "g-a",
+    });
+  });
+
+  it("binds the owner program track onto the host TV without waiting for a track event", async () => {
+    class FakeStream {
+      constructor(public tracks: MediaStreamTrack[]) {}
+    }
+    vi.stubGlobal("MediaStream", FakeStream);
+
+    const remote = track("video", "from-owner");
+    Object.defineProperty(remote, "muted", { value: false, configurable: true });
+    const guestPc = mockPc();
+    guestPc.transceivers[3]!.receiver.track = remote as unknown as {
+      kind: "video";
+      id: string;
+      readyState: "live";
+    };
+
+    const media = createRoomMedia({
+      localAgentId: "host",
+      occupantCount: () => 2,
+      peers: () => [{ peerId: "g-a", pc: guestPc, via: "entrance" }],
+      sendJson: () => {},
+      forward: true,
+      resolveLocalFile: () => null,
+      ownerOf: (id) => (id === "file-1" ? "g-a" : null),
+      fileMeta: (id) =>
+        id === "file-1"
+          ? { name: "guest-clip.mp4", kind: "video" as const }
+          : null,
+    });
+    expect((await media.startListedProgram("file-1")).ok).toBe(true);
+    expect(media.getState().programStream).not.toBeNull();
+    expect(
+      roomTvStream({
+        programStream: media.getState().programStream,
+        localProgramStream: media.getState().localProgramStream,
+      })
+    ).not.toBeNull();
+
+    vi.unstubAllGlobals();
+  });
+
+  it("rebinds the host TV when owner clock telemetry arrives after replaceTrack", async () => {
+    class FakeStream {
+      constructor(public tracks: MediaStreamTrack[]) {}
+    }
+    vi.stubGlobal("MediaStream", FakeStream);
+
+    const guestPc = mockPc();
+    const media = createRoomMedia({
+      localAgentId: "host",
+      occupantCount: () => 2,
+      peers: () => [{ peerId: "g-a", pc: guestPc, via: "entrance" }],
+      sendJson: () => {},
+      forward: true,
+      resolveLocalFile: () => null,
+      ownerOf: (id) => (id === "file-1" ? "g-a" : null),
+      fileMeta: (id) =>
+        id === "file-1"
+          ? { name: "guest-clip.mp4", kind: "video" as const }
+          : null,
+    });
+    expect((await media.startListedProgram("file-1")).ok).toBe(true);
+    expect(media.getState().programStream).toBeNull();
+
+    const remote = track("video", "late-owner");
+    Object.defineProperty(remote, "muted", { value: false, configurable: true });
+    guestPc.transceivers[3]!.receiver.track = remote as unknown as {
+      kind: "video";
+      id: string;
+      readyState: "live";
+    };
+
+    await media.onControl({
+      type: SESSION_CAST_TYPE,
+      v: 1,
+      op: "state",
+      from: "g-a",
+      paused: false,
+      t: 1,
+      duration: 90,
+      id: "file-1",
+    });
+    expect(media.getState().programStream).not.toBeNull();
+
+    vi.unstubAllGlobals();
+  });
+
+  it("captures on the file owner when the host casts their hanging file", async () => {
+    class FakeStream {
+      constructor(public tracks: MediaStreamTrack[]) {}
+    }
+    vi.stubGlobal("MediaStream", FakeStream);
+
+    const video = track("video", "owner-prog");
+    Object.defineProperty(video, "muted", { value: false, configurable: true });
+    const file = new File([new Uint8Array(4)], "guest-clip.mp4", {
+      type: "video/mp4",
+    });
+    const json: unknown[] = [];
+    const hostPc = mockPc();
+    const media = createRoomMedia({
+      localAgentId: "g-a",
+      occupantCount: () => 2,
+      peers: () => [{ peerId: "host", pc: hostPc, via: "entrance" }],
+      sendJson: (m) => json.push(m),
+      resolveLocalFile: (id) => (id === "file-1" ? file : null),
+      captureProgram: async () => ({
+        audio: null,
+        video,
+        stop: vi.fn(),
+      }),
+    });
+    await media.onControl({
+      type: SESSION_CAST_TYPE,
+      v: 1,
+      op: "offer",
+      from: "host",
+      kind: "video",
+      name: "guest-clip.mp4",
+      id: "file-1",
+      fromPeer: "g-a",
+    });
+    expect(media.getState().streamingFileId).toBe("file-1");
+    expect(media.getState().programName).toBe("guest-clip.mp4");
+    expect(media.getState().localProgramStream).not.toBeNull();
+    expect(hostPc.transceivers[3]!.sender.replaceTrack).toHaveBeenCalledWith(
+      video
+    );
+    expect(json.some((m) => (m as { op?: string }).op === "reject")).toBe(
+      false
+    );
+    vi.unstubAllGlobals();
+  });
+
+  it("rejects when the designated owner cannot capture the file", async () => {
+    const json: unknown[] = [];
+    const media = createRoomMedia({
+      localAgentId: "g-a",
+      occupantCount: () => 2,
+      peers: () => [{ peerId: "host", pc: mockPc(), via: "entrance" }],
+      sendJson: (m) => json.push(m),
+      resolveLocalFile: () => null,
+    });
+    await media.onControl({
+      type: SESSION_CAST_TYPE,
+      v: 1,
+      op: "offer",
+      from: "host",
+      kind: "video",
+      name: "missing.mp4",
+      id: "file-1",
+      fromPeer: "g-a",
+    });
+    expect(json).toContainEqual({
+      type: SESSION_CAST_TYPE,
+      v: 1,
+      op: "reject",
+      from: "g-a",
+      id: "file-1",
+    });
+    expect(media.getState().localProgramStream).toBeNull();
+  });
+
+  it("lets the host pause and seek a guest-hung file via cast state", async () => {
+    const clock = { paused: false, currentTime: 12, duration: 90 };
+    const video = track("video", "owner-prog");
+    const file = new File([new Uint8Array(4)], "guest-clip.mp4", {
+      type: "video/mp4",
+    });
+    const ownerJson: unknown[] = [];
+    const owner = createRoomMedia({
+      localAgentId: "g-a",
+      occupantCount: () => 2,
+      peers: () => [{ peerId: "host", pc: mockPc(), via: "entrance" }],
+      sendJson: (m) => ownerJson.push(m),
+      resolveLocalFile: (id) => (id === "file-1" ? file : null),
+      captureProgram: async () => ({
+        audio: null,
+        video,
+        stop: vi.fn(),
+        play() {
+          clock.paused = false;
+        },
+        pause() {
+          clock.paused = true;
+        },
+        seek(seconds: number) {
+          clock.currentTime = seconds;
+        },
+        clock: () => ({ ...clock }),
+      }),
+    });
+    await owner.onControl({
+      type: SESSION_CAST_TYPE,
+      v: 1,
+      op: "offer",
+      from: "host",
+      kind: "video",
+      name: "guest-clip.mp4",
+      id: "file-1",
+      fromPeer: "g-a",
+    });
+
+    const hostJson: unknown[] = [];
+    const host = createRoomMedia({
+      localAgentId: "host",
+      occupantCount: () => 2,
+      peers: () => [{ peerId: "g-a", pc: mockPc(), via: "entrance" }],
+      sendJson: (m) => hostJson.push(m),
+      forward: true,
+      resolveLocalFile: () => null,
+      ownerOf: (id) => (id === "file-1" ? "g-a" : null),
+      fileMeta: (id) =>
+        id === "file-1"
+          ? { name: "guest-clip.mp4", kind: "video" as const }
+          : null,
+    });
+    expect((await host.startListedProgram("file-1")).ok).toBe(true);
+
+    host.pauseProgram();
+    const pauseCmd = hostJson.find(
+      (m) =>
+        (m as { op?: string; paused?: boolean }).op === "state" &&
+        (m as { paused?: boolean }).paused === true
+    );
+    expect(pauseCmd).toMatchObject({
+      type: SESSION_CAST_TYPE,
+      op: "state",
+      from: "host",
+      paused: true,
+    });
+    await owner.onControl(pauseCmd);
+    expect(clock.paused).toBe(true);
+    expect(owner.getState().programPaused).toBe(true);
+
+    host.seekProgram(44);
+    const seekCmd = hostJson.find(
+      (m) =>
+        (m as { op?: string; t?: number }).op === "state" &&
+        (m as { t?: number }).t === 44
+    );
+    expect(seekCmd).toBeTruthy();
+    await owner.onControl(seekCmd);
+    expect(clock.currentTime).toBe(44);
+
+    host.playProgram();
+    const playCmd = [...hostJson]
+      .reverse()
+      .find(
+        (m) =>
+          (m as { op?: string; paused?: boolean }).op === "state" &&
+          (m as { paused?: boolean }).paused === false
+      );
+    expect(playCmd).toBeTruthy();
+    await owner.onControl(playCmd);
+    expect(clock.paused).toBe(false);
+
+    await host.onControl({
+      type: SESSION_CAST_TYPE,
+      v: 1,
+      op: "state",
+      from: "g-a",
+      paused: false,
+      t: 44,
+      duration: 90,
+      id: "file-1",
+    });
+    expect(host.getState().programPaused).toBe(false);
+    expect(host.getState().programTime).toBe(44);
+    expect(host.getState().programDuration).toBe(90);
+  });
+
   it("lets a guest mark on-air from the cast offer file id", async () => {
     const media = createRoomMedia({
       localAgentId: "g-a",

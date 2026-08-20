@@ -8,6 +8,7 @@ import type {
   RoomFilePlayback,
   RoomFileTransfer,
 } from "./goRoomFileTransfer";
+import { fileShareKind } from "./goRoomFileShare";
 import type { SessionFileControl, SessionFileShareItem } from "@pg/roster/rosterSessionFile";
 
 class GoRoomFiles {
@@ -158,6 +159,18 @@ class GoRoomFiles {
   listingOwner(fileId: string): string | null {
     const e = this.#xfer?.getState().entries.find((x) => x.id === fileId);
     return e?.ownerId ?? null;
+  }
+
+  listingMeta(
+    fileId: string
+  ): { name: string; kind: "audio" | "video" } | null {
+    const e = this.#xfer?.getState().entries.find((x) => x.id === fileId);
+    if (!e) return null;
+    const kind = fileShareKind({ mime: e.mime, name: e.name });
+    return {
+      name: e.name,
+      kind: kind === "audio" ? "audio" : "video",
+    };
   }
 
   forgetOwner(ownerId: string): string[] {

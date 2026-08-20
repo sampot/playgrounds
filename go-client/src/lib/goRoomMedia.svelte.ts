@@ -76,6 +76,7 @@ class GoRoomMedia {
     forward?: boolean;
     resolveLocalFile?: (id: string) => File | null;
     ownerOf?: (id: string) => string | null;
+    fileMeta?: (id: string) => { name: string; kind: "audio" | "video" } | null;
   }): void {
     this.detach();
     this.#media = createRoomMedia(opts);

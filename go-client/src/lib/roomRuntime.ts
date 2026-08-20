@@ -266,6 +266,7 @@ export function createRoomRuntime(opts?: {
       forward: true,
       resolveLocalFile: (id) => goRoomFiles.localFile(id),
       ownerOf: (id) => goRoomFiles.listingOwner(id),
+      fileMeta: (id) => goRoomFiles.listingMeta(id),
     });
   }
 

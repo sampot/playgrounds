@@ -496,14 +496,21 @@ export function roomTvBindStream(opts: {
 
 export type RoomTvHudKind = "none" | "host-file" | "watch";
 
-/** Host file clock lives on the picture; guests only watch. No-input snow has no HUD. */
+/** Host directs the file clock; volume stays on each local sink. */
 export function roomTvHudKind(opts: {
   tvOn: boolean;
   role?: "host" | "guest";
   fileTransport?: boolean;
+  /** Catalog file on the TV (host may not hold the File). */
+  fileOnTv?: boolean;
 }): RoomTvHudKind {
   if (!opts.tvOn) return "none";
-  if (opts.role === "host" && opts.fileTransport) return "host-file";
+  if (
+    opts.role === "host" &&
+    (opts.fileTransport || opts.fileOnTv)
+  ) {
+    return "host-file";
+  }
   return "watch";
 }
 

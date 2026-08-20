@@ -655,6 +655,7 @@ export function createGuestRuntime() {
           },
           resolveLocalFile: (id) => goRoomFiles.localFile(id),
           ownerOf: (id) => goRoomFiles.listingOwner(id),
+          fileMeta: (id) => goRoomFiles.listingMeta(id),
         });
         sess.pc.addEventListener("track", (ev) => {
           goRoomMedia.onRemoteTrack(ev, sess.pc);

@@ -1250,9 +1250,15 @@ describe("room TV HUD", () => {
       roomTvHudKind({ tvOn: true, role: "host", fileTransport: true })
     ).toBe("host-file");
     expect(
+      roomTvHudKind({ tvOn: true, role: "host", fileOnTv: true })
+    ).toBe("host-file");
+    expect(
       roomTvHudKind({ tvOn: true, role: "host", fileTransport: false })
     ).toBe("watch");
     expect(roomTvHudKind({ tvOn: true, role: "guest" })).toBe("watch");
+    expect(
+      roomTvHudKind({ tvOn: true, role: "guest", fileTransport: true })
+    ).toBe("watch");
     expect(roomTvHudHasTransport("host-file")).toBe(true);
     expect(roomTvHudHasTransport("watch")).toBe(false);
     expect(roomTvHudHasTransport("none")).toBe(false);

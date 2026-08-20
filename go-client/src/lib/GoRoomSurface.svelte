@@ -43,6 +43,7 @@
     GO_ROOM_TEXT_UNLOCK,
     GO_ROOM_TEXT_UNSILENCE,
     GO_ROOM_TV_OFF_BTN,
+    GO_ROOM_OWNER_DECODE,
     attachMediaStream,
     attachPlaybackUrl,
     canShareDisplay,
@@ -320,6 +321,7 @@
       tvOn,
       role,
       fileTransport: goRoomMedia.programTransport,
+      fileOnTv: Boolean(goRoomMedia.streamingFileId),
     })
   );
   const selectedPerson = $derived(
@@ -1941,6 +1943,9 @@
     {#if goRoomMedia.error && goRoomMedia.error !== mediaError}
       <p class="err room-live-err" role="alert">{goRoomMedia.error}</p>
     {/if}
+    {#if role === "guest" && goRoomMedia.programTransport}
+      <p class="room-owner-decode" role="status">{GO_ROOM_OWNER_DECODE}</p>
+    {/if}
     </div>
   {/if}
     <video
@@ -3125,6 +3130,12 @@
     position: relative;
     z-index: 6;
     margin: 0.35rem 0 0;
+  }
+  .room-owner-decode {
+    margin: 0.35rem 0 0;
+    font-size: 0.85rem;
+    line-height: 1.35;
+    color: var(--go-muted, #8a8694);
   }
 </style>
 
