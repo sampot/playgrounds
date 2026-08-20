@@ -7,7 +7,7 @@
  * GO_SW_REV＝橋／room-play 邏輯；GO_SHELL_CACHE_REV＝殼 Cache 名。
  * 只改 room-play／canvas 時只 bump GO_SW_REV，勿清掉已暖好的離線殼。
  */
-const GO_SW_REV = 27;
+const GO_SW_REV = 39;
 /** Bump only when shell cache policy or cacheable path set changes. */
 const GO_SHELL_CACHE_REV = 26;
 const CANVAS_PREFIX = "/canvas/";
@@ -532,13 +532,19 @@ async function respondCanvas(request, parsed) {
   });
 }
 
+const ROOM_FILE_PREFIX = "/room-file/";
 const ROOM_PLAY_PREFIX = "/room-play/";
 /** @type {Map<string, { mime: string, size: number, spans: { start: number, bytes: Uint8Array }[], appendAt: number, ended: boolean, aborted: boolean, waiters: Function[], lastNeed: number }>} */
 const roomPlays = new Map();
+/** @type {Map<string, File>} */
+const roomLocalFiles = new Map();
 
 function parseRoomPlayPath(pathname) {
-  if (!pathname.startsWith(ROOM_PLAY_PREFIX)) return null;
-  const raw = pathname.slice(ROOM_PLAY_PREFIX.length);
+  let prefix = null;
+  if (pathname.startsWith(ROOM_FILE_PREFIX)) prefix = ROOM_FILE_PREFIX;
+  else if (pathname.startsWith(ROOM_PLAY_PREFIX)) prefix = ROOM_PLAY_PREFIX;
+  if (!prefix) return null;
+  const raw = pathname.slice(prefix.length);
   if (!raw || raw.includes("/")) return null;
   try {
     return decodeURIComponent(raw);
@@ -561,16 +567,95 @@ function parseByteRange(header, size) {
   }
   const start = Number(a);
   if (!Number.isFinite(start) || start < 0) return null;
+  if (start >= size) return null;
   const end = b === "" ? size - 1 : Number(b);
   if (!Number.isFinite(end) || end < start) return null;
   return { start, end: Math.min(end, size - 1) };
 }
 
 function playFetchRange(header, size) {
-  const parsed = parseByteRange(header, size);
-  if (parsed) return parsed;
-  if (size > 0) return { start: 0, end: size - 1 };
-  return null;
+  return parseByteRange(header, size);
+}
+
+function isBytesRangeHeader(header) {
+  return Boolean(header && /^bytes=/i.test(String(header).trim()));
+}
+
+const MEDIA_EXT_MIME = {
+  mp4: "video/mp4",
+  m4v: "video/mp4",
+  mov: "video/quicktime",
+  webm: "video/webm",
+  mkv: "video/x-matroska",
+  mp3: "audio/mpeg",
+  m4a: "audio/mp4",
+  aac: "audio/aac",
+  wav: "audio/wav",
+  ogg: "audio/ogg",
+  flac: "audio/flac",
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+  avif: "image/avif",
+};
+
+function extOfName(name) {
+  const base = String(name || "").split("/").pop() || "";
+  const i = base.lastIndexOf(".");
+  if (i <= 0) return "";
+  return base.slice(i + 1).toLowerCase();
+}
+
+function roomFileContentType(mime, name) {
+  const t = String(mime || "").trim().toLowerCase();
+  if (t && t !== "application/octet-stream") return t;
+  return MEDIA_EXT_MIME[extOfName(name)] || t || "application/octet-stream";
+}
+
+function isMediaContentType(mime) {
+  const t = String(mime || "").toLowerCase();
+  return t.startsWith("video/") || t.startsWith("audio/");
+}
+
+function isWebKitMediaEngine(ua) {
+  const s = String(ua || "");
+  if (/Chrome|Chromium|Edg\/|Android/i.test(s)) return false;
+  return /Safari/i.test(s) || /AppleWebKit/i.test(s);
+}
+
+const ROOM_PLAY_MEDIA_BLOB_MAX = 2 * 1024 * 1024;
+
+function mediaRangeForBufferedBody(range, size, maxBytes) {
+  const cap = Math.max(1, maxBytes || ROOM_PLAY_MEDIA_BLOB_MAX);
+  if (range) {
+    return {
+      start: range.start,
+      end: Math.min(range.end, range.start + cap - 1, Math.max(0, size - 1)),
+    };
+  }
+  return { start: 0, end: Math.min(Math.max(0, size - 1), cap - 1) };
+}
+
+function roomFileHttpBodyKind(opts) {
+  if (opts.local) return "blob-local";
+  if (!isMediaContentType(opts.mime) || !isWebKitMediaEngine(opts.ua)) {
+    return "stream";
+  }
+  const dest = String(opts.destination || "").toLowerCase();
+  if (dest === "video" || dest === "audio" || dest === "track") {
+    return "blob-media";
+  }
+  if (opts.hasRange) return "blob-media";
+  return "stream";
+}
+
+function localFileSlice(file, start, endExclusive, name) {
+  const type = roomFileContentType(file.type, name || file.name);
+  const from = Math.max(0, start);
+  const to = Math.max(from, endExclusive);
+  return file.slice(from, to, type);
 }
 
 function wakePlay(s) {
@@ -612,16 +697,40 @@ function putPlaySpan(spans, start, chunk) {
 
 const ROOM_PLAY_MAX = 32 * 1024 * 1024;
 const ROOM_PLAY_HEAD = 2 * 1024 * 1024;
-const ROOM_PLAY_RANGE_SLICE = 512 * 1024;
 
 function playStoredBytes(spans) {
   return spans.reduce((n, sp) => n + sp.bytes.byteLength, 0);
 }
 
 function trimPlaySpans(s) {
-  const maxBytes = ROOM_PLAY_MAX;
+  const maxBytes = s.maxBytes || ROOM_PLAY_MAX;
   if (maxBytes <= 0) {
     s.spans = [];
+    return;
+  }
+  if (s.mode === "save") {
+    const pinList =
+      s.pins && s.pins.size > 0 ? Array.from(s.pins.values()) : [0];
+    const minPin = Math.max(0, Math.min.apply(null, pinList));
+    if (minPin > 0) {
+      const clipped = [];
+      for (const span of s.spans) {
+        const end = span.start + span.bytes.byteLength;
+        if (end <= minPin) continue;
+        if (span.start < minPin) {
+          clipped.push({
+            start: minPin,
+            bytes: span.bytes.subarray(minPin - span.start),
+          });
+        } else {
+          clipped.push(span);
+        }
+      }
+      s.spans = clipped.reduce(
+        (acc, sp) => putPlaySpan(acc, sp.start, sp.bytes),
+        []
+      );
+    }
     return;
   }
   const pinList =
@@ -702,6 +811,23 @@ function slicePlaySpans(spans, start, end) {
 function applyRoomPlayMessage(data) {
   const id = typeof data.id === "string" ? data.id : "";
   if (!id) return;
+  if (data.op === "register-local") {
+    const file = data.file;
+    if (file && typeof file.size === "number" && typeof file.slice === "function") {
+      roomLocalFiles.set(id, file);
+      const prev = roomPlays.get(id);
+      if (prev) {
+        prev.aborted = true;
+        wakePlay(prev);
+        roomPlays.delete(id);
+      }
+    }
+    return;
+  }
+  if (data.op === "unregister-local") {
+    roomLocalFiles.delete(id);
+    return;
+  }
   if (data.op === "open") {
     const prev = roomPlays.get(id);
     if (prev) {
@@ -711,6 +837,9 @@ function applyRoomPlayMessage(data) {
     roomPlays.set(id, {
       mime: data.mime || "application/octet-stream",
       size: Number(data.size) || 0,
+      maxBytes: ROOM_PLAY_MAX,
+      name: typeof data.name === "string" ? data.name : "",
+      mode: data.mode === "save" ? "save" : "play",
       spans: [],
       appendAt: 0,
       pins: new Map(),
@@ -733,22 +862,10 @@ function applyRoomPlayMessage(data) {
     const at =
       typeof data.at === "number" && Number.isFinite(data.at) ? data.at : s.appendAt;
     if (!s.pins) s.pins = new Map();
-    const pinList =
-      s.pins.size > 0
-        ? Array.from(s.pins.values()).sort((a, b) => a - b)
-        : [0];
-    const share = Math.max(1, Math.floor(ROOM_PLAY_MAX / pinList.length));
-    const end = at + copy.byteLength;
-    let useful = false;
-    for (const pin of pinList) {
-      const from = Math.max(0, pin);
-      const to = from + share;
-      if (at < to && end > from) {
-        useful = true;
-        break;
-      }
-    }
-    if (!useful) return;
+    /**
+     * Page mirror already gated on the pin window (append waits). Do not drop
+     * here — silent drops caused large saves to end short (檔案不完整).
+     */
     s.spans = putPlaySpan(s.spans, at, copy);
     s.appendAt = at + copy.byteLength;
     trimPlaySpans(s);
@@ -764,6 +881,7 @@ function applyRoomPlayMessage(data) {
   }
   if (data.op === "end") {
     s.ended = true;
+    void flushPendingPlayPin(id);
     wakePlay(s);
     return;
   }
@@ -777,50 +895,168 @@ function applyRoomPlayMessage(data) {
 
 function livePlayStream(id) {
   let sent = 0;
+  let settled = false;
   const streamKey = `live-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const s0 = roomPlays.get(id);
+  const transferId = allocRoomTransferId();
+  const purpose = s0 && s0.mode === "save" ? "save" : "play";
+  const expectSize = s0 && s0.size > 0 ? s0.size : 0;
+  const endExclusive = expectSize > 0 ? expectSize - 1 : undefined;
+  void notifyOpenTransfer(id, transferId, 0, endExclusive, purpose);
   if (s0) {
     if (!s0.pins) s0.pins = new Map();
     s0.pins.set(streamKey, sent);
   }
+  const settle = (ok, reason) => {
+    if (settled) return;
+    settled = true;
+    void notifyTransferEnd(id, transferId, ok, sent, reason);
+  };
   return new ReadableStream({
     async pull(controller) {
       const s = roomPlays.get(id);
       if (!s || s.aborted) {
+        settle(false, "aborted");
+        controller.close();
+        return;
+      }
+      if (expectSize > 0 && sent >= expectSize) {
+        settle(true);
         controller.close();
         return;
       }
       let avail = playContiguousEnd(s.spans, sent);
-      while (avail <= sent && !s.ended && !s.aborted) {
-        await notifyPlayNeed(id, sent, sent + ROOM_PLAY_RANGE_SLICE - 1);
+      while (
+        avail <= sent &&
+        !s.ended &&
+        !s.aborted &&
+        !(expectSize > 0 && sent >= expectSize)
+      ) {
+        await flushPendingPlayPin(id);
         await waitPlay(s);
         avail = playContiguousEnd(s.spans, sent);
       }
       const cur = roomPlays.get(id);
       if (!cur || cur.aborted) {
+        settle(false, "aborted");
+        controller.close();
+        return;
+      }
+      if (expectSize > 0 && sent >= expectSize) {
+        settle(true);
         controller.close();
         return;
       }
       avail = playContiguousEnd(cur.spans, sent);
       if (avail > sent) {
-        const piece = slicePlaySpans(cur.spans, sent, avail);
+        const limit = expectSize > 0 ? Math.min(avail, expectSize) : avail;
+        const piece = slicePlaySpans(cur.spans, sent, limit);
         sent += piece.byteLength;
         if (cur.pins) cur.pins.set(streamKey, sent);
         trimPlaySpans(cur);
         void notifyPlayPin(id, streamKey, sent);
         controller.enqueue(piece);
+        if (expectSize > 0 && sent >= expectSize) {
+          settle(true);
+          controller.close();
+        }
         return;
       }
+      if (cur.ended && expectSize > 0 && sent < expectSize) {
+        settle(false, "incomplete");
+        controller.error(new Error("incomplete file body"));
+        return;
+      }
+      settle(true);
       controller.close();
     },
     cancel() {
       const s = roomPlays.get(id);
-      if (!s || !s.pins) return;
-      s.pins.delete(streamKey);
-      trimPlaySpans(s);
-      void notifyPlayPin(id, streamKey, -1);
+      if (s && s.pins) {
+        s.pins.delete(streamKey);
+        trimPlaySpans(s);
+        void notifyPlayPin(id, streamKey, -1);
+      }
+      const wasOk = settled;
+      settle(false, "cancelled");
+      /**
+       * After a successful body, Safari／Chrome often cancel() the stream.
+       * Do not treat that as save-cancel — UI would flicker／stick busy.
+       */
+      if (wasOk) return;
+      const cur = roomPlays.get(id);
+      if (!cur || !cur.pins || cur.pins.size === 0) {
+        void notifyPlaySaveCancel(id);
+      }
     },
   });
+}
+
+async function notifyPlaySaveCancel(id) {
+  const clients = await self.clients.matchAll({
+    type: "window",
+    includeUncontrolled: true,
+  });
+  for (const client of clients) {
+    try {
+      client.postMessage({
+        type: "go-room-play",
+        op: "save-cancel",
+        id,
+      });
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+function allocRoomTransferId() {
+  return `rt-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/** One HTTP response ↔ one transferId; page must session_file.request with this id. */
+async function notifyOpenTransfer(id, transferId, offset, end, purpose) {
+  const clients = await self.clients.matchAll({
+    type: "window",
+    includeUncontrolled: true,
+  });
+  for (const client of clients) {
+    try {
+      client.postMessage({
+        type: "go-room-play",
+        op: "open-transfer",
+        id,
+        transferId,
+        offset,
+        end,
+        purpose,
+      });
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+/** Completion authority: HTTP body delivered (or aborted) for this transferId. */
+async function notifyTransferEnd(id, transferId, ok, delivered, reason) {
+  const clients = await self.clients.matchAll({
+    type: "window",
+    includeUncontrolled: true,
+  });
+  for (const client of clients) {
+    try {
+      client.postMessage({
+        type: "go-room-play",
+        op: ok ? "transfer-complete" : "transfer-abort",
+        id,
+        transferId,
+        delivered,
+        reason,
+      });
+    } catch {
+      /* ignore */
+    }
+  }
 }
 
 async function notifyPlayPin(id, streamKey, at) {
@@ -835,6 +1071,19 @@ async function notifyPlayPin(id, streamKey, at) {
     s.lastPinAt = at;
     s.pendingPin = null;
   }
+  await postPlayPin(id, streamKey, at);
+}
+
+async function flushPendingPlayPin(id) {
+  const s = roomPlays.get(id);
+  if (!s || !s.pendingPin) return;
+  const { streamKey, at } = s.pendingPin;
+  s.pendingPin = null;
+  s.lastPinAt = at;
+  await postPlayPin(id, streamKey, at);
+}
+
+async function postPlayPin(id, streamKey, at) {
   const clients = await self.clients.matchAll({
     type: "window",
     includeUncontrolled: true,
@@ -854,32 +1103,6 @@ async function notifyPlayPin(id, streamKey, at) {
   }
 }
 
-async function notifyPlayNeed(id, start, end) {
-  const s = roomPlays.get(id);
-  if (!s) return;
-  const now = Date.now();
-  if (s.lastNeed === start && now - (s.lastNeedAt || 0) < 400) return;
-  s.lastNeed = start;
-  s.lastNeedAt = now;
-  const clients = await self.clients.matchAll({
-    type: "window",
-    includeUncontrolled: true,
-  });
-  for (const client of clients) {
-    try {
-      client.postMessage({
-        type: "go-room-play",
-        op: "need",
-        id,
-        start,
-        end,
-      });
-    } catch {
-      /* ignore */
-    }
-  }
-}
-
 function emptyPlayStream() {
   return new ReadableStream({
     start(c) {
@@ -891,23 +1114,34 @@ function emptyPlayStream() {
 function rangePlayStream(id, range) {
   const limit = range.end + 1;
   let sent = range.start;
+  let settled = false;
   const streamKey = `range-${range.start}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const s0 = roomPlays.get(id);
+  const transferId = allocRoomTransferId();
+  const purpose = s0 && s0.mode === "save" ? "save" : "play";
+  void notifyOpenTransfer(id, transferId, range.start, range.end, purpose);
   if (s0) {
     if (!s0.pins) s0.pins = new Map();
     s0.pins.set(streamKey, sent);
     trimPlaySpans(s0);
     void notifyPlayPin(id, streamKey, sent);
   }
+  const settle = (ok, reason) => {
+    if (settled) return;
+    settled = true;
+    void notifyTransferEnd(id, transferId, ok, sent - range.start, reason);
+  };
   return new ReadableStream({
     async pull(controller) {
       if (sent >= limit) {
+        settle(true);
         controller.close();
         return;
       }
       for (;;) {
         const s = roomPlays.get(id);
         if (!s || s.aborted) {
+          settle(false, "aborted");
           controller.close();
           return;
         }
@@ -919,23 +1153,39 @@ function rangePlayStream(id, range) {
           trimPlaySpans(s);
           void notifyPlayPin(id, streamKey, sent);
           controller.enqueue(piece);
+          if (sent >= limit) {
+            settle(true);
+            controller.close();
+          }
           return;
         }
         if (s.ended) {
+          if (sent < limit) {
+            settle(false, "incomplete");
+            controller.error(new Error("incomplete file body"));
+            return;
+          }
+          settle(true);
           controller.close();
           return;
         }
-        const needEnd = Math.min(range.end, sent + ROOM_PLAY_RANGE_SLICE - 1);
-        await notifyPlayNeed(id, sent, needEnd);
         await waitPlay(s);
       }
     },
     cancel() {
       const s = roomPlays.get(id);
-      if (!s || !s.pins) return;
-      s.pins.delete(streamKey);
-      trimPlaySpans(s);
-      void notifyPlayPin(id, streamKey, -1);
+      if (s && s.pins) {
+        s.pins.delete(streamKey);
+        trimPlaySpans(s);
+        void notifyPlayPin(id, streamKey, -1);
+      }
+      const wasOk = settled;
+      settle(false, "cancelled");
+      if (wasOk) return;
+      const cur = roomPlays.get(id);
+      if (!cur || !cur.pins || cur.pins.size === 0) {
+        void notifyPlaySaveCancel(id);
+      }
     },
   });
 }
@@ -973,49 +1223,224 @@ function waitForPlaySession(id, ms) {
   });
 }
 
+async function readPlayStreamToBytes(stream) {
+  const reader = stream.getReader();
+  const parts = [];
+  let n = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (value && value.byteLength) {
+      parts.push(value);
+      n += value.byteLength;
+    }
+  }
+  const out = new Uint8Array(n);
+  let o = 0;
+  for (const p of parts) {
+    out.set(p, o);
+    o += p.byteLength;
+  }
+  return out;
+}
+
+function mediaRangeHeaders(mime, start, end, size) {
+  const total = size > 0 ? size : "*";
+  return {
+    "Content-Type": mime,
+    "Content-Range": `bytes ${start}-${end}/${total}`,
+    "Content-Length": String(end - start + 1),
+    "Accept-Ranges": "bytes",
+    "Cache-Control": "no-store",
+  };
+}
+
 async function respondRoomPlay(id, request) {
+  const method = String(request.method || "GET").toUpperCase();
+  if (method !== "GET" && method !== "HEAD") {
+    return new Response("Method Not Allowed", {
+      status: 405,
+      headers: {
+        Allow: "GET, HEAD",
+        "Content-Type": "text/plain; charset=utf-8",
+        "Cache-Control": "no-store",
+      },
+    });
+  }
+
+  const ua =
+    (self.navigator && self.navigator.userAgent) ||
+    request.headers.get("User-Agent") ||
+    "";
+
+  const localFile = roomLocalFiles.get(id);
+  if (localFile) {
+    const mime = roomFileContentType(localFile.type, localFile.name);
+    const size = localFile.size;
+    const rangeHeader = request.headers.get("Range");
+    const range = playFetchRange(rangeHeader, size);
+    if (isBytesRangeHeader(rangeHeader) && !range) {
+      return new Response(null, {
+        status: 416,
+        headers: {
+          "Content-Range": `bytes */${size > 0 ? size : "*"}`,
+          "Cache-Control": "no-store",
+        },
+      });
+    }
+    if (method === "HEAD" && !range) {
+      const headers = {
+        "Content-Type": mime,
+        "Accept-Ranges": "bytes",
+        "Cache-Control": "no-store",
+      };
+      if (size > 0) headers["Content-Length"] = String(size);
+      return new Response(null, { status: 200, headers });
+    }
+    if (range) {
+      const len = range.end - range.start + 1;
+      if (method === "HEAD") {
+        return new Response(null, {
+          status: 206,
+          headers: mediaRangeHeaders(mime, range.start, range.end, size),
+        });
+      }
+      return new Response(
+        localFileSlice(localFile, range.start, range.end + 1),
+        {
+          status: 206,
+          headers: mediaRangeHeaders(mime, range.start, range.end, size),
+        }
+      );
+    }
+    const headers = {
+      "Content-Type": mime,
+      "Accept-Ranges": "bytes",
+      "Cache-Control": "no-store",
+    };
+    if (size > 0) headers["Content-Length"] = String(size);
+    if (method === "HEAD") {
+      return new Response(null, { status: 200, headers });
+    }
+    return new Response(localFileSlice(localFile, 0, size), {
+      status: 200,
+      headers,
+    });
+  }
+
   let s = roomPlays.get(id);
   if (!s || s.aborted) {
     s = await waitForPlaySession(id, 8000);
   }
   if (!s || s.aborted) {
-    return new Response(null, { status: 404 });
-  }
-  const mime = s.mime || "video/mp4";
-  const size = s.size;
-  const range = playFetchRange(
-    request.headers.get("Range"),
-    size
-  );
-  if (request.method === "HEAD" && !request.headers.get("Range")) {
-    return new Response(null, {
-      status: 200,
+    return new Response("Not Found", {
+      status: 404,
       headers: {
-        "Content-Type": mime,
-        "Content-Length": String(size || ""),
-        "Accept-Ranges": "bytes",
+        "Content-Type": "text/plain; charset=utf-8",
         "Cache-Control": "no-store",
       },
     });
   }
-  if (range) {
-    if (request.method === "HEAD") {
-      const end = range.end;
-      const total = size || "*";
+  const mime = roomFileContentType(s.mime, s.name);
+  const size = s.size;
+  const rangeHeader = request.headers.get("Range");
+  const range = playFetchRange(rangeHeader, size);
+  const bodyKind = roomFileHttpBodyKind({
+    ua,
+    mime,
+    local: false,
+    destination: request.destination,
+    hasRange: Boolean(range),
+  });
+  if (isBytesRangeHeader(rangeHeader) && !range) {
+    return new Response(null, {
+      status: 416,
+      headers: {
+        "Content-Range": `bytes */${size > 0 ? size : "*"}`,
+        "Cache-Control": "no-store",
+      },
+    });
+  }
+  if (method === "HEAD" && !range) {
+    const headers = {
+      "Content-Type": mime,
+      "Accept-Ranges": "bytes",
+      "Cache-Control": "no-store",
+    };
+    if (size > 0) headers["Content-Length"] = String(size);
+    return new Response(null, { status: 200, headers });
+  }
+  if (range || bodyKind === "blob-media") {
+    const servedRange =
+      bodyKind === "blob-media"
+        ? mediaRangeForBufferedBody(range, size > 0 ? size : (range ? range.end + 1 : 0))
+        : range;
+    if (!servedRange) {
       return new Response(null, {
-        status: 206,
+        status: 416,
         headers: {
-          "Content-Type": mime,
-          "Content-Range": `bytes ${range.start}-${end}/${total}`,
-          "Content-Length": String(end - range.start + 1),
-          "Accept-Ranges": "bytes",
+          "Content-Range": `bytes */${size > 0 ? size : "*"}`,
           "Cache-Control": "no-store",
         },
       });
     }
-    const served = servePlayRange(id, range);
+    if (method === "HEAD") {
+      return new Response(null, {
+        status: 206,
+        headers: mediaRangeHeaders(
+          mime,
+          servedRange.start,
+          servedRange.end,
+          size
+        ),
+      });
+    }
+    if (bodyKind === "blob-media") {
+      try {
+        const served = servePlayRange(id, servedRange);
+        if (served.end < served.start) {
+          return new Response(null, {
+            status: 416,
+            headers: {
+              "Content-Range": `bytes */${size > 0 ? size : "*"}`,
+              "Cache-Control": "no-store",
+            },
+          });
+        }
+        const bytes = await readPlayStreamToBytes(served.body);
+        const end = servedRange.start + Math.max(0, bytes.byteLength) - 1;
+        if (bytes.byteLength <= 0 || end < servedRange.start) {
+          return new Response(null, {
+            status: 416,
+            headers: {
+              "Content-Range": `bytes */${size > 0 ? size : "*"}`,
+              "Cache-Control": "no-store",
+            },
+          });
+        }
+        return new Response(bytes, {
+          status: 206,
+          headers: mediaRangeHeaders(mime, servedRange.start, end, size),
+        });
+      } catch {
+        return new Response(null, {
+          status: 416,
+          headers: {
+            "Content-Range": `bytes */${size > 0 ? size : "*"}`,
+            "Cache-Control": "no-store",
+          },
+        });
+      }
+    }
+    const served = servePlayRange(id, servedRange);
     if (served.end < served.start) {
-      return new Response(null, { status: 416 });
+      return new Response(null, {
+        status: 416,
+        headers: {
+          "Content-Range": `bytes */${size > 0 ? size : "*"}`,
+          "Cache-Control": "no-store",
+        },
+      });
     }
     const total = size || "*";
     return new Response(served.body, {
@@ -1034,11 +1459,13 @@ async function respondRoomPlay(id, request) {
     "Accept-Ranges": "bytes",
     "Cache-Control": "no-store",
   };
+  if (size > 0) headers["Content-Length"] = String(size);
   return new Response(livePlayStream(id), { status: 200, headers });
 }
 
 self.addEventListener("fetch", event => {
   const url = new URL(event.request.url);
+  if (url.protocol !== "http:" && url.protocol !== "https:") return;
   if (url.origin !== self.location.origin) return;
 
   const playId = parseRoomPlayPath(url.pathname);

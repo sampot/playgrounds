@@ -37,6 +37,7 @@ import {
   goRoomCastCaptureError,
   htmlMediaCaptureStreamSupported,
 } from "./goRoom";
+import { roomFilePath } from "./goRoomPlayRegistry";
 
 export type RoomMediaPeer = {
   peerId: string;
@@ -843,7 +844,7 @@ export function createRoomMedia(opts: {
   }
 
   function revokeOwnerDecode(): void {
-    if (ownerDecodeUrl) {
+    if (ownerDecodeUrl?.startsWith("blob:")) {
       try {
         URL.revokeObjectURL(ownerDecodeUrl);
       } catch {
@@ -857,9 +858,15 @@ export function createRoomMedia(opts: {
 
   async function captureLocalFile(
     file: File,
-    quiet = false
+    quiet = false,
+    fileId?: string
   ): Promise<RoomMediaResult> {
-    const capture = opts.captureProgram ?? captureProgramFromFile;
+    const capture =
+      opts.captureProgram ??
+      ((f: File) =>
+        fileId
+          ? captureProgramFromHttp(roomFilePath(fileId), f)
+          : Promise.resolve(null));
     const next = await capture(file);
     const castErr = goRoomCastCaptureError();
     if (!next || (!next.audio && !next.video)) {
@@ -922,7 +929,7 @@ export function createRoomMedia(opts: {
       }
       return { ok: false, error: GO_ROOM_CAST_UNSUPPORTED };
     }
-    const out = await captureLocalFile(file, quiet);
+    const out = await captureLocalFile(file, quiet, id);
     if (out.ok) streamingFileId = id;
     return out;
   }
@@ -1237,7 +1244,7 @@ export function createRoomMedia(opts: {
       program?.stop();
       program = null;
       revokeOwnerDecode();
-      ownerDecodeUrl = URL.createObjectURL(file);
+      ownerDecodeUrl = roomFilePath(id);
       ownerDecodeKind = programKindOfFile(file);
       streamingFileId = id;
       programName = file.name.trim() || "影片";
@@ -1799,20 +1806,22 @@ function captureFromMediaElement(el: HTMLMediaElement): CapturedProgram | null {
   };
 }
 
-async function captureProgramFromFile(file: File): Promise<CapturedProgram | null> {
+async function captureProgramFromHttp(
+  src: string,
+  file: File
+): Promise<CapturedProgram | null> {
   if (typeof document === "undefined") return null;
   const mime = file.type || "";
   const isAudio = mime.startsWith("audio/") && !mime.startsWith("video/");
   const el = document.createElement(isAudio ? "audio" : "video") as
     | HTMLVideoElement
     | HTMLAudioElement;
-  const url = URL.createObjectURL(file);
   el.muted = true;
   el.defaultMuted = true;
   el.volume = 0;
   el.autoplay = true;
   el.loop = true;
-  el.preload = "auto";
+  el.preload = "metadata";
   el.controls = false;
   el.setAttribute("muted", "");
   el.setAttribute("playsinline", "");
@@ -1824,8 +1833,7 @@ async function captureProgramFromFile(file: File): Promise<CapturedProgram | nul
     (el as HTMLVideoElement).playsInline = true;
   }
   document.body.appendChild(el);
-  el.src = url;
-  el.load();
+  el.src = src;
 
   const failCleanup = () => {
     try {
@@ -1836,7 +1844,6 @@ async function captureProgramFromFile(file: File): Promise<CapturedProgram | nul
     } catch {
       /* ignore */
     }
-    URL.revokeObjectURL(url);
   };
 
   const waitEvent = (name: string, ms: number) =>
@@ -1955,7 +1962,6 @@ async function captureProgramFromFile(file: File): Promise<CapturedProgram | nul
           /* ignore */
         }
       }
-      URL.revokeObjectURL(url);
     },
   };
 }

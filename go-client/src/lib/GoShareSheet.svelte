@@ -7,11 +7,22 @@
     url: string;
     spoken?: string;
     hint?: string;
+    /** Mirrored chrome flash — visible above the panel while modal is open. */
+    flash?: string;
     onClose: () => void;
     onFlash: (msg: string) => void;
   };
 
-  let { open, title, url, spoken = "", hint, onClose, onFlash }: Props = $props();
+  let {
+    open,
+    title,
+    url,
+    spoken = "",
+    hint,
+    flash = "",
+    onClose,
+    onFlash,
+  }: Props = $props();
 </script>
 
 <ShareSheet
@@ -20,6 +31,7 @@
   {url}
   {spoken}
   hint={hint}
+  {flash}
   urlAsLink={false}
   {onClose}
   {onFlash}

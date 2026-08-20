@@ -146,10 +146,12 @@ describe("roomFileOnAir", () => {
 });
 
 describe("formatFileShareSize", () => {
-  it("shows a compact capacity label", () => {
+  it("uses decimal MB／GB like Finder／Chrome (not 1024-based MiB)", () => {
     expect(formatFileShareSize(500)).toBe("500 B");
-    expect(formatFileShareSize(2048)).toBe("2.0 KB");
-    expect(formatFileShareSize(2 * 1024 * 1024)).toBe("2.0 MB");
+    expect(formatFileShareSize(2000)).toBe("2.0 KB");
+    expect(formatFileShareSize(2_000_000)).toBe("2.0 MB");
+    /** 561.1×10⁶ bytes → Finder 「561.1 MB」; 1024² would wrongly show 535.1 */
+    expect(formatFileShareSize(561_100_000)).toBe("561.1 MB");
   });
 });
 

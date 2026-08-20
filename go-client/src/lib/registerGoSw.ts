@@ -2,13 +2,12 @@
 
 import { isGoCanvasSwUsable } from "./goCanvasSupport";
 
-const SW_URL = "/sw.js?v=27";
-const DEV_SW_PURGE_KEY = "go_dev_sw_purged";
+/** Bump with go-client/static/sw.js GO_SW_REV so phones pick up bridge fixes. */
+export const GO_SW_URL = "/sw.js?v=39";
 
 /**
- * Vite DEV must not keep a controlling SW: room-play grew `sw.js` a lot, and
- * Soft refresh under Slow 4G was re-fetching shell／deps through the worker
- * instead of entering `/room` from memory. Production still registers as usual.
+ * Dev helper: drop controlling SW + go shell caches (manual／tests).
+ * Production／DEV both register — `/room-file/` download needs a controller.
  */
 export async function purgeGoServiceWorkerForDev(): Promise<boolean> {
   if (typeof window === "undefined") return false;
@@ -36,25 +35,8 @@ export async function purgeGoServiceWorkerForDev(): Promise<boolean> {
 
 export function registerGoServiceWorker(): void {
   if (typeof window === "undefined") return;
-
-  if (import.meta.env.DEV) {
-    void (async () => {
-      const had = await purgeGoServiceWorkerForDev();
-      if (!had) return;
-      try {
-        if (sessionStorage.getItem(DEV_SW_PURGE_KEY) === "1") return;
-        sessionStorage.setItem(DEV_SW_PURGE_KEY, "1");
-      } catch {
-        /* ignore */
-      }
-      // Active worker survives unregister until the next load.
-      window.location.reload();
-    })();
-    return;
-  }
-
   if (!isGoCanvasSwUsable()) return;
-  void navigator.serviceWorker.register(SW_URL, { scope: "/" }).catch(() => {
-    /* ignore — canvas path will surface errors when needed */
+  void navigator.serviceWorker.register(GO_SW_URL, { scope: "/" }).catch(() => {
+    /* ignore — canvas／room-file paths surface errors when needed */
   });
 }

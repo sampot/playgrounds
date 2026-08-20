@@ -1,6 +1,7 @@
 /**
  * 包廂檔案分享區：目錄 metadata ＋ 按需串流。
- * 分享者只留 File handle；下載先取得 writable 再 request；RAM 最多一個 chunk。
+ * 前端一律 `/room-file/<id>`；本機 File 由 SW／page registry 直出（不經 DC）；
+ * 遠端 bytes 經 DC transfer；下載＝fetch → writable。
  */
 
 import {
@@ -15,21 +16,24 @@ import {
   type SessionFileControl,
   type SessionFileShareItem,
 } from "@pg/roster/rosterSessionFile";
-import { ROOM_FILE_SAVE_UNSUPPORTED } from "./goRoomFileSave";
+import {
+  ROOM_FILE_SAVE_UNSUPPORTED,
+  pipeResponseToWritable,
+} from "./goRoomFileSave";
 import type { RoomFileWritable } from "./goRoomFileSave";
 import { GO_ROOM_HANG_FILES_ONLY } from "./goRoom";
+import { createRoomPlaySink, type RoomPlaySink } from "./goRoomFilePlay";
 import {
-  createImagePreviewSink,
-  createRoomPlaySink,
-  type RoomPlaySink,
-} from "./goRoomFilePlay";
-import { waitRoomPlaySw } from "./goRoomPlayBridge";
+  registerLocalRoomFile,
+  unregisterLocalRoomFile,
+  waitRoomPlaySw,
+} from "./goRoomPlayBridge";
 import { fileShareKind } from "./goRoomFileShare";
 import {
   SESSION_FILE_PLAY_MAX_INFLIGHT,
-  SESSION_FILE_PLAY_RANGE_SLICE,
-  SESSION_FILE_PLAY_SEEK_DEBOUNCE_MS,
   SESSION_FILE_PLAY_SEEK_SLACK,
+  roomFileContentType,
+  roomFilePath,
 } from "./goRoomPlayRegistry";
 
 export type { RoomFileWritable };
@@ -74,14 +78,51 @@ export type RoomFileResult =
   | { ok: true; id?: string }
   | { ok: false; error: string; cancelled?: boolean };
 
+export type RoomFileBrowserDownload =
+  | { ok: true; id: string; url: string; name: string }
+  | { ok: false; error: string };
+
 export type RoomFileTransfer = {
   shareLocalFile(file: File): Promise<RoomFileResult>;
   shareLocalDirectory(files: File[]): Promise<RoomFileResult>;
   unshareLocal(id: string): boolean;
   unshare(id: string, opts?: { host?: boolean }): boolean;
   download(id: string, pickSave: RoomFilePickSave): Promise<RoomFileResult>;
+  /**
+   * Same-origin `/room-file/<id>` for the owner's File (SW serves locally).
+   * Remote must use download()+fetch.
+   */
+  primeBrowserDownload(id: string): RoomFileBrowserDownload;
+  /** SW download stream cancelled (Safari early abort) — release busy UI. */
+  cancelHttpSave(fileId: string): void;
   play(id: string): Promise<RoomFileResult>;
-  seekPlay(offset: number): Promise<RoomFileResult>;
+  /**
+   * SW opened one HTTP roundtrip — page only relays session_file.request
+   * with SW’s transferId (never invents ids).
+   */
+  acceptHttpTransfer(msg: {
+    fileId: string;
+    transferId: string;
+    offset: number;
+    end?: number;
+    purpose?: "play" | "save";
+  }): RoomFileResult;
+  /**
+   * SW finished (or aborted) delivering this HTTP body — completion authority.
+   * Owner session_file.done alone must not mark success.
+   */
+  noteHttpTransferEnd(msg: {
+    fileId: string;
+    transferId: string;
+    ok: boolean;
+    delivered?: number;
+    reason?: string;
+  }): void;
+  /**
+   * Resume an in-flight transfer near offset. Does not open transfers —
+   * new Ranges are HTTP → SW → acceptHttpTransfer.
+   */
+  seekPlay(offset: number, forFileId?: string): Promise<RoomFileResult>;
   stopPlay(): void;
   notePlayhead(seconds: number): void;
   localFile(id: string): File | null;
@@ -106,7 +147,13 @@ export type RoomFileTransferDeps = {
     name?: string;
     size?: number;
     playId?: string;
+    mode?: "play" | "save";
   }) => RoomPlaySink;
+  /** Test／in-process HTTP façade; production defaults to fetch(url). */
+  fetchRoomFile?: (url: string) => Promise<Response>;
+  /** Register owned File for `/room-file/<id>` (no DC). */
+  registerLocalFile?: (id: string, file: File) => void;
+  unregisterLocalFile?: (id: string) => void;
 };
 
 const BUFFER_HIGH = 64 * 1024;
@@ -123,6 +170,8 @@ type Inbound = {
   mime?: string;
   name?: string;
   playPaused?: boolean;
+  /** Owner session_file.done — source exhausted; not HTTP success. */
+  sourceDone?: boolean;
 };
 
 function playbackKindOf(
@@ -133,21 +182,6 @@ function playbackKindOf(
   if (kind === "image") return "image";
   if (kind === "audio") return "audio";
   return "video";
-}
-
-async function writeLocalSlices(
-  file: File,
-  writable: RoomFileWritable
-): Promise<void> {
-  const chunk = SESSION_FILE_CHUNK_PAYLOAD_MAX;
-  let offset = 0;
-  while (offset < file.size) {
-    const piece = file.slice(offset, offset + chunk);
-    const buf = new Uint8Array(await piece.arrayBuffer());
-    await writable.write(buf);
-    offset += buf.byteLength;
-  }
-  await writable.close();
 }
 
 export function createRoomFileTransfer(
@@ -173,26 +207,51 @@ export function createRoomFileTransfer(
   >();
   let playback: RoomFilePlayback | null = null;
   let playSink: RoomPlaySink | null = null;
+  /** File id for the open `/room-file/` session (play or download). */
+  let httpFileId: string | null = null;
   let lastSeekOpenAt = -1;
   let lastSeekOpenTs = 0;
   const makePlaySink =
     deps.createPlaySink ??
-    ((opts: { mime?: string; name?: string; size?: number; playId?: string }) =>
-      createRoomPlaySink(opts));
+    ((opts: {
+      mime?: string;
+      name?: string;
+      size?: number;
+      playId?: string;
+      mode?: "play" | "save";
+    }) => createRoomPlaySink(opts));
+  const fetchRoomFile =
+    deps.fetchRoomFile ?? ((url: string) => fetch(url));
+  const registerLocal =
+    deps.registerLocalFile ??
+    ((id: string, file: File) => {
+      registerLocalRoomFile(id, file);
+    });
+  const unregisterLocal =
+    deps.unregisterLocalFile ??
+    ((id: string) => {
+      unregisterLocalRoomFile(id);
+    });
 
   function playInbounds(): Inbound[] {
     return [...inbounds.values()].filter((i) => i.purpose === "play");
   }
 
-  function hasSaveInbound(): boolean {
-    for (const i of inbounds.values()) {
-      if (i.purpose === "save") return true;
-    }
-    return false;
+  function clearHttpSink(): void {
+    playSink?.destroy();
+    playSink = null;
+    httpFileId = null;
+    lastSeekOpenAt = -1;
+    lastSeekOpenTs = 0;
   }
 
   function busy(): boolean {
-    return inbounds.size > 0 || outboundPumps.size > 0;
+    return (
+      inbounds.size > 0 ||
+      outboundPumps.size > 0 ||
+      /** Remote download HTTP session (not private play). */
+      (httpFileId != null && playback == null)
+    );
   }
 
   function pumpsForPeer(peer?: string) {
@@ -210,9 +269,8 @@ export function createRoomFileTransfer(
   }
 
   function revokePlayback(): void {
-    playSink?.destroy();
-    playSink = null;
-    if (playback?.url) {
+    clearHttpSink();
+    if (playback?.url?.startsWith("blob:")) {
       try {
         URL.revokeObjectURL(playback.url);
       } catch {
@@ -295,7 +353,8 @@ export function createRoomFileTransfer(
   }
 
   function applyPlayPressure(pressure: "ok" | "high" | "low"): void {
-    for (const cur of playInbounds()) {
+    for (const cur of inbounds.values()) {
+      if (cur.purpose !== "play" && cur.purpose !== "save") continue;
       if (pressure === "high" && !cur.playPaused) {
         if (cur.baseOffset > 0) continue;
         cur.playPaused = true;
@@ -408,8 +467,13 @@ export function createRoomFileTransfer(
       return { ok: false, error: "檔案太大或是空的（上限 2 GB）" };
     }
     const id = newId();
-    const mime = file.type || undefined;
+    const mime = roomFileContentType(file.type, name) || undefined;
     outboundFiles.set(id, file);
+    try {
+      registerLocal(id, file);
+    } catch {
+      /* SW may be missing in tests without registerLocalFile dep */
+    }
     entries = [
       ...entries,
       {
@@ -456,7 +520,14 @@ export function createRoomFileTransfer(
         if (e.parentId === id) drop.add(e.id);
       }
     }
-    for (const gone of drop) outboundFiles.delete(gone);
+    for (const gone of drop) {
+      outboundFiles.delete(gone);
+      try {
+        unregisterLocal(gone);
+      } catch {
+        /* ignore */
+      }
+    }
     abortOutboundForFile(id);
     if (playback && drop.has(playback.id)) revokePlayback();
     entries = entries.filter((e) => !drop.has(e.id));
@@ -490,8 +561,7 @@ export function createRoomFileTransfer(
       return { ok: false, error: GO_ROOM_HANG_FILES_ONLY };
     }
     if (entry.mine) {
-      const file = outboundFiles.get(id);
-      if (!file) return { ok: false, error: "找不到這個檔" };
+      if (!outboundFiles.get(id)) return { ok: false, error: "找不到這個檔" };
       let writable: RoomFileWritable | null;
       try {
         writable = await pickSave({ suggestedName: entry.name });
@@ -502,13 +572,27 @@ export function createRoomFileTransfer(
       if (!writable) {
         return { ok: false, error: "已取消", cancelled: true };
       }
+      await waitRoomPlaySw();
       try {
-        await writeLocalSlices(file, writable);
+        const res = await fetchRoomFile(roomFilePath(id));
+        if (!res.ok && res.status !== 206) {
+          throw new Error(
+            res.status === 404 ? "找不到這個檔" : `下載失敗（HTTP ${res.status}）`
+          );
+        }
+        const written = await pipeResponseToWritable(res.body, writable);
+        const expectLen = (() => {
+          const raw = res.headers.get("Content-Length");
+          if (raw == null || raw === "") return entry.size;
+          const n = Number(raw);
+          return Number.isFinite(n) && n >= 0 ? n : entry.size;
+        })();
+        if (written !== expectLen) throw new Error("檔案不完整");
+        return { ok: true, id };
       } catch (e) {
         const msg = e instanceof Error ? e.message : "下載失敗";
         return { ok: false, error: msg };
       }
-      return { ok: true, id };
     }
     if (busy()) {
       return { ok: false, error: "一次只能傳一個檔" };
@@ -523,27 +607,124 @@ export function createRoomFileTransfer(
     if (!writable) {
       return { ok: false, error: "已取消", cancelled: true };
     }
-    const transferId = newId();
-    inbounds.set(transferId, {
-      fileId: id,
-      transferId,
-      received: 0,
+    await waitRoomPlaySw();
+    /** Drop private-play state so save-cancel／transfer-end can clear this HTTP session. */
+    revokePlayback();
+    playSink = makePlaySink({
+      mime: entry.mime,
+      name: entry.name,
       size: entry.size,
-      writes: Promise.resolve(),
-      purpose: "save",
-      baseOffset: 0,
-      writable,
+      playId: id,
+      mode: "save",
     });
+    httpFileId = id;
     patch(id, { status: "transferring", received: 0, error: undefined });
-    sendSafe(
-      buildSessionFileControl({
-        op: "request",
-        id,
-        transferId,
-        from: deps.localAgentId,
-      })
-    );
-    return { ok: true, id };
+    emit();
+    /** Transfer opens when SW handles this GET (open-transfer → acceptHttpTransfer). */
+    try {
+      const res = await fetchRoomFile(roomFilePath(id));
+      if (!res.ok && res.status !== 206) {
+        throw new Error(
+          res.status === 404 ? "找不到這個檔" : `下載失敗（HTTP ${res.status}）`
+        );
+      }
+      const written = await pipeResponseToWritable(res.body, writable);
+      const expectLen = (() => {
+        const raw = res.headers.get("Content-Length");
+        if (raw == null || raw === "") return entry.size;
+        const n = Number(raw);
+        return Number.isFinite(n) && n >= 0 ? n : entry.size;
+      })();
+      if (written !== expectLen) {
+        throw new Error("檔案不完整");
+      }
+      for (const cur of [...inbounds.values()]) {
+        if (cur.fileId === id && cur.purpose === "save") {
+          inbounds.delete(cur.transferId);
+        }
+      }
+      playSink?.end();
+      clearHttpSink();
+      patch(id, { status: "listed", received: entry.size, error: undefined });
+      emit();
+      return { ok: true, id };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "下載失敗";
+      for (const cur of [...inbounds.values()]) {
+        if (cur.fileId !== id || cur.purpose !== "save") continue;
+        sendSafe(
+          buildSessionFileControl({
+            op: "cancel",
+            id,
+            transferId: cur.transferId,
+          })
+        );
+        inbounds.delete(cur.transferId);
+      }
+      clearHttpSink();
+      patch(id, { status: "error", error: msg });
+      emit();
+      return { ok: false, error: msg };
+    } finally {
+      if (httpFileId === id) clearHttpSink();
+      const cur = entries.find((e) => e.id === id);
+      if (cur?.status === "transferring") {
+        patch(id, {
+          status: "listed",
+          received: Math.max(cur.received, entry.size),
+          error: undefined,
+        });
+        emit();
+      }
+    }
+  }
+
+  /**
+   * Same-origin `/room-file/<id>` for local File (SW serves; no blob: product path).
+   */
+  function primeBrowserDownload(id: string): RoomFileBrowserDownload {
+    const entry = entries.find((e) => e.id === id);
+    if (!entry) {
+      return { ok: false, error: "找不到這個檔" };
+    }
+    if (entry.kind === "dir" || entry.kind === "device") {
+      return { ok: false, error: GO_ROOM_HANG_FILES_ONLY };
+    }
+    if (!entry.mine) {
+      return {
+        ok: false,
+        error: "請用下載按鈕（頁面會以 HTTP fetch 存檔）",
+      };
+    }
+    if (!outboundFiles.get(id)) return { ok: false, error: "找不到這個檔" };
+    return { ok: true, id, url: roomFilePath(id), name: entry.name };
+  }
+
+  function cancelHttpSave(fileId: string): void {
+    for (const cur of [...inbounds.values()]) {
+      if (cur.fileId !== fileId || cur.purpose !== "save") continue;
+      sendSafe(
+        buildSessionFileControl({
+          op: "cancel",
+          id: cur.fileId,
+          transferId: cur.transferId,
+        })
+      );
+      void closeInbound(cur, false, "下載已中斷");
+    }
+    if (httpFileId === fileId) {
+      /** End (not abort) so a retry GET can still find the session. */
+      playSink?.end();
+      playSink = null;
+      httpFileId = null;
+      lastSeekOpenAt = -1;
+      lastSeekOpenTs = 0;
+      const cur = entries.find((e) => e.id === fileId);
+      if (cur?.status === "transferring") {
+        patch(fileId, { status: "listed", error: undefined });
+      }
+      emit();
+    }
   }
 
   async function play(id: string): Promise<RoomFileResult> {
@@ -555,15 +736,15 @@ export function createRoomFileTransfer(
       return { ok: false, error: GO_ROOM_HANG_FILES_ONLY };
     }
     if (entry.mine) {
-      const file = outboundFiles.get(id);
-      if (!file) return { ok: false, error: "找不到這個檔" };
+      if (!outboundFiles.get(id)) return { ok: false, error: "找不到這個檔" };
       revokePlayback();
+      await waitRoomPlaySw();
       playback = {
         id,
-        url: URL.createObjectURL(file),
+        url: roomFilePath(id),
         name: entry.name,
-        mime: entry.mime || file.type || "application/octet-stream",
-        kind: playbackKindOf(entry.mime || file.type, entry.name),
+        mime: roomFileContentType(entry.mime, entry.name),
+        kind: playbackKindOf(entry.mime, entry.name),
       };
       emit();
       return { ok: true, id };
@@ -572,69 +753,141 @@ export function createRoomFileTransfer(
       return { ok: false, error: "一次只能傳一個檔" };
     }
     revokePlayback();
-    const playKind = playbackKindOf(entry.mime, entry.name);
-    const transferId = newId();
-    if (playKind !== "image") await waitRoomPlaySw();
-    playSink =
-      playKind === "image"
-        ? createImagePreviewSink({ mime: entry.mime, name: entry.name })
-        : makePlaySink({
-            mime: entry.mime,
-            name: entry.name,
-            size: entry.size,
-            /** Stable per file so remount／re-play keeps the same `/room-play/<id>`. */
-            playId: id,
-          });
+    await waitRoomPlaySw();
+    playSink = makePlaySink({
+      mime: roomFileContentType(entry.mime, entry.name),
+      name: entry.name,
+      size: entry.size,
+      /** Stable per file so remount／re-play keeps the same `/room-file/<id>`. */
+      playId: id,
+    });
+    httpFileId = id;
     playback = {
       id,
       url: playSink.url,
       name: entry.name,
-      mime: entry.mime || "application/octet-stream",
+      mime: roomFileContentType(entry.mime, entry.name),
       kind: playbackKindOf(entry.mime, entry.name),
     };
-    inbounds.set(transferId, {
-      fileId: id,
-      transferId,
-      received: 0,
-      size: entry.size,
-      writes: Promise.resolve(),
-      purpose: "play",
-      baseOffset: 0,
-      mime: entry.mime,
-      name: entry.name,
-      playPaused: false,
-    });
+    /** HTTP Ranges open transfers via SW open-transfer → acceptHttpTransfer. */
     patch(id, { status: "transferring", received: 0, error: undefined });
-    sendSafe(
-      buildSessionFileControl({
-        op: "request",
-        id,
-        transferId,
-        from: deps.localAgentId,
-        offset: 0,
-      })
-    );
     emit();
     return { ok: true, id };
   }
 
-  async function seekPlay(offset: number): Promise<RoomFileResult> {
+  function acceptHttpTransfer(msg: {
+    fileId: string;
+    transferId: string;
+    offset: number;
+    end?: number;
+    purpose?: "play" | "save";
+  }): RoomFileResult {
+    const fileId = msg.fileId;
+    const transferId =
+      typeof msg.transferId === "string" ? msg.transferId.trim() : "";
+    if (!transferId) {
+      return { ok: false, error: "缺少 transferId" };
+    }
+    if (inbounds.has(transferId)) {
+      return { ok: true, id: fileId };
+    }
+    const at = Math.floor(msg.offset);
+    if (!Number.isFinite(at) || at < 0) {
+      return { ok: false, error: "無法跳到那裡" };
+    }
+    const activeId = playback?.id ?? httpFileId;
+    if (!activeId || !playSink) {
+      return { ok: false, error: "沒有在播放" };
+    }
+    if (fileId !== activeId) {
+      return { ok: false, error: "沒有在播放" };
+    }
+    const entry = entries.find((e) => e.id === fileId);
+    if (!entry || entry.mine) {
+      return { ok: true, id: fileId };
+    }
+    if (at >= entry.size) {
+      return { ok: false, error: "無法跳到那裡" };
+    }
+    if (
+      [...inbounds.values()].some(
+        (i) => i.purpose === "save" && i.fileId !== fileId
+      )
+    ) {
+      return { ok: false, error: "一次只能傳一個檔" };
+    }
+    const purpose =
+      msg.purpose === "save" || (!playback && httpFileId === fileId)
+        ? "save"
+        : "play";
+    /** Far seek: drop transfers that cannot serve this offset. */
+    for (const cur of [...inbounds.values()]) {
+      if (cur.fileId !== fileId) continue;
+      if (cur.purpose === "save" && cur.baseOffset === 0) continue;
+      const pumped = cur.baseOffset + cur.received;
+      const near =
+        at >= cur.baseOffset - SESSION_FILE_PLAY_SEEK_SLACK &&
+        at <= pumped + SESSION_FILE_PLAY_SEEK_SLACK;
+      if (!near) dropPlayInbound(cur);
+    }
+    const victim = evictPlayInboundFor(at);
+    if (victim) dropPlayInbound(victim);
+    lastSeekOpenAt = at;
+    lastSeekOpenTs = Date.now();
+    inbounds.set(transferId, {
+      fileId,
+      transferId,
+      received: 0,
+      size: entry.size,
+      writes: Promise.resolve(),
+      purpose,
+      baseOffset: at,
+      mime: entry.mime,
+      name: entry.name,
+      playPaused: false,
+    });
+    patch(fileId, {
+      status: "transferring",
+      received: Math.max(entry.received, at, playReceivedAbs(fileId)),
+      error: undefined,
+    });
+    sendSafe(
+      buildSessionFileControl({
+        op: "request",
+        id: fileId,
+        transferId,
+        from: deps.localAgentId,
+        offset: at,
+      })
+    );
+    emit();
+    return { ok: true, id: fileId };
+  }
+
+  async function seekPlay(
+    offset: number,
+    forFileId?: string
+  ): Promise<RoomFileResult> {
     const at = Math.floor(offset);
     if (!Number.isFinite(at) || at < 0) {
       return { ok: false, error: "無法跳到那裡" };
     }
-    if (!playback || !playSink) {
+    const fileId = playback?.id ?? httpFileId;
+    if (!fileId || !playSink) {
       return { ok: false, error: "沒有在播放" };
     }
-    const entry = entries.find((e) => e.id === playback.id);
+    if (forFileId && forFileId !== fileId) {
+      return { ok: false, error: "沒有在播放" };
+    }
+    const entry = entries.find((e) => e.id === fileId);
     if (!entry || entry.mine) {
-      return { ok: true, id: playback.id };
+      return { ok: true, id: fileId };
     }
     if (at >= entry.size) {
       return { ok: false, error: "無法跳到那裡" };
     }
     if (playSink.covers?.(at, Math.min(entry.size, at + 1))) {
-      return { ok: true, id: playback.id };
+      return { ok: true, id: fileId };
     }
     const resumePlay = (cur: Inbound) => {
       if (!cur.playPaused) return;
@@ -647,71 +900,16 @@ export function createRoomFileTransfer(
         })
       );
     };
-    /**
-     * Active transfer that already owns this byte region: wait for it.
-     * Slack must be >> SW need slice or every pull opens another DC Range.
-     */
-    for (const cur of playInbounds()) {
-      if (cur.fileId !== playback.id) continue;
+    for (const cur of inbounds.values()) {
+      if (cur.fileId !== fileId) continue;
       const pumped = cur.baseOffset + cur.received;
       if (at >= cur.baseOffset && at <= pumped + SESSION_FILE_PLAY_SEEK_SLACK) {
         resumePlay(cur);
-        return { ok: true, id: playback.id };
+        return { ok: true, id: fileId };
       }
     }
-    const now = Date.now();
-    if (
-      lastSeekOpenAt >= 0 &&
-      now - lastSeekOpenTs < SESSION_FILE_PLAY_SEEK_DEBOUNCE_MS &&
-      Math.abs(at - lastSeekOpenAt) <= SESSION_FILE_PLAY_RANGE_SLICE
-    ) {
-      return { ok: true, id: playback.id };
-    }
-    if (hasSaveInbound()) {
-      return { ok: false, error: "一次只能傳一個檔" };
-    }
-    /** Far seek: drop transfers that cannot serve this offset. */
-    for (const cur of [...playInbounds()]) {
-      if (cur.fileId !== playback.id) continue;
-      const pumped = cur.baseOffset + cur.received;
-      const near =
-        at >= cur.baseOffset - SESSION_FILE_PLAY_SEEK_SLACK &&
-        at <= pumped + SESSION_FILE_PLAY_SEEK_SLACK;
-      if (!near) dropPlayInbound(cur);
-    }
-    const victim = evictPlayInboundFor(at);
-    if (victim) dropPlayInbound(victim);
-    const transferId = newId();
-    lastSeekOpenAt = at;
-    lastSeekOpenTs = now;
-    inbounds.set(transferId, {
-      fileId: playback.id,
-      transferId,
-      received: 0,
-      size: entry.size,
-      writes: Promise.resolve(),
-      purpose: "play",
-      baseOffset: at,
-      mime: entry.mime,
-      name: entry.name,
-      playPaused: false,
-    });
-    patch(playback.id, {
-      status: "transferring",
-      received: Math.max(entry.received, at, playReceivedAbs(playback.id)),
-      error: undefined,
-    });
-    sendSafe(
-      buildSessionFileControl({
-        op: "request",
-        id: playback.id,
-        transferId,
-        from: deps.localAgentId,
-        offset: at,
-      })
-    );
-    emit();
-    return { ok: true, id: playback.id };
+    /** Far seek is a new HTTP Range — page must not invent transferIds. */
+    return { ok: true, id: fileId };
   }
 
   function stopPlay(): void {
@@ -781,24 +979,48 @@ export function createRoomFileTransfer(
     } catch {
       /* ignore close errors */
     }
-    if (ok && cur.purpose === "play") {
+    if (ok && (cur.purpose === "play" || cur.purpose === "save")) {
       const expect = Math.max(0, cur.size - cur.baseOffset);
       if (cur.received !== expect) {
         patch(cur.fileId, {
           status: "error",
           error: "檔案不完整",
         });
+        /** end only — fetch／`<a download>` may still be reading buffered spans. */
+        playSink?.end();
         return;
       }
-      if (playInbounds().length === 0) {
-        playSink?.end();
+      const stillOpen = [...inbounds.values()].some(
+        (i) => i.fileId === cur.fileId
+      );
+      if (!stillOpen) {
+        /**
+         * HTTP save: DC often finishes while fetch is still piping.
+         * Do NOT end here — a premature end + trimmed hole → Safari「檔案不完整」.
+         * download() ends after written === Content-Length.
+         */
+        if (!(cur.purpose === "save" && !cur.writable)) {
+          playSink?.end();
+        }
         if (playback && playSink && playback.id === cur.fileId) {
           playback = { ...playback, url: playSink.url };
         }
       }
     }
     if (ok) {
-      if (cur.purpose !== "play" || playInbounds().length === 0) {
+      if (cur.purpose === "save" && !cur.writable) {
+        /**
+         * SW already delivered the HTTP body (transfer-complete). Re-enable the
+         * Download button — do not leave status stuck on transferring (Safari
+         * often cancel()s after a successful body; download() may still be
+         * closing the writable / blob bridge).
+         */
+        patch(cur.fileId, {
+          status: "listed",
+          received: cur.size,
+          error: undefined,
+        });
+      } else if (cur.purpose !== "play" || playInbounds().length === 0) {
         patch(cur.fileId, {
           status: "listed",
           received: cur.size,
@@ -808,6 +1030,14 @@ export function createRoomFileTransfer(
     } else {
       if (cur.purpose === "play" && playInbounds().length === 0) {
         revokePlayback();
+      }
+      /**
+       * HTTP save: end the session so the fetch body can finish／fail cleanly.
+       * Do NOT abort/destroy — that deletes SW spans and the next GET 404s as
+       * 「找不到這個檔」(Chrome／Safari often cancel＋retry the stream).
+       */
+      if (cur.purpose === "save" && !cur.writable) {
+        playSink?.end();
       }
       if (cur.purpose !== "play" || playInbounds().length === 0) {
         patch(cur.fileId, {
@@ -943,14 +1173,50 @@ export function createRoomFileTransfer(
       if (cur) {
         void cur.writes.then(() => {
           if (inbounds.get(cur.transferId) !== cur) return;
-          if (cur.received !== cur.size - cur.baseOffset) {
-            void closeInbound(cur, false, "檔案不完整");
-            return;
+          cur.sourceDone = true;
+          const expect = Math.max(0, cur.size - cur.baseOffset);
+          if (cur.received === expect) {
+            patch(cur.fileId, {
+              received:
+                cur.purpose === "play"
+                  ? playReceivedAbs(cur.fileId)
+                  : cur.size,
+              error: undefined,
+            });
           }
-          void closeInbound(cur, true);
+          /**
+           * Owner done = source exhausted only. Do not closeInbound / mark
+           * listed — wait for SW transfer-complete／abort (HTTP delivery).
+           * Save must not playSink.end() here (Edge／Safari: fetch still reading).
+           */
         });
       }
     }
+  }
+
+  function noteHttpTransferEnd(msg: {
+    fileId: string;
+    transferId: string;
+    ok: boolean;
+    delivered?: number;
+    reason?: string;
+  }): void {
+    const cur = inbounds.get(msg.transferId);
+    if (!cur || cur.fileId !== msg.fileId) return;
+    if (msg.ok) {
+      const expect = Math.max(0, cur.size - cur.baseOffset);
+      if (cur.received !== expect) {
+        void closeInbound(cur, false, "檔案不完整");
+        return;
+      }
+      void closeInbound(cur, true);
+      return;
+    }
+    const reason =
+      msg.reason === "incomplete" || msg.reason?.includes("incomplete")
+        ? "檔案不完整"
+        : msg.reason || "下載失敗";
+    void closeInbound(cur, false, reason);
   }
 
   function playReceivedAbs(fileId: string): number {
@@ -985,16 +1251,14 @@ export function createRoomFileTransfer(
     const payload = chunk.payload;
     cur.writes = cur.writes.then(async () => {
       if (inbounds.get(cur.transferId) !== cur) return;
-      if (cur.purpose === "play") {
+      if (cur.purpose === "play" || cur.purpose === "save") {
         if (!playSink) return;
         const end = Math.min(cur.size, at + payload.byteLength);
         const pressure = await playSink.append(payload, at);
-        const accepted = playSink.covers?.(at, end) ?? true;
-        if (accepted) {
-          cur.received = nextGot;
-          patch(cur.fileId, { received: playReceivedAbs(cur.fileId) });
-          applyPlayPressure(pressure);
-        } else {
+        if (inbounds.get(cur.transferId) !== cur || !playSink) return;
+        /** append waits until stored — only then advance received. */
+        const stored = playSink.covers?.(at, end) ?? true;
+        if (!stored) {
           if (!cur.playPaused) {
             cur.playPaused = true;
             sendSafe(
@@ -1005,12 +1269,18 @@ export function createRoomFileTransfer(
               })
             );
           }
+          return;
         }
+        cur.received = nextGot;
+        patch(cur.fileId, {
+          received:
+            cur.purpose === "play"
+              ? playReceivedAbs(cur.fileId)
+              : at + payload.byteLength,
+        });
+        applyPlayPressure(pressure);
         return;
       }
-      cur.received = nextGot;
-      await cur.writable?.write(payload);
-      patch(cur.fileId, { received: at + payload.byteLength });
     });
   }
 
@@ -1018,6 +1288,13 @@ export function createRoomFileTransfer(
     for (const p of outboundPumps.values()) p.abort = true;
     for (const cur of inbounds.values()) void cur.writable?.abort?.();
     inbounds.clear();
+    for (const id of outboundFiles.keys()) {
+      try {
+        unregisterLocal(id);
+      } catch {
+        /* ignore */
+      }
+    }
     outboundFiles.clear();
     entries = [];
     outboundPumps.clear();
@@ -1031,7 +1308,11 @@ export function createRoomFileTransfer(
     unshareLocal,
     unshare,
     download,
+    primeBrowserDownload,
+    cancelHttpSave,
     play,
+    acceptHttpTransfer,
+    noteHttpTransferEnd,
     seekPlay,
     stopPlay,
     notePlayhead,

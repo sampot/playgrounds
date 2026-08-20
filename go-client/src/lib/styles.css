@@ -260,6 +260,23 @@ html[data-theme="dark"] .pixel-btn--primary:focus-visible:not(:disabled) {
 }
 
 /* —— Go 專用：覆寫共用 ShareSheet（硬邊／pixel），不改元件預設 —— */
+.share-sheet-flash {
+  border: var(--pixel-edge) solid rgb(var(--ink)) !important;
+  border-radius: var(--radius) !important;
+  background: rgb(var(--fill)) !important;
+  color: rgb(var(--ink)) !important;
+  font-family: var(--pixel) !important;
+  font-size: 0.8rem !important;
+  font-weight: 700 !important;
+  line-height: 1.45 !important;
+  box-shadow: var(--pixel-shadow) !important;
+  animation: pixel-bubble-blink 1.4s steps(2) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .share-sheet-flash {
+    animation: none;
+  }
+}
 .share-sheet-panel {
   border: var(--pixel-edge) solid rgb(var(--ink)) !important;
   border-bottom: none !important;

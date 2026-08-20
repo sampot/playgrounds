@@ -18,6 +18,8 @@ class GoRoomFiles {
   #xfer: RoomFileTransfer | null = null;
   #unsub: (() => void) | null = null;
   #unlistenNeed: (() => void) | null = null;
+  #unlistenTransferEnd: (() => void) | null = null;
+  #unlistenSaveCancel: (() => void) | null = null;
   #attachGen = 0;
   #pendingControl: unknown[] = [];
   #pendingBinary: ArrayBuffer[] = [];
@@ -44,11 +46,10 @@ class GoRoomFiles {
     },
     gen: number
   ): Promise<void> {
-    const [{ createRoomFileTransfer }, { listenRoomPlayNeed }, { parseRoomPlayPath }] =
+    const [{ createRoomFileTransfer }, { listenRoomOpenTransfer, listenRoomTransferEnd, listenRoomPlaySaveCancel }] =
       await Promise.all([
         import("./goRoomFileTransfer"),
         import("./goRoomPlayBridge"),
-        import("./goRoomPlayRegistry"),
       ]);
     if (gen !== this.#attachGen) return;
 
@@ -64,16 +65,14 @@ class GoRoomFiles {
       }
       this.playback = s.playback;
     });
-    this.#unlistenNeed = listenRoomPlayNeed((playId, start) => {
-      const url = this.playback?.url ?? "";
-      let path = url;
-      try {
-        if (url && !url.startsWith("/")) path = new URL(url).pathname;
-      } catch {
-        /* keep */
-      }
-      if (parseRoomPlayPath(path) !== playId) return;
-      void this.#xfer?.seekPlay(start);
+    this.#unlistenNeed = listenRoomOpenTransfer((msg) => {
+      this.#xfer?.acceptHttpTransfer(msg);
+    });
+    this.#unlistenTransferEnd = listenRoomTransferEnd((msg) => {
+      this.#xfer?.noteHttpTransferEnd(msg);
+    });
+    this.#unlistenSaveCancel = listenRoomPlaySaveCancel((playId) => {
+      this.#xfer?.cancelHttpSave(playId);
     });
 
     const ctrl = this.#pendingControl.splice(0);
@@ -88,6 +87,10 @@ class GoRoomFiles {
     this.#pendingBinary = [];
     this.#unlistenNeed?.();
     this.#unlistenNeed = null;
+    this.#unlistenTransferEnd?.();
+    this.#unlistenTransferEnd = null;
+    this.#unlistenSaveCancel?.();
+    this.#unlistenSaveCancel = null;
     this.#unsub?.();
     this.#unsub = null;
     this.#xfer?.dispose();
@@ -127,6 +130,15 @@ class GoRoomFiles {
     return (
       this.#xfer?.download(id, pickSave) ??
       Promise.resolve({ ok: false as const, error: "尚未連線" })
+    );
+  }
+
+  primeBrowserDownload(id: string) {
+    return (
+      this.#xfer?.primeBrowserDownload(id) ?? {
+        ok: false as const,
+        error: "尚未連線",
+      }
     );
   }
 

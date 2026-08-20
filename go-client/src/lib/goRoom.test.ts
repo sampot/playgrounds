@@ -829,7 +829,7 @@ describe("attachPlaybackUrl", () => {
     expect(play).toHaveBeenCalledTimes(1);
   });
 
-  it("calls load after assigning a same-origin play URL", () => {
+  it("does not call load on the first src assign (Safari aborts the first Range)", () => {
     const load = vi.fn();
     const el = {
       src: "",
@@ -838,8 +838,22 @@ describe("attachPlaybackUrl", () => {
       play: async () => {},
       load,
     };
-    attachPlaybackUrl(el, "/room-play/tr-1");
-    expect(el.src).toBe("/room-play/tr-1");
+    attachPlaybackUrl(el, "/room-file/tr-1");
+    expect(el.src).toBe("/room-file/tr-1");
+    expect(load).not.toHaveBeenCalled();
+  });
+
+  it("calls load when replacing an existing playback URL", () => {
+    const load = vi.fn();
+    const el = {
+      src: "/room-file/old",
+      paused: true,
+      muted: false,
+      play: async () => {},
+      load,
+    };
+    attachPlaybackUrl(el, "/room-file/tr-1");
+    expect(el.src).toBe("/room-file/tr-1");
     expect(load).toHaveBeenCalledTimes(1);
   });
 

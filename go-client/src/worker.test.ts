@@ -29,13 +29,15 @@ describe("go static asset router", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("does not SPA-fallback /room-play so a missed SW cannot feed HTML to <video>", async () => {
+  it("does not SPA-fallback /room-file so a missed SW cannot feed HTML to media", async () => {
     const fetch = vi.fn();
-    const response = await worker.fetch(
-      new Request("https://go.samkuo.me/room-play/tr-1"),
-      { ASSETS: { fetch } }
-    );
-    expect(response.status).toBe(404);
+    for (const path of ["/room-file/tr-1", "/room-play/tr-1"]) {
+      const response = await worker.fetch(
+        new Request(`https://go.samkuo.me${path}`),
+        { ASSETS: { fetch } }
+      );
+      expect(response.status).toBe(404);
+    }
     expect(fetch).not.toHaveBeenCalled();
   });
 

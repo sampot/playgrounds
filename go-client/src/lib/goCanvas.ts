@@ -29,6 +29,7 @@ import {
 import { handleGoBuiltInKv } from "./goBuiltInKv";
 import { handleGoShellPlatformApi } from "./goShellPlatform";
 import { handleGoShellSessionApi } from "./goShellSession";
+import { GO_SW_URL } from "./registerGoSw";
 
 configurePlaygroundsPaths({ basePath: "", mode: "standalone" });
 
@@ -36,9 +37,6 @@ configurePlaygroundsPaths({ basePath: "", mode: "standalone" });
 function isGoCanvasSwUsableSync(): boolean {
   return isGoCanvasSwUsable();
 }
-
-/** Bump with go-client/static/sw.js GO_SW_REV so phones pick up bridge fixes. */
-const SW_URL = "/sw.js?v=27";
 
 function withCanvasBridge(files: FileMap, storageScope?: string): FileMap {
   const out: FileMap = { ...files };
@@ -56,7 +54,7 @@ export async function ensureGoCanvasSw(): Promise<ServiceWorkerRegistration> {
     const { goCanvasSwUnavailableMessage } = await import("./goCanvasSupport");
     throw new Error(goCanvasSwUnavailableMessage());
   }
-  const reg = await navigator.serviceWorker.register(SW_URL, { scope: "/" });
+  const reg = await navigator.serviceWorker.register(GO_SW_URL, { scope: "/" });
   await navigator.serviceWorker.ready;
   if (!navigator.serviceWorker.controller) {
     await new Promise<void>((resolve, reject) => {

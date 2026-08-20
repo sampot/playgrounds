@@ -39,13 +39,47 @@ describe("createRoomPlaySink", () => {
       size: 4,
       sessions,
     });
-    expect(sink.url).toBe("/room-play/tr-1");
+    expect(sink.url).toBe("/room-file/tr-1");
     await sink.append(new Uint8Array([9, 8, 7, 6]));
     sink.end();
     const stream = sessions.liveBody("tr-1");
     const reader = stream.getReader();
     const first = await reader.read();
     expect(Array.from(first.value ?? [])).toEqual([9, 8, 7, 6]);
+  });
+
+  it("waits for the pin window so a sequential save never skips bytes past the RAM cap", async () => {
+    const sessions = createRoomPlayRegistry();
+    const sink = createRoomPlaySink({
+      playId: "save-1",
+      mime: "application/octet-stream",
+      size: 48,
+      sessions,
+      maxBytes: 16,
+      highBytes: 12,
+      lowBytes: 4,
+      mode: "save",
+    });
+    const body = sessions.liveBody("save-1");
+    const reader = body.getReader();
+    const out: number[] = [];
+
+    const producer = (async () => {
+      for (let at = 0; at < 48; at += 8) {
+        await sink.append(new Uint8Array(8).fill(at / 8), at);
+      }
+      sink.end();
+    })();
+
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) out.push(...value);
+    }
+    await producer;
+    expect(out).toEqual(
+      Array.from({ length: 48 }, (_, i) => Math.floor(i / 8))
+    );
   });
 
   it("uses the same-origin play URL for a file larger than the RAM window", () => {
@@ -56,7 +90,7 @@ describe("createRoomPlaySink", () => {
       size: 400 * 1024 * 1024,
       sessions,
     });
-    expect(sink.url).toBe("/room-play/big");
+    expect(sink.url).toBe("/room-file/big");
   });
 
   it("does not construct MediaSource when a playId is set", () => {
@@ -78,7 +112,7 @@ describe("createRoomPlaySink", () => {
         mime: "video/mp4",
         size: 400 * 1024 * 1024,
       });
-      expect(sink.url).toBe("/room-play/big");
+      expect(sink.url).toBe("/room-file/big");
       expect(constructed).toBe(0);
     } finally {
       g.MediaSource = prev;

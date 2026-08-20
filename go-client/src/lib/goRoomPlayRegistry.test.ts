@@ -1,10 +1,20 @@
 import { describe, expect, it } from "vitest";
 import {
   createRoomPlayRegistry,
+  isWebKitMediaEngine,
+  localFileSlice,
+  mediaRangeForBufferedBody,
   parseByteRange,
+  parseRoomFilePath,
   parseRoomPlayPath,
   playFetchRange,
+  isBytesRangeHeader,
+  roomFileContentType,
+  roomFileHttpBodyKind,
+  roomFileMethodAllowed,
+  roomFilePath,
   roomPlayPath,
+  SESSION_FILE_PLAY_MEDIA_BLOB_MAX,
 } from "./goRoomPlayRegistry";
 
 async function readAll(
@@ -27,20 +37,22 @@ async function readAll(
   return out;
 }
 
-describe("room play path", () => {
-  it("round-trips a transfer id", () => {
-    expect(roomPlayPath("tr-1")).toBe("/room-play/tr-1");
-    expect(parseRoomPlayPath("/room-play/tr-1")).toBe("tr-1");
-    expect(parseRoomPlayPath("/room/tr-1")).toBeNull();
+describe("room file path", () => {
+  it("uses /room-file/ as the canonical same-origin URL", () => {
+    expect(roomFilePath("tr-1")).toBe("/room-file/tr-1");
+    expect(roomPlayPath("tr-1")).toBe("/room-file/tr-1");
+    expect(parseRoomFilePath("/room-file/tr-1")).toBe("tr-1");
+    expect(parseRoomFilePath("/room-play/tr-1")).toBe("tr-1");
+    expect(parseRoomPlayPath("/room-play/legacy")).toBe("legacy");
+    expect(parseRoomFilePath("/room/tr-1")).toBeNull();
   });
 });
 
 describe("playFetchRange", () => {
-  it("turns an unranged GET of a known-size file into a whole-file range", () => {
-    expect(playFetchRange(null, 400 * 1024 * 1024)).toEqual({
-      start: 0,
-      end: 400 * 1024 * 1024 - 1,
-    });
+  it("does not invent a Range for unranged GET (200 + live body, not synthetic 206)", () => {
+    expect(playFetchRange(null, 400 * 1024 * 1024)).toBeNull();
+    expect(playFetchRange(undefined, 100)).toBeNull();
+    expect(playFetchRange("", 100)).toBeNull();
   });
 
   it("keeps an explicit Range header", () => {
@@ -54,6 +66,24 @@ describe("parseByteRange", () => {
     expect(parseByteRange("bytes=2-", 8)).toEqual({ start: 2, end: 7 });
     expect(parseByteRange("bytes=-3", 8)).toEqual({ start: 5, end: 7 });
     expect(parseByteRange(null, 8)).toBeNull();
+  });
+
+  it("rejects unsatisfiable ranges (start past EOF)", () => {
+    expect(parseByteRange("bytes=100-200", 50)).toBeNull();
+  });
+});
+
+describe("roomFile HTTP helpers", () => {
+  it("allows only GET and HEAD", () => {
+    expect(roomFileMethodAllowed("GET")).toBe(true);
+    expect(roomFileMethodAllowed("HEAD")).toBe(true);
+    expect(roomFileMethodAllowed("POST")).toBe(false);
+  });
+
+  it("detects bytes= Range headers", () => {
+    expect(isBytesRangeHeader("bytes=0-1")).toBe(true);
+    expect(isBytesRangeHeader(null)).toBe(false);
+    expect(isBytesRangeHeader("")).toBe(false);
   });
 });
 
@@ -158,6 +188,28 @@ describe("createRoomPlayRegistry", () => {
     expect(reg.bufferedBytes("t1")).toBeLessThanOrEqual(16);
   });
 
+  it("save mode refuses overflow instead of clipping unread ahead bytes", () => {
+    const reg = createRoomPlayRegistry();
+    reg.open("t1", {
+      mode: "save",
+      mime: "application/octet-stream",
+      size: 48,
+      maxBytes: 16,
+      highBytes: 24,
+      lowBytes: 4,
+    });
+    reg.pin("t1", "r0", 0);
+    expect(reg.push("t1", new Uint8Array(16).fill(1), 0)).toBe("ok");
+    /** Play trim would clip a straddling chunk; save must not store a partial. */
+    expect(reg.push("t1", new Uint8Array(8).fill(2), 12)).toBe("high");
+    expect(reg.covers("t1", 12, 20)).toBe(false);
+    expect(reg.covers("t1", 0, 16)).toBe(true);
+    reg.pin("t1", "r0", 8);
+    expect(reg.push("t1", new Uint8Array(8).fill(2), 16)).toBe("ok");
+    expect(reg.covers("t1", 8, 24)).toBe(true);
+    expect(reg.bufferedBytes("t1")).toBeLessThanOrEqual(16);
+  });
+
   it("after the pin advances, drops consumed prefix and keeps the next window", () => {
     const reg = createRoomPlayRegistry();
     reg.open("t1", {
@@ -194,5 +246,115 @@ describe("createRoomPlayRegistry", () => {
     expect(reg.covers("t1", 0, 16)).toBe(true);
     expect(reg.covers("t1", 984, 1000)).toBe(true);
     expect(reg.bufferedBytes("t1")).toBeLessThanOrEqual(32);
+  });
+
+  it("infers a playable media type when File.type is empty or octet-stream", () => {
+    expect(roomFileContentType("video/mp4", "x.bin")).toBe("video/mp4");
+    expect(roomFileContentType("", "clip.mp4")).toBe("video/mp4");
+    expect(roomFileContentType("application/octet-stream", "clip.m4v")).toBe(
+      "video/mp4"
+    );
+    expect(roomFileContentType("", "clip.mov")).toBe("video/quicktime");
+    expect(roomFileContentType("", "track.m4a")).toBe("audio/mp4");
+    expect(roomFileContentType("", "notes.txt")).toBe(
+      "application/octet-stream"
+    );
+  });
+
+  it("serves a local File slice as a typed Blob (Safari cannot play SW ReadableStream)", () => {
+    const file = new File([new Uint8Array([10, 20, 30, 40, 50, 60])], "clip.mp4", {
+      type: "",
+    });
+    const slice = localFileSlice(file, 2, 5);
+    expect(slice).toBeInstanceOf(Blob);
+    expect(slice.size).toBe(3);
+    expect(slice.type).toBe("video/mp4");
+  });
+
+  it("reports an inferred mime for a local File with an empty type", () => {
+    const reg = createRoomPlayRegistry();
+    const file = new File([new Uint8Array([1, 2, 3, 4])], "clip.mp4", {
+      type: "",
+    });
+    reg.registerLocal("local-mp4", file);
+    expect(reg.meta("local-mp4")?.mime).toBe("video/mp4");
+  });
+
+  it("caps WebKit media Ranges so each HTTP body is a complete Blob, not a live stream", () => {
+    expect(isWebKitMediaEngine("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15")).toBe(
+      true
+    );
+    expect(
+      isWebKitMediaEngine(
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+      )
+    ).toBe(false);
+    expect(
+      mediaRangeForBufferedBody({ start: 0, end: 99 }, 100, 16)
+    ).toEqual({ start: 0, end: 15 });
+    expect(mediaRangeForBufferedBody(null, 100, 16)).toEqual({
+      start: 0,
+      end: 15,
+    });
+    expect(SESSION_FILE_PLAY_MEDIA_BLOB_MAX).toBe(2 * 1024 * 1024);
+    expect(
+      roomFileHttpBodyKind({
+        ua: "Version/17.5 Safari/605.1.15",
+        mime: "video/mp4",
+        local: false,
+        destination: "video",
+      })
+    ).toBe("blob-media");
+    expect(
+      roomFileHttpBodyKind({
+        ua: "Version/17.5 Safari/605.1.15",
+        mime: "video/mp4",
+        local: false,
+        hasRange: true,
+      })
+    ).toBe("blob-media");
+    expect(
+      roomFileHttpBodyKind({
+        ua: "Version/17.5 Safari/605.1.15",
+        mime: "video/mp4",
+        local: false,
+      })
+    ).toBe("stream");
+    expect(
+      roomFileHttpBodyKind({
+        ua: "Chrome/120.0.0.0 Safari/537.36",
+        mime: "video/mp4",
+        local: false,
+        destination: "video",
+      })
+    ).toBe("stream");
+    expect(
+      roomFileHttpBodyKind({
+        ua: "Version/17.5 Safari/605.1.15",
+        mime: "video/mp4",
+        local: true,
+      })
+    ).toBe("blob-local");
+  });
+
+  it("serves a registered local File without DC spans (full GET + Range)", async () => {
+    const reg = createRoomPlayRegistry();
+    const file = new File([new Uint8Array([10, 20, 30, 40, 50, 60])], "a.bin", {
+      type: "application/octet-stream",
+    });
+    reg.registerLocal("local-1", file);
+    expect(reg.meta("local-1")).toMatchObject({
+      mime: "application/octet-stream",
+      size: 6,
+      ended: true,
+    });
+    expect(Array.from(await readAll(reg.liveBody("local-1")))).toEqual([
+      10, 20, 30, 40, 50, 60,
+    ]);
+    expect(
+      Array.from(await readAll(await reg.rangeBody("local-1", { start: 2, end: 4 })))
+    ).toEqual([30, 40, 50]);
+    reg.unregisterLocal("local-1");
+    expect(reg.meta("local-1")).toBeNull();
   });
 });

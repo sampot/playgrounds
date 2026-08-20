@@ -7,7 +7,11 @@ import {
 } from "@pg/roster/rosterSessionFile";
 import { createRoomFileTransfer } from "./goRoomFileTransfer";
 import { createPlayByteWindow, createRegistryPlaySink } from "./goRoomFilePlay";
-import { createRoomPlayRegistry, parseRoomPlayPath } from "./goRoomPlayRegistry";
+import {
+  createRoomPlayRegistry,
+  defaultRoomPlaySessions,
+  parseRoomFilePath,
+} from "./goRoomPlayRegistry";
 import { GO_ROOM_HANG_FILES_ONLY } from "./goRoom";
 import type { RoomFileWritable } from "./goRoomFileSave";
 
@@ -52,6 +56,168 @@ function mockWritable() {
   return { writable, chunks, isClosed: () => closed };
 }
 
+/** In-process `/room-file/` façade for unit tests (no real Service Worker). */
+function httpFacade() {
+  const sessions = createRoomPlayRegistry();
+  let trN = 0;
+  let openHandler:
+    | ((msg: {
+        fileId: string;
+        transferId: string;
+        offset: number;
+        end?: number;
+        purpose?: "play" | "save";
+      }) => void)
+    | null = null;
+  let endHandler:
+    | ((msg: {
+        fileId: string;
+        transferId: string;
+        ok: boolean;
+        delivered?: number;
+        reason?: string;
+      }) => void)
+    | null = null;
+
+  function watchBody(
+    fileId: string,
+    transferId: string,
+    body: ReadableStream<Uint8Array>,
+    expectLen: number
+  ): ReadableStream<Uint8Array> {
+    const reader = body.getReader();
+    let delivered = 0;
+    let settled = false;
+    const settle = (ok: boolean, reason?: string) => {
+      if (settled) return;
+      settled = true;
+      endHandler?.({
+        fileId,
+        transferId,
+        ok,
+        delivered,
+        reason,
+      });
+    };
+    return new ReadableStream({
+      async pull(controller) {
+        try {
+          const { done, value } = await reader.read();
+          if (done) {
+            if (expectLen > 0 && delivered < expectLen) {
+              settle(false, "incomplete");
+              controller.error(new Error("incomplete file body"));
+              return;
+            }
+            settle(true);
+            controller.close();
+            return;
+          }
+          if (value?.byteLength) {
+            delivered += value.byteLength;
+            controller.enqueue(value);
+          }
+        } catch (e) {
+          settle(false, "aborted");
+          controller.error(e);
+        }
+      },
+      cancel() {
+        settle(false, "cancelled");
+        void reader.cancel();
+      },
+    });
+  }
+
+  return {
+    sessions,
+    onOpenTransfer(
+      handler: (msg: {
+        fileId: string;
+        transferId: string;
+        offset: number;
+        end?: number;
+        purpose?: "play" | "save";
+      }) => void
+    ) {
+      openHandler = handler;
+    },
+    onTransferEnd(
+      handler: (msg: {
+        fileId: string;
+        transferId: string;
+        ok: boolean;
+        delivered?: number;
+        reason?: string;
+      }) => void
+    ) {
+      endHandler = handler;
+    },
+    createPlaySink: (opts: {
+      mime?: string;
+      name?: string;
+      size?: number;
+      playId?: string;
+      mode?: "play" | "save";
+    }) => createRegistryPlaySink({ ...opts, sessions }),
+    fetchRoomFile: async (url: string) => {
+      const id = parseRoomFilePath(new URL(url, "http://go.local").pathname);
+      if (!id) return new Response(null, { status: 404 });
+      if (sessions.hasLocal(id)) {
+        const meta = sessions.meta(id)!;
+        const body = sessions.liveBody(id);
+        return new Response(body, {
+          status: 200,
+          headers: {
+            "Content-Type": meta.mime,
+            "Content-Length": String(meta.size),
+            "Accept-Ranges": "bytes",
+          },
+        });
+      }
+      let meta = sessions.meta(id);
+      for (let i = 0; i < 100 && !meta; i++) {
+        await new Promise((r) => setTimeout(r, 5));
+        meta = sessions.meta(id);
+      }
+      if (!meta || meta.size <= 0) {
+        return new Response(null, { status: 404 });
+      }
+      const range = { start: 0, end: meta.size - 1 };
+      const transferId = `sw-tr-${++trN}`;
+      openHandler?.({
+        fileId: id,
+        transferId,
+        offset: 0,
+        end: range.end,
+        purpose: meta.mode === "save" ? "save" : "play",
+      });
+      const raw = await sessions.rangeBody(id, range);
+      const body = watchBody(id, transferId, raw, meta.size);
+      return new Response(body, {
+        status: 206,
+        headers: {
+          "Content-Type": meta.mime,
+          "Content-Range": `bytes ${range.start}-${range.end}/${meta.size}`,
+          "Content-Length": String(meta.size),
+        },
+      });
+    },
+  };
+}
+
+function wireHttpOpen(
+  http: ReturnType<typeof httpFacade>,
+  guest: ReturnType<typeof createRoomFileTransfer>
+) {
+  http.onOpenTransfer((msg) => {
+    guest.acceptHttpTransfer(msg);
+  });
+  http.onTransferEnd((msg) => {
+    guest.noteHttpTransferEnd(msg);
+  });
+}
+
 describe("createRoomFileTransfer", () => {
   it("shares metadata only and allows a second listing", async () => {
     const json: unknown[] = [];
@@ -85,6 +251,295 @@ describe("createRoomFileTransfer", () => {
     expect(xfer.getState().entries).toHaveLength(2);
   });
 
+  it("infers video/mp4 when the picker File has an empty type", async () => {
+    const xfer = createRoomFileTransfer({
+      localAgentId: "host-1",
+      localName: "太郎",
+      sendJson: () => {},
+      sendBinary: () => {},
+      newId: () => "file-1",
+    });
+    expect((await xfer.shareLocalFile(fileOf("clip.mp4", 8, ""))).ok).toBe(true);
+    expect(xfer.getState().entries[0]?.mime).toBe("video/mp4");
+  });
+
+  it("does not serve hung files from the page registry — HTTP always goes to fetch (SW)", async () => {
+    const fetch = vi.fn(
+      async () =>
+        new Response(new Uint8Array([9, 8, 7, 6]), {
+          status: 200,
+          headers: { "Content-Length": "4" },
+        })
+    );
+    vi.stubGlobal("fetch", fetch);
+    try {
+      const xfer = createRoomFileTransfer({
+        localAgentId: "h",
+        localName: "太郎",
+        sendJson: () => {},
+        sendBinary: () => {},
+        newId: () => "file-1",
+      });
+      expect((await xfer.shareLocalFile(fileOf("note.txt", 4))).ok).toBe(true);
+      expect(defaultRoomPlaySessions.hasLocal("file-1")).toBe(false);
+      const sink = mockWritable();
+      const saved = await xfer.download("file-1", async () => sink.writable);
+      expect(saved.ok).toBe(true);
+      expect(fetch).toHaveBeenCalled();
+      expect(String(fetch.mock.calls[0]![0])).toMatch(/\/room-file\/file-1/);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("rejects remote primeBrowserDownload — remote must use download()+fetch", async () => {
+    const guest = createRoomFileTransfer({
+      localAgentId: "g",
+      localName: "訪客",
+      sendJson: () => {},
+      sendBinary: () => {},
+      newId: () => "tr-1",
+    });
+    guest.onControl({
+      type: SESSION_FILE_TYPE,
+      v: 1,
+      op: "share",
+      id: "file-1",
+      name: "clip.txt",
+      size: 3,
+      owner: "h",
+      ownerName: "太郎",
+    });
+    const primed = guest.primeBrowserDownload("file-1");
+    expect(primed.ok).toBe(false);
+    if (!primed.ok) expect(primed.error).toMatch(/HTTP fetch|下載/);
+  });
+
+  it("re-enables listing after SW transfer-complete for a remote save", async () => {
+    const http = httpFacade();
+    let guest!: ReturnType<typeof createRoomFileTransfer>;
+    const owner = createRoomFileTransfer({
+      localAgentId: "h",
+      localName: "太郎",
+      sendJson: (m) => guest.onControl(m),
+      sendBinary: (b) => guest.onBinary(b),
+      newId: () => "file-1",
+    });
+    guest = createRoomFileTransfer({
+      localAgentId: "g",
+      localName: "訪客",
+      sendJson: (m) => owner.onControl(m),
+      sendBinary: () => {},
+      createPlaySink: http.createPlaySink,
+      fetchRoomFile: http.fetchRoomFile,
+    });
+    wireHttpOpen(http, guest);
+    await owner.shareLocalFile(fileOf("clip.bin", 4));
+    const sink = mockWritable();
+    const pending = guest.download("file-1", async () => sink.writable);
+    expect((await pending).ok).toBe(true);
+    expect(guest.getState().entries[0]?.status).toBe("listed");
+    expect(guest.getState().busy).toBe(false);
+  });
+
+  it("clears transferring when SW completes save even if playback id still matches", async () => {
+    const guest = createRoomFileTransfer({
+      localAgentId: "g",
+      localName: "訪客",
+      sendJson: () => {},
+      sendBinary: () => {},
+      createPlaySink: () =>
+        createPlayByteWindow({ mime: "application/octet-stream", size: 4 }),
+    });
+    guest.onControl({
+      type: SESSION_FILE_TYPE,
+      v: 1,
+      op: "share",
+      id: "file-1",
+      name: "clip.bin",
+      size: 4,
+      owner: "h",
+    });
+    expect((await guest.play("file-1")).ok).toBe(true);
+    expect(
+      guest.acceptHttpTransfer({
+        fileId: "file-1",
+        transferId: "sw-save",
+        offset: 0,
+        purpose: "save",
+      }).ok
+    ).toBe(true);
+    /** Simulate download() having switched the sink to save while playback lingers. */
+    guest.onBinary(
+      encodeSessionFileChunk({
+        transferId: "sw-save",
+        seq: 0,
+        payload: new Uint8Array([1, 2, 3, 4]),
+      })
+    );
+    await vi.waitFor(() => {
+      expect(guest.getState().entries[0]?.received).toBe(4);
+    });
+    guest.noteHttpTransferEnd({
+      fileId: "file-1",
+      transferId: "sw-save",
+      ok: true,
+      delivered: 4,
+    });
+    await vi.waitFor(() => {
+      expect(guest.getState().entries[0]?.status).toBe("listed");
+    });
+  });
+
+  it("cancelHttpSave after a completed transfer does not leave status transferring", async () => {
+    const http = httpFacade();
+    const g2 = createRoomFileTransfer({
+      localAgentId: "g",
+      localName: "訪客",
+      sendJson: () => {},
+      sendBinary: () => {},
+      createPlaySink: http.createPlaySink,
+      fetchRoomFile: () => new Promise(() => {}),
+    });
+    g2.onControl({
+      type: SESSION_FILE_TYPE,
+      v: 1,
+      op: "share",
+      id: "file-1",
+      name: "a.bin",
+      size: 2,
+      owner: "h",
+    });
+    void g2.download("file-1", async () => mockWritable().writable);
+    await vi.waitFor(() => {
+      expect(g2.getState().entries[0]?.status).toBe("transferring");
+    });
+    expect(
+      g2.acceptHttpTransfer({
+        fileId: "file-1",
+        transferId: "sw-1",
+        offset: 0,
+        purpose: "save",
+      }).ok
+    ).toBe(true);
+    g2.onBinary(
+      encodeSessionFileChunk({
+        transferId: "sw-1",
+        seq: 0,
+        payload: new Uint8Array([9, 9]),
+      })
+    );
+    await vi.waitFor(() => {
+      expect(g2.getState().entries[0]?.received).toBe(2);
+    });
+    g2.noteHttpTransferEnd({
+      fileId: "file-1",
+      transferId: "sw-1",
+      ok: true,
+      delivered: 2,
+    });
+    await vi.waitFor(() => {
+      expect(g2.getState().entries[0]?.status).toBe("listed");
+    });
+    /** Safari often cancel()s the SW stream after a successful body. */
+    g2.cancelHttpSave("file-1");
+    expect(g2.getState().entries[0]?.status).toBe("listed");
+  });
+
+  it("cancelHttpSave ends the DC transfer without aborting the HTTP session", async () => {
+    const http = httpFacade();
+    const json: unknown[] = [];
+    let releaseFetch!: () => void;
+    const fetchGate = new Promise<void>((r) => {
+      releaseFetch = r;
+    });
+    const guest = createRoomFileTransfer({
+      localAgentId: "g",
+      localName: "訪客",
+      sendJson: (m) => json.push(m),
+      sendBinary: () => {},
+      newId: () => "tr-1",
+      createPlaySink: http.createPlaySink,
+      fetchRoomFile: async (url) => {
+        await fetchGate;
+        return http.fetchRoomFile(url);
+      },
+    });
+    wireHttpOpen(http, guest);
+    guest.onControl({
+      type: SESSION_FILE_TYPE,
+      v: 1,
+      op: "share",
+      id: "file-1",
+      name: "clip.bin",
+      size: 8,
+      owner: "h",
+      ownerName: "太郎",
+    });
+    const sink = mockWritable();
+    const pending = guest.download("file-1", async () => sink.writable);
+    await vi.waitFor(() => {
+      expect(guest.getState().busy).toBe(true);
+      expect(http.sessions.meta("file-1")).not.toBeNull();
+    });
+    /** SW would open-transfer on GET; fetch is gated — accept explicitly. */
+    expect(
+      guest.acceptHttpTransfer({
+        fileId: "file-1",
+        transferId: "sw-tr-1",
+        offset: 0,
+        purpose: "save",
+      }).ok
+    ).toBe(true);
+    guest.cancelHttpSave("file-1");
+    await vi.waitFor(() => {
+      expect(guest.getState().busy).toBe(false);
+    });
+    /** Must end, not abort/delete — a retry fetch would otherwise 404「找不到這個檔」. */
+    expect(http.sessions.meta("file-1")).toMatchObject({ ended: true });
+    releaseFetch();
+    expect((await pending).ok).toBe(false);
+    expect(json.some((m) => (m as { op?: string }).op === "cancel")).toBe(true);
+  });
+
+  it("local play／download use /room-file/<id> with zero peer request", async () => {
+    const http = httpFacade();
+    const json: unknown[] = [];
+    const bins: ArrayBuffer[] = [];
+    const xfer = createRoomFileTransfer({
+      localAgentId: "h",
+      localName: "太郎",
+      sendJson: (m) => json.push(m),
+      sendBinary: (b) => bins.push(b),
+      newId: () => "file-1",
+      createPlaySink: http.createPlaySink,
+      fetchRoomFile: http.fetchRoomFile,
+      registerLocalFile: (id, file) => http.sessions.registerLocal(id, file),
+      unregisterLocalFile: (id) => http.sessions.unregisterLocal(id),
+    });
+    expect((await xfer.shareLocalFile(fileOf("note.txt", 4))).ok).toBe(true);
+    const played = await xfer.play("file-1");
+    expect(played.ok).toBe(true);
+    expect(xfer.getState().playback?.url).toBe("/room-file/file-1");
+    expect(xfer.getState().playback?.url.startsWith("blob:")).toBe(false);
+
+    const sink = mockWritable();
+    const saved = await xfer.download("file-1", async () => sink.writable);
+    expect(saved.ok).toBe(true);
+    expect(sink.chunks.reduce((n, c) => n + c.byteLength, 0)).toBe(4);
+    expect(json.some((m) => (m as { op?: string }).op === "request")).toBe(
+      false
+    );
+    expect(bins).toHaveLength(0);
+
+    const primed = xfer.primeBrowserDownload("file-1");
+    expect(primed.ok).toBe(true);
+    if (primed.ok) {
+      expect(primed.url).toBe("/room-file/file-1");
+      expect(primed.name).toBe("note.txt");
+    }
+  });
+
   it("does not request when the save picker is cancelled", async () => {
     const json: unknown[] = [];
     const guest = createRoomFileTransfer({
@@ -110,8 +565,10 @@ describe("createRoomFileTransfer", () => {
     );
   });
 
-  it("streams slices to a writable after request, without assembling a blob", async () => {
+  it("downloads via fetch(/room-file/…) — DC chunks feed the HTTP body, not the writable", async () => {
     let guest!: ReturnType<typeof createRoomFileTransfer>;
+    const http = httpFacade();
+    const fetched: string[] = [];
     const owner = createRoomFileTransfer({
       localAgentId: "h",
       localName: "太郎",
@@ -125,14 +582,19 @@ describe("createRoomFileTransfer", () => {
       sendJson: (m) => owner.onControl(m),
       sendBinary: () => {},
       newId: () => "tr-1",
+      createPlaySink: http.createPlaySink,
+      fetchRoomFile: async (url) => {
+        fetched.push(url);
+        return http.fetchRoomFile(url);
+      },
     });
+    wireHttpOpen(http, guest);
 
     await owner.shareLocalFile(fileOf("clip.txt", 3));
-    expect(guest.getState().entries[0]?.name).toBe("clip.txt");
-
     const sink = mockWritable();
     const started = await guest.download("file-1", async () => sink.writable);
     expect(started.ok).toBe(true);
+    expect(fetched).toEqual(["/room-file/file-1"]);
 
     await vi.waitFor(() => {
       expect(sink.isClosed()).toBe(true);
@@ -140,6 +602,187 @@ describe("createRoomFileTransfer", () => {
     const received = sink.chunks.reduce((n, c) => n + c.byteLength, 0);
     expect(received).toBe(3);
     expect(guest.getState().entries[0]).not.toHaveProperty("blobUrl");
+    expect(guest.getState().busy).toBe(false);
+  });
+
+  it("fails remote download when the HTTP body length does not match Content-Length", async () => {
+    const http = httpFacade();
+    const guest = createRoomFileTransfer({
+      localAgentId: "g",
+      localName: "訪客",
+      sendJson: () => {},
+      sendBinary: () => {},
+      newId: () => "tr-1",
+      createPlaySink: http.createPlaySink,
+      fetchRoomFile: async () =>
+        new Response(new Uint8Array([1, 2]), {
+          status: 200,
+          headers: { "Content-Length": "5" },
+        }),
+    });
+    guest.onControl({
+      type: SESSION_FILE_TYPE,
+      v: 1,
+      op: "share",
+      id: "file-1",
+      name: "clip.txt",
+      size: 5,
+      owner: "h",
+      ownerName: "太郎",
+    });
+    const sink = mockWritable();
+    const out = await guest.download("file-1", async () => sink.writable);
+    expect(out.ok).toBe(false);
+    expect(out).toMatchObject({ error: expect.stringMatching(/不完整/) });
+    expect(guest.getState().busy).toBe(false);
+  });
+
+  it("does not abort the HTTP session when DC finishes before fetch reads (Edge 0-byte race)", async () => {
+    let guest!: ReturnType<typeof createRoomFileTransfer>;
+    const http = httpFacade();
+    const destroyed: string[] = [];
+    let releaseFetch!: () => void;
+    const fetchGate = new Promise<void>((r) => {
+      releaseFetch = r;
+    });
+    const owner = createRoomFileTransfer({
+      localAgentId: "h",
+      localName: "太郎",
+      sendJson: (m) => guest.onControl(m),
+      sendBinary: (b) => guest.onBinary(b),
+      newId: () => "file-1",
+    });
+    guest = createRoomFileTransfer({
+      localAgentId: "g",
+      localName: "訪客",
+      sendJson: (m) => owner.onControl(m),
+      sendBinary: () => {},
+      newId: () => "tr-1",
+      createPlaySink: (opts) => {
+        const sink = http.createPlaySink(opts);
+        const destroy = sink.destroy.bind(sink);
+        sink.destroy = () => {
+          destroyed.push(opts.playId ?? "play");
+          destroy();
+        };
+        return sink;
+      },
+      fetchRoomFile: async (url) => {
+        await fetchGate;
+        return http.fetchRoomFile(url);
+      },
+    });
+    wireHttpOpen(http, guest);
+
+    await owner.shareLocalFile(fileOf("clip.txt", 5));
+    const sink = mockWritable();
+    const pending = guest.download("file-1", async () => sink.writable);
+    await vi.waitFor(() => {
+      expect(http.sessions.meta("file-1")).not.toBeNull();
+    });
+    /** Fetch gated — simulate SW open-transfer for this GET. */
+    expect(
+      guest.acceptHttpTransfer({
+        fileId: "file-1",
+        transferId: "sw-tr-edge",
+        offset: 0,
+        purpose: "save",
+      }).ok
+    ).toBe(true);
+
+    await vi.waitFor(() => {
+      expect(guest.getState().entries[0]?.received).toBe(5);
+      expect(http.sessions.meta("file-1")?.received).toBe(5);
+    });
+    /**
+     * DC done must NOT end/abort — fetch has not read yet (Safari／Edge race).
+     * Spans stay until download() finishes the HTTP body.
+     */
+    expect(destroyed).toEqual([]);
+    expect(http.sessions.meta("file-1")).toMatchObject({
+      ended: false,
+      received: 5,
+    });
+    expect(guest.getState().busy).toBe(true);
+    expect(guest.getState().entries[0]?.status).toBe("transferring");
+
+    releaseFetch();
+    expect((await pending).ok).toBe(true);
+    await vi.waitFor(() => {
+      expect(sink.isClosed()).toBe(true);
+    });
+    expect(sink.chunks.reduce((n, c) => n + c.byteLength, 0)).toBe(5);
+  });
+
+  it("fails remote download when the HTTP façade returns an error status", async () => {
+    const http = httpFacade();
+    const json: unknown[] = [];
+    const guest = createRoomFileTransfer({
+      localAgentId: "g",
+      localName: "訪客",
+      sendJson: (m) => json.push(m),
+      sendBinary: () => {},
+      newId: () => "tr-1",
+      createPlaySink: http.createPlaySink,
+      fetchRoomFile: async () => new Response(null, { status: 404 }),
+    });
+    guest.onControl({
+      type: SESSION_FILE_TYPE,
+      v: 1,
+      op: "share",
+      id: "file-1",
+      name: "clip.txt",
+      size: 3,
+      owner: "h",
+      ownerName: "太郎",
+    });
+    const sink = mockWritable();
+    const out = await guest.download("file-1", async () => sink.writable);
+    expect(out.ok).toBe(false);
+    expect(out).toMatchObject({ error: expect.stringMatching(/找不到|HTTP|下載/) });
+    expect(sink.chunks).toHaveLength(0);
+    expect(guest.getState().busy).toBe(false);
+    /** 404 before SW open-transfer — page must not invent a request. */
+    expect(json.some((m) => (m as { op?: string }).op === "request")).toBe(
+      false
+    );
+  });
+
+  it("ignores HTTP need／seek for a different room-file id", async () => {
+    const http = httpFacade();
+    const guest = createRoomFileTransfer({
+      localAgentId: "g",
+      localName: "訪客",
+      sendJson: () => {},
+      sendBinary: () => {},
+      newId: () => "tr-1",
+      createPlaySink: http.createPlaySink,
+    });
+    guest.onControl({
+      type: SESSION_FILE_TYPE,
+      v: 1,
+      op: "share",
+      id: "file-1",
+      name: "clip.mp4",
+      size: 32,
+      mime: "video/mp4",
+      owner: "h",
+    });
+    expect((await guest.play("file-1")).ok).toBe(true);
+    expect(
+      guest.acceptHttpTransfer({
+        fileId: "other-file",
+        transferId: "sw-1",
+        offset: 8,
+      }).ok
+    ).toBe(false);
+    expect(
+      guest.acceptHttpTransfer({
+        fileId: "file-1",
+        transferId: "sw-1",
+        offset: 8,
+      }).ok
+    ).toBe(true);
   });
 
   it("tags outbound chunks with the requester so mesh can skip the Host", async () => {
@@ -242,8 +885,9 @@ describe("createRoomFileTransfer", () => {
     expect(out.ok).toBe(false);
   });
 
-  it("plays a remote video into a local object URL without a save picker", async () => {
+  it("plays a remote video into a same-origin /room-file/ URL without a save picker", async () => {
     let guest!: ReturnType<typeof createRoomFileTransfer>;
+    const http = httpFacade();
     const owner = createRoomFileTransfer({
       localAgentId: "h",
       localName: "太郎",
@@ -257,6 +901,7 @@ describe("createRoomFileTransfer", () => {
       sendJson: (m) => owner.onControl(m),
       sendBinary: () => {},
       newId: () => "tr-1",
+      createPlaySink: http.createPlaySink,
     });
 
     const clip = fileOf("clip.mp4", 4, "video/mp4");
@@ -264,10 +909,72 @@ describe("createRoomFileTransfer", () => {
     expect((await guest.play("file-1")).ok).toBe(true);
     expect(guest.getState().playback?.id).toBe("file-1");
     await vi.waitFor(() => {
-      expect(guest.getState().playback?.url).toBe("/room-play/file-1");
+      expect(guest.getState().playback?.url).toBe("/room-file/file-1");
     });
     expect(guest.getState().playback?.name).toBe("clip.mp4");
     expect(guest.getState().playback?.kind).toBe("video");
+  });
+
+  it("plays a remote image via the same /room-file/ HTTP URL, not a blob:", async () => {
+    let guest!: ReturnType<typeof createRoomFileTransfer>;
+    const http = httpFacade();
+    const owner = createRoomFileTransfer({
+      localAgentId: "h",
+      localName: "太郎",
+      sendJson: (m) => guest.onControl(m),
+      sendBinary: (b) => guest.onBinary(b),
+      newId: () => "pic-1",
+    });
+    guest = createRoomFileTransfer({
+      localAgentId: "g",
+      localName: "訪客",
+      sendJson: (m) => owner.onControl(m),
+      sendBinary: () => {},
+      newId: () => "tr-1",
+      createPlaySink: http.createPlaySink,
+    });
+    await owner.shareLocalFile(fileOf("shot.png", 6, "image/png"));
+    expect((await guest.play("pic-1")).ok).toBe(true);
+    expect(guest.getState().playback?.url).toBe("/room-file/pic-1");
+    expect(guest.getState().playback?.kind).toBe("image");
+    expect(guest.getState().playback?.url.startsWith("blob:")).toBe(false);
+  });
+
+  it("exposes the same /room-file/<id> for remote play and download of one file", async () => {
+    let guest!: ReturnType<typeof createRoomFileTransfer>;
+    const http = httpFacade();
+    const fetched: string[] = [];
+    const owner = createRoomFileTransfer({
+      localAgentId: "h",
+      localName: "太郎",
+      sendJson: (m) => guest.onControl(m),
+      sendBinary: (b) => guest.onBinary(b),
+      newId: () => "shared-1",
+    });
+    guest = createRoomFileTransfer({
+      localAgentId: "g",
+      localName: "訪客",
+      sendJson: (m) => owner.onControl(m),
+      sendBinary: () => {},
+      newId: () => "tr-1",
+      createPlaySink: http.createPlaySink,
+      fetchRoomFile: async (url) => {
+        fetched.push(url);
+        return http.fetchRoomFile(url);
+      },
+    });
+    wireHttpOpen(http, guest);
+    await owner.shareLocalFile(fileOf("clip.mp4", 4, "video/mp4"));
+    expect((await guest.play("shared-1")).ok).toBe(true);
+    const playUrl = guest.getState().playback?.url;
+    expect(playUrl).toBe("/room-file/shared-1");
+    guest.stopPlay();
+    const sink = mockWritable();
+    expect((await guest.download("shared-1", async () => sink.writable)).ok).toBe(
+      true
+    );
+    expect(fetched).toEqual(["/room-file/shared-1"]);
+    expect(fetched[0]).toBe(playUrl);
   });
 
   it("keeps the same playback object while remote play chunks arrive", async () => {
@@ -297,6 +1004,13 @@ describe("createRoomFileTransfer", () => {
     expect((await guest.play("clip")).ok).toBe(true);
     const first = seen[seen.length - 1];
     expect(first?.url).toBe(sink.url);
+    expect(
+      guest.acceptHttpTransfer({
+        fileId: "clip",
+        transferId: "tr-1",
+        offset: 0,
+      }).ok
+    ).toBe(true);
     guest.onBinary(
       encodeSessionFileChunk({
         transferId: "tr-1",
@@ -342,14 +1056,22 @@ describe("createRoomFileTransfer", () => {
       owner: "h",
     });
     expect((await guest.play("big")).ok).toBe(true);
+    expect(
+      json.filter((m) => (m as { op?: string }).op === "request")
+    ).toHaveLength(0);
+    expect(
+      guest.acceptHttpTransfer({
+        fileId: "big",
+        transferId: "sw-tr-1",
+        offset: 0,
+      }).ok
+    ).toBe(true);
     const startRequests = json.filter(
       (m) => (m as { op?: string }).op === "request"
     );
     expect(startRequests).toHaveLength(1);
-    expect(startRequests[0]).toMatchObject({ offset: 0 });
-    const transferId = (
-      startRequests[0] as { transferId: string }
-    ).transferId;
+    expect(startRequests[0]).toMatchObject({ offset: 0, transferId: "sw-tr-1" });
+    const transferId = "sw-tr-1";
     guest.onBinary(
       encodeSessionFileChunk({
         transferId,
@@ -408,23 +1130,32 @@ describe("createRoomFileTransfer", () => {
     });
     expect((await guest.play("big")).ok).toBe(true);
     expect(
-      json.filter((m) => (m as { op?: string }).op === "request")
-    ).toHaveLength(1);
-    expect(json[0]).toMatchObject({ offset: 0, transferId: "tr-1" });
+      guest.acceptHttpTransfer({
+        fileId: "big",
+        transferId: "sw-tr-1",
+        offset: 0,
+      }).ok
+    ).toBe(true);
+    expect(json[0]).toMatchObject({ offset: 0, transferId: "sw-tr-1" });
+    /** Near seeks are resume-only — no new transferId from the page. */
     expect((await guest.seekPlay(64 * 1024)).ok).toBe(true);
-    expect(
-      json.filter((m) => (m as { op?: string }).op === "request")
-    ).toHaveLength(1);
     expect((await guest.seekPlay(2 * 1024 * 1024)).ok).toBe(true);
     expect(
       json.filter((m) => (m as { op?: string }).op === "request")
     ).toHaveLength(1);
-    expect((await guest.seekPlay(40 * 1024 * 1024)).ok).toBe(true);
+    /** Far Range = new HTTP → SW allocates transferId. */
+    expect(
+      guest.acceptHttpTransfer({
+        fileId: "big",
+        transferId: "sw-tr-2",
+        offset: 40 * 1024 * 1024,
+      }).ok
+    ).toBe(true);
     const requests = json.filter((m) => (m as { op?: string }).op === "request");
     expect(requests).toHaveLength(2);
     expect(requests[1]).toMatchObject({
       offset: 40 * 1024 * 1024,
-      transferId: "tr-2",
+      transferId: "sw-tr-2",
     });
   });
 
@@ -451,8 +1182,27 @@ describe("createRoomFileTransfer", () => {
       owner: "h",
     });
     expect((await guest.play("big")).ok).toBe(true);
-    expect((await guest.seekPlay(40 * 1024 * 1024)).ok).toBe(true);
-    expect((await guest.seekPlay(80 * 1024 * 1024)).ok).toBe(true);
+    expect(
+      guest.acceptHttpTransfer({
+        fileId: "big",
+        transferId: "sw-tr-1",
+        offset: 0,
+      }).ok
+    ).toBe(true);
+    expect(
+      guest.acceptHttpTransfer({
+        fileId: "big",
+        transferId: "sw-tr-2",
+        offset: 40 * 1024 * 1024,
+      }).ok
+    ).toBe(true);
+    expect(
+      guest.acceptHttpTransfer({
+        fileId: "big",
+        transferId: "sw-tr-3",
+        offset: 80 * 1024 * 1024,
+      }).ok
+    ).toBe(true);
     const requests = json.filter((m) => (m as { op?: string }).op === "request");
     expect(requests.length).toBeGreaterThanOrEqual(3);
     expect(
@@ -487,11 +1237,14 @@ describe("createRoomFileTransfer", () => {
       owner: "h",
     });
     expect((await guest.play("file-1")).ok).toBe(true);
-    const transferId = (
-      ownerJson.find((m) => (m as { op?: string }).op === "request") as {
-        transferId: string;
-      }
-    ).transferId;
+    expect(
+      guest.acceptHttpTransfer({
+        fileId: "file-1",
+        transferId: "sw-tr-1",
+        offset: 0,
+      }).ok
+    ).toBe(true);
+    const transferId = "sw-tr-1";
     guest.onBinary(
       encodeSessionFileChunk({
         transferId,
@@ -514,12 +1267,15 @@ describe("createRoomFileTransfer", () => {
   });
 
   it("rejects a second download while a transfer is in flight", async () => {
+    const http = httpFacade();
     const guest = createRoomFileTransfer({
       localAgentId: "g",
       localName: "訪客",
       sendJson: () => {},
       sendBinary: () => {},
       newId: () => "tr-1",
+      createPlaySink: http.createPlaySink,
+      fetchRoomFile: () => new Promise(() => {}),
     });
     guest.onControl({
       type: SESSION_FILE_TYPE,
@@ -540,13 +1296,17 @@ describe("createRoomFileTransfer", () => {
       owner: "h",
     });
     const sink = mockWritable();
-    expect((await guest.download("a", async () => sink.writable)).ok).toBe(true);
+    void guest.download("a", async () => sink.writable);
+    await vi.waitFor(() => {
+      expect(guest.getState().busy).toBe(true);
+    });
     expect((await guest.download("b", async () => sink.writable)).ok).toBe(
       false
     );
   });
 
   it("lets the owner download their own hanging file without a peer request", async () => {
+    const http = httpFacade();
     const json: unknown[] = [];
     const xfer = createRoomFileTransfer({
       localAgentId: "h",
@@ -554,6 +1314,9 @@ describe("createRoomFileTransfer", () => {
       sendJson: (m) => json.push(m),
       sendBinary: () => {},
       newId: () => "file-1",
+      fetchRoomFile: http.fetchRoomFile,
+      registerLocalFile: (id, file) => http.sessions.registerLocal(id, file),
+      unregisterLocalFile: (id) => http.sessions.unregisterLocal(id),
     });
     expect((await xfer.shareLocalFile(fileOf("note.txt", 4))).ok).toBe(true);
     const sink = mockWritable();
@@ -723,14 +1486,27 @@ describe("createRoomFileTransfer", () => {
       owner: "h",
     });
     expect((await guest.play("clip")).ok).toBe(true);
-    expect((await guest.seekPlay(40 * 1024 * 1024)).ok).toBe(true);
+    expect(
+      guest.acceptHttpTransfer({
+        fileId: "clip",
+        transferId: "sw-tr-1",
+        offset: 0,
+      }).ok
+    ).toBe(true);
+    expect(
+      guest.acceptHttpTransfer({
+        fileId: "clip",
+        transferId: "sw-tr-2",
+        offset: 40 * 1024 * 1024,
+      }).ok
+    ).toBe(true);
     expect(guest.getState().playback?.url).toBe(sink.url);
     const requests = json.filter((m) => (m as { op?: string }).op === "request");
     expect(requests).toHaveLength(2);
-    expect(requests[0]).toMatchObject({ offset: 0, transferId: "tr-1" });
+    expect(requests[0]).toMatchObject({ offset: 0, transferId: "sw-tr-1" });
     expect(requests[1]).toMatchObject({
       offset: 40 * 1024 * 1024,
-      transferId: "tr-2",
+      transferId: "sw-tr-2",
     });
   });
 
@@ -762,11 +1538,14 @@ describe("createRoomFileTransfer", () => {
       owner: "h",
     });
     expect((await guest.play("big")).ok).toBe(true);
-    const headId = (
-      json.find((m) => (m as { op?: string }).op === "request") as {
-        transferId: string;
-      }
-    ).transferId;
+    expect(
+      guest.acceptHttpTransfer({
+        fileId: "big",
+        transferId: "sw-tr-1",
+        offset: 0,
+      }).ok
+    ).toBe(true);
+    const headId = "sw-tr-1";
     guest.onBinary(
       encodeSessionFileChunk({
         transferId: headId,
@@ -777,13 +1556,15 @@ describe("createRoomFileTransfer", () => {
     await vi.waitFor(() => {
       expect(guest.getState().entries[0]?.received).toBe(40);
     });
-    expect((await guest.seekPlay(40 * 1024 * 1024)).ok).toBe(true);
+    expect(
+      guest.acceptHttpTransfer({
+        fileId: "big",
+        transferId: "sw-tr-2",
+        offset: 40 * 1024 * 1024,
+      }).ok
+    ).toBe(true);
     expect(guest.getState().entries[0]?.received).toBe(40 * 1024 * 1024);
-    const seekId = (
-      json.filter((m) => (m as { op?: string }).op === "request").at(-1) as {
-        transferId: string;
-      }
-    ).transferId;
+    const seekId = "sw-tr-2";
     guest.onBinary(
       encodeSessionFileChunk({
         transferId: seekId,
@@ -818,6 +1599,13 @@ describe("createRoomFileTransfer", () => {
       owner: "h",
     });
     expect((await guest.play("big")).ok).toBe(true);
+    expect(
+      guest.acceptHttpTransfer({
+        fileId: "big",
+        transferId: "sw-tr-1",
+        offset: 0,
+      }).ok
+    ).toBe(true);
     for (let at = 512 * 1024; at <= 2 * 1024 * 1024; at += 512 * 1024) {
       expect((await guest.seekPlay(at)).ok).toBe(true);
     }
@@ -856,14 +1644,17 @@ describe("createRoomFileTransfer", () => {
       owner: "h",
     });
     expect((await guest.play("clip")).ok).toBe(true);
-    const playId = parseRoomPlayPath(guest.getState().playback?.url ?? "");
+    const playId = parseRoomFilePath(guest.getState().playback?.url ?? "");
     expect(playId).toBeTruthy();
     sessions.pin(playId!, "r0", 0);
-    const transferId = (
-      json.find((m) => (m as { op?: string }).op === "request") as {
-        transferId: string;
-      }
-    ).transferId;
+    expect(
+      guest.acceptHttpTransfer({
+        fileId: "clip",
+        transferId: "sw-tr-1",
+        offset: 0,
+      }).ok
+    ).toBe(true);
+    const transferId = "sw-tr-1";
     guest.onBinary(
       encodeSessionFileChunk({
         transferId,
@@ -896,5 +1687,125 @@ describe("createRoomFileTransfer", () => {
     expect(guest.getState().entries[0]?.received).toBe(16);
     expect(sessions.covers(playId!, 16, 24)).toBe(false);
     expect(json.some((m) => (m as { op?: string }).op === "pause")).toBe(true);
+  });
+
+  it("does not mark success on owner done until SW transfer-complete", async () => {
+    const json: unknown[] = [];
+    const guest = createRoomFileTransfer({
+      localAgentId: "g",
+      localName: "訪客",
+      sendJson: (m) => json.push(m),
+      sendBinary: () => {},
+      newId: () => "id-1",
+      createPlaySink: () =>
+        createPlayByteWindow({
+          mime: "text/plain",
+          maxBytes: 64,
+        }),
+    });
+    guest.onControl({
+      type: SESSION_FILE_TYPE,
+      v: 1,
+      op: "share",
+      id: "file-1",
+      name: "a.txt",
+      size: 4,
+      owner: "h",
+    });
+    expect((await guest.play("file-1")).ok).toBe(true);
+    expect(
+      guest.acceptHttpTransfer({
+        fileId: "file-1",
+        transferId: "sw-tr-1",
+        offset: 0,
+      }).ok
+    ).toBe(true);
+    guest.onBinary(
+      encodeSessionFileChunk({
+        transferId: "sw-tr-1",
+        seq: 0,
+        payload: new Uint8Array([1, 2, 3, 4]),
+      })
+    );
+    await vi.waitFor(() => {
+      expect(guest.getState().entries[0]?.received).toBe(4);
+    });
+    guest.onControl({
+      type: SESSION_FILE_TYPE,
+      v: 1,
+      op: "done",
+      id: "file-1",
+      transferId: "sw-tr-1",
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(guest.getState().busy).toBe(true);
+    expect(guest.getState().entries[0]?.status).toBe("transferring");
+    guest.noteHttpTransferEnd({
+      fileId: "file-1",
+      transferId: "sw-tr-1",
+      ok: true,
+      delivered: 4,
+    });
+    await vi.waitFor(() => {
+      expect(guest.getState().busy).toBe(false);
+    });
+    expect(guest.getState().entries[0]?.status).toBe("listed");
+  });
+
+  it("SW transfer-abort after short owner done marks incomplete", async () => {
+    const guest = createRoomFileTransfer({
+      localAgentId: "g",
+      localName: "訪客",
+      sendJson: () => {},
+      sendBinary: () => {},
+      createPlaySink: () => createPlayByteWindow({ mime: "text/plain" }),
+    });
+    guest.onControl({
+      type: SESSION_FILE_TYPE,
+      v: 1,
+      op: "share",
+      id: "file-1",
+      name: "a.txt",
+      size: 8,
+      owner: "h",
+    });
+    expect((await guest.play("file-1")).ok).toBe(true);
+    expect(
+      guest.acceptHttpTransfer({
+        fileId: "file-1",
+        transferId: "sw-tr-1",
+        offset: 0,
+      }).ok
+    ).toBe(true);
+    guest.onBinary(
+      encodeSessionFileChunk({
+        transferId: "sw-tr-1",
+        seq: 0,
+        payload: new Uint8Array([1, 2]),
+      })
+    );
+    await vi.waitFor(() => {
+      expect(guest.getState().entries[0]?.received).toBe(2);
+    });
+    guest.onControl({
+      type: SESSION_FILE_TYPE,
+      v: 1,
+      op: "done",
+      id: "file-1",
+      transferId: "sw-tr-1",
+    });
+    await Promise.resolve();
+    expect(guest.getState().entries[0]?.status).toBe("transferring");
+    guest.noteHttpTransferEnd({
+      fileId: "file-1",
+      transferId: "sw-tr-1",
+      ok: false,
+      reason: "incomplete",
+    });
+    await vi.waitFor(() => {
+      expect(guest.getState().entries[0]?.status).toBe("error");
+    });
+    expect(guest.getState().entries[0]?.error).toMatch(/不完整|失敗/);
   });
 });

@@ -19,6 +19,12 @@
      * (field catalog). go keeps plain spoken text.
      */
     urlAsLink?: boolean;
+    /**
+     * Live flash while the sheet is open. Native `showModal` top-layer
+     * covers page chrome, so callers pass the same message here to keep
+     * it readable above the panel.
+     */
+    flash?: string;
     onClose: () => void;
     onFlash: (msg: string) => void;
   };
@@ -30,6 +36,7 @@
     spoken = "",
     hint = "請對方用相機掃碼開玩",
     urlAsLink = false,
+    flash = "",
     onClose,
     onFlash,
   }: Props = $props();
@@ -136,6 +143,9 @@
     if (e.target === dialogEl) onClose();
   }}
 >
+  {#if flash.trim()}
+    <p class="share-sheet-flash" role="status">{flash}</p>
+  {/if}
   <div class="share-sheet-panel">
     <header class="share-sheet-head">
       <h2 id="share-sheet-title" class="share-sheet-title">{title}</h2>
@@ -237,6 +247,33 @@
     justify-content: flex-end;
     position: fixed;
     inset: 0;
+    /* Clear chrome flash under the header (phone + desktop). */
+    padding-top: calc(5.5rem + env(safe-area-inset-top, 0px));
+    box-sizing: border-box;
+  }
+  .share-sheet-flash {
+    position: absolute;
+    /* Align with `.chrome-flash--toast` while header is held open. */
+    top: calc(3.1rem + env(safe-area-inset-top, 0px));
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2;
+    width: calc(100% - 1.5rem);
+    max-width: 24rem;
+    margin: 0;
+    padding: 0.55rem 0.75rem;
+    border: 1px solid rgb(var(--ss-line));
+    border-radius: var(--ss-radius);
+    background: rgb(var(--ss-fill));
+    color: rgb(var(--ss-ink));
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    line-height: 1.4;
+    text-align: start;
+    box-shadow: 0 6px 18px color-mix(in oklab, rgb(var(--ss-ink)) 14%, transparent);
+    box-sizing: border-box;
+    pointer-events: none;
   }
   .share-sheet-panel {
     display: flex;
@@ -389,8 +426,12 @@
   }
   @media (min-width: 40rem) and (min-height: 561px) {
     .share-sheet[open] {
+      /* Bias below vertical center so the panel clears top flash. */
       justify-content: center;
-      padding: 1rem;
+      padding: calc(5.5rem + env(safe-area-inset-top, 0px)) 1rem 2.5rem;
+    }
+    .share-sheet-flash {
+      top: calc(3.1rem + env(safe-area-inset-top, 0px));
     }
     .share-sheet-panel {
       border-radius: calc(var(--ss-radius) + 0.35rem);
@@ -407,9 +448,13 @@
   @media (orientation: landscape) and (max-height: 560px) {
     .share-sheet[open] {
       justify-content: stretch;
-      padding: 0.35rem;
+      padding: calc(3.75rem + env(safe-area-inset-top, 0px)) 0.35rem 0.35rem;
       padding-left: max(0.35rem, env(safe-area-inset-left, 0px));
       padding-right: max(0.35rem, env(safe-area-inset-right, 0px));
+    }
+    .share-sheet-flash {
+      top: calc(0.45rem + env(safe-area-inset-top, 0px));
+      max-width: min(36rem, calc(100% - 1rem));
     }
     .share-sheet-panel {
       display: grid;

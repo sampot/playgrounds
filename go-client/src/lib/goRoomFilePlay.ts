@@ -1,6 +1,6 @@
 /**
- * 包廂檔案播放：滑動窗口，不把整檔緩進 JS。
- * 遠端檔走同一 origin 的 `/room-play/<id>`（SW＝標準 HTTP Range 片源；bytes 仍走 DC）。
+ * 包廂檔案播放／檢視：滑動窗口，不把整檔緩進 JS。
+ * 遠端檔走同一 origin 的 `/room-file/<id>`（SW＝標準 HTTP；bytes 仍走 DC）。
  * 無 playId 時（測試）走 byte window。不做格式特判／remux。
  */
 
@@ -9,7 +9,7 @@ import {
   SESSION_FILE_PLAY_BUFFER_LOW,
   SESSION_FILE_PLAY_BUFFER_MAX,
   defaultRoomPlaySessions,
-  roomPlayPath,
+  roomFilePath,
   type RoomPlayRegistry,
 } from "./goRoomPlayRegistry";
 import { listenRoomPlayPin, notifyRoomPlaySw } from "./goRoomPlayBridge";
@@ -41,6 +41,8 @@ export type PlaySinkOpts = {
   highBytes?: number;
   lowBytes?: number;
   sessions?: RoomPlayRegistry;
+  /** Stream-through download — see RoomPlayOpenOpts.mode. */
+  mode?: "play" | "save";
 };
 
 function pressureOf(
@@ -164,7 +166,7 @@ export function createPlayByteWindow(opts: PlaySinkOpts = {}): RoomPlaySink {
   };
 }
 
-/** Page-side mirror of SW `/room-play/` bytes; HTTP GETs are served by the SW. */
+/** Page-side mirror of SW `/room-file/` bytes; HTTP GETs are served by the SW. */
 export function createRegistryPlaySink(opts: PlaySinkOpts = {}): RoomPlaySink {
   const sessions = opts.sessions ?? defaultRoomPlaySessions;
   const playId =
@@ -179,6 +181,7 @@ export function createRegistryPlaySink(opts: PlaySinkOpts = {}): RoomPlaySink {
     maxBytes: opts.maxBytes,
     highBytes,
     lowBytes,
+    mode: opts.mode === "save" ? "save" : "play",
   });
   notifyRoomPlaySw({
     type: "go-room-play",
@@ -186,6 +189,8 @@ export function createRegistryPlaySink(opts: PlaySinkOpts = {}): RoomPlaySink {
     id: playId,
     mime,
     size,
+    name: opts.name,
+    mode: opts.mode === "save" ? "save" : "play",
   });
   let dead = false;
   const stopPin = listenRoomPlayPin((id, streamKey, at) => {
@@ -196,13 +201,25 @@ export function createRegistryPlaySink(opts: PlaySinkOpts = {}): RoomPlaySink {
 
   return {
     get url() {
-      return roomPlayPath(playId);
+      return roomFilePath(playId);
     },
     async append(chunk, fileOffset) {
       if (dead) return "low";
       const copy = chunk.slice();
       const at = fileOffset ?? 0;
-      const pressure = sessions.push(playId, copy, at);
+      const end = at + copy.byteLength;
+      let pressure: PlayPressure = "low";
+      /**
+       * Stream-through save／play: never skip a sequential chunk because the
+       * 32 MiB pin window has not advanced yet — wait for the HTTP reader.
+       * Only notify the SW after the page mirror actually stores the bytes.
+       */
+      while (!dead) {
+        pressure = sessions.push(playId, copy, at);
+        if (sessions.covers(playId, at, end)) break;
+        await sessions.waitSpace(playId);
+      }
+      if (dead || !sessions.covers(playId, at, end)) return "low";
       const bytes = copy.buffer.slice(
         copy.byteOffset,
         copy.byteOffset + copy.byteLength

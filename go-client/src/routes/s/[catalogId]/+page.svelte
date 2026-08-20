@@ -388,6 +388,7 @@
       title={hostShare.title}
       url={hostShare.url}
       spoken={hostShare.url}
+      flash={chromeSession.flash}
       onClose={closeHostShareSheet}
       onFlash={msg => chromeSession.setFlash(msg)}
     />

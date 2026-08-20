@@ -1,6 +1,6 @@
 /**
- * In-process / SW-side buffer for 包廂遠端私下播.
- * Holds original DC bytes (soft cap) and serves them as a media Response body.
+ * In-process / SW-side buffer for 包廂遠端檔（下載／檢視／私下播）.
+ * Holds original DC bytes (soft cap) and serves them as a standard HTTP Response body.
  * Not Cache Storage; not a page-level whole-file Blob.
  */
 
@@ -21,13 +21,24 @@ export const SESSION_FILE_PLAY_RANGE_SLICE = 512 * 1024;
 export const SESSION_FILE_PLAY_SEEK_SLACK = 2 * 1024 * 1024;
 /** Ignore duplicate far-seek opens within this window. */
 export const SESSION_FILE_PLAY_SEEK_DEBOUNCE_MS = 400;
+/**
+ * Safari／WebKit AVFoundation cannot play a Service Worker ReadableStream.
+ * Each media Range is answered as a complete Blob, capped so we do not buffer
+ * a whole-file Range into RAM (Safari then issues the next Range).
+ */
+export const SESSION_FILE_PLAY_MEDIA_BLOB_MAX = 2 * 1024 * 1024;
 
 export type PlayPressure = "ok" | "high" | "low";
 
+/** Canonical same-origin file URL (download／preview／play). */
+export const ROOM_FILE_PATH_PREFIX = "/room-file/";
+/** Legacy alias; parse still accepts it. */
 export const ROOM_PLAY_PATH_PREFIX = "/room-play/";
 export const ROOM_PLAY_MSG = "go-room-play";
 
 export type ByteRange = { start: number; end: number };
+
+export type RoomPlayBufferMode = "play" | "save";
 
 export type RoomPlayOpenOpts = {
   mime?: string;
@@ -36,6 +47,12 @@ export type RoomPlayOpenOpts = {
   highBytes?: number;
   lowBytes?: number;
   headBytes?: number;
+  /**
+   * `save` = stream-through download: only drop bytes already read (before pin);
+   * never clip unread ahead (that caused Safari「檔案不完整」).
+   * `play` = sliding seek windows (default).
+   */
+  mode?: RoomPlayBufferMode;
 };
 
 type Session = {
@@ -45,6 +62,7 @@ type Session = {
   highBytes: number;
   lowBytes: number;
   headBytes: number;
+  mode: RoomPlayBufferMode;
   spans: { start: number; bytes: Uint8Array }[];
   appendAt: number;
   /** Active HTTP stream read cursors — trim must not drop unread bytes before these. */
@@ -54,7 +72,41 @@ type Session = {
   waiters: Array<() => void>;
 };
 
+function minPinOf(s: Session): number {
+  if (s.pins.size === 0) return 0;
+  let min = Infinity;
+  for (const p of s.pins.values()) min = Math.min(min, p);
+  return Number.isFinite(min) ? Math.max(0, min) : 0;
+}
+
+/** Drop only bytes strictly before the HTTP read pin (save stream-through). */
+function trimSaveSpans(s: Session): void {
+  const minPin = minPinOf(s);
+  if (minPin <= 0) return;
+  const clipped: { start: number; bytes: Uint8Array }[] = [];
+  for (const span of s.spans) {
+    const end = span.start + span.bytes.byteLength;
+    if (end <= minPin) continue;
+    if (span.start < minPin) {
+      clipped.push({
+        start: minPin,
+        bytes: span.bytes.subarray(minPin - span.start),
+      });
+    } else {
+      clipped.push(span);
+    }
+  }
+  s.spans = clipped.reduce(
+    (acc, sp) => putFileSpan(acc, sp.start, sp.bytes),
+    [] as { start: number; bytes: Uint8Array }[]
+  );
+}
+
 function trimPlaySpans(s: Session): void {
+  if (s.mode === "save") {
+    trimSaveSpans(s);
+    return;
+  }
   const maxBytes = s.maxBytes;
   if (maxBytes <= 0) {
     s.spans = [];
@@ -102,10 +154,16 @@ function chunkOverlapsPinWindow(
   len: number
 ): boolean {
   if (len <= 0) return false;
+  const end = at + len;
+  if (s.mode === "save") {
+    const minPin = minPinOf(s);
+    if (end <= minPin) return false;
+    if (at >= minPin + s.maxBytes) return false;
+    return true;
+  }
   const pinList =
     s.pins.size > 0 ? [...s.pins.values()].sort((a, b) => a - b) : [0];
   const share = Math.max(1, Math.floor(s.maxBytes / pinList.length));
-  const end = at + len;
   for (const pin of pinList) {
     const from = Math.max(0, pin);
     const to = from + share;
@@ -114,25 +172,67 @@ function chunkOverlapsPinWindow(
   return false;
 }
 
+/** Save: refuse if storing would exceed max after dropping the consumed prefix. */
+function saveChunkFitsBudget(
+  s: Session,
+  at: number,
+  chunk: Uint8Array
+): boolean {
+  const minPin = minPinOf(s);
+  const end = at + chunk.byteLength;
+  if (end <= minPin) return true;
+  const merged = putFileSpan(s.spans, at, chunk);
+  let stored = 0;
+  for (const span of merged) {
+    const sEnd = span.start + span.bytes.byteLength;
+    if (sEnd <= minPin) continue;
+    if (span.start < minPin) stored += sEnd - minPin;
+    else stored += span.bytes.byteLength;
+  }
+  return stored <= s.maxBytes;
+}
+
 function pressureOf(bytes: number, high: number, low: number): PlayPressure {
   if (bytes >= high) return "high";
   if (bytes <= low) return "low";
   return "ok";
 }
 
-export function roomPlayPath(id: string): string {
-  return `${ROOM_PLAY_PATH_PREFIX}${encodeURIComponent(id)}`;
+export function roomFilePath(id: string): string {
+  return `${ROOM_FILE_PATH_PREFIX}${encodeURIComponent(id)}`;
 }
 
-export function parseRoomPlayPath(pathname: string): string | null {
-  if (!pathname.startsWith(ROOM_PLAY_PATH_PREFIX)) return null;
-  const raw = pathname.slice(ROOM_PLAY_PATH_PREFIX.length);
+/** Same-origin URL that asks the SW for Content-Disposition: attachment. */
+export function roomFileDownloadPath(id: string): string {
+  return `${roomFilePath(id)}?download=1`;
+}
+
+/** @deprecated Prefer roomFilePath — same canonical /room-file/ URL. */
+export function roomPlayPath(id: string): string {
+  return roomFilePath(id);
+}
+
+function idFromPrefixedPath(pathname: string, prefix: string): string | null {
+  if (!pathname.startsWith(prefix)) return null;
+  const raw = pathname.slice(prefix.length);
   if (!raw || raw.includes("/")) return null;
   try {
     return decodeURIComponent(raw);
   } catch {
     return null;
   }
+}
+
+export function parseRoomFilePath(pathname: string): string | null {
+  return (
+    idFromPrefixedPath(pathname, ROOM_FILE_PATH_PREFIX) ??
+    idFromPrefixedPath(pathname, ROOM_PLAY_PATH_PREFIX)
+  );
+}
+
+/** @deprecated Prefer parseRoomFilePath — accepts /room-file/ and /room-play/. */
+export function parseRoomPlayPath(pathname: string): string | null {
+  return parseRoomFilePath(pathname);
 }
 
 export function parseByteRange(
@@ -153,20 +253,128 @@ export function parseByteRange(
   }
   const start = Number(a);
   if (!Number.isFinite(start) || start < 0) return null;
+  if (start >= size) return null;
   const end = b === "" ? size - 1 : Number(b);
   if (!Number.isFinite(end) || end < start) return null;
   return { start, end: Math.min(end, size - 1) };
 }
 
-/** Unranged GET with a known size → bytes=0-(size-1) so we can answer with 206. */
+/** True when the client sent a `bytes=` Range unit (even if unsatisfiable). */
+export function isBytesRangeHeader(
+  header: string | null | undefined
+): boolean {
+  return Boolean(header && /^bytes=/i.test(String(header).trim()));
+}
+
+/** Explicit Range only. Unranged GET → null (200 + live body + Content-Length). */
 export function playFetchRange(
   rangeHeader: string | null | undefined,
   size: number
 ): ByteRange | null {
-  const parsed = parseByteRange(rangeHeader, size);
-  if (parsed) return parsed;
-  if (size > 0) return { start: 0, end: size - 1 };
-  return null;
+  return parseByteRange(rangeHeader, size);
+}
+
+export function roomFileMethodAllowed(method: string): boolean {
+  const m = method.toUpperCase();
+  return m === "GET" || m === "HEAD";
+}
+
+const MEDIA_EXT_MIME: Record<string, string> = {
+  mp4: "video/mp4",
+  m4v: "video/mp4",
+  mov: "video/quicktime",
+  webm: "video/webm",
+  mkv: "video/x-matroska",
+  mp3: "audio/mpeg",
+  m4a: "audio/mp4",
+  aac: "audio/aac",
+  wav: "audio/wav",
+  ogg: "audio/ogg",
+  flac: "audio/flac",
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+  avif: "image/avif",
+};
+
+function extOfName(name: string): string {
+  const base = name.split("/").pop() ?? name;
+  const i = base.lastIndexOf(".");
+  if (i <= 0) return "";
+  return base.slice(i + 1).toLowerCase();
+}
+
+/** HTTP Content-Type for /room-file. Safari will not play octet-stream as video. */
+export function roomFileContentType(mime?: string, name?: string): string {
+  const t = (mime ?? "").trim().toLowerCase();
+  if (t && t !== "application/octet-stream") return t;
+  const inferred = MEDIA_EXT_MIME[extOfName(name ?? "")];
+  return inferred || t || "application/octet-stream";
+}
+
+export function isMediaContentType(mime: string): boolean {
+  const t = mime.toLowerCase();
+  return t.startsWith("video/") || t.startsWith("audio/");
+}
+
+/** Safari／WebKit media engine (not Chromium, which also contains "Safari" in UA). */
+export function isWebKitMediaEngine(ua: string): boolean {
+  const s = ua || "";
+  if (/Chrome|Chromium|Edg\/|Android/i.test(s)) return false;
+  return /Safari/i.test(s) || /AppleWebKit/i.test(s);
+}
+
+export function mediaRangeForBufferedBody(
+  range: ByteRange | null,
+  size: number,
+  maxBytes = SESSION_FILE_PLAY_MEDIA_BLOB_MAX
+): ByteRange {
+  const cap = Math.max(1, maxBytes);
+  if (range) {
+    return {
+      start: range.start,
+      end: Math.min(range.end, range.start + cap - 1, Math.max(0, size - 1)),
+    };
+  }
+  return { start: 0, end: Math.min(Math.max(0, size - 1), cap - 1) };
+}
+
+export type RoomFileHttpBodyKind = "blob-local" | "blob-media" | "stream";
+
+export function roomFileHttpBodyKind(opts: {
+  ua: string;
+  mime: string;
+  local: boolean;
+  destination?: string;
+  hasRange?: boolean;
+}): RoomFileHttpBodyKind {
+  if (opts.local) return "blob-local";
+  if (!isMediaContentType(opts.mime) || !isWebKitMediaEngine(opts.ua)) {
+    return "stream";
+  }
+  const dest = (opts.destination || "").toLowerCase();
+  if (dest === "video" || dest === "audio" || dest === "track") {
+    return "blob-media";
+  }
+  /** Safari <video> always Range; page fetch() download must keep the live 200. */
+  if (opts.hasRange) return "blob-media";
+  return "stream";
+}
+
+/** File.slice is a view (not a RAM copy). Safari plays Blob SW bodies; not streams. */
+export function localFileSlice(
+  file: Blob,
+  start: number,
+  endExclusive: number,
+  name?: string
+): Blob {
+  const fileName = name ?? (file instanceof File ? file.name : "");
+  const type = roomFileContentType(file.type, fileName);
+  const from = Math.max(0, start);
+  const to = Math.max(from, endExclusive);
+  return file.slice(from, to, type);
 }
 
 function putFileSpan(
@@ -253,7 +461,13 @@ function sliceFileSpans(
 
 export type RoomPlayRegistry = {
   open(id: string, opts?: RoomPlayOpenOpts): void;
+  /** Own shared File — HTTP served locally; no DC transfer. */
+  registerLocal(id: string, file: File): void;
+  unregisterLocal(id: string): void;
+  hasLocal(id: string): boolean;
   push(id: string, chunk: Uint8Array, at?: number): PlayPressure;
+  /** Resolve when pin／trim may allow a previously-rejected chunk. */
+  waitSpace(id: string): Promise<void>;
   end(id: string): void;
   abort(id: string): void;
   /** Advance a named HTTP stream read cursor (bytes before `at` may be trimmed). */
@@ -270,6 +484,7 @@ export type RoomPlayRegistry = {
 
 export function createRoomPlayRegistry(): RoomPlayRegistry {
   const sessions = new Map<string, Session>();
+  const localFiles = new Map<string, File>();
 
   function get(id: string): Session | undefined {
     return sessions.get(id);
@@ -283,6 +498,40 @@ export function createRoomPlayRegistry(): RoomPlayRegistry {
   function wait(s: Session): Promise<void> {
     return new Promise((resolve) => {
       s.waiters.push(resolve);
+    });
+  }
+
+  function localMeta(id: string) {
+    const file = localFiles.get(id);
+    if (!file) return null;
+    return {
+      mime: roomFileContentType(file.type, file.name),
+      size: file.size,
+      received: file.size,
+      ended: true,
+    };
+  }
+
+  function streamLocalFile(
+    file: File,
+    start: number,
+    endExclusive: number
+  ): ReadableStream<Uint8Array> {
+    const chunk = SESSION_FILE_PLAY_RANGE_SLICE;
+    let offset = Math.max(0, start);
+    const limit = Math.min(file.size, endExclusive);
+    return new ReadableStream({
+      async pull(controller) {
+        if (offset >= limit) {
+          controller.close();
+          return;
+        }
+        const end = Math.min(offset + chunk, limit);
+        const buf = new Uint8Array(await file.slice(offset, end).arrayBuffer());
+        offset = end;
+        if (buf.byteLength) controller.enqueue(buf);
+        if (offset >= limit) controller.close();
+      },
     });
   }
 
@@ -300,6 +549,7 @@ export function createRoomPlayRegistry(): RoomPlayRegistry {
         highBytes: opts.highBytes ?? SESSION_FILE_PLAY_BUFFER_HIGH,
         lowBytes: opts.lowBytes ?? SESSION_FILE_PLAY_BUFFER_LOW,
         headBytes: opts.headBytes ?? SESSION_FILE_PLAY_HEAD_KEEP,
+        mode: opts.mode === "save" ? "save" : "play",
         spans: [],
         appendAt: 0,
         pins: new Map(),
@@ -308,11 +558,30 @@ export function createRoomPlayRegistry(): RoomPlayRegistry {
         waiters: [],
       });
     },
+    registerLocal(id, file) {
+      localFiles.set(id, file);
+      const prev = sessions.get(id);
+      if (prev) {
+        prev.aborted = true;
+        wake(prev);
+        sessions.delete(id);
+      }
+    },
+    unregisterLocal(id) {
+      localFiles.delete(id);
+    },
+    hasLocal(id) {
+      return localFiles.has(id);
+    },
     push(id, chunk, at) {
+      if (localFiles.has(id)) return "low";
       const s = get(id);
       if (!s || s.aborted) return "low";
       const pos = at ?? s.appendAt;
       if (!chunkOverlapsPinWindow(s, pos, chunk.byteLength)) {
+        return "high";
+      }
+      if (s.mode === "save" && !saveChunkFitsBudget(s, pos, chunk)) {
         return "high";
       }
       s.spans = putFileSpan(s.spans, pos, chunk);
@@ -320,6 +589,11 @@ export function createRoomPlayRegistry(): RoomPlayRegistry {
       trimPlaySpans(s);
       wake(s);
       return pressureOf(spansStoredBytes(s.spans), s.highBytes, s.lowBytes);
+    },
+    waitSpace(id) {
+      const s = get(id);
+      if (!s || s.aborted || s.ended) return Promise.resolve();
+      return wait(s);
     },
     end(id) {
       const s = get(id);
@@ -351,6 +625,8 @@ export function createRoomPlayRegistry(): RoomPlayRegistry {
       wake(s);
     },
     covers(id, start, end) {
+      const file = localFiles.get(id);
+      if (file) return start >= 0 && end <= file.size && end >= start;
       const s = get(id);
       if (!s) return false;
       return fileSpansCover(s.spans, start, end);
@@ -368,6 +644,8 @@ export function createRoomPlayRegistry(): RoomPlayRegistry {
       return sliceFileSpans(s.spans, start, to);
     },
     meta(id) {
+      const local = localMeta(id);
+      if (local) return local;
       const s = get(id);
       if (!s) return null;
       return {
@@ -378,6 +656,8 @@ export function createRoomPlayRegistry(): RoomPlayRegistry {
       };
     },
     liveBody(id) {
+      const file = localFiles.get(id);
+      if (file) return streamLocalFile(file, 0, file.size);
       const s0 = get(id);
       if (!s0) {
         return new ReadableStream({
@@ -411,7 +691,13 @@ export function createRoomPlayRegistry(): RoomPlayRegistry {
             sent += piece.byteLength;
             s.pins.set(streamKey, sent);
             trimPlaySpans(s);
+            wake(s);
             controller.enqueue(piece);
+            return;
+          }
+          /** Do not close short of declared size when ended with holes. */
+          if (s.ended && sent < s.size && avail <= sent) {
+            controller.error(new Error("檔案不完整"));
             return;
           }
           controller.close();
@@ -421,10 +707,15 @@ export function createRoomPlayRegistry(): RoomPlayRegistry {
           if (!s) return;
           s.pins.delete(streamKey);
           trimPlaySpans(s);
+          wake(s);
         },
       });
     },
     async rangeBody(id, range) {
+      const file = localFiles.get(id);
+      if (file) {
+        return streamLocalFile(file, range.start, range.end + 1);
+      }
       const limit = range.end + 1;
       let sent = range.start;
       const streamKey = `range-${range.start}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -432,6 +723,7 @@ export function createRoomPlayRegistry(): RoomPlayRegistry {
       if (s0) {
         s0.pins.set(streamKey, sent);
         trimPlaySpans(s0);
+        wake(s0);
       }
       return new ReadableStream<Uint8Array>({
         async pull(controller) {
@@ -451,10 +743,15 @@ export function createRoomPlayRegistry(): RoomPlayRegistry {
               sent += piece.byteLength;
               s.pins.set(streamKey, sent);
               trimPlaySpans(s);
+              wake(s);
               controller.enqueue(piece);
               return;
             }
             if (s.ended) {
+              if (sent < limit) {
+                controller.error(new Error("檔案不完整"));
+                return;
+              }
               controller.close();
               return;
             }
@@ -466,10 +763,14 @@ export function createRoomPlayRegistry(): RoomPlayRegistry {
           if (!s) return;
           s.pins.delete(streamKey);
           trimPlaySpans(s);
+          wake(s);
         },
       });
     },
     bufferedBytes(id) {
+      if (localFiles.has(id)) {
+        return localFiles.get(id)?.size ?? 0;
+      }
       const s = get(id);
       return s ? spansStoredBytes(s.spans) : 0;
     },

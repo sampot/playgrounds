@@ -418,6 +418,20 @@ describe("createRoomMedia", () => {
     });
   });
 
+  it("warms owner decode from /room-file/<id>, not an object URL", async () => {
+    const file = new File([new Uint8Array(4)], "MTV.mp4", { type: "video/mp4" });
+    const media = createRoomMedia({
+      localAgentId: "host",
+      occupantCount: () => 1,
+      peers: () => [],
+      sendJson: () => {},
+      resolveLocalFile: (id) => (id === "file-1" ? file : null),
+    });
+    expect((await media.warmProgram("file-1")).ok).toBe(true);
+    expect(media.getState().ownerDecodeUrl).toBe("/room-file/file-1");
+    expect(media.getState().ownerDecodeUrl?.startsWith("blob:")).toBe(false);
+  });
+
   it("lets the host put a guest-hung file on the TV without pulling bytes", async () => {
     const json: unknown[] = [];
     const guestPc = mockPc();

@@ -1177,8 +1177,10 @@ export function attachPlaybackUrl(
     if (el.paused) void tryPlay(el);
     return;
   }
+  const hadSrc = Boolean(playbackSrcOf(el));
   el.src = url;
-  el.load?.();
+  /** First assign: setting src already loads. A second load() aborts Safari's first Range. */
+  if (hadSrc) el.load?.();
   void tryPlay(el);
 }
 

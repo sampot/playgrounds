@@ -629,6 +629,7 @@
     title={shareTitle}
     url={shareUrl}
     spoken={shareSpoken}
+    flash={chromeSession.flash}
     onClose={() => (shareOpen = false)}
     onFlash={msg => chromeSession.setFlash(msg)}
   />

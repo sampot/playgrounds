@@ -13,7 +13,8 @@
   import { goSessionChat } from "$lib/goSessionChat.svelte";
   import { goRoomFiles } from "$lib/goRoomFiles.svelte";
   import { goRoomMedia } from "$lib/goRoomMedia.svelte";
-  import { pickRoomFileSave } from "$lib/goRoomFileSave";
+  import { pickRoomFileSave, roomFileSaveSupported, createBrowserSaveWritable, triggerBrowserDownload } from "$lib/goRoomFileSave";
+  import { ensureRoomFileSw } from "$lib/goRoomPlayBridge";
   import GoShareSheet from "$lib/GoShareSheet.svelte";
   import GoAdSlot from "$lib/GoAdSlot.svelte";
   import GoRoomTvSlot from "$lib/GoRoomTvSlot.svelte";
@@ -99,6 +100,8 @@
     GO_ROOM_FILE_DELETE,
     GO_ROOM_FILE_DELETE_CONFIRM,
     GO_ROOM_FILE_DOWNLOAD,
+    GO_ROOM_FILE_SAVE,
+    GO_ROOM_FILE_SAVE_READY_HINT,
     GO_ROOM_FILE_DROP,
     GO_ROOM_FILE_FILTERS,
     GO_ROOM_FILE_FILTER_LABEL,
@@ -189,6 +192,11 @@
   let confirmDialog = $state<HTMLDialogElement | null>(null);
   let fileInput = $state<HTMLInputElement | null>(null);
   let fileError = $state("");
+  let fileHint = $state("");
+  /** Safari／無 Save picker：第一次下載只緩存；就緒後再按「存檔」。 */
+  let pendingBrowserSaves = $state<
+    Map<string, { url: string; name: string }>
+  >(new Map());
   let mediaError = $state("");
   let presenceVideoEl = $state<HTMLVideoElement | null>(null);
   let localPreviewEl = $state<HTMLVideoElement | null>(null);
@@ -315,6 +323,17 @@
 
   onMount(() => {
     clientReady = true;
+    /** Safari guests often have SW ready but not controlling yet — prime early. */
+    void ensureRoomFileSw();
+    return () => {
+      for (const { url } of pendingBrowserSaves.values()) {
+        try {
+          URL.revokeObjectURL(url);
+        } catch {
+          /* ignore */
+        }
+      }
+    };
   });
   const tvHudKind = $derived(
     roomTvHudKind({
@@ -881,12 +900,75 @@
 
   async function onDownload(id: string) {
     fileError = "";
-    const result = await goRoomFiles.download(id, (opts) =>
-      pickRoomFileSave(opts.suggestedName)
-    );
+    fileHint = "";
+    const ready = pendingBrowserSaves.get(id);
+    if (ready) {
+      /**
+       * Second click under a fresh user gesture — Safari will honor `<a download>`.
+       * Keep the prepared blob so they can save again without re-fetching.
+       */
+      triggerBrowserDownload(ready.url, ready.name);
+      return;
+    }
+    /**
+     * Always page fetch(/room-file/…) through the SW (HTTP client).
+     * Safari download manager bypasses SW on Content-Disposition／`<a download href=/room-file>` —
+     * without Save picker we bridge OS save via blob: after the HTTP body completes.
+     * WebKit also drops programmatic `<a download>` after async fetch — defer to「存檔」.
+     */
+    const swReady = await ensureRoomFileSw();
+    if (!swReady) {
+      fileError = "還沒準備好下載。請重新載入頁面後再試。";
+      return;
+    }
+    const deferOsSave = !roomFileSaveSupported();
+    const result = await goRoomFiles.download(id, async (opts) => {
+      if (!deferOsSave) {
+        return pickRoomFileSave(opts.suggestedName);
+      }
+      return createBrowserSaveWritable(opts.suggestedName, {
+        onPrepared: (url, name) => {
+          const prev = pendingBrowserSaves.get(id);
+          if (prev) {
+            try {
+              URL.revokeObjectURL(prev.url);
+            } catch {
+              /* ignore */
+            }
+          }
+          const next = new Map(pendingBrowserSaves);
+          next.set(id, { url, name });
+          pendingBrowserSaves = next;
+          fileHint = GO_ROOM_FILE_SAVE_READY_HINT;
+        },
+      });
+    });
     if (!result.ok && !("cancelled" in result && result.cancelled)) {
       fileError = result.error;
+      fileHint = "";
     }
+  }
+
+  function clearPendingBrowserSave(id: string): void {
+    const prev = pendingBrowserSaves.get(id);
+    if (!prev) return;
+    try {
+      URL.revokeObjectURL(prev.url);
+    } catch {
+      /* ignore */
+    }
+    const next = new Map(pendingBrowserSaves);
+    next.delete(id);
+    pendingBrowserSaves = next;
+  }
+
+  function downloadButtonLabel(id: string): string {
+    return pendingBrowserSaves.has(id) ? GO_ROOM_FILE_SAVE : GO_ROOM_FILE_DOWNLOAD;
+  }
+
+  function downloadButtonDisabled(status: string | undefined, id: string): boolean {
+    if (pendingBrowserSaves.has(id)) return false;
+    return status === "transferring";
   }
 
   async function onToggleCamera() {
@@ -1036,6 +1118,7 @@
     const id = deleteFileId;
     deleteFileId = null;
     if (!id) return;
+    clearPendingBrowserSave(id);
     goRoomFiles.unshare(id, { host: role === "host" });
     if (previewId === id) closePreview();
   }
@@ -1503,6 +1586,9 @@
           {#if fileError}
             <p class="err" role="alert">{fileError}</p>
           {/if}
+          {#if fileHint}
+            <p class="muted" role="status">{fileHint}</p>
+          {/if}
           <input
             bind:this={fileInput}
             class="file-hidden"
@@ -1578,10 +1664,10 @@
                     <button
                       type="button"
                       class="pixel-btn pixel-btn--primary"
-                      disabled={f.status === "transferring"}
+                      disabled={downloadButtonDisabled(f.status, f.id)}
                       onclick={() => void onDownload(f.id)}
                     >
-                      {GO_ROOM_FILE_DOWNLOAD}
+                      {downloadButtonLabel(f.id)}
                     </button>
                   {/if}
                   {#if acts.cast}
@@ -1646,10 +1732,10 @@
                         <button
                           type="button"
                           class="pixel-btn pixel-btn--primary"
-                          disabled={!listed || listed.status === "transferring"}
+                          disabled={!listed || downloadButtonDisabled(listed.status, row.system.file.id)}
                           onclick={() => void onDownload(row.system.file!.id)}
                         >
-                          下載
+                          {downloadButtonLabel(row.system.file.id)}
                         </button>
                       {/if}
                     </div>
@@ -2033,8 +2119,9 @@
           bind:this={filePlayEl}
           class="file-player-audio"
           controls
-          preload="auto"
+          preload="metadata"
           playsinline
+          webkit-playsinline
           ontimeupdate={() => goRoomFiles.notePlayhead(filePlayEl?.currentTime ?? 0)}
           aria-label="播放 {previewFile?.name ?? ""}"
         ></audio>
@@ -2043,8 +2130,9 @@
           bind:this={filePlayEl}
           class="media-video media-video--program"
           controls
-          preload="auto"
+          preload="metadata"
           playsinline
+          webkit-playsinline
           ontimeupdate={() => goRoomFiles.notePlayhead(filePlayEl?.currentTime ?? 0)}
           aria-label="播放 {previewFile?.name ?? ""}"
         ></video>
@@ -2054,15 +2142,22 @@
       {#if fileError}
         <p class="err" role="alert">{fileError}</p>
       {/if}
+      {#if fileHint}
+        <p class="muted" role="status">{fileHint}</p>
+      {/if}
       <div class="confirm-actions">
         <button type="button" class="pixel-btn" onclick={() => closePreview()}>關閉</button>
         {#if previewId}
           <button
             type="button"
             class="pixel-btn pixel-btn--primary"
+            disabled={downloadButtonDisabled(
+              files.find((f) => f.id === previewId)?.status,
+              previewId
+            )}
             onclick={() => void onDownload(previewId!)}
           >
-            {GO_ROOM_FILE_DOWNLOAD}
+            {downloadButtonLabel(previewId)}
           </button>
         {/if}
       </div>
@@ -2128,6 +2223,7 @@
       url={shortUrl}
       spoken={spoken}
       hint={GO_ROOM_SHARE_HINT}
+      flash={chromeSession.flash}
       onClose={() => (shareOpen = false)}
       onFlash={(msg) => chromeSession.setFlash(msg)}
     />

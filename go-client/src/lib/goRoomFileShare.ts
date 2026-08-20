@@ -7,6 +7,10 @@ export const GO_ROOM_FILE_CAST = "推播至大螢幕";
 export const GO_ROOM_FILE_DELETE = "撤回";
 export const GO_ROOM_FILE_ON_AIR = "大螢幕播放中";
 export const GO_ROOM_FILE_DOWNLOAD = "下載";
+/** Safari／無 Save picker：第一次「下載」只拉齊 bytes；就緒後改此文案再點才存到本機。 */
+export const GO_ROOM_FILE_SAVE = "存檔";
+export const GO_ROOM_FILE_SAVE_READY_HINT =
+  "檔已就緒。再按「存檔」才會存到這台。";
 export const GO_ROOM_FILE_DROP = "拖進來或點這裡掛上檔案";
 export const GO_ROOM_FILE_DELETE_CONFIRM =
   "撤回後在場的人看不到這個檔。已存到硬碟的不受影響。";
@@ -87,12 +91,13 @@ export function roomFileOnAir(opts: {
   return Boolean(name) && name === opts.fileName.trim();
 }
 
+/** Human size label using decimal units (SI) — matches Finder／Chrome downloads. */
 export function formatFileShareSize(n: number): string {
   if (!Number.isFinite(n) || n < 0) return "0 B";
-  if (n < 1024) return `${Math.round(n)} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  if (n < 1024 * 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(n / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+  if (n < 1000) return `${Math.round(n)} B`;
+  if (n < 1000 * 1000) return `${(n / 1000).toFixed(1)} KB`;
+  if (n < 1000 * 1000 * 1000) return `${(n / (1000 * 1000)).toFixed(1)} MB`;
+  return `${(n / (1000 * 1000 * 1000)).toFixed(1)} GB`;
 }
 
 export function roomFileShareProgress(done: number, total: number): number {
