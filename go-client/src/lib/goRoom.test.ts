@@ -80,7 +80,9 @@ import {
   roomShellTabPanes,
   ROOM_SHELL_WIDE_MIN_PX,
   roomStageStatus,
+  roomTvBindStream,
   roomTvLabel,
+  roomTvPictureOn,
   roomTvStream,
   takePickedFiles,
 } from "./goRoom";
@@ -189,6 +191,45 @@ describe("roomTvLabel", () => {
       "正在播 clip.webm"
     );
     expect(roomTvLabel({ sourceName: "小明" })).toBe("電視上是 小明");
+  });
+});
+
+describe("roomTvPictureOn", () => {
+  it("is off when there is no offered program name", () => {
+    expect(roomTvPictureOn({})).toBe(false);
+    expect(roomTvPictureOn({ programName: null, remoteProgramName: "  " })).toBe(
+      false
+    );
+  });
+
+  it("is on when the host or a remote peer has offered a program", () => {
+    expect(roomTvPictureOn({ programName: "MTV.mp4" })).toBe(true);
+    expect(roomTvPictureOn({ remoteProgramName: "鏡頭" })).toBe(true);
+  });
+});
+
+describe("roomTvBindStream", () => {
+  it("drops a leftover RTP stream when the TV has no signal", () => {
+    const remote = {
+      id: "remote",
+      getTracks: () => [
+        { readyState: "live", muted: false } as MediaStreamTrack,
+      ],
+    } as unknown as MediaStream;
+    expect(
+      roomTvBindStream({
+        programStream: remote,
+        localProgramStream: null,
+        programName: null,
+        remoteProgramName: null,
+      })
+    ).toBeNull();
+    expect(
+      roomTvBindStream({
+        programStream: remote,
+        remoteProgramName: "MTV.mp4",
+      })
+    ).toBe(remote);
   });
 });
 
@@ -841,6 +882,23 @@ describe("attachMediaStream", () => {
     el.paused = false;
     attachMediaStream(el, stream);
     expect(play).toHaveBeenCalledTimes(1);
+  });
+
+  it("clears the last decoded frame when the stream is removed", () => {
+    const stream = {} as MediaStream;
+    const play = vi.fn(async () => {});
+    const load = vi.fn();
+    const el = {
+      srcObject: stream as MediaStream | null,
+      paused: false,
+      muted: false,
+      play,
+      load,
+    };
+    attachMediaStream(el, null);
+    expect(el.srcObject).toBeNull();
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(play).not.toHaveBeenCalled();
   });
 
   it("mutes and retries when autoplay with audio is blocked", async () => {

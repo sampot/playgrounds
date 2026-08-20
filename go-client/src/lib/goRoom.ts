@@ -451,6 +451,16 @@ function mediaStreamHasFrames(stream: MediaStream): boolean {
   }
 }
 
+/** TV picture is on only while a program is offered (not leftover RTP). */
+export function roomTvPictureOn(opts: {
+  programName?: string | null;
+  remoteProgramName?: string | null;
+}): boolean {
+  return Boolean(
+    opts.programName?.trim() || opts.remoteProgramName?.trim()
+  );
+}
+
 /**
  * Bind the TV hole.
  * - Host casting a file: keep the local capture when remote is only a muted
@@ -468,6 +478,20 @@ export function roomTvStream(opts: {
     return local;
   }
   return remote ?? local ?? null;
+}
+
+/**
+ * What the TV `<video>` should bind.
+ * No-signal drops leftover receiver tracks so the last frame clears locally.
+ */
+export function roomTvBindStream(opts: {
+  programStream: MediaStream | null;
+  localProgramStream?: MediaStream | null;
+  programName?: string | null;
+  remoteProgramName?: string | null;
+}): MediaStream | null {
+  if (!roomTvPictureOn(opts)) return null;
+  return roomTvStream(opts);
 }
 
 export type RoomTvHudKind = "none" | "host-file" | "watch";
@@ -902,6 +926,8 @@ export type AttachMediaEl = {
   muted: boolean;
   volume?: number;
   play: () => Promise<void>;
+  /** Clears the last decoded frame after `srcObject = null` (HTMLMediaElement). */
+  load?: () => void;
 };
 
 export type TvSinkVolume = { volume: number; muted: boolean };
@@ -944,6 +970,11 @@ export function attachMediaStream(
     return;
   }
   media.srcObject = stream;
+  if (!stream) {
+    // Browsers keep the last decoded frame after srcObject=null until load().
+    if (typeof media.load === "function") media.load();
+    return;
+  }
   play();
 }
 

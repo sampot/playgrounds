@@ -282,9 +282,15 @@ export function createRoomMedia(opts: {
       isLiveTrack(remotePresenceVideo) ? remotePresenceVideo : null,
       isLiveTrack(remotePresenceAudio) ? remotePresenceAudio : null,
     ].filter((t): t is MediaStreamTrack => Boolean(t));
-    const programTracks = [remoteProgramVideo, remoteProgramAudio].filter(
-      (t): t is MediaStreamTrack => Boolean(t) && isLiveTrack(t)
+    // No-signal: hide leftover program receivers so the TV clears locally.
+    const programOffered = Boolean(
+      programName?.trim() || remoteProgramName?.trim()
     );
+    const programTracks = programOffered
+      ? [remoteProgramVideo, remoteProgramAudio].filter(
+          (t): t is MediaStreamTrack => Boolean(t) && isLiveTrack(t)
+        )
+      : [];
     const localTracks = [camera].filter((t): t is MediaStreamTrack => Boolean(t));
     const localProgramTracks = [
       program?.video ?? null,
@@ -1129,6 +1135,9 @@ export function createRoomMedia(opts: {
         remoteProgramFileId = null;
         remoteProgramFrom = null;
         watchingProgram = false;
+        remoteProgramVideo = null;
+        remoteProgramAudio = null;
+        programCache = null;
         emit();
         return;
       }

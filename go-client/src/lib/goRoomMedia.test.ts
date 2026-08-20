@@ -342,6 +342,49 @@ describe("createRoomMedia", () => {
     ).toBe(media.getState().programStream);
   });
 
+  it("drops the program stream on unoffer so receivers clear the TV picture", async () => {
+    class FakeStream {
+      constructor(public tracks: MediaStreamTrack[]) {}
+    }
+    vi.stubGlobal("MediaStream", FakeStream);
+    const pc = mockPc();
+    const remote = track("video", "host-prog");
+    Object.defineProperty(remote, "muted", { value: false, configurable: true });
+    pc.transceivers[3]!.receiver.track = remote as unknown as {
+      kind: string;
+      id: string;
+      readyState: "live" | "ended";
+    };
+    const media = createRoomMedia({
+      localAgentId: "g-b",
+      occupantCount: () => 2,
+      peers: () => [{ peerId: "host", pc, via: "entrance" }],
+      sendJson: () => {},
+    });
+    await media.onControl({
+      type: SESSION_CAST_TYPE,
+      v: 1,
+      op: "offer",
+      from: "host",
+      kind: "video",
+      name: "鏡頭",
+    });
+    await media.refresh();
+    expect(media.getState().programStream).not.toBeNull();
+    expect(media.getState().remoteProgramName).toBe("鏡頭");
+
+    media.onControl({
+      type: SESSION_CAST_TYPE,
+      v: 1,
+      op: "unoffer",
+      from: "host",
+    });
+    await media.refresh();
+    expect(media.getState().remoteProgramName).toBeNull();
+    expect(media.getState().watchingProgram).toBe(false);
+    expect(media.getState().programStream).toBeNull();
+  });
+
   it("tags the catalog file id when the host puts a hanging file on the TV", async () => {
     const video = track("video", "prog-v");
     const file = new File([new Uint8Array(4)], "MTV.mp4", { type: "video/mp4" });

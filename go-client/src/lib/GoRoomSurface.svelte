@@ -77,7 +77,8 @@
     roomTvHudKind,
     roomTvHudRestore,
     roomTvLabel,
-    roomTvStream,
+    roomTvBindStream,
+    roomTvPictureOn,
     syncTvSinkPlayback,
     toggleTvFullscreen,
     tvFullscreenElement,
@@ -291,15 +292,18 @@
     })
   );
   const tvStream = $derived(
-    roomTvStream({
+    roomTvBindStream({
       programStream: goRoomMedia.programStream,
       localProgramStream: goRoomMedia.localProgramStream,
+      programName: goRoomMedia.programName,
+      remoteProgramName: goRoomMedia.remoteProgramName,
     })
   );
   const tvOn = $derived(
-    Boolean(
-      tvStream || goRoomMedia.programName || goRoomMedia.remoteProgramName
-    )
+    roomTvPictureOn({
+      programName: goRoomMedia.programName,
+      remoteProgramName: goRoomMedia.remoteProgramName,
+    })
   );
   const loginGate = $derived(
     roomHostLoginGate({ role, loggedIn, phase, clientReady })
