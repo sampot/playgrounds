@@ -333,6 +333,9 @@ export const GO_ROOM_EMPTY_TIMELINE = "還沒有訊息。";
 
 export const GO_ROOM_KEEP_OPEN = "這一間只在這個畫面開著的時候存在。";
 
+export const GO_ROOM_GATE_BODY =
+  "請人進來：即時視訊、共享檔案。被請進來的人不必有通行證。";
+
 export const GO_ROOM_LOGIN_HINT =
   "被請進來的人不必有通行證；開這一間的人要留在這個畫面。另一台裝置請掃邀請進來。";
 

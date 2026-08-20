@@ -25,6 +25,7 @@
     GO_ROOM_CAMERA_STOP_WATCH,
     GO_ROOM_EMPTY_TIMELINE,
     GO_ROOM_END_CONFIRM_HOST,
+    GO_ROOM_GATE_BODY,
     GO_ROOM_KICK,
     GO_ROOM_KICK_CONFIRM,
     GO_ROOM_LEAVE_CONFIRM_GUEST,
@@ -298,11 +299,11 @@
       tvStream || goRoomMedia.programName || goRoomMedia.remoteProgramName
     )
   );
+  const loginGate = $derived(
+    role === "host" && !loggedIn && phase === "idle"
+  );
   const overlayOpen = $derived(
-    (role === "host" && !loggedIn && phase === "idle") ||
-      phase === "connecting" ||
-      phase === "error" ||
-      phase === "ended"
+    phase === "connecting" || phase === "error" || phase === "ended"
   );
   const tvHudKind = $derived(
     roomTvHudKind({
@@ -1171,7 +1172,24 @@
         floats={stageFloats}
         caption={tvCaption && tvCaption.until > Date.now() ? tvCaption.text : null}
       />
-      {#if showAd}
+      {#if loginGate}
+        <div class="room-tv-gate" role="region" aria-labelledby="room-gate-title">
+          <p id="room-gate-title" class="room-tv-gate-title pixel-text">開包廂</p>
+          <p class="room-tv-gate-body">
+            {GO_ROOM_GATE_BODY}
+          </p>
+          <button
+            type="button"
+            class="pixel-btn pixel-btn--primary room-tv-gate-btn"
+            onclick={() => onLogin?.()}
+          >
+            登入後開包廂
+          </button>
+          <p class="muted room-tv-gate-hint">
+            {GO_ROOM_LOGIN_HINT} 單機小品不受影響。
+          </p>
+        </div>
+      {:else if showAd}
         <div class="room-ad">
           <GoAdSlot onNavigate={onAdNavigate} />
         </div>
@@ -1937,20 +1955,11 @@
     class="room-sheet"
     aria-labelledby="room-overlay-title"
     oncancel={(e) => {
-      /* Login／connecting／error／ended stay until the phase changes. */
+      /* Connecting／error／ended stay until the phase changes. */
       e.preventDefault();
     }}
   >
-    {#if role === "host" && !loggedIn && phase === "idle"}
-      <div class="booth-sheet pixel-box">
-        <p id="room-overlay-title" class="booth-sheet-title pixel-text">開包廂</p>
-        <p>開這一間是為了請人進來一起看電視。被請進來的人不必有通行證。</p>
-        <button type="button" class="pixel-btn pixel-btn--primary" onclick={() => onLogin?.()}>
-          登入後開包廂
-        </button>
-        <p class="muted">{GO_ROOM_LOGIN_HINT} 單機小品不受影響。</p>
-      </div>
-    {:else if phase === "connecting"}
+    {#if phase === "connecting"}
       <div class="booth-sheet pixel-box">
         <p id="room-overlay-title">{message || "正在進包廂…"}</p>
       </div>
@@ -2211,6 +2220,54 @@
     position: relative;
     min-width: 0;
     container-type: inline-size;
+  }
+  .room-tv-gate {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: center;
+    gap: 0.55rem;
+    padding: 0.85rem 1rem;
+    box-sizing: border-box;
+    background: color-mix(in oklab, rgb(var(--ink)) 42%, transparent);
+    color: #f4efe4;
+    pointer-events: auto;
+  }
+  .room-tv-gate-title {
+    margin: 0;
+    font-size: 1rem;
+    color: #f4efe4;
+  }
+  .room-tv-gate-body {
+    margin: 0;
+    line-height: 1.45;
+    font-size: 0.92rem;
+  }
+  .room-tv-gate-btn {
+    min-height: 44px;
+    align-self: stretch;
+  }
+  .room-tv-gate-hint {
+    margin: 0;
+    color: color-mix(in oklab, #f4efe4 88%, transparent);
+  }
+  @container (min-width: 28rem) {
+    .room-tv-gate {
+      align-items: center;
+      text-align: center;
+      padding: 1.25rem 1.5rem;
+    }
+    .room-tv-gate-body,
+    .room-tv-gate-hint {
+      max-width: 28rem;
+    }
+    .room-tv-gate-btn {
+      align-self: center;
+      min-width: min(100%, 16rem);
+    }
   }
   .room-ad {
     position: absolute;

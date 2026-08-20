@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   GO_ROOM_END_CONFIRM_HOST,
+  GO_ROOM_GATE_BODY,
   GO_ROOM_LEAVE_CONFIRM_GUEST,
   GO_ROOM_LOGIN_HINT,
   GO_ROOM_MEDIA_OFF,
@@ -577,6 +578,13 @@ describe("booth copy", () => {
       "另一台裝置請掃這張邀請進來，不要再開一間包廂。"
     );
     expect(GO_ROOM_LOGIN_HINT).toContain("另一台裝置請掃邀請進來。");
+  });
+
+  it("frames the login gate around live video and file sharing, not watching TV", () => {
+    expect(GO_ROOM_GATE_BODY).toBe(
+      "請人進來：即時視訊、共享檔案。被請進來的人不必有通行證。"
+    );
+    expect(GO_ROOM_GATE_BODY).not.toContain("一起看電視");
   });
 
   it("warns that hung items and live pulls stop when the Host ends the booth", () => {
