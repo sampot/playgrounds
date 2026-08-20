@@ -565,6 +565,16 @@ describe("roomHostMemberMenu", () => {
     });
   });
 
+  it("disables put-on-TV when that member is already on the big screen", () => {
+    const items = roomHostMemberMenu({
+      mine: false,
+      liveAudio: true,
+      liveVideo: true,
+      onAir: true,
+    });
+    expect(items.find((i) => i.action === "putOnTv")?.enabled).toBe(false);
+  });
+
   it("does not let the Host kick themselves, and disables mute when the mic is already off", () => {
     const items = roomHostMemberMenu({
       mine: true,

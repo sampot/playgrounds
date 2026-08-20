@@ -1401,6 +1401,7 @@
                         mine: card.mine,
                         liveAudio: card.micOn,
                         liveVideo: card.cameraOn,
+                        onAir: card.onAir,
                       })
                     : undefined}
                   hostMenuOpen={hostMenuPeerId === card.peerId}

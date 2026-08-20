@@ -447,6 +447,46 @@ export function createRoomMedia(opts: {
     };
   }
 
+  function isLiveTvSource(peerId: string): boolean {
+    if (!programFromLive || !tvSourcePeerId) return false;
+    const local =
+      peerId === "local" || peerId === opts.localAgentId;
+    if (local) {
+      return (
+        tvSourcePeerId === "local" || tvSourcePeerId === opts.localAgentId
+      );
+    }
+    return tvSourcePeerId === peerId;
+  }
+
+  async function unofferProgram(): Promise<void> {
+    if (program || programName) {
+      opts.sendJson(
+        buildSessionCastMessage({
+          op: "unoffer",
+          from: opts.localAgentId,
+        })
+      );
+    }
+    programWatchers.clear();
+    if (!programFromLive) program?.stop();
+    program = null;
+    programFromLive = false;
+    tvSourcePeerId = null;
+    programName = null;
+    streamingFileId = null;
+    revokeOwnerDecode();
+    await push();
+    emit();
+  }
+
+  /** Live on the TV went away — clear cast so the room shows 沒訊號. */
+  async function clearLiveTvIfSource(peerId: string): Promise<boolean> {
+    if (!isLiveTvSource(peerId)) return false;
+    await unofferProgram();
+    return true;
+  }
+
   function offerProgram(): void {
     if (!program && !programName) return;
     opts.sendJson(
@@ -608,6 +648,7 @@ export function createRoomMedia(opts: {
     cameraWatchers.clear();
     await dropCamera();
     liveSource = null;
+    if (await clearLiveTvIfSource("local")) return;
     await push();
     emit();
   }
@@ -727,6 +768,11 @@ export function createRoomMedia(opts: {
       micListeners.clear();
       await stopTrack(mic);
       mic = null;
+      if (isLiveTvSource("local") && !camera) {
+        await unofferProgram();
+        return;
+      }
+      if (isLiveTvSource("local")) syncLiveProgram();
       await push();
       emit();
     },
@@ -762,24 +808,7 @@ export function createRoomMedia(opts: {
       emit();
     },
     async stopProgram() {
-      if (program || programName) {
-        opts.sendJson(
-          buildSessionCastMessage({
-            op: "unoffer",
-            from: opts.localAgentId,
-          })
-        );
-      }
-      programWatchers.clear();
-      if (!programFromLive) program?.stop();
-      program = null;
-      programFromLive = false;
-      tvSourcePeerId = null;
-      programName = null;
-      streamingFileId = null;
-      revokeOwnerDecode();
-      await push();
-      emit();
+      await unofferProgram();
     },
     async putLiveOnTv(peerId, name) {
       const local =
@@ -848,6 +877,16 @@ export function createRoomMedia(opts: {
         peerId,
         layer === "audio" ? { mic: false } : { camera: false }
       );
+      if (layer !== "audio") {
+        if (await clearLiveTvIfSource(peerId)) return { ok: true };
+      } else if (isLiveTvSource(peerId)) {
+        syncLiveProgram();
+        if (!program?.video && !program?.audio) {
+          await unofferProgram();
+          return { ok: true };
+        }
+        await push();
+      }
       emit();
       return { ok: true };
     },
@@ -1059,6 +1098,7 @@ export function createRoomMedia(opts: {
         if (data.op === "unoffer") {
           setRemoteLive(data.from, { camera: false });
           if (watchingPeerId === data.from) watching = false;
+          if (await clearLiveTvIfSource(data.from)) return;
           emit();
           return;
         }
@@ -1094,6 +1134,14 @@ export function createRoomMedia(opts: {
         if (data.op === "unoffer") {
           setRemoteLive(data.from, { mic: false });
           if (watchingPeerId === data.from) listening = false;
+          if (isLiveTvSource(data.from)) {
+            syncLiveProgram();
+            if (!program?.video && !program?.audio) {
+              await unofferProgram();
+              return;
+            }
+            await push();
+          }
           emit();
           return;
         }

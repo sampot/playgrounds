@@ -51,6 +51,12 @@ import {
   DEFAULT_INVITE_TTL_MS,
   isInviteUnexpired,
 } from "./hostRuntime";
+import {
+  clearRoomInviteSession,
+  readRoomInviteSession,
+  writeRoomInviteSession,
+  type RoomInviteSessionSnapshot,
+} from "./goRoomInviteSession";
 
 export type RoomPhase = "idle" | "open" | "ended" | "error";
 
@@ -84,7 +90,16 @@ function sendBinary(session: RosterPeerSession | null, buf: ArrayBuffer): void {
   ch.send(buf);
 }
 
-export function createRoomRuntime() {
+export function createRoomRuntime(opts?: {
+  /** Defaults to `sessionStorage` in the browser; tests inject a memory store. */
+  inviteSession?: Pick<Storage, "getItem" | "setItem" | "removeItem"> | null;
+}) {
+  const inviteSession =
+    opts && "inviteSession" in opts
+      ? opts.inviteSession
+      : typeof sessionStorage !== "undefined"
+        ? sessionStorage
+        : null;
   let status: RoomStatus = {
     phase: "idle",
     message: "",
@@ -444,6 +459,7 @@ export function createRoomRuntime() {
     loop?.stop();
     loop = null;
     const toRevoke = status.inviteId;
+    clearRoomInviteSession(inviteSession);
     set({
       inviteDoor: "expired",
       shortUrl: null,
@@ -467,6 +483,71 @@ export function createRoomRuntime() {
     inviteExpiryTimer = setTimeout(() => {
       expireDoor(inviteId);
     }, delay);
+  }
+
+  function persistDoor(snap: RoomInviteSessionSnapshot): void {
+    writeRoomInviteSession(inviteSession, snap);
+  }
+
+  function startAnswerLoop(inviteId: string, apiKey: string): void {
+    loop?.stop();
+    loop = startPlatformHostAnswerLoop({
+      inviteId,
+      apiKey,
+      useRelay: false,
+      media: "ready",
+      maxAnswers: 0,
+      localPresence: {
+        agentId: localAgentId,
+        name: hostName(),
+      },
+      prepareHandlers: () => {
+        const slot: PeerSlot = {
+          peerId: null,
+          session: null,
+          displayName: null,
+        };
+        slots.push(slot);
+        return {
+          handlers: handlers(slot),
+          attachSession: (sess: RosterPeerSession) => {
+            slot.session = sess;
+            sess.pc.addEventListener("track", (ev) => {
+              goRoomMedia.onRemoteTrack(ev, sess.pc);
+              if (slot.peerId) void goRoomMedia.forwardFrom(slot.peerId);
+            });
+            refreshGuestSummary();
+            if (sess.getChannel()?.readyState === "open") {
+              set({
+                phase: "open",
+                error: null,
+                message: occupancyMessage(),
+              });
+            }
+          },
+        };
+      },
+      onError: (msg) => set({ error: msg }),
+    });
+  }
+
+  function restoreDoorFromSession(): void {
+    const snap = readRoomInviteSession(inviteSession);
+    if (!snap) return;
+    const apiKey = goAuth.getPlatformApiKeyForHostLoop();
+    if (!apiKey) {
+      clearRoomInviteSession(inviteSession);
+      return;
+    }
+    set({
+      inviteId: snap.inviteId,
+      shortUrl: snap.shortUrl,
+      inviteExpiresAt: snap.expiresAt,
+      inviteDoor: "live",
+      message: occupancyMessage(),
+    });
+    scheduleInviteExpiry(snap.inviteId, snap.expiresAt);
+    startAnswerLoop(snap.inviteId, apiKey);
   }
 
   async function mintInviteAndAnswer(): Promise<{
@@ -530,44 +611,12 @@ export function createRoomRuntime() {
         message: occupancyMessage(),
       });
       scheduleInviteExpiry(created.invite_id, expiresAt);
-      loop = startPlatformHostAnswerLoop({
+      persistDoor({
         inviteId: created.invite_id,
-        apiKey,
-        useRelay: false,
-        media: "ready",
-        maxAnswers: 0,
-        localPresence: {
-          agentId: localAgentId,
-          name: hostName(),
-        },
-        prepareHandlers: () => {
-          const slot: PeerSlot = {
-            peerId: null,
-            session: null,
-            displayName: null,
-          };
-          slots.push(slot);
-          return {
-            handlers: handlers(slot),
-            attachSession: (sess: RosterPeerSession) => {
-              slot.session = sess;
-              sess.pc.addEventListener("track", (ev) => {
-                goRoomMedia.onRemoteTrack(ev, sess.pc);
-                if (slot.peerId) void goRoomMedia.forwardFrom(slot.peerId);
-              });
-              refreshGuestSummary();
-              if (sess.getChannel()?.readyState === "open") {
-                set({
-                  phase: "open",
-                  error: null,
-                  message: occupancyMessage(),
-                });
-              }
-            },
-          };
-        },
-        onError: (msg) => set({ error: msg }),
+        shortUrl: created.short_url,
+        expiresAt,
       });
+      startAnswerLoop(created.invite_id, apiKey);
       if (previousId && previousId !== created.invite_id) {
         void goAuth.revokePlatformInvite(previousId);
       }
@@ -597,6 +646,8 @@ export function createRoomRuntime() {
     try {
       if (opts?.afterEnd || status.phase === "ended") {
         closing = false;
+        clearInviteExpiryTimer();
+        clearRoomInviteSession(inviteSession);
         set({
           phase: "idle",
           error: null,
@@ -619,6 +670,7 @@ export function createRoomRuntime() {
         inviteDoor: status.inviteDoor === "live" ? "live" : "none",
         message: occupancyMessage(),
       });
+      if (!doorIsLive()) restoreDoorFromSession();
     } finally {
       opening = false;
     }
@@ -628,6 +680,7 @@ export function createRoomRuntime() {
     if (closing || status.phase === "ended") return;
     closing = true;
     clearInviteExpiryTimer();
+    clearRoomInviteSession(inviteSession);
     loop?.stop();
     loop = null;
     goSessionChat.detach();

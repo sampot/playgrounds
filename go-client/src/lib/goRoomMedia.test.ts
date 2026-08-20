@@ -551,6 +551,130 @@ describe("createRoomMedia", () => {
     expect(media.getState().programName).toBe("小明");
   });
 
+  it("clears the TV when the local camera on air is turned off", async () => {
+    const json: unknown[] = [];
+    const cam = track("video", "cam");
+    const media = createRoomMedia({
+      localAgentId: "host",
+      occupantCount: () => 1,
+      peers: () => [],
+      sendJson: (m) => json.push(m),
+      getUserMedia: async () =>
+        ({
+          getVideoTracks: () => [cam],
+          getAudioTracks: () => [],
+        }) as unknown as MediaStream,
+    });
+    expect((await media.enableCamera()).ok).toBe(true);
+    expect((await media.putLiveOnTv("local", "主持")).ok).toBe(true);
+    expect(media.getState().programName).toBe("主持");
+    expect(media.getState().tvSourcePeerId).toBe("local");
+
+    await media.disableCamera();
+    expect(media.getState().camera).toBe(false);
+    expect(media.getState().programName).toBeNull();
+    expect(media.getState().tvSourcePeerId).toBeNull();
+    expect(json).toContainEqual({
+      type: SESSION_CAST_TYPE,
+      v: 1,
+      op: "unoffer",
+      from: "host",
+    });
+  });
+
+  it("clears the TV when display share on air ends", async () => {
+    const json: unknown[] = [];
+    const screen = track("video", "screen");
+    const media = createRoomMedia({
+      localAgentId: "host",
+      occupantCount: () => 1,
+      peers: () => [],
+      sendJson: (m) => json.push(m),
+      getDisplayMedia: async () =>
+        ({
+          getVideoTracks: () => [screen],
+          getAudioTracks: () => [],
+        }) as unknown as MediaStream,
+    });
+    expect((await media.enableDisplay()).ok).toBe(true);
+    expect((await media.putLiveOnTv("local")).ok).toBe(true);
+
+    await media.disableDisplay();
+    expect(media.getState().display).toBe(false);
+    expect(media.getState().programName).toBeNull();
+    expect(media.getState().tvSourcePeerId).toBeNull();
+    expect(json).toContainEqual({
+      type: SESSION_CAST_TYPE,
+      v: 1,
+      op: "unoffer",
+      from: "host",
+    });
+  });
+
+  it("clears the TV when a remote live source on air unoffers the camera", async () => {
+    const json: unknown[] = [];
+    const a = mockPc();
+    const cam = track("video", "from-a");
+    a.transceivers[1]!.receiver.track = cam as unknown as {
+      kind: string;
+      id: string;
+      readyState: "live" | "ended";
+    };
+    const media = createRoomMedia({
+      localAgentId: "host",
+      occupantCount: () => 2,
+      peers: () => [{ peerId: "g-a", pc: a, via: "entrance" }],
+      sendJson: (m) => json.push(m),
+      forward: true,
+    });
+    await media.putLiveOnTv("g-a", "小明");
+    expect(media.getState().tvSourcePeerId).toBe("g-a");
+
+    await media.onControl({
+      type: SESSION_CAMERA_TYPE,
+      v: 1,
+      op: "unoffer",
+      from: "g-a",
+    });
+    expect(media.getState().programName).toBeNull();
+    expect(media.getState().tvSourcePeerId).toBeNull();
+    expect(json).toContainEqual({
+      type: SESSION_CAST_TYPE,
+      v: 1,
+      op: "unoffer",
+      from: "host",
+    });
+  });
+
+  it("clears the TV when mic-only local source on air is muted", async () => {
+    const json: unknown[] = [];
+    const mic = track("audio", "mic");
+    const media = createRoomMedia({
+      localAgentId: "host",
+      occupantCount: () => 1,
+      peers: () => [],
+      sendJson: (m) => json.push(m),
+      getUserMedia: async () =>
+        ({
+          getVideoTracks: () => [],
+          getAudioTracks: () => [mic],
+        }) as unknown as MediaStream,
+    });
+    expect((await media.enableMic()).ok).toBe(true);
+    expect((await media.putLiveOnTv("local", "主持")).ok).toBe(true);
+
+    await media.disableMic();
+    expect(media.getState().mic).toBe(false);
+    expect(media.getState().programName).toBeNull();
+    expect(media.getState().tvSourcePeerId).toBeNull();
+    expect(json).toContainEqual({
+      type: SESSION_CAST_TYPE,
+      v: 1,
+      op: "unoffer",
+      from: "host",
+    });
+  });
+
   it("lets display media replace the camera on the same live video slot", async () => {
     const pc = mockPc();
     const cam = track("video", "cam");

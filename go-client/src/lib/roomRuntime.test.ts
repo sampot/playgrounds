@@ -481,4 +481,49 @@ describe("roomRuntime", () => {
       vi.useRealTimers();
     }
   });
+
+  it("persists the door and re-arms the expiry timer after a refresh", async () => {
+    vi.useFakeTimers();
+    const map = new Map<string, string>();
+    const store = {
+      getItem: (k: string) => (map.has(k) ? map.get(k)! : null),
+      setItem: (k: string, v: string) => {
+        map.set(k, String(v));
+      },
+      removeItem: (k: string) => {
+        map.delete(k);
+      },
+    };
+    try {
+      const expiresAt = Date.now() + 5_000;
+      fixtures.mint.mockResolvedValue({
+        invite_id: "inv-room",
+        short_url: "https://go.samkuo.me/i/abc123",
+        expires_at: expiresAt,
+      });
+      const { createRoomRuntime } = await import("./roomRuntime");
+      const first = createRoomRuntime({ inviteSession: store });
+      await first.openBooth();
+      await first.mintInviteAndAnswer();
+      expect(store.getItem("pg_go_room_invite_door")).toContain("inv-room");
+      expect(fixtures.startLoop).toHaveBeenCalledTimes(1);
+
+      const second = createRoomRuntime({ inviteSession: store });
+      await second.openBooth();
+      expect(second.getStatus().inviteDoor).toBe("live");
+      expect(second.getStatus().shortUrl).toBe(
+        "https://go.samkuo.me/i/abc123"
+      );
+      expect(second.getStatus().inviteExpiresAt).toBe(expiresAt);
+      expect(fixtures.startLoop).toHaveBeenCalledTimes(2);
+      expect(fixtures.mint).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(5_500);
+      expect(second.getStatus().inviteDoor).toBe("expired");
+      expect(second.getStatus().shortUrl).toBeNull();
+      expect(store.getItem("pg_go_room_invite_door")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

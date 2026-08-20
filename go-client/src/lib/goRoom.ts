@@ -793,12 +793,14 @@ export function roomHostMemberMenu(opts: {
   mine: boolean;
   liveAudio: boolean;
   liveVideo: boolean;
+  /** Already the designated big-screen live source. */
+  onAir?: boolean;
 }): RoomHostMenuItem[] {
   const items: RoomHostMenuItem[] = [
     {
       action: "putOnTv",
       label: GO_ROOM_PUT_ON_TV,
-      enabled: opts.liveAudio || opts.liveVideo,
+      enabled: (opts.liveAudio || opts.liveVideo) && !opts.onAir,
     },
     {
       action: "forceMute",
