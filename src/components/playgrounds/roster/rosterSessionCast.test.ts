@@ -51,6 +51,16 @@ describe("session_cast", () => {
     expect(
       isSessionCastMessage(
         buildSessionCastMessage({
+          op: "reject",
+          from: "g-a",
+          id: "file-1",
+          reason: "這個瀏覽器當不了大螢幕片源",
+        })
+      )
+    ).toBe(true);
+    expect(
+      isSessionCastMessage(
+        buildSessionCastMessage({
           op: "offer",
           from: "host-1",
           kind: "video",

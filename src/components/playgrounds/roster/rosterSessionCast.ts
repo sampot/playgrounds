@@ -29,6 +29,8 @@ export type SessionCastMessage = {
   id?: string;
   /** Program RTP source peer when casting another occupant's file／live. */
   fromPeer?: string;
+  /** Reject／error copy for the director (e.g. Safari cannot be program source). */
+  reason?: string;
 };
 
 const CAST_OPS = new Set<SessionCastOp>([
@@ -77,6 +79,9 @@ export function isSessionCastMessage(data: unknown): data is SessionCastMessage 
   }
   if (m.id !== undefined && !isId(m.id)) return false;
   if (m.fromPeer !== undefined && !isId(m.fromPeer)) return false;
+  if (m.reason !== undefined) {
+    if (typeof m.reason !== "string" || m.reason.length > NAME_MAX) return false;
+  }
   if (m.op === "offer") return Boolean(m.kind);
   return true;
 }
@@ -91,6 +96,7 @@ export function buildSessionCastMessage(opts: {
   duration?: number;
   id?: string;
   fromPeer?: string;
+  reason?: string;
 }): SessionCastMessage {
   const msg: SessionCastMessage = {
     type: SESSION_CAST_TYPE,
@@ -105,5 +111,6 @@ export function buildSessionCastMessage(opts: {
   if (opts.duration !== undefined) msg.duration = opts.duration;
   if (opts.id) msg.id = opts.id;
   if (opts.fromPeer) msg.fromPeer = opts.fromPeer;
+  if (opts.reason) msg.reason = opts.reason;
   return msg;
 }

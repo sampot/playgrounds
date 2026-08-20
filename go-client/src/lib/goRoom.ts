@@ -394,10 +394,50 @@ export const GO_ROOM_CAST_STOP_WATCH = "停止播放";
 export const GO_ROOM_HANG_FILES_ONLY = "只能掛檔，不掛資料夾";
 export const GO_ROOM_CAST_UNSUPPORTED =
   "播不了這份檔。請改用電腦再掛一次，或改下載。";
+export const GO_ROOM_CAST_SOURCE_UNSUPPORTED =
+  "這個瀏覽器當不了大螢幕片源（常見於 Safari）。請改用電腦 Chrome／Edge 掛檔，或請主持自己掛同一份。";
 export const GO_ROOM_OWNER_DECODE =
   "這一頁正在解碼這份檔。請留著這個畫面，對方才能收看。";
 export const GO_ROOM_MEDIA_PERM_DENIED = "沒有鏡頭或麥克風權限。";
 export const GO_ROOM_DISPLAY_PERM_DENIED = "沒有畫面分享權限。";
+
+/** True when HTMLMediaElement.captureStream (or moz) exists — Safari／WebKit usually false. */
+export function htmlMediaCaptureStreamSupported(
+  mediaProto:
+    | { captureStream?: unknown; mozCaptureStream?: unknown }
+    | null
+    | undefined = typeof HTMLMediaElement !== "undefined"
+    ? (HTMLMediaElement.prototype as {
+        captureStream?: unknown;
+        mozCaptureStream?: unknown;
+      })
+    : null
+): boolean {
+  if (!mediaProto) return false;
+  return (
+    typeof mediaProto.captureStream === "function" ||
+    typeof mediaProto.mozCaptureStream === "function"
+  );
+}
+
+/**
+ * Canvas-only program capture looks "live" but stays black／stalls on WebKit.
+ * Only use canvas to patch Chromium when the native media capture API exists.
+ */
+export function allowCanvasProgramCaptureFallback(opts: {
+  nativeHtmlMediaCaptureStream: boolean;
+}): boolean {
+  return Boolean(opts.nativeHtmlMediaCaptureStream);
+}
+
+/** Copy when program capture fails — prefer Safari／WebKit source guidance. */
+export function goRoomCastCaptureError(opts?: {
+  nativeHtmlMediaCaptureStream?: boolean;
+}): string {
+  const native =
+    opts?.nativeHtmlMediaCaptureStream ?? htmlMediaCaptureStreamSupported();
+  return native ? GO_ROOM_CAST_UNSUPPORTED : GO_ROOM_CAST_SOURCE_UNSUPPORTED;
+}
 
 /** Guest↔Guest mesh is postponed; Hub star carries files and media. */
 export const GO_ROOM_MESH_ENABLED = false;

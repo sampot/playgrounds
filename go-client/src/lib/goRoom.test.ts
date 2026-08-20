@@ -4,9 +4,14 @@ import {
   GO_ROOM_GATE_BODY,
   GO_ROOM_LEAVE_CONFIRM_GUEST,
   GO_ROOM_LOGIN_HINT,
+  GO_ROOM_CAST_SOURCE_UNSUPPORTED,
+  GO_ROOM_CAST_UNSUPPORTED,
   GO_ROOM_MEDIA_OFF,
   GO_ROOM_MESH_ENABLED,
   GO_ROOM_SHARE_HINT,
+  allowCanvasProgramCaptureFallback,
+  goRoomCastCaptureError,
+  htmlMediaCaptureStreamSupported,
   applyTvSinkVolume,
   attachMediaStream,
   attachPlaybackUrl,
@@ -597,6 +602,45 @@ describe("roomHostMemberMenu", () => {
 describe("GO_ROOM_MESH_ENABLED", () => {
   it("keeps Guest↔Guest mesh off so Hub star is the only path", () => {
     expect(GO_ROOM_MESH_ENABLED).toBe(false);
+  });
+});
+
+describe("program capture capability", () => {
+  it("detects native HTMLMediaElement.captureStream", () => {
+    expect(
+      htmlMediaCaptureStreamSupported({
+        captureStream: () => null,
+      })
+    ).toBe(true);
+    expect(
+      htmlMediaCaptureStreamSupported({
+        mozCaptureStream: () => null,
+      })
+    ).toBe(true);
+    expect(htmlMediaCaptureStreamSupported({})).toBe(false);
+    expect(htmlMediaCaptureStreamSupported(null)).toBe(false);
+  });
+
+  it("does not allow canvas-only program capture without native media capture", () => {
+    expect(
+      allowCanvasProgramCaptureFallback({
+        nativeHtmlMediaCaptureStream: false,
+      })
+    ).toBe(false);
+    expect(
+      allowCanvasProgramCaptureFallback({
+        nativeHtmlMediaCaptureStream: true,
+      })
+    ).toBe(true);
+  });
+
+  it("uses Safari-oriented copy when native capture is missing", () => {
+    expect(
+      goRoomCastCaptureError({ nativeHtmlMediaCaptureStream: false })
+    ).toBe(GO_ROOM_CAST_SOURCE_UNSUPPORTED);
+    expect(
+      goRoomCastCaptureError({ nativeHtmlMediaCaptureStream: true })
+    ).toBe(GO_ROOM_CAST_UNSUPPORTED);
   });
 });
 

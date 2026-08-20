@@ -29,7 +29,14 @@ import {
   type SessionCameraMessage,
   type SessionMicMessage,
 } from "@pg/roster/rosterSessionCamera";
-import { GO_ROOM_CAST_UNSUPPORTED, GO_ROOM_DISPLAY_PERM_DENIED, GO_ROOM_MEDIA_PERM_DENIED } from "./goRoom";
+import {
+  GO_ROOM_CAST_UNSUPPORTED,
+  GO_ROOM_DISPLAY_PERM_DENIED,
+  GO_ROOM_MEDIA_PERM_DENIED,
+  allowCanvasProgramCaptureFallback,
+  goRoomCastCaptureError,
+  htmlMediaCaptureStreamSupported,
+} from "./goRoom";
 
 export type RoomMediaPeer = {
   peerId: string;
@@ -201,6 +208,19 @@ function isLiveTrack(t: MediaStreamTrack | null): t is MediaStreamTrack {
   if (!t) return false;
   if (t.readyState && t.readyState !== "live") return false;
   return true;
+}
+
+/** Forward a received track without stealing it from the host TV sink. */
+function cloneTrackForForward(
+  t: MediaStreamTrack | null
+): MediaStreamTrack | null {
+  if (!t) return null;
+  try {
+    if (typeof t.clone === "function") return t.clone();
+  } catch {
+    /* fall through */
+  }
+  return t;
 }
 
 export function createRoomMedia(opts: {
@@ -473,6 +493,17 @@ export function createRoomMedia(opts: {
   }
 
   function collectRemoteFromPeers(): void {
+    // Hub remote-file cast: program RTP arrives on the owner's PC. Other
+    // guests' program receivers are uplink placeholders — do not overwrite
+    // the host TV sink with those (Safari join → Chrome host black).
+    const programFrom =
+      opts.forward &&
+      remoteProgramFrom &&
+      remoteProgramFrom !== opts.localAgentId &&
+      !program &&
+      !programFromLive
+        ? remoteProgramFrom
+        : null;
     for (const peer of opts.peers()) {
       const pVid = receiverTrack(peer.pc, "presence", "video");
       const pAud = receiverTrack(peer.pc, "presence", "audio");
@@ -480,8 +511,13 @@ export function createRoomMedia(opts: {
       const gAud = receiverTrack(peer.pc, "program", "audio");
       if (pVid) holdRemote({ layer: "presence", kind: "video" }, pVid);
       if (pAud) holdRemote({ layer: "presence", kind: "audio" }, pAud);
-      if (gVid) holdRemote({ layer: "program", kind: "video" }, gVid);
-      if (gAud) holdRemote({ layer: "program", kind: "audio" }, gAud);
+      const takeProgram = !programFrom || peer.peerId === programFrom;
+      if (takeProgram && gVid) {
+        holdRemote({ layer: "program", kind: "video" }, gVid);
+      }
+      if (takeProgram && gAud) {
+        holdRemote({ layer: "program", kind: "audio" }, gAud);
+      }
     }
   }
 
@@ -607,15 +643,26 @@ export function createRoomMedia(opts: {
   }
 
   function offerProgram(fromPeer?: string): void {
-    if (!program && !programName) return;
+    if (!program && !programName && !remoteProgramName) return;
+    const owner =
+      fromPeer ??
+      (remoteProgramFrom && remoteProgramFrom !== opts.localAgentId
+        ? remoteProgramFrom
+        : undefined);
+    const kind =
+      program?.video || remoteProgramKind === "video"
+        ? "video"
+        : program?.audio || remoteProgramKind === "audio"
+          ? "audio"
+          : "video";
     opts.sendJson(
       buildSessionCastMessage({
         op: "offer",
         from: opts.localAgentId,
-        kind: program?.video ? "video" : "audio",
-        name: programName ?? "節目",
-        id: streamingFileId ?? undefined,
-        fromPeer,
+        kind,
+        name: programName ?? remoteProgramName ?? "節目",
+        id: streamingFileId ?? remoteProgramFileId ?? undefined,
+        fromPeer: owner,
       })
     );
   }
@@ -694,8 +741,12 @@ export function createRoomMedia(opts: {
       if (!programWatchers.has(dest.peerId)) continue;
       const audio = receiverTrack(from.pc, "program", "audio");
       const video = receiverTrack(from.pc, "program", "video");
-      if (audio) await replaceBoothTrack(dest.pc, "program", "audio", audio);
-      if (video) await replaceBoothTrack(dest.pc, "program", "video", video);
+      // Clone so the host TV can keep the original receiver track while Hub
+      // fans the same program out to multiple guests.
+      const sendAudio = cloneTrackForForward(audio);
+      const sendVideo = cloneTrackForForward(video);
+      if (sendAudio) await replaceBoothTrack(dest.pc, "program", "audio", sendAudio);
+      if (sendVideo) await replaceBoothTrack(dest.pc, "program", "video", sendVideo);
     }
   }
 
@@ -710,6 +761,7 @@ export function createRoomMedia(opts: {
           op: "reject",
           from: opts.localAgentId,
           id,
+          reason: out.error || goRoomCastCaptureError(),
         })
       );
       return out;
@@ -728,6 +780,12 @@ export function createRoomMedia(opts: {
   }
 
   async function push(): Promise<void> {
+    const hubRemoteProgram =
+      Boolean(opts.forward) &&
+      Boolean(remoteProgramFrom) &&
+      remoteProgramFrom !== opts.localAgentId &&
+      !program &&
+      !programFromLive;
     for (const peer of opts.peers()) {
       if (!peer.peerId) continue;
       const presenceVideo =
@@ -737,6 +795,9 @@ export function createRoomMedia(opts: {
       const sendProgram = Boolean(program && programWatchers.has(peer.peerId));
       await replaceBoothTrack(peer.pc, "presence", "audio", presenceAudio);
       await replaceBoothTrack(peer.pc, "presence", "video", presenceVideo);
+      // Remote file cast: program RTP is Hub-forwarded from owner. Do not
+      // null the program senders here — that undoes forwardFrom for joiners.
+      if (hubRemoteProgram) continue;
       await replaceBoothTrack(
         peer.pc,
         "program",
@@ -749,6 +810,9 @@ export function createRoomMedia(opts: {
         "video",
         sendProgram ? (program?.video ?? null) : null
       );
+    }
+    if (hubRemoteProgram && remoteProgramFrom) {
+      await thisForwardFrom(remoteProgramFrom);
     }
   }
 
@@ -797,12 +861,13 @@ export function createRoomMedia(opts: {
   ): Promise<RoomMediaResult> {
     const capture = opts.captureProgram ?? captureProgramFromFile;
     const next = await capture(file);
+    const castErr = goRoomCastCaptureError();
     if (!next || (!next.audio && !next.video)) {
       if (!quiet) {
-        error = GO_ROOM_CAST_UNSUPPORTED;
+        error = castErr;
         emit();
       }
-      return { ok: false, error: GO_ROOM_CAST_UNSUPPORTED };
+      return { ok: false, error: castErr };
     }
     program?.stop();
     program = next;
@@ -819,11 +884,11 @@ export function createRoomMedia(opts: {
   function tryCaptureOwner(): RoomMediaResult {
     if (program && (program.audio || program.video)) return { ok: true };
     if (!ownerDecodeEl) {
-      return { ok: false, error: GO_ROOM_CAST_UNSUPPORTED };
+      return { ok: false, error: goRoomCastCaptureError() };
     }
     const next = captureFromMediaElement(ownerDecodeEl);
     if (!next || (!next.audio && !next.video)) {
-      return { ok: false, error: GO_ROOM_CAST_UNSUPPORTED };
+      return { ok: false, error: goRoomCastCaptureError() };
     }
     program?.stop();
     program = next;
@@ -1308,7 +1373,10 @@ export function createRoomMedia(opts: {
         remoteProgramFrom &&
         remoteProgramFrom !== opts.localAgentId
       ) {
-        markAll(programWatchers);
+        // Late joiners need a fresh session_cast offer (RTP forward alone is
+        // not enough for 沒訊號／大螢幕播放中).
+        const added = markAll(programWatchers);
+        if (added > 0) offerProgram(remoteProgramFrom);
         await thisForwardFrom(remoteProgramFrom);
       }
       if (mic) markAll(micListeners);
@@ -1424,6 +1492,7 @@ export function createRoomMedia(opts: {
               op: "reject",
               from: opts.localAgentId,
               id: fileId,
+              reason: GO_ROOM_CAST_UNSUPPORTED,
             })
           );
           return;
@@ -1479,19 +1548,39 @@ export function createRoomMedia(opts: {
         return;
       }
       if (data.op === "reject") {
-        if (data.id && (watchingProgram || streamingFileId === data.id)) {
-          watchingProgram = false;
-          if (streamingFileId === data.id) {
-            streamingFileId = null;
-            programName = null;
-            remoteProgramName = null;
-            remoteProgramKind = null;
-            remoteProgramFileId = null;
-            remoteProgramFrom = null;
-          }
-          error = GO_ROOM_CAST_UNSUPPORTED;
+        const reason =
+          typeof data.reason === "string" && data.reason.trim()
+            ? data.reason.trim()
+            : GO_ROOM_CAST_UNSUPPORTED;
+        const mine =
+          Boolean(data.id) &&
+          (streamingFileId === data.id ||
+            remoteProgramFileId === data.id ||
+            watchingProgram);
+        if (!mine) return;
+        if (
+          opts.forward &&
+          remoteProgramFileId === data.id &&
+          remoteProgramFrom &&
+          remoteProgramFrom !== opts.localAgentId
+        ) {
+          error = reason;
+          await unofferProgram();
+          error = reason;
           emit();
+          return;
         }
+        watchingProgram = false;
+        if (streamingFileId === data.id || remoteProgramFileId === data.id) {
+          streamingFileId = null;
+          programName = null;
+          remoteProgramName = null;
+          remoteProgramKind = null;
+          remoteProgramFileId = null;
+          remoteProgramFrom = null;
+        }
+        error = reason;
+        emit();
         return;
       }
       if (data.op === "state") {
@@ -1627,7 +1716,11 @@ function captureFromMediaElement(el: HTMLMediaElement): CapturedProgram | null {
   let drawTimer = 0;
   let stream = mediaElementCaptureStream(el);
   const video = el as HTMLVideoElement;
+  const nativeOk = htmlMediaCaptureStreamSupported();
   const canCanvas =
+    allowCanvasProgramCaptureFallback({
+      nativeHtmlMediaCaptureStream: nativeOk,
+    }) &&
     typeof document !== "undefined" &&
     typeof document.createElement("canvas").captureStream === "function";
   if (
@@ -1787,9 +1880,13 @@ async function captureProgramFromFile(file: File): Promise<CapturedProgram | nul
   let drawTimer = 0;
   let stream = mediaElementCaptureStream(el);
   const video = el as HTMLVideoElement;
+  const nativeOk = htmlMediaCaptureStreamSupported();
   if (
     !isAudio &&
     (!stream || !stream.getVideoTracks()[0]) &&
+    allowCanvasProgramCaptureFallback({
+      nativeHtmlMediaCaptureStream: nativeOk,
+    }) &&
     typeof document.createElement("canvas").captureStream === "function"
   ) {
     const canvas = document.createElement("canvas");

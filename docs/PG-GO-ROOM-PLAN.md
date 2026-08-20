@@ -226,7 +226,7 @@ game { catalogId, seats[] } // 大螢幕槽掛該 SAM 畫布；席次＝指定�
 - `session_cast` 的 `state`：主持遙控來源播放器（paused／t）；owner 回報進度（含 duration）給主持 HUD。片子／音的**畫面時鐘**仍是 RTP；靜態圖無播放頭。開局控制走 `session_play`（§7.2），不是 `session_cast` 載 bytes。
 - 星狀下主持對每位 Guest 各送 program RTP（瀏覽器常每條 PC 各編一次）。人數軟頂 ≤6。**不是**雲端轉碼／片庫。
 
-來源端 `captureStream` 快樂路徑＝桌機 Chromium。iOS Safari 當**收看端**收 RTP。若要以 iOS 當電影／音來源而 `captureStream` 失敗：頁內說明改由桌機當大螢幕來源——**不要**為通過而把大螢幕改回 DC 播檔。
+來源端 `captureStream` 快樂路徑＝桌機 **Chrome／Edge**（Chromium）。**Safari／WebKit**（含桌機）當**收看端**收 RTP 可以；當電影／音**片源**常缺 `HTMLMediaElement.captureStream`——reject＋頁內說明改 Chrome／Edge 掛檔或主持自掛；**禁止** canvas-only 假片源（黑屏／卡死），**不要**為通過而把大螢幕改回 DC 播檔。
 
 ### 5.8 殼面：大螢幕槽＋三區（硬）
 
@@ -679,7 +679,7 @@ Guest ↔ Guest 不另建 PC；控制面經 Host fanout；內容經 Host 轉幀�
 | 能力 | 快樂路徑 | 失敗怎麼辦 |
 | --- | --- | --- |
 | 收大螢幕（節目 RTP）、開鏡頭、開麥 | 含 iOS Safari 當收看／開口 | 權限拒＝頁內說明 |
-| 電影／音／圖來源 `captureStream`（含別人掛的檔） | 桌機／Android Chromium 當屋子或持檔端 | iOS 當來源失敗→頁內說明改桌機；收看端仍收 RTP；**不要**改 DC 當大螢幕 |
+| 電影／音／圖來源 `captureStream`（含別人掛的檔） | 桌機／Android **Chrome／Edge** 當屋子或持檔端 | **Safari／WebKit**（含桌機）當來源常無 `HTMLMediaElement.captureStream`→ reject＋頁內說明改 Chrome／Edge 掛檔或主持自掛；收看端仍收 RTP；**不要** canvas-only 冒充、**不要**改 DC 當大螢幕 |
 | 私下播目錄影音 | 本機 `<video controls>`／`<audio controls>`；大檔邊收邊播；遠端可用 SW 片源 | 解不了→頁內說明；**不要**改叫人下載當唯一出路 |
 | 螢幕分享 `getDisplayMedia` | 與鏡頭互斥的同一條**在場** live；可被指定上大螢幕 | 權限拒＝頁內說明 |
 | Save picker 下載 | 桌機／Android Chromium | iOS 失敗（§8.2）；改私下播或只收大螢幕 |
@@ -1050,3 +1050,6 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 | 2026-08-20 | **別人掛的檔上大螢幕：** `file { owner, id }`＝持檔端本機渲染 → 節目 RTP（可 Guest 掛的檔）；呈現型別影→音→圖遞增；doc／任意 MIME 不承諾；否決主持拉檔再播、否決 DC 冒充大螢幕。Phase **2e**；凍結 #31 |
 | 2026-08-20 | **2e 實作（video／audio）：** `session_cast.fromPeer`；host `startListedProgram` 遠端檔；owner capture＋Hub `forwardFrom`；reject／持檔端解碼提示 |
 | 2026-08-20 | **主持遙控片子時鐘：** 別人掛的檔上大螢幕時，播／停／seek 由主持經 `session_cast.state` 遙控 owner；owner 回報 t／duration；HUD 僅主持有 transport；音量仍本機 sink |
+| 2026-08-20 | **Safari 不當大螢幕片源：** 無原生 `HTMLMediaElement.captureStream` 時不走 canvas-only（黑屏／卡頓）；`session_cast.reject`＋`reason`；主持清遠端 cast；頁內說明改 Chrome／Edge 掛檔 |
+| 2026-08-20 | **Hub 遠端檔：主持 TV 只綁 owner 接收軌：** 第三人加入時勿用其 program uplink placeholder 蓋掉 `remoteProgramVideo`（否則 Chrome 主持黑屏、重推後 Safari 有畫面） |
+| 2026-08-20 | **晚進門重送 `session_cast` offer：** 遠端檔推播中第三人加入時，Hub `refresh` 除轉 RTP 外須重 offer（含 `fromPeer`／id）；否則新人一直「沒訊號」、檔案區無「大螢幕播放中」 |
