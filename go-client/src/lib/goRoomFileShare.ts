@@ -1,11 +1,11 @@
 /**
- * 包廂分享區：多媒體卡片、篩選、權限、電視播放中標記。
+ * 包廂分享區：多媒體卡片、篩選、權限、大螢幕播放中標記。
  */
 
 export const GO_ROOM_FILE_PREVIEW = "預覽";
-export const GO_ROOM_FILE_CAST = "推播至大電視";
+export const GO_ROOM_FILE_CAST = "推播至大螢幕";
 export const GO_ROOM_FILE_DELETE = "撤回";
-export const GO_ROOM_FILE_ON_AIR = "電視播放中";
+export const GO_ROOM_FILE_ON_AIR = "大螢幕播放中";
 export const GO_ROOM_FILE_DOWNLOAD = "下載";
 export const GO_ROOM_FILE_DROP = "拖進來或點這裡掛上檔案";
 export const GO_ROOM_FILE_DELETE_CONFIRM =

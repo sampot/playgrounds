@@ -21,7 +21,7 @@ export type BoothHotspot = {
 };
 
 export const GO_BOOTH_HOTSPOTS: readonly BoothHotspot[] = [
-  { id: "tv", label: "包廂電視", ...BOOTH_TV },
+  { id: "tv", label: "包廂大螢幕", ...BOOTH_TV },
   { id: "door", label: "請人進來", ...BOOTH_DOOR },
   { id: "shelf", label: "分享區", ...BOOTH_SHELF },
   ...BOOTH_SEATS.map(

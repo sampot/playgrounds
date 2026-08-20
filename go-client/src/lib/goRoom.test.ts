@@ -190,7 +190,7 @@ describe("roomTvLabel", () => {
     expect(roomTvLabel({ remoteProgramName: "clip.webm" })).toBe(
       "正在播 clip.webm"
     );
-    expect(roomTvLabel({ sourceName: "小明" })).toBe("電視上是 小明");
+    expect(roomTvLabel({ sourceName: "小明" })).toBe("大螢幕上是 小明");
   });
 });
 
@@ -682,7 +682,7 @@ describe("booth copy", () => {
     expect(GO_ROOM_GATE_BODY).toBe(
       "請人進來：即時視訊、共享檔案。被請進來的人不必有通行證。"
     );
-    expect(GO_ROOM_GATE_BODY).not.toContain("一起看電視");
+    expect(GO_ROOM_GATE_BODY).not.toContain("一起看大螢幕");
   });
 
   it("hides the host login gate until the client is ready", () => {
@@ -722,7 +722,7 @@ describe("booth copy", () => {
 
   it("warns that hung items and live pulls stop when the Host ends the booth", () => {
     expect(GO_ROOM_END_CONFIRM_HOST).toBe(
-      "關掉後在場的人會斷線，目錄會沒了，電視與鏡頭會停，進行中的遊戲會停。已存到硬碟的檔不受影響。"
+      "關掉後在場的人會斷線，目錄會沒了，大螢幕與鏡頭會停，進行中的遊戲會停。已存到硬碟的檔不受影響。"
     );
     expect(GO_ROOM_LEAVE_CONFIRM_GUEST).toBe(
       "離開後你會斷線；其他人還在。你掛上的項目會從分享區拿掉。"
@@ -863,10 +863,10 @@ describe("enterTvFullscreen", () => {
 
 describe("room TV copy", () => {
   it("names the booth TV panel, not the share catalog", () => {
-    expect(GO_ROOM_TV_TITLE).toBe("包廂電視");
+    expect(GO_ROOM_TV_TITLE).toBe("包廂大螢幕");
     expect(GO_ROOM_TV_FULLSCREEN).toBe("全螢幕");
     expect(GO_ROOM_TV_HINT_HOST).toContain("檔案區");
-    expect(GO_ROOM_TV_HINT_HOST).toContain("放到電視上");
+    expect(GO_ROOM_TV_HINT_HOST).toContain("放到大螢幕上");
     expect(GO_ROOM_TV_HINT_GUEST).toContain("主持");
   });
 });

@@ -1444,7 +1444,7 @@
                     </button>
                   {/if}
                 {:else}
-                  <p class="muted">點成員不會自動上電視。</p>
+                  <p class="muted">點成員不會自動上大螢幕。</p>
                 {/if}
               </div>
             </div>

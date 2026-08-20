@@ -1,5 +1,5 @@
 /**
- * 包廂文字時間線：一般訊息卡片＋連動系統動態（進出／檔案／電視）.
+ * 包廂文字時間線：一般訊息卡片＋連動系統動態（進出／檔案／大螢幕）.
  * Local-only notes — not a new DataChannel type; each peer derives from occupancy／catalog／TV.
  */
 
@@ -141,12 +141,12 @@ export function roomSystemFileText(who: string, fileName: string): string {
 export function roomSystemTvLiveText(host: string, who: string): string {
   const actor = host.trim() || "主持人";
   const target = who.trim() || "成員";
-  return `${actor} 已將 ${target}的鏡頭 推播至大電視`;
+  return `${actor} 已將 ${target}的鏡頭 推播至大螢幕`;
 }
 
 export function roomSystemTvFileText(host: string, fileName: string): string {
   const actor = host.trim() || "主持人";
-  return `${actor} 已將 ${fileName.trim() || "片子"} 放到電視上`;
+  return `${actor} 已將 ${fileName.trim() || "片子"} 放到大螢幕上`;
 }
 
 export function roomOccupancyChanges(

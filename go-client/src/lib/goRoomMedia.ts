@@ -1,6 +1,6 @@
 /**
  * 包廂在場／節目媒體：replaceTrack on booth 2+2。
- * 節目＝房級電視；在場聲＝開麥即送；在場影像仍要 request（PG-GO-ROOM-PLAN §9.8）。
+ * 節目＝房級大螢幕；在場聲＝開麥即送；在場影像仍要 request（PG-GO-ROOM-PLAN §9.8）。
  */
 
 import {

@@ -330,5 +330,5 @@ go-client/ATTRIBUTION.md
 | 2026-08-18 | 包廂敘事對齊：壽命＝主持 `/room` 畫面開著（門牌 TTL 另計） |
 | 2026-08-18 | 包廂熱點對齊說／掛／播（細節見 [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)） |
 | 2026-08-18 | 包廂熱點對齊說／掛／要、分享目錄＋按需拉 |
-| 2026-08-19 | `/room` 不重做大廳行走地圖；包廂為獨立靜態內景＋電視（見 [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)） |
-| 2026-08-19 | 包廂殼面改電視槽＋三區（見 [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md) §5.8） |
+| 2026-08-19 | `/room` 不重做大廳行走地圖；包廂為獨立靜態內景＋大螢幕（見 [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)） |
+| 2026-08-19 | 包廂殼面改大螢幕槽＋三區（見 [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md) §5.8） |

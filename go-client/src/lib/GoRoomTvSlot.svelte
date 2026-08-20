@@ -106,7 +106,7 @@
     muted
     playsinline
     controls={false}
-    aria-label="包廂電視"
+    aria-label="包廂大螢幕"
   ></video>
   {#if !tvOn}
     <span class="tv-snow" aria-hidden="true"></span>

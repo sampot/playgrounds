@@ -57,7 +57,7 @@ describe("roomFileShareMatches", () => {
 describe("roomFileShareActions", () => {
   it("lets peers download and preview; owner skips those; only host casts; owner or host deletes", () => {
     expect(GO_ROOM_FILE_PREVIEW).toBe("預覽");
-    expect(GO_ROOM_FILE_CAST).toBe("推播至大電視");
+    expect(GO_ROOM_FILE_CAST).toBe("推播至大螢幕");
     expect(GO_ROOM_FILE_DELETE).toBe("撤回");
     expect(GO_ROOM_FILE_DROP).toBe("拖進來或點這裡掛上檔案");
     expect(
@@ -105,7 +105,7 @@ describe("roomFileShareActions", () => {
 
 describe("roomFileOnAir", () => {
   it("marks the catalog file the host put on the TV", () => {
-    expect(GO_ROOM_FILE_ON_AIR).toBe("電視播放中");
+    expect(GO_ROOM_FILE_ON_AIR).toBe("大螢幕播放中");
     expect(
       roomFileOnAir({
         fileId: "a",

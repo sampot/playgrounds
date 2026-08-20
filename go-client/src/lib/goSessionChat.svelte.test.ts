@@ -310,10 +310,10 @@ describe("goSessionChat", () => {
       peers: [],
       broadcast: () => 1,
     });
-    goSessionChat.sendText("上電視");
+    goSessionChat.sendText("上大螢幕");
     const mid = goSessionChat.messages[0]!.id;
     expect(goSessionChat.captionMessage(mid)).toBe(true);
-    expect(goSessionChat.caption?.text).toBe("上電視");
+    expect(goSessionChat.caption?.text).toBe("上大螢幕");
     expect(goSessionChat.deleteMessage(mid)).toBe(true);
     expect(goSessionChat.messages).toHaveLength(0);
     expect(goSessionChat.deleteMessage(mid)).toBe(false);

@@ -12,7 +12,7 @@ export const GO_ROOM_TEXT_UNLOCK = "解除全員禁言";
 export const GO_ROOM_TEXT_SILENCE = "暫時禁言";
 export const GO_ROOM_TEXT_UNSILENCE = "解除禁言";
 export const GO_ROOM_TEXT_DELETE = "刪除訊息";
-export const GO_ROOM_TEXT_CAPTION = "推播至大電視";
+export const GO_ROOM_TEXT_CAPTION = "推播至大螢幕";
 export const GO_ROOM_TEXT_LOCKED_HINT = "僅主持人可發言";
 export const GO_ROOM_TEXT_SILENCED_HINT = "你已被暫時禁言";
 
@@ -355,7 +355,7 @@ export const GO_ROOM_LOGIN_HINT =
   "被請進來的人不必有通行證；開這一間的人要留在這個畫面。另一台裝置請掃邀請進來。";
 
 export const GO_ROOM_END_CONFIRM_HOST =
-  "關掉後在場的人會斷線，目錄會沒了，電視與鏡頭會停，進行中的遊戲會停。已存到硬碟的檔不受影響。";
+  "關掉後在場的人會斷線，目錄會沒了，大螢幕與鏡頭會停，進行中的遊戲會停。已存到硬碟的檔不受影響。";
 
 export const GO_ROOM_LEAVE_CONFIRM_GUEST =
   "離開後你會斷線；其他人還在。你掛上的項目會從分享區拿掉。";
@@ -365,14 +365,14 @@ export const GO_ROOM_CONNECT_FAILED =
 
 export const GO_ROOM_MEDIA_OFF = "鏡頭 · 未開";
 export const GO_ROOM_TV_OFF = "沒訊號";
-export const GO_ROOM_TV_TITLE = "包廂電視";
+export const GO_ROOM_TV_TITLE = "包廂大螢幕";
 export const GO_ROOM_TV_FULLSCREEN = "全螢幕";
 export const GO_ROOM_TV_EXIT_FULLSCREEN = "離開全螢幕";
 export const GO_ROOM_TV_VOLUME = "音量";
 export const GO_ROOM_TV_HINT_HOST =
-  "片子在檔案區掛上後按放到電視上。鏡頭在成員區指定。";
-export const GO_ROOM_TV_HINT_GUEST = "電視畫面由主持指定。點全螢幕可放大。";
-export const GO_ROOM_PUT_ON_TV = "放到電視上";
+  "片子在檔案區掛上後按放到大螢幕上。鏡頭在成員區指定。";
+export const GO_ROOM_TV_HINT_GUEST = "大螢幕畫面由主持指定。點全螢幕可放大。";
+export const GO_ROOM_PUT_ON_TV = "放到大螢幕上";
 export const GO_ROOM_FORCE_MUTE = "強制靜音";
 export const GO_ROOM_FORCE_CAMERA_OFF = "關閉鏡頭";
 export const GO_ROOM_KICK = "踢出包廂";
@@ -380,7 +380,7 @@ export const GO_ROOM_MEMBER_MORE = "更多";
 export const GO_ROOM_KICK_CONFIRM =
   "要把這個人請出這一間？對方會斷線；其他人還在。";
 export const GO_ROOM_KICKED = "主持請你離開這一間";
-export const GO_ROOM_TV_OFF_BTN = "從電視拿掉";
+export const GO_ROOM_TV_OFF_BTN = "從大螢幕拿掉";
 export const GO_ROOM_TV_PLAY = "播放";
 export const GO_ROOM_TV_PAUSE = "暫停";
 export const GO_ROOM_CINEMA_ENTER = "隱藏控制面板";
@@ -439,7 +439,7 @@ export function roomTvLabel(opts: {
   const file = opts.remoteProgramName?.trim() || opts.programName?.trim();
   if (file) return `正在播 ${file}`;
   const who = opts.sourceName?.trim();
-  if (who) return `電視上是 ${who}`;
+  if (who) return `大螢幕上是 ${who}`;
   return GO_ROOM_TV_OFF;
 }
 

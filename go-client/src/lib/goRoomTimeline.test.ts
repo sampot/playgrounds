@@ -169,10 +169,10 @@ describe("room TV system copy", () => {
     expect(roomTvCueChange({ kind: "off" }, live)).toEqual(live);
     expect(roomTvCueChange(live, live)).toBeNull();
     expect(roomSystemTvLiveText("主持人", "小華")).toBe(
-      "主持人 已將 小華的鏡頭 推播至大電視"
+      "主持人 已將 小華的鏡頭 推播至大螢幕"
     );
     expect(roomSystemTvFileText("主持人", "mv.mp4")).toBe(
-      "主持人 已將 mv.mp4 放到電視上"
+      "主持人 已將 mv.mp4 放到大螢幕上"
     );
   });
 });
