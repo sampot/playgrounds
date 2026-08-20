@@ -202,9 +202,12 @@ export function roomFilePath(id: string): string {
   return `${ROOM_FILE_PATH_PREFIX}${encodeURIComponent(id)}`;
 }
 
-/** Same-origin URL that asks the SW for Content-Disposition: attachment. */
+/**
+ * Same as roomFilePath — do NOT add Content-Disposition／?download=.
+ * WebKit’s download manager bypasses the SW for those and hits origin 404.
+ */
 export function roomFileDownloadPath(id: string): string {
-  return `${roomFilePath(id)}?download=1`;
+  return roomFilePath(id);
 }
 
 /** @deprecated Prefer roomFilePath — same canonical /room-file/ URL. */

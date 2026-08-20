@@ -96,6 +96,7 @@
     catalogTransferHint,
   } from "$lib/goRoomCatalog";
   import {
+    GO_ROOM_FILE_CANCEL,
     GO_ROOM_FILE_CAST,
     GO_ROOM_FILE_DELETE,
     GO_ROOM_FILE_DELETE_CONFIRM,
@@ -110,6 +111,7 @@
     fileShareIcon,
     fileShareKind,
     formatFileShareSize,
+    roomFileDownloadMode,
     roomFileOnAir,
     roomFileShareActions,
     roomFileShareMatches,
@@ -957,6 +959,12 @@
     }
   }
 
+  function onCancelDownload(id: string) {
+    fileError = "";
+    fileHint = "";
+    goRoomFiles.cancelDownload(id);
+  }
+
   function clearPendingBrowserSave(id: string): void {
     const prev = pendingBrowserSaves.get(id);
     if (!prev) return;
@@ -970,11 +978,26 @@
     pendingBrowserSaves = next;
   }
 
-  function downloadButtonLabel(id: string): string {
-    return pendingBrowserSaves.has(id) ? GO_ROOM_FILE_SAVE : GO_ROOM_FILE_DOWNLOAD;
+  function downloadSlotMode(
+    status: string | undefined,
+    id: string
+  ): "download" | "save" | "cancel" {
+    return roomFileDownloadMode({
+      status,
+      pendingSave: pendingBrowserSaves.has(id),
+      playing: goRoomFiles.playback?.id === id,
+    });
+  }
+
+  function downloadButtonLabel(id: string, status?: string): string {
+    const mode = downloadSlotMode(status, id);
+    if (mode === "cancel") return GO_ROOM_FILE_CANCEL;
+    if (mode === "save") return GO_ROOM_FILE_SAVE;
+    return GO_ROOM_FILE_DOWNLOAD;
   }
 
   function downloadButtonDisabled(status: string | undefined, id: string): boolean {
+    if (downloadSlotMode(status, id) === "cancel") return false;
     if (pendingBrowserSaves.has(id)) return false;
     return status === "transferring";
   }
@@ -1673,9 +1696,15 @@
                       type="button"
                       class="pixel-btn pixel-btn--primary"
                       disabled={downloadButtonDisabled(f.status, f.id)}
-                      onclick={() => void onDownload(f.id)}
+                      onclick={() => {
+                        if (downloadSlotMode(f.status, f.id) === "cancel") {
+                          onCancelDownload(f.id);
+                          return;
+                        }
+                        void onDownload(f.id);
+                      }}
                     >
-                      {downloadButtonLabel(f.id)}
+                      {downloadButtonLabel(f.id, f.status)}
                     </button>
                   {/if}
                   {#if acts.cast}
@@ -1741,9 +1770,19 @@
                           type="button"
                           class="pixel-btn pixel-btn--primary"
                           disabled={!listed || downloadButtonDisabled(listed.status, row.system.file.id)}
-                          onclick={() => void onDownload(row.system.file!.id)}
+                          onclick={() => {
+                            const id = row.system.file!.id;
+                            if (listed && downloadSlotMode(listed.status, id) === "cancel") {
+                              onCancelDownload(id);
+                              return;
+                            }
+                            void onDownload(id);
+                          }}
                         >
-                          {downloadButtonLabel(row.system.file.id)}
+                          {downloadButtonLabel(
+                            row.system.file.id,
+                            listed?.status
+                          )}
                         </button>
                       {/if}
                     </div>
@@ -2173,9 +2212,19 @@
               files.find((f) => f.id === previewId)?.status,
               previewId
             )}
-            onclick={() => void onDownload(previewId!)}
+            onclick={() => {
+              const st = files.find((f) => f.id === previewId)?.status;
+              if (downloadSlotMode(st, previewId!) === "cancel") {
+                onCancelDownload(previewId!);
+                return;
+              }
+              void onDownload(previewId!);
+            }}
           >
-            {downloadButtonLabel(previewId)}
+            {downloadButtonLabel(
+              previewId,
+              files.find((f) => f.id === previewId)?.status
+            )}
           </button>
         {/if}
       </div>

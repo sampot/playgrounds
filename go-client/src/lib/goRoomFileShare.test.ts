@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   GO_ROOM_FILE_CAST,
+  GO_ROOM_FILE_CANCEL,
   GO_ROOM_FILE_DELETE,
   GO_ROOM_FILE_DROP,
   GO_ROOM_FILE_FILTERS,
@@ -10,6 +11,7 @@ import {
   fileShareIcon,
   fileShareKind,
   formatFileShareSize,
+  roomFileDownloadMode,
   roomFileOnAir,
   roomFileShareActions,
   roomFileShareMatches,
@@ -160,5 +162,25 @@ describe("roomFileShareProgress", () => {
     expect(roomFileShareProgress(0, 0)).toBe(0);
     expect(roomFileShareProgress(1, 4)).toBe(25);
     expect(roomFileShareProgress(4, 4)).toBe(100);
+  });
+});
+
+describe("roomFileDownloadMode", () => {
+  it("shows cancel while mid-save, save when blob bridge ready, else download", () => {
+    expect(GO_ROOM_FILE_CANCEL).toBe("取消");
+    expect(roomFileDownloadMode({ status: "listed" })).toBe("download");
+    expect(
+      roomFileDownloadMode({ status: "transferring", playing: true })
+    ).toBe("download");
+    expect(
+      roomFileDownloadMode({ status: "transferring", playing: false })
+    ).toBe("cancel");
+    expect(
+      roomFileDownloadMode({
+        status: "transferring",
+        pendingSave: true,
+        playing: false,
+      })
+    ).toBe("save");
   });
 });

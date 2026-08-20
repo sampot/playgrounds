@@ -133,6 +133,10 @@ class GoRoomFiles {
     );
   }
 
+  cancelDownload(id: string): void {
+    this.#xfer?.cancelDownload(id);
+  }
+
   primeBrowserDownload(id: string) {
     return (
       this.#xfer?.primeBrowserDownload(id) ?? {

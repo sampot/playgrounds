@@ -70,6 +70,11 @@ export type SessionFileControl = {
   from?: string;
   /** Byte start for this transfer. Play Range／seek; omit or 0 = from the start. */
   offset?: number;
+  /**
+   * Byte count for this transfer (HTTP body／Range length).
+   * Omit = pump to EOF from offset. Partial Range／WebKit media caps must set this.
+   */
+  length?: number;
   items?: SessionFileShareItem[];
   kind?: "file" | "dir" | "device";
   device?: "camera" | "mic";
@@ -175,6 +180,17 @@ export function isSessionFileControl(
       !Number.isInteger(m.offset) ||
       m.offset < 0 ||
       m.offset > SESSION_FILE_MAX_BYTES
+    ) {
+      return false;
+    }
+  }
+  if (m.length !== undefined) {
+    if (
+      typeof m.length !== "number" ||
+      !Number.isFinite(m.length) ||
+      !Number.isInteger(m.length) ||
+      m.length <= 0 ||
+      m.length > SESSION_FILE_MAX_BYTES
     ) {
       return false;
     }

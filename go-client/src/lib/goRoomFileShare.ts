@@ -7,6 +7,8 @@ export const GO_ROOM_FILE_CAST = "推播至大螢幕";
 export const GO_ROOM_FILE_DELETE = "撤回";
 export const GO_ROOM_FILE_ON_AIR = "大螢幕播放中";
 export const GO_ROOM_FILE_DOWNLOAD = "下載";
+/** In-flight remote／HTTP save — replace the download affordance. */
+export const GO_ROOM_FILE_CANCEL = "取消";
 /** Safari／無 Save picker：第一次「下載」只拉齊 bytes；就緒後改此文案再點才存到本機。 */
 export const GO_ROOM_FILE_SAVE = "存檔";
 export const GO_ROOM_FILE_SAVE_READY_HINT =
@@ -103,4 +105,18 @@ export function formatFileShareSize(n: number): string {
 export function roomFileShareProgress(done: number, total: number): number {
   if (total <= 0) return 0;
   return Math.max(0, Math.min(100, Math.round((done / total) * 100)));
+}
+
+/**
+ * Primary download-slot mode for a catalog row.
+ * Cancel only while this peer is mid-save (transferring, not private-playing).
+ */
+export function roomFileDownloadMode(opts: {
+  status?: string;
+  pendingSave?: boolean;
+  playing?: boolean;
+}): "download" | "save" | "cancel" {
+  if (opts.pendingSave) return "save";
+  if (opts.status === "transferring" && !opts.playing) return "cancel";
+  return "download";
 }

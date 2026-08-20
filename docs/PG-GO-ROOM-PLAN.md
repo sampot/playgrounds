@@ -657,7 +657,7 @@ client 同一形 HTTP request → /room-file/<id>
 session_file.share     { id, name, size, mime, owner }   // 掛上：僅檔 metadata。本客戶端不送 kind:dir／parentId
 session_file.unshare   { id }                      // 撤一檔
 session_file.catalog   { items: share[] }          // 晚進門：Host 重放目錄
-session_file.request   { id, transferId, from, offset?, length? }  // 對應一筆 HTTP／Range；owner 從 offset 泵
+session_file.request   { id, transferId, from, offset?, length? }  // 對應一筆 HTTP／Range；owner 從 offset 泵 length（omit＝到 EOF）
 session_file.reject    { id, transferId }          // 已撤回／擁有者離席／忙碌／無法服務
 session_file.pause     { id, transferId }          // 該 transfer 背壓；owner 停泵、transfer 仍在
 session_file.resume    { id, transferId }          // 續泵
@@ -1115,7 +1115,7 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 - [x] 未登入不能開這一間；導向登入；不擋 `/s/`
 - [x] Guest 無帳號、不下載 SAM，同意後進入包廂 UI（網址仍 `/i/`）
 - [ ] 同一短鏈 ≥2 Guest 與 Host 互傳≥1 則文字；分享區掛檔後第二人對同源 URL `fetch`／下載成功（≤上限）；無落盤能力則頁內說明且**禁止**整檔 Blob；超限／可執行檔拒
-- [ ] **同源靜態檔門面：** 遠端與本機掛檔皆對同一 **`/room-file/<id>`** 發 HTTP；本機零 DC；遠端得正確 status／header；頁面不直讀 DC chunk、不另開 object URL 產品路徑
+- [x] **同源靜態檔門面：** 遠端與本機掛檔皆對同一 **`/room-file/<id>`** 發 HTTP；本機零 DC；遠端得正確 status／header；頁面不直讀 DC chunk、不另開 object URL 產品路徑（單元已對齊；手測仍見上一項）
 - [x] **HTTP↔transfer 隧道：** 遠端每一筆 GET／Range 開一條 `transferId`（SW 分配＋`open-transfer`）；SW 依宣告交完 body 後 `transfer-complete`／abort 才終態；owner `done` 不得單獨標成功；本機不開 transfer；禁止 file-level 常駐池與 HTTP 脫鉤完成條件
 - [x] 訊息不經 Platform；檔 bytes 不經 Platform；散場丟目錄（已存檔不刪）
 - [x] 包廂 offer SDP 含 `m=audio`、`m=video`（現況 **1+1**）
@@ -1190,9 +1190,10 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 | 2026-08-20 | **大檔 save 不提早 end／不裁未讀：** DC 完成時 UI 可已顯示完整大小，但 play 窗口 trim 若裁掉 pin 前方未讀 bytes＋提早 `end()` → Safari「檔案不完整」。save mode 只丟已讀前綴；`download()` pipe 完才 `end`；SW `v=34` |
 | 2026-08-20 | **單主畫面＋在場聲混音：** 否決瀏覽器多路視訊合成進節目（監視牆／會議小格烤一路）。大螢幕維持主持切台一路。星狀下在場聲＝Host `AudioContext` 混音再送（§9.8.1）；節目音不混開口。凍結 #18／#27／#32；Phase **2f** |
 | 2026-08-20 | **2f 實作：** `goRoomPresenceAudioMix`；Hub `pushPresenceAudio`（單開麥轉發、≥2 混音、排除自迴音）；關麥重推；節目音不混入 |
-| 2026-08-20 | **HTTP↔transfer 隧道綁定（硬）：** 對前端 SW＝標準 HTTP server；每筆 `fetch`／媒體 GET／Range＝完整 roundtrip＝一條虛擬 connection（`transferId`，共用實體 DC）。幾次 request 由 downloader／`<video>` 決定，非 SW。完成權威＝SW 交完該 response 宣告長度；owner `done`＝源端泵完≠成功。否決 file-level 常駐池與 DC／HTTP 認定分裂。§2／§4／§8.2／§9.4／§9.7／凍結 #5／#19；實作仍待對齊 |
+| 2026-08-20 | **HTTP↔transfer 隧道綁定（硬）：** 對前端 SW＝標準 HTTP server；每筆 `fetch`／媒體 GET／Range＝完整 roundtrip＝一條虛擬 connection（`transferId`，共用實體 DC）。幾次 request 由 downloader／`<video>` 決定，非 SW。完成權威＝SW 交完該 response 宣告長度；owner `done`＝源端泵完≠成功。否決 file-level 常駐池與 DC／HTTP 認定分裂。§2／§4／§8.2／§9.4／§9.7／凍結 #5／#19 |
 | 2026-08-20 | **索取路徑凍結 `/room-file/<id>`：** 契約 URL 僅此形；撤規範面「過渡 `/room-play/`」；下載／檢視／私下播同一路徑 |
 | 2026-08-20 | **本機掛檔 SW 直出（硬）：** 前端目錄檔一律 `/room-file/<id>`；自己掛的 `File` 由 SW 滿足 HTTP（可 Range），**不開 transfer、不經 DataChannel**；遠端仍每 roundtrip ↔ transfer。撤「本機可用 object URL」產品路徑 |
 | 2026-08-20 | **`transferId` 由 SW 管理（硬）：** 遠端每筆 GET／Range body stream 開時 SW 分配 id 並 `open-transfer`；頁面只 `acceptHttpTransfer`→`session_file.request`。UI／play／download／seek 只發 HTTP。SW `v=36`；撤頁面 `need`→`seekPlay` 自造 id |
 | 2026-08-20 | **完成權威＝SW 交付（硬）：** SW 交完／abort 該 HTTP body → `transfer-complete`／`transfer-abort`；頁面 `noteHttpTransferEnd` 才收尾。owner `done` 只標源端泵完。live stream 交齊宣告長度即可 close（不必先 `end`，保 Edge／Safari 讀前不裁 spans）。SW `v=37` |
 | 2026-08-20 | **頁面不直出本機檔（硬）：** 索取／預覽／大螢幕解碼一律 HTTP `/room-file/<id>`；本機優化只在 SW（`File.slice`）。頁面不得頁內 Registry `Response`／`createObjectURL(File)`。Owner 仍持 `File` 只為掛上＋把 handle 交給 SW＋遠端 DC 泵 |
+| 2026-08-20 | **Range length 對齊（硬）：** `request.length`＝該筆 HTTP body；owner 泵到 offset+length；`noteHttpTransferEnd` 以 Range／SW `delivered` 為成功條件（非整檔 remainder）；完成後 `cancel` 停泵；play 成功不 `end` sink（可再 seek）；背壓 `pause` 含 mid-file Range；撤 `?download=1` CD 門面 |

@@ -138,6 +138,45 @@ describe("session_file control", () => {
     ).toBe(false);
   });
 
+  it("accepts a Range request with length (HTTP body size)", () => {
+    expect(
+      isSessionFileControl({
+        type: SESSION_FILE_TYPE,
+        v: 1,
+        op: "request",
+        id: "file-1",
+        transferId: "tr-2",
+        from: "g",
+        offset: 4096,
+        length: 2 * 1024 * 1024,
+      })
+    ).toBe(true);
+    expect(
+      isSessionFileControl({
+        type: SESSION_FILE_TYPE,
+        v: 1,
+        op: "request",
+        id: "file-1",
+        transferId: "tr-2",
+        from: "g",
+        offset: 0,
+        length: 0,
+      })
+    ).toBe(false);
+    expect(
+      isSessionFileControl({
+        type: SESSION_FILE_TYPE,
+        v: 1,
+        op: "request",
+        id: "file-1",
+        transferId: "tr-2",
+        from: "g",
+        offset: 0,
+        length: -1,
+      })
+    ).toBe(false);
+  });
+
   it("blocks typical executable names", () => {
     expect(isBlockedSessionFileName("Setup.exe")).toBe(true);
     expect(isBlockedSessionFileName("note.APK")).toBe(true);
