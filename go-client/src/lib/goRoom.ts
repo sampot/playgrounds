@@ -207,6 +207,21 @@ export function roomShowAdSlot(opts: {
   return !opts.tvOn;
 }
 
+/**
+ * Host login CTA on the TV slot. Wait until the client has run so prerender／
+ * hydration do not flash「登入後開包廂」while sessionStorage rehydrates and
+ * route chunks finish downloading.
+ */
+export function roomHostLoginGate(opts: {
+  role: "host" | "guest";
+  loggedIn: boolean;
+  phase: RoomUiPhase;
+  clientReady: boolean;
+}): boolean {
+  if (!opts.clientReady) return false;
+  return opts.role === "host" && !opts.loggedIn && opts.phase === "idle";
+}
+
 export type RoomEscStep =
   | "close-share"
   | "close-preview"
@@ -428,12 +443,31 @@ export function roomTvLabel(opts: {
   return GO_ROOM_TV_OFF;
 }
 
-/** Bind the TV hole: remote program RTP, else the local capture while we are the house. */
+function mediaStreamHasFrames(stream: MediaStream): boolean {
+  try {
+    return stream.getTracks().some((t) => mediaTrackHasFrames(t));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Bind the TV hole.
+ * - Host casting a file: keep the local capture when remote is only a muted
+ *   transceiver placeholder from a newly joined peer.
+ * - Joiners watching RTP: bind the remote program even while muted so the
+ *   first frames can paint (do not drop a muted remote when there is no local).
+ */
 export function roomTvStream(opts: {
   programStream: MediaStream | null;
   localProgramStream?: MediaStream | null;
 }): MediaStream | null {
-  return opts.programStream ?? opts.localProgramStream ?? null;
+  const remote = opts.programStream;
+  const local = opts.localProgramStream ?? null;
+  if (local && !(remote && mediaStreamHasFrames(remote))) {
+    return local;
+  }
+  return remote ?? local ?? null;
 }
 
 export type RoomTvHudKind = "none" | "host-file" | "watch";
@@ -471,9 +505,32 @@ export function roomTvVolumeFromInput(raw: number): number {
   return Math.min(1, Math.max(0, raw));
 }
 
-/** HUD speaker and slider share this; never mute while the bar still reads 100%. */
+/** TV starts muted + playsinline so joiners can autoplay; user unmutes. */
 export function roomTvHudDefaultSink(): { volume: number; muted: boolean } {
-  return { volume: 1, muted: false };
+  return { volume: 1, muted: true };
+}
+
+/**
+ * Speaker: when quiet, first tap unmutes (and opens the slider).
+ * When already audible, tap only toggles the slider panel.
+ */
+export function roomTvVolumeIconClick(opts: {
+  quiet: boolean;
+  panelOpen: boolean;
+  volume: number;
+}): { muted: boolean; panelOpen: boolean; volume: number } {
+  if (opts.quiet) {
+    return {
+      muted: false,
+      panelOpen: true,
+      volume: opts.volume > 0 ? opts.volume : 1,
+    };
+  }
+  return {
+    muted: false,
+    panelOpen: roomTvVolumePanelAfterIconClick(opts.panelOpen),
+    volume: opts.volume,
+  };
 }
 
 export function roomTvSinkMuted(volume: number, muted: boolean): boolean {
@@ -849,22 +906,41 @@ export type AttachMediaEl = {
 
 export type TvSinkVolume = { volume: number; muted: boolean };
 
+export type AttachMediaSink = TvSinkVolume & {
+  /** Fired when play only succeeded after forcing mute (autoplay policy). */
+  onAutoplayMuted?: () => void;
+};
+
+/** Bind a stream to a media element without resetting srcObject on every emit. */
 export function attachMediaStream(
   el: AttachMediaEl | HTMLMediaElement | null | undefined,
   stream: MediaStream | null,
-  sink?: TvSinkVolume
+  sink?: AttachMediaSink
 ): void {
   if (!el) return;
   const media = el as AttachMediaEl;
   const play = () => {
     if (!stream) return;
-    void tryPlay(media).finally(() => {
-      if (sink) applyTvSinkVolume(media as { volume: number; muted: boolean }, sink);
+    void tryPlay(media).then((result) => {
+      if (!sink) return;
+      if (result === "muted") {
+        applyTvSinkVolume(media as { volume: number; muted: boolean }, {
+          volume: sink.volume,
+          muted: true,
+        });
+        sink.onAutoplayMuted?.();
+        return;
+      }
+      if (result === "ok") {
+        applyTvSinkVolume(media as { volume: number; muted: boolean }, sink);
+      }
     });
   };
   if (media.srcObject === stream) {
     if (stream && media.paused) play();
-    else if (sink) applyTvSinkVolume(media as { volume: number; muted: boolean }, sink);
+    else if (sink) {
+      applyTvSinkVolume(media as { volume: number; muted: boolean }, sink);
+    }
     return;
   }
   media.srcObject = stream;
@@ -1029,15 +1105,17 @@ export function attachPlaybackUrl(
 async function tryPlay(el: {
   muted: boolean;
   play: () => Promise<void>;
-}): Promise<void> {
+}): Promise<"ok" | "muted" | "fail"> {
   try {
     await el.play();
+    return "ok";
   } catch {
     el.muted = true;
     try {
       await el.play();
+      return "muted";
     } catch {
-      /* autoplay still blocked */
+      return "fail";
     }
   }
 }

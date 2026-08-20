@@ -299,3 +299,69 @@ describe("goAuth.mintPlatformInvite (GO-INVITE)", () => {
     expect(lsKeys).toEqual([]);
   });
 });
+
+describe("goAuth.initFromLocation / refreshProfile (session keep)", () => {
+  const originalFetch = globalThis.fetch;
+
+  afterEach(() => {
+    goAuth.__setApiKeyForTests(null);
+    goAuth.clear();
+    if (originalFetch) globalThis.fetch = originalFetch;
+    vi.unstubAllGlobals();
+  });
+
+  it("keeps same-tab login when /v1/field/me fails offline", async () => {
+    goAuth.__setApiKeyForTests("pg_sk_offline");
+    vi.stubGlobal("window", {
+      location: { hash: "", search: "", pathname: "/", href: "https://go.samkuo.me/" },
+    });
+    vi.stubGlobal("fetch", async () => {
+      throw new TypeError("Failed to fetch");
+    });
+
+    await goAuth.initFromLocation();
+
+    expect(goAuth.loggedIn).toBe(true);
+    expect(goAuth.getPlatformApiKeyForHostLoop()).toBe("pg_sk_offline");
+  });
+
+  it("clears same-tab login when /v1/field/me returns 401", async () => {
+    goAuth.__setApiKeyForTests("pg_sk_revoked");
+    vi.stubGlobal("window", {
+      location: { hash: "", search: "", pathname: "/", href: "https://go.samkuo.me/" },
+    });
+    vi.stubGlobal(
+      "fetch",
+      async () => new Response("{}", { status: 401 })
+    );
+
+    await goAuth.initFromLocation();
+
+    expect(goAuth.loggedIn).toBe(false);
+    expect(goAuth.getPlatformApiKeyForHostLoop()).toBeNull();
+  });
+
+  it("refreshProfile keeps the session on a network error", async () => {
+    goAuth.__setApiKeyForTests("pg_sk_offline");
+    vi.stubGlobal("fetch", async () => {
+      throw new TypeError("Failed to fetch");
+    });
+
+    const profile = await goAuth.refreshProfile();
+
+    expect(goAuth.loggedIn).toBe(true);
+    expect(goAuth.getPlatformApiKeyForHostLoop()).toBe("pg_sk_offline");
+    expect(profile).toBe(goAuth.profile);
+  });
+
+  it("refreshProfile clears the session on 401", async () => {
+    goAuth.__setApiKeyForTests("pg_sk_revoked");
+    vi.stubGlobal(
+      "fetch",
+      async () => new Response("{}", { status: 401 })
+    );
+
+    await expect(goAuth.refreshProfile()).resolves.toBeNull();
+    expect(goAuth.loggedIn).toBe(false);
+  });
+});

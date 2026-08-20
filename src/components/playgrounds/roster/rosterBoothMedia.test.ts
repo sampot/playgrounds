@@ -4,6 +4,7 @@ import {
   boothSlotOfIndex,
   boothTransceiverIndex,
   boothVideoCodecPreferences,
+  ensureBoothTransceiversSendrecv,
   replaceBoothTrack,
 } from "./rosterBoothMedia";
 
@@ -79,5 +80,17 @@ describe("replaceBoothTrack", () => {
     const track = { kind: "video" };
     await replaceBoothTrack(pc, "program", "video", track as MediaStreamTrack);
     expect(pc.getTransceivers()[3]!.direction).toBe("sendrecv");
+  });
+});
+
+describe("ensureBoothTransceiversSendrecv", () => {
+  it("forces every transceiver back to sendrecv before createAnswer", () => {
+    const pc = mockPc();
+    for (const tr of pc.getTransceivers()) tr.direction = "recvonly";
+    expect(ensureBoothTransceiversSendrecv(pc)).toBe(4);
+    expect(pc.getTransceivers().every((t) => t.direction === "sendrecv")).toBe(
+      true
+    );
+    expect(ensureBoothTransceiversSendrecv(pc)).toBe(0);
   });
 });

@@ -23,7 +23,14 @@ import {
   createRoomPlaySink,
   type RoomPlaySink,
 } from "./goRoomFilePlay";
+import { waitRoomPlaySw } from "./goRoomPlayBridge";
 import { fileShareKind } from "./goRoomFileShare";
+import {
+  SESSION_FILE_PLAY_MAX_INFLIGHT,
+  SESSION_FILE_PLAY_RANGE_SLICE,
+  SESSION_FILE_PLAY_SEEK_DEBOUNCE_MS,
+  SESSION_FILE_PLAY_SEEK_SLACK,
+} from "./goRoomPlayRegistry";
 
 export type { RoomFileWritable };
 export { SESSION_FILE_PLAY_BUFFER_MAX } from "./goRoomFilePlay";
@@ -74,6 +81,7 @@ export type RoomFileTransfer = {
   unshare(id: string, opts?: { host?: boolean }): boolean;
   download(id: string, pickSave: RoomFilePickSave): Promise<RoomFileResult>;
   play(id: string): Promise<RoomFileResult>;
+  seekPlay(offset: number): Promise<RoomFileResult>;
   stopPlay(): void;
   notePlayhead(seconds: number): void;
   localFile(id: string): File | null;
@@ -93,7 +101,12 @@ export type RoomFileTransferDeps = {
   sendBinary: (buf: ArrayBuffer, destPeerId?: string) => void;
   bufferedAmount?: (destPeerId?: string) => number;
   newId?: () => string;
-  createPlaySink?: (opts: { mime?: string; name?: string }) => RoomPlaySink;
+  createPlaySink?: (opts: {
+    mime?: string;
+    name?: string;
+    size?: number;
+    playId?: string;
+  }) => RoomPlaySink;
 };
 
 const BUFFER_HIGH = 64 * 1024;
@@ -105,6 +118,7 @@ type Inbound = {
   size: number;
   writes: Promise<void>;
   purpose: "save" | "play";
+  baseOffset: number;
   writable?: RoomFileWritable;
   mime?: string;
   name?: string;
@@ -146,21 +160,48 @@ export function createRoomFileTransfer(
   let entries: RoomFileEntry[] = [];
   const listeners = new Set<(s: RoomFileState) => void>();
   const outboundFiles = new Map<string, File>();
-  let inbound: Inbound | null = null;
-  let outboundTransferId: string | null = null;
-  let pumpAbort = false;
-  let pumpPaused = false;
+  const inbounds = new Map<string, Inbound>();
+  const outboundPumps = new Map<
+    string,
+    {
+      transferId: string;
+      fileId: string;
+      destPeerId?: string;
+      abort: boolean;
+      paused: boolean;
+    }
+  >();
   let playback: RoomFilePlayback | null = null;
   let playSink: RoomPlaySink | null = null;
+  let lastSeekOpenAt = -1;
+  let lastSeekOpenTs = 0;
   const makePlaySink =
     deps.createPlaySink ??
-    ((opts: { mime?: string; name?: string }) => createRoomPlaySink(opts));
+    ((opts: { mime?: string; name?: string; size?: number; playId?: string }) =>
+      createRoomPlaySink(opts));
+
+  function playInbounds(): Inbound[] {
+    return [...inbounds.values()].filter((i) => i.purpose === "play");
+  }
+
+  function hasSaveInbound(): boolean {
+    for (const i of inbounds.values()) {
+      if (i.purpose === "save") return true;
+    }
+    return false;
+  }
 
   function busy(): boolean {
-    return inbound != null || outboundTransferId != null;
+    return inbounds.size > 0 || outboundPumps.size > 0;
+  }
+
+  function pumpsForPeer(peer?: string) {
+    const key = peer ?? "";
+    return [...outboundPumps.values()].filter((p) => (p.destPeerId ?? "") === key);
   }
 
   function snap(): RoomFileState {
+    if (playback && playSink) playback.url = playSink.url;
     return {
       entries: entries.map((e) => ({ ...e })),
       busy: busy(),
@@ -199,26 +240,82 @@ export function createRoomFileTransfer(
     }
   }
 
+  function abortOutboundForFile(fileId: string): void {
+    for (const p of outboundPumps.values()) {
+      if (p.fileId === fileId) p.abort = true;
+    }
+  }
+
+  function cancelInboundsForFile(fileId: string, reason: string): void {
+    for (const cur of [...inbounds.values()]) {
+      if (cur.fileId !== fileId) continue;
+      sendSafe(
+        buildSessionFileControl({
+          op: "cancel",
+          id: cur.fileId,
+          transferId: cur.transferId,
+        })
+      );
+      void closeInbound(cur, false, reason);
+    }
+  }
+
+  function evictPlayInboundFor(at: number): Inbound | undefined {
+    const plays = playInbounds();
+    if (plays.length < SESSION_FILE_PLAY_MAX_INFLIGHT) return undefined;
+    const pool = plays.filter(
+      (p) => !(p.baseOffset === 0 && p.received < p.size - p.baseOffset)
+    );
+    const candidates = pool.length > 0 ? pool : plays;
+    let worst = candidates[0];
+    let worstScore = -1;
+    for (const p of candidates) {
+      const pumped = p.baseOffset + p.received;
+      const dist =
+        at < p.baseOffset ? p.baseOffset - at : at > pumped ? at - pumped : 0;
+      const score = dist * 2 + p.baseOffset;
+      if (score > worstScore) {
+        worst = p;
+        worstScore = score;
+      }
+    }
+    return worst;
+  }
+
+  function dropPlayInbound(cur: Inbound): void {
+    if (inbounds.get(cur.transferId) !== cur) return;
+    inbounds.delete(cur.transferId);
+    sendSafe(
+      buildSessionFileControl({
+        op: "cancel",
+        id: cur.fileId,
+        transferId: cur.transferId,
+      })
+    );
+  }
+
   function applyPlayPressure(pressure: "ok" | "high" | "low"): void {
-    if (!inbound || inbound.purpose !== "play") return;
-    if (pressure === "high" && !inbound.playPaused) {
-      inbound.playPaused = true;
-      sendSafe(
-        buildSessionFileControl({
-          op: "pause",
-          id: inbound.fileId,
-          transferId: inbound.transferId,
-        })
-      );
-    } else if (pressure === "low" && inbound.playPaused) {
-      inbound.playPaused = false;
-      sendSafe(
-        buildSessionFileControl({
-          op: "resume",
-          id: inbound.fileId,
-          transferId: inbound.transferId,
-        })
-      );
+    for (const cur of playInbounds()) {
+      if (pressure === "high" && !cur.playPaused) {
+        if (cur.baseOffset > 0) continue;
+        cur.playPaused = true;
+        sendSafe(
+          buildSessionFileControl({
+            op: "pause",
+            id: cur.fileId,
+            transferId: cur.transferId,
+          })
+        );
+      } else if (pressure === "low" && cur.playPaused) {
+        cur.playPaused = false;
+        sendSafe(
+          buildSessionFileControl({
+            op: "resume",
+            id: cur.fileId,
+            transferId: cur.transferId,
+          })
+        );
+      }
     }
   }
 
@@ -233,23 +330,30 @@ export function createRoomFileTransfer(
     fileId: string,
     file: File,
     transferId: string,
-    destPeerId?: string
+    destPeerId?: string,
+    startOffset = 0
   ): Promise<void> {
-    outboundTransferId = transferId;
-    pumpAbort = false;
-    pumpPaused = false;
-    patch(fileId, { status: "transferring", received: 0, error: undefined });
+    const pump = {
+      transferId,
+      fileId,
+      destPeerId,
+      abort: false,
+      paused: false,
+    };
+    outboundPumps.set(transferId, pump);
+    const from = Math.max(0, Math.min(file.size, Math.floor(startOffset)));
+    patch(fileId, { status: "transferring", received: from, error: undefined });
     try {
-      let offset = 0;
+      let offset = from;
       let seq = 0;
       while (offset < file.size) {
-        if (pumpAbort) return;
-        while (pumpPaused && !pumpAbort) {
+        if (pump.abort) return;
+        while (pump.paused && !pump.abort) {
           await new Promise((r) => setTimeout(r, 16));
         }
-        if (pumpAbort) return;
+        if (pump.abort) return;
         await waitDrain(destPeerId);
-        if (pumpAbort) return;
+        if (pump.abort) return;
         const end = Math.min(offset + SESSION_FILE_CHUNK_PAYLOAD_MAX, file.size);
         const slice = file.slice(offset, end);
         const buf = new Uint8Array(await slice.arrayBuffer());
@@ -263,9 +367,12 @@ export function createRoomFileTransfer(
         );
         offset += buf.byteLength;
         seq += 1;
-        patch(fileId, { received: offset });
+        const listed = entries.find((e) => e.id === fileId);
+        patch(fileId, {
+          received: Math.max(listed?.received ?? 0, offset),
+        });
       }
-      if (pumpAbort) return;
+      if (pump.abort) return;
       sendSafe(
         buildSessionFileControl({
           op: "done",
@@ -287,7 +394,7 @@ export function createRoomFileTransfer(
         })
       );
     } finally {
-      outboundTransferId = null;
+      outboundPumps.delete(transferId);
       emit();
     }
   }
@@ -350,7 +457,7 @@ export function createRoomFileTransfer(
       }
     }
     for (const gone of drop) outboundFiles.delete(gone);
-    if (outboundTransferId) pumpAbort = true;
+    abortOutboundForFile(id);
     if (playback && drop.has(playback.id)) revokePlayback();
     entries = entries.filter((e) => !drop.has(e.id));
     emit();
@@ -363,16 +470,7 @@ export function createRoomFileTransfer(
     if (!entry) return false;
     if (entry.mine) return unshareLocal(id);
     if (!opts?.host) return false;
-    if (inbound && inbound.fileId === id) {
-      sendSafe(
-        buildSessionFileControl({
-          op: "cancel",
-          id: inbound.fileId,
-          transferId: inbound.transferId,
-        })
-      );
-      void closeInbound(false, "已撤回");
-    }
+    cancelInboundsForFile(id, "已撤回");
     if (playback?.id === id) revokePlayback();
     entries = entries.filter((e) => e.id !== id && e.parentId !== id);
     emit();
@@ -426,15 +524,16 @@ export function createRoomFileTransfer(
       return { ok: false, error: "已取消", cancelled: true };
     }
     const transferId = newId();
-    inbound = {
+    inbounds.set(transferId, {
       fileId: id,
       transferId,
       received: 0,
       size: entry.size,
       writes: Promise.resolve(),
       purpose: "save",
+      baseOffset: 0,
       writable,
-    };
+    });
     patch(id, { status: "transferring", received: 0, error: undefined });
     sendSafe(
       buildSessionFileControl({
@@ -474,10 +573,18 @@ export function createRoomFileTransfer(
     }
     revokePlayback();
     const playKind = playbackKindOf(entry.mime, entry.name);
+    const transferId = newId();
+    if (playKind !== "image") await waitRoomPlaySw();
     playSink =
       playKind === "image"
         ? createImagePreviewSink({ mime: entry.mime, name: entry.name })
-        : makePlaySink({ mime: entry.mime, name: entry.name });
+        : makePlaySink({
+            mime: entry.mime,
+            name: entry.name,
+            size: entry.size,
+            /** Stable per file so remount／re-play keeps the same `/room-play/<id>`. */
+            playId: id,
+          });
     playback = {
       id,
       url: playSink.url,
@@ -485,18 +592,18 @@ export function createRoomFileTransfer(
       mime: entry.mime || "application/octet-stream",
       kind: playbackKindOf(entry.mime, entry.name),
     };
-    const transferId = newId();
-    inbound = {
+    inbounds.set(transferId, {
       fileId: id,
       transferId,
       received: 0,
       size: entry.size,
       writes: Promise.resolve(),
       purpose: "play",
+      baseOffset: 0,
       mime: entry.mime,
       name: entry.name,
       playPaused: false,
-    };
+    });
     patch(id, { status: "transferring", received: 0, error: undefined });
     sendSafe(
       buildSessionFileControl({
@@ -504,29 +611,126 @@ export function createRoomFileTransfer(
         id,
         transferId,
         from: deps.localAgentId,
+        offset: 0,
       })
     );
     emit();
     return { ok: true, id };
   }
 
+  async function seekPlay(offset: number): Promise<RoomFileResult> {
+    const at = Math.floor(offset);
+    if (!Number.isFinite(at) || at < 0) {
+      return { ok: false, error: "無法跳到那裡" };
+    }
+    if (!playback || !playSink) {
+      return { ok: false, error: "沒有在播放" };
+    }
+    const entry = entries.find((e) => e.id === playback.id);
+    if (!entry || entry.mine) {
+      return { ok: true, id: playback.id };
+    }
+    if (at >= entry.size) {
+      return { ok: false, error: "無法跳到那裡" };
+    }
+    if (playSink.covers?.(at, Math.min(entry.size, at + 1))) {
+      return { ok: true, id: playback.id };
+    }
+    const resumePlay = (cur: Inbound) => {
+      if (!cur.playPaused) return;
+      cur.playPaused = false;
+      sendSafe(
+        buildSessionFileControl({
+          op: "resume",
+          id: cur.fileId,
+          transferId: cur.transferId,
+        })
+      );
+    };
+    /**
+     * Active transfer that already owns this byte region: wait for it.
+     * Slack must be >> SW need slice or every pull opens another DC Range.
+     */
+    for (const cur of playInbounds()) {
+      if (cur.fileId !== playback.id) continue;
+      const pumped = cur.baseOffset + cur.received;
+      if (at >= cur.baseOffset && at <= pumped + SESSION_FILE_PLAY_SEEK_SLACK) {
+        resumePlay(cur);
+        return { ok: true, id: playback.id };
+      }
+    }
+    const now = Date.now();
+    if (
+      lastSeekOpenAt >= 0 &&
+      now - lastSeekOpenTs < SESSION_FILE_PLAY_SEEK_DEBOUNCE_MS &&
+      Math.abs(at - lastSeekOpenAt) <= SESSION_FILE_PLAY_RANGE_SLICE
+    ) {
+      return { ok: true, id: playback.id };
+    }
+    if (hasSaveInbound()) {
+      return { ok: false, error: "一次只能傳一個檔" };
+    }
+    /** Far seek: drop transfers that cannot serve this offset. */
+    for (const cur of [...playInbounds()]) {
+      if (cur.fileId !== playback.id) continue;
+      const pumped = cur.baseOffset + cur.received;
+      const near =
+        at >= cur.baseOffset - SESSION_FILE_PLAY_SEEK_SLACK &&
+        at <= pumped + SESSION_FILE_PLAY_SEEK_SLACK;
+      if (!near) dropPlayInbound(cur);
+    }
+    const victim = evictPlayInboundFor(at);
+    if (victim) dropPlayInbound(victim);
+    const transferId = newId();
+    lastSeekOpenAt = at;
+    lastSeekOpenTs = now;
+    inbounds.set(transferId, {
+      fileId: playback.id,
+      transferId,
+      received: 0,
+      size: entry.size,
+      writes: Promise.resolve(),
+      purpose: "play",
+      baseOffset: at,
+      mime: entry.mime,
+      name: entry.name,
+      playPaused: false,
+    });
+    patch(playback.id, {
+      status: "transferring",
+      received: Math.max(entry.received, at, playReceivedAbs(playback.id)),
+      error: undefined,
+    });
+    sendSafe(
+      buildSessionFileControl({
+        op: "request",
+        id: playback.id,
+        transferId,
+        from: deps.localAgentId,
+        offset: at,
+      })
+    );
+    emit();
+    return { ok: true, id: playback.id };
+  }
+
   function stopPlay(): void {
-    if (inbound?.purpose === "play") {
+    for (const cur of playInbounds()) {
       sendSafe(
         buildSessionFileControl({
           op: "cancel",
-          id: inbound.fileId,
-          transferId: inbound.transferId,
+          id: cur.fileId,
+          transferId: cur.transferId,
         })
       );
-      void closeInbound(false, "已停止播放");
+      void closeInbound(cur, false, "已停止播放");
     }
     revokePlayback();
     emit();
   }
 
   function notePlayhead(seconds: number): void {
-    if (!playSink || inbound?.purpose !== "play") return;
+    if (!playSink || playInbounds().length === 0) return;
     void playSink.evictUntil(seconds).then(applyPlayPressure);
   }
 
@@ -551,9 +755,10 @@ export function createRoomFileTransfer(
     const gone = entries.filter((e) => e.ownerId === ownerId);
     if (gone.length === 0) return [];
     const ids = gone.map((e) => e.id);
-    if (inbound && ids.includes(inbound.fileId)) {
-      void inbound.writable?.abort?.();
-      inbound = null;
+    for (const cur of [...inbounds.values()]) {
+      if (!ids.includes(cur.fileId)) continue;
+      void cur.writable?.abort?.();
+      inbounds.delete(cur.transferId);
     }
     if (playback && ids.includes(playback.id)) revokePlayback();
     entries = entries.filter((e) => e.ownerId !== ownerId);
@@ -561,10 +766,12 @@ export function createRoomFileTransfer(
     return ids;
   }
 
-  async function closeInbound(ok: boolean, error?: string): Promise<void> {
-    const cur = inbound;
-    inbound = null;
-    if (!cur) return;
+  async function closeInbound(
+    cur: Inbound,
+    ok: boolean,
+    error?: string
+  ): Promise<void> {
+    if (inbounds.get(cur.transferId) === cur) inbounds.delete(cur.transferId);
     try {
       await cur.writes;
       if (cur.purpose === "save" && cur.writable) {
@@ -575,23 +782,39 @@ export function createRoomFileTransfer(
       /* ignore close errors */
     }
     if (ok && cur.purpose === "play") {
-      playSink?.end();
-      if (playback && playSink && playback.id === cur.fileId) {
-        playback = { ...playback, url: playSink.url };
+      const expect = Math.max(0, cur.size - cur.baseOffset);
+      if (cur.received !== expect) {
+        patch(cur.fileId, {
+          status: "error",
+          error: "檔案不完整",
+        });
+        return;
+      }
+      if (playInbounds().length === 0) {
+        playSink?.end();
+        if (playback && playSink && playback.id === cur.fileId) {
+          playback = { ...playback, url: playSink.url };
+        }
       }
     }
     if (ok) {
-      patch(cur.fileId, {
-        status: "listed",
-        received: cur.size,
-        error: undefined,
-      });
+      if (cur.purpose !== "play" || playInbounds().length === 0) {
+        patch(cur.fileId, {
+          status: "listed",
+          received: cur.size,
+          error: undefined,
+        });
+      }
     } else {
-      if (cur.purpose === "play") revokePlayback();
-      patch(cur.fileId, {
-        status: "error",
-        error: error || (cur.purpose === "play" ? "播放失敗" : "下載失敗"),
-      });
+      if (cur.purpose === "play" && playInbounds().length === 0) {
+        revokePlayback();
+      }
+      if (cur.purpose !== "play" || playInbounds().length === 0) {
+        patch(cur.fileId, {
+          status: "error",
+          error: error || (cur.purpose === "play" ? "播放失敗" : "下載失敗"),
+        });
+      }
     }
   }
 
@@ -633,24 +856,9 @@ export function createRoomFileTransfer(
         }
       }
       outboundFiles.delete(data.id);
-      if (outboundTransferId) pumpAbort = true;
+      abortOutboundForFile(data.id);
       if (playback?.id === data.id) revokePlayback();
-      const inboundHit =
-        inbound &&
-        (inbound.fileId === data.id ||
-          entries.some(
-            (e) => e.id === inbound?.fileId && e.parentId === data.id
-          ));
-      if (inbound && inboundHit) {
-        sendSafe(
-          buildSessionFileControl({
-            op: "cancel",
-            id: inbound.fileId,
-            transferId: inbound.transferId,
-          })
-        );
-        void closeInbound(false, "對方已撤回");
-      }
+      cancelInboundsForFile(data.id, "對方已撤回");
       entries = entries.filter(
         (e) => e.id !== data.id && e.parentId !== data.id
       );
@@ -700,92 +908,119 @@ export function createRoomFileTransfer(
         }
         return;
       }
-      if (busy() && outboundTransferId !== transferId) {
-        sendSafe(
-          buildSessionFileControl({
-            op: "reject",
-            id: data.id,
-            transferId,
-          })
-        );
-        return;
+      const peerPumps = pumpsForPeer(data.from);
+      if (peerPumps.length >= SESSION_FILE_PLAY_MAX_INFLIGHT) {
+        peerPumps[0]!.abort = true;
       }
-      void pumpOutbound(data.id, file, transferId, data.from);
+      void pumpOutbound(data.id, file, transferId, data.from, data.offset ?? 0);
       return;
     }
     if (data.op === "pause") {
-      if (data.transferId && outboundTransferId === data.transferId) {
-        pumpPaused = true;
-      }
+      const pump = data.transferId ? outboundPumps.get(data.transferId) : undefined;
+      if (pump) pump.paused = true;
       return;
     }
     if (data.op === "resume") {
-      if (data.transferId && outboundTransferId === data.transferId) {
-        pumpPaused = false;
-      }
+      const pump = data.transferId ? outboundPumps.get(data.transferId) : undefined;
+      if (pump) pump.paused = false;
       return;
     }
     if (data.op === "reject" || data.op === "cancel") {
-      if (data.transferId && inbound?.transferId === data.transferId) {
-        void closeInbound(false, data.op === "reject" ? "現在傳不了" : "已取消");
+      const inboundHit = data.transferId ? inbounds.get(data.transferId) : undefined;
+      if (inboundHit) {
+        void closeInbound(
+          inboundHit,
+          false,
+          data.op === "reject" ? "現在傳不了" : "已取消"
+        );
       }
-      if (data.transferId && outboundTransferId === data.transferId) {
-        pumpAbort = true;
-      }
+      const pump = data.transferId ? outboundPumps.get(data.transferId) : undefined;
+      if (pump) pump.abort = true;
       return;
     }
     if (data.op === "done") {
-      if (data.transferId && inbound?.transferId === data.transferId) {
-        const cur = inbound;
+      const cur = data.transferId ? inbounds.get(data.transferId) : undefined;
+      if (cur) {
         void cur.writes.then(() => {
-          if (inbound !== cur) return;
-          if (cur.received !== cur.size) {
-            void closeInbound(false, "檔案不完整");
+          if (inbounds.get(cur.transferId) !== cur) return;
+          if (cur.received !== cur.size - cur.baseOffset) {
+            void closeInbound(cur, false, "檔案不完整");
             return;
           }
-          void closeInbound(true);
+          void closeInbound(cur, true);
         });
       }
     }
   }
 
+  function playReceivedAbs(fileId: string): number {
+    let max = 0;
+    for (const cur of playInbounds()) {
+      if (cur.fileId !== fileId) continue;
+      max = Math.max(max, cur.baseOffset + cur.received);
+    }
+    const listed = entries.find((e) => e.id === fileId);
+    if (listed) max = Math.max(max, listed.received);
+    return max;
+  }
+
   function onBinary(buf: ArrayBuffer | Uint8Array): void {
     const chunk = decodeSessionFileChunk(buf);
-    if (!chunk || !inbound) return;
-    if (chunk.transferId !== inbound.transferId) return;
-    const next = inbound.received + chunk.payload.byteLength;
-    if (next > inbound.size) {
-      void closeInbound(false, "檔案超過宣告大小");
+    if (!chunk) return;
+    const cur = inbounds.get(chunk.transferId);
+    if (!cur) return;
+    const at = cur.baseOffset + cur.received;
+    const nextGot = cur.received + chunk.payload.byteLength;
+    if (at + chunk.payload.byteLength > cur.size) {
+      void closeInbound(cur, false, "檔案超過宣告大小");
       sendSafe(
         buildSessionFileControl({
           op: "cancel",
-          id: inbound.fileId,
-          transferId: inbound.transferId,
+          id: cur.fileId,
+          transferId: cur.transferId,
         })
       );
       return;
     }
     const payload = chunk.payload;
-    inbound.received = next;
-    inbound.writes = inbound.writes.then(async () => {
-      if (inbound?.purpose === "play") {
+    cur.writes = cur.writes.then(async () => {
+      if (inbounds.get(cur.transferId) !== cur) return;
+      if (cur.purpose === "play") {
         if (!playSink) return;
-        const pressure = await playSink.append(payload);
-        applyPlayPressure(pressure);
+        const end = Math.min(cur.size, at + payload.byteLength);
+        const pressure = await playSink.append(payload, at);
+        const accepted = playSink.covers?.(at, end) ?? true;
+        if (accepted) {
+          cur.received = nextGot;
+          patch(cur.fileId, { received: playReceivedAbs(cur.fileId) });
+          applyPlayPressure(pressure);
+        } else {
+          if (!cur.playPaused) {
+            cur.playPaused = true;
+            sendSafe(
+              buildSessionFileControl({
+                op: "pause",
+                id: cur.fileId,
+                transferId: cur.transferId,
+              })
+            );
+          }
+        }
         return;
       }
-      await inbound?.writable?.write(payload);
+      cur.received = nextGot;
+      await cur.writable?.write(payload);
+      patch(cur.fileId, { received: at + payload.byteLength });
     });
-    patch(inbound.fileId, { received: next });
   }
 
   function dispose(): void {
-    pumpAbort = true;
-    if (inbound) void inbound.writable?.abort?.();
-    inbound = null;
+    for (const p of outboundPumps.values()) p.abort = true;
+    for (const cur of inbounds.values()) void cur.writable?.abort?.();
+    inbounds.clear();
     outboundFiles.clear();
     entries = [];
-    outboundTransferId = null;
+    outboundPumps.clear();
     revokePlayback();
     emit();
   }
@@ -797,6 +1032,7 @@ export function createRoomFileTransfer(
     unshare,
     download,
     play,
+    seekPlay,
     stopPlay,
     notePlayhead,
     localFile,

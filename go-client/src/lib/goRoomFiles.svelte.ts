@@ -2,12 +2,11 @@
  * 包廂 file-share UI state — attach from guest/host room runtimes.
  */
 
-import {
-  createRoomFileTransfer,
-  type RoomFileEntry,
-  type RoomFilePickSave,
-  type RoomFilePlayback,
-  type RoomFileTransfer,
+import type {
+  RoomFileEntry,
+  RoomFilePickSave,
+  RoomFilePlayback,
+  RoomFileTransfer,
 } from "./goRoomFileTransfer";
 import type { SessionFileControl, SessionFileShareItem } from "@pg/roster/rosterSessionFile";
 
@@ -17,6 +16,10 @@ class GoRoomFiles {
   playback = $state<RoomFilePlayback | null>(null);
   #xfer: RoomFileTransfer | null = null;
   #unsub: (() => void) | null = null;
+  #unlistenNeed: (() => void) | null = null;
+  #attachGen = 0;
+  #pendingControl: unknown[] = [];
+  #pendingBinary: ArrayBuffer[] = [];
 
   attach(opts: {
     localAgentId: string;
@@ -26,6 +29,28 @@ class GoRoomFiles {
     bufferedAmount?: (destPeerId?: string) => number;
   }): void {
     this.detach();
+    const gen = ++this.#attachGen;
+    void this.#boot(opts, gen);
+  }
+
+  async #boot(
+    opts: {
+      localAgentId: string;
+      localName: string;
+      sendJson: (msg: SessionFileControl) => void;
+      sendBinary: (buf: ArrayBuffer, destPeerId?: string) => void;
+      bufferedAmount?: (destPeerId?: string) => number;
+    },
+    gen: number
+  ): Promise<void> {
+    const [{ createRoomFileTransfer }, { listenRoomPlayNeed }, { parseRoomPlayPath }] =
+      await Promise.all([
+        import("./goRoomFileTransfer"),
+        import("./goRoomPlayBridge"),
+        import("./goRoomPlayRegistry"),
+      ]);
+    if (gen !== this.#attachGen) return;
+
     this.#xfer = createRoomFileTransfer(opts);
     this.#unsub = this.#xfer.subscribe((s) => {
       this.entries = s.entries;
@@ -38,9 +63,30 @@ class GoRoomFiles {
       }
       this.playback = s.playback;
     });
+    this.#unlistenNeed = listenRoomPlayNeed((playId, start) => {
+      const url = this.playback?.url ?? "";
+      let path = url;
+      try {
+        if (url && !url.startsWith("/")) path = new URL(url).pathname;
+      } catch {
+        /* keep */
+      }
+      if (parseRoomPlayPath(path) !== playId) return;
+      void this.#xfer?.seekPlay(start);
+    });
+
+    const ctrl = this.#pendingControl.splice(0);
+    const bins = this.#pendingBinary.splice(0);
+    for (const data of ctrl) this.#xfer.onControl(data);
+    for (const buf of bins) this.#xfer.onBinary(buf);
   }
 
   detach(): void {
+    this.#attachGen++;
+    this.#pendingControl = [];
+    this.#pendingBinary = [];
+    this.#unlistenNeed?.();
+    this.#unlistenNeed = null;
     this.#unsub?.();
     this.#unsub = null;
     this.#xfer?.dispose();
@@ -90,6 +136,13 @@ class GoRoomFiles {
     );
   }
 
+  seekPlay(offset: number) {
+    return (
+      this.#xfer?.seekPlay(offset) ??
+      Promise.resolve({ ok: false as const, error: "尚未連線" })
+    );
+  }
+
   stopPlay(): void {
     this.#xfer?.stopPlay();
   }
@@ -112,11 +165,20 @@ class GoRoomFiles {
   }
 
   onControl(data: unknown): void {
-    this.#xfer?.onControl(data);
+    if (!this.#xfer) {
+      this.#pendingControl.push(data);
+      return;
+    }
+    this.#xfer.onControl(data);
   }
 
   onBinary(buf: ArrayBuffer | Uint8Array): void {
-    this.#xfer?.onBinary(buf);
+    if (!this.#xfer) {
+      const view = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+      this.#pendingBinary.push(view.slice().buffer);
+      return;
+    }
+    this.#xfer.onBinary(buf);
   }
 }
 

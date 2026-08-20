@@ -105,7 +105,7 @@ describe("room file system copy", () => {
     ).toEqual([{ id: "f2", name: "presentation.pdf", ownerName: "小明" }]);
   });
 
-  it("offers 預覽／下載 from catalog consumes", () => {
+  it("offers 預覽／下載 from catalog consumes; skips both for the owner", () => {
     expect(roomSystemFileText("小明", "presentation.pdf")).toBe(
       "小明 上傳了 presentation.pdf"
     );
@@ -120,6 +120,13 @@ describe("room file system copy", () => {
       preview: true,
       download: true,
     });
+    expect(
+      roomSystemFileActions({
+        name: "clip.mp4",
+        mime: "video/mp4",
+        mine: true,
+      })
+    ).toEqual({ preview: false, download: false });
   });
 });
 

@@ -56,6 +56,7 @@ export {
   boothSlotOfIndex,
   boothTransceiverOf,
   replaceBoothTrack,
+  ensureBoothTransceiversSendrecv,
   applyBoothVideoCodecPreferences,
   boothVideoCodecPreferences,
 } from "./rosterBoothMedia";

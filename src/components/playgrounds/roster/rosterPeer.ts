@@ -13,7 +13,10 @@ import {
   encodeSessionSdpToRosterWire,
   decodeRosterWireToSdp,
 } from "./rosterWire";
-import { applyBoothVideoCodecPreferences } from "./rosterBoothMedia";
+import {
+  applyBoothVideoCodecPreferences,
+  ensureBoothTransceiversSendrecv,
+} from "./rosterBoothMedia";
 
 export { sdpHasAvMediaLines, sdpHasBoothMediaLines };
 
@@ -395,7 +398,10 @@ export async function acceptRosterOffer(opts: {
   });
 
   await pc.setRemoteDescription({ type: "offer", sdp: decoded.sdp });
-  if (opts.media === "ready") applyBoothVideoCodecPreferences(pc);
+  if (opts.media === "ready") {
+    ensureBoothTransceiversSendrecv(pc);
+    applyBoothVideoCodecPreferences(pc);
+  }
   const answer = await pc.createAnswer();
   await pc.setLocalDescription(answer);
   await waitIceComplete(pc, iceWaitOpts(opts.iceServers));

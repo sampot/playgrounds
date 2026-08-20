@@ -69,7 +69,7 @@
 - 以再開一個 `/room` 當「連上既有這一間」（`/room` 不是房號）。
 - 同時收兩路**在場**視訊拼成格子牆（節目＋在場是兩層槽，不是兩張臉）。同一人同時開鏡頭又開畫面分享；4K／跨網電影院承諾。
 - 用 DataChannel／每人本機 seek **當作包廂電視**的傳輸；用節目 RTP／`captureStream` **代替**個人下載或私下播檔。
-- **Live 收看不得**為通過而組整檔 `Blob`／MSE（live 走 RTP）。**檔案播放**走滑動緩衝／MSE，或（遠端檔）用 **Service Worker** 把 DC bytes 編成給 `<video>`／`<audio>` 的 `Response`（可 Range）；RAM 有頂、**不以整檔大小拒絕**。本機掛的 `File` 可用 object URL（OS 檔，不進 JS heap）。關播放器即 `revoke`／拆 MSE／停 SW 攔截。**下載落盤**仍禁止整檔 Blob 後備（§8.2）。
+- **Live 收看不得**為通過而組整檔 `Blob`／MSE（live 走 RTP）。**檔案播放**走滑動緩衝，或（遠端檔）用 **Service Worker** 把 DC bytes 編成給 `<video>`／`<audio>` 的 `Response`（可 Range）；RAM 有頂、**不以整檔大小拒絕**。本機掛的 `File` 可用 object URL（OS 檔，不進 JS heap）。關播放器即 `revoke`／停 SW 攔截。私下播**不用 MediaSource／mp4box**。**下載落盤**仍禁止整檔 Blob 後備（§8.2）。
 - **包廂下載不得**用 Service Worker 攔截另存、把 ReadableStream 當下載 `Response` 餵系統下載管理員。**播放**允許 SW（§9.3）。
 - **包廂傳檔不得**用 OPFS、IndexedDB、Cache Storage 當檔案緩衝或落盤。
 - **包廂傳檔不得**掛資料夾／子目錄（沒有 dir 列、沒有「選資料夾」）。一次可多選檔。
@@ -547,7 +547,7 @@ showSaveFilePicker({ suggestedName }) → fileHandle.createWritable()
 session_file.share     { id, name, size, mime, owner }   // 掛上：僅檔 metadata。本客戶端不送 kind:dir／parentId
 session_file.unshare   { id }                      // 撤一檔
 session_file.catalog   { items: share[] }          // 晚進門：Host 重放目錄
-session_file.request   { id, transferId, from, offset? }  // 下載或播放；writable 僅下載要就緒；播放 Range 可帶 byte offset
+session_file.request   { id, transferId, from, offset? }  // 下載或播放；writable 僅下載要就緒；播放 Range／seek＝新 transfer＋byte offset，owner `File.slice` 從該處泵到 EOF
 session_file.reject    { id, transferId }          // 已撤回／擁有者離席／無寫入能力／忙碌
 session_file.pause     { id, transferId }          // 播放緩衝滿；owner 停泵、transfer 仍在
 session_file.resume    { id, transferId }          // 窗口有空；owner 續泵
@@ -639,13 +639,13 @@ Guest ↔ Guest 不另建 PC；控制面經 Host fanout；內容經 Host 轉幀�
 | | 下載（§8.2） | 檢視 | 私下播放（影音檔） | 包廂電視 | 在場鏡頭 |
 | --- | --- | --- | --- | --- | --- |
 | 目的 | 對方硬碟多一份 | 當場看圖 | 我這台看／聽；可 seek；散場沒有檔 | 全場同一路；跟著來源走 | 可被主持切上電視 |
-| 開始 | 先 Save picker，再拉 bytes | `request` 後有上限暫看 | `session_file` chunk（滑動緩衝／MSE，或 SW 片源） | 進門即收節目 | 開＝offer；影像待指定 |
+| 開始 | 先 Save picker，再拉 bytes | `request` 後有上限暫看 | `session_file` chunk（滑動緩衝，或 SW 片源） | 進門即收節目 | 開＝offer；影像待指定 |
 | RAM | ≤ 一幀 chunk | 小圖可組暫存 object URL | 播放窗口軟頂 **32 MiB**；緩衝滿 `pause` owner | 瀏覽器 RTP；**禁止**組整檔 Blob | 同左 |
 | 控制 | 下載者自己的進度 | 關預覽即停 | **本機播放器** seek／暫停 | **來源端** seek／暫停；收看端不可對電視獨立拖進度 | 本機預覽 |
 
 檢視不是下載的 Blob 後備。私下播放＝只想自己看、不要一份落盤檔，**不是**電視。可等檔頭足夠就開播（mp4 常要 moov）；仍是 DC bytes。**禁止**為私下播組整檔 `Blob` 當暫存（本機 `File` object URL 除外）。
 
-**遠端私下播可用 Service Worker（允許、有邊界）：** 若 MSE／滑動窗口不夠讓瀏覽器原生 `<video>`／`<audio>` 做 Range／漸進讀檔，**可以**用 go 既有 SW 攔截一個本機播放 URL（例：`/room-play/<transferId>`），把 `session_file` chunk 編成 `Response`（含 `206` Range）。bytes 仍只走 WebRTC。
+**遠端私下播用 Service Worker（允許、有邊界）：** 用 go 既有 SW 攔截一個本機播放 URL（例：`/room-play/<transferId>`），把 `session_file` chunk 編成 `Response`（含 `206` Range）。bytes 仍只走 WebRTC。**不用 MediaSource／mp4box。**
 
 | 可 | 不可 |
 | --- | --- |
@@ -691,7 +691,7 @@ session_cast.state    { from: host, paused?, t?, name? }                     // 
 
 收看端**不必**再 `request` 節目（房級已收）。`paused`／`t` 僅 UI。開局不走 `session_cast`（見 §9.9 `session_play`）。
 
-**私下播檔不走 `session_cast`。** 重用 `session_file.request`／chunk／`done`；收方滑動緩衝、MSE 或 **SW 片源**，不是 Save picker。緩衝滿時 `pause`／`resume` 同一 `transferId`。
+**私下播檔不走 `session_cast`。** 重用 `session_file.request`／chunk／`done`；收方滑動緩衝或 **SW 片源**，不是 Save picker。同一檔私下播最多 **兩路** `transferId` 同時泵（頭＋尾，對齊 `<video>` 兩個 Range）。第三路 Range 淘汰較遠的那條。緩衝滿時 `pause`／`resume` 各 `transferId`。**下載**仍一次一個檔。
 
 **鏡頭** `session_camera`：
 
@@ -835,7 +835,7 @@ Esc 回大廳（現況 `goEscapeHome` 含 `/chat` → 改 `/room`）。**劇院�
 | 時間線 | RAM；散場丟 |
 | 檔案目錄 | RAM metadata（含目錄樹相對路徑）；散場丟。**內容**只在下載時寫入使用者選的檔；分頁不留副本 |
 | 檔案緩衝 | **禁止** OPFS／IndexedDB／Cache／SW 當**下載**後備（檢視圖的上限暫存除外；**播放**見下） |
-| 播放緩衝 | 影音檔播放＝滑動窗口／MSE，或遠端 **SW 片源**（軟頂 32 MiB）；**不以整檔大小拒絕**；關播放器 `revoke`／停攔截。本機掛檔可用 `File` object URL。SW **不得** Cache 整檔 |
+| 播放緩衝 | 影音檔播放＝滑動窗口，或遠端 **SW 片源**（軟頂 32 MiB）；**不以整檔大小拒絕**；關播放器 `revoke`／停攔截。本機掛檔可用 `File` object URL。SW **不得** Cache 整檔。**不用 MediaSource／mp4box** |
 | 收看緩衝 | live 僅瀏覽器 RTP 管線；**禁止**為 live 組整檔 Blob |
 | 顯示名 | 可繼續 Roster `localStorage` |
 | 分析 | 若打點，只計「鑄了包廂邀請／握手成功／掛過鏡頭」之類；不記正文、檔名、RTP |
@@ -990,7 +990,8 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 | 2026-08-19 | **Hub 先行、mesh 延後：** 檔與媒體一律經主持轉送（`GO_ROOM_MESH_ENABLED = false`）。進門 PC 建立後即綁本機 video；按收看才顯示 |
 | 2026-08-19 | **Live ≠ 檔：** 每人同時一條 live（`getUserMedia` XOR `getDisplayMedia`，可含聲），走 WebRTC，出現在在場名單。目錄只掛檔。影音檔改漸進下載＋本機播放器（可 seek），不佔 live、不走 `captureStream` |
 | 2026-08-19 | **只掛檔：** 分享目錄不掛資料夾；拿掉「選資料夾」／`webkitdirectory`。Drop 夾內檔當獨立檔。遠端 `kind:dir` 忽略 |
-| 2026-08-19 | **播放≠整檔緩存：** 取消 256 MiB 整檔上限。播放＝滑動窗口（32 MiB）／MSE，緩衝滿 `pause` owner。本機 `File` 仍走 object URL（不進 JS heap） |
+| 2026-08-19 | **播放≠整檔緩存：** 取消 256 MiB 整檔上限。播放＝滑動窗口（32 MiB），緩衝滿 `pause` owner。本機 `File` 仍走 object URL（不進 JS heap） |
+| 2026-08-19 | **私下播不用 MSE／mp4box：** 遠端檔只走 SW `/room-play/` 原始 bytes；無 playId 才 byte window |
 | 2026-08-19 | **播放可用 SW：** 遠端影音播放若需要，可用 go 既有 Service Worker 攔截播放 URL、把 DC chunk 編成媒體 `Response`（含 Range）。下載仍禁止 SW／Cache 整檔 |
 | 2026-08-19 | **包廂電視主面：** 靜態內景（不走動）；主面＝電視不是時間線；兩層螢幕（電視 RTP ≠ 私下播 DC）；主持指定來源；電影廣播＝節目 RTP／`captureStream`；房級收電視與開麥聲；文字＝輔助抽屜。凍結 #18–#28 |
 | 2026-08-19 | **2c 落地：** `goBoothLayout`／`GoBoothStage`；節目槽＝電視（`startProgram`／`putLiveOnTv`）；房級收節目與麥；文字／分享抽屜；私下播留在分享區 |
@@ -1014,4 +1015,4 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 | 2026-08-19 | **全螢幕同一套 HUD：** 系統全螢幕打在電視槽，不用 `<video>` 原生播放器；離開時只喚醒畫面、不改主持時鐘 |
 | 2026-08-19 | **HUD 還原＋音量：** 已全螢幕（槽或劇院態）圖示改還原；控制列加本機音量／靜音 |
 | 2026-08-19 | **電視一直開著：** 沒來源＝沒訊號（雪花），不是關機。讀者面 `沒訊號`／`從電視拿掉`；`unoffer` 只清輸入 |
-| 2026-08-19 | **播放器慣例列：** 單列不換行；音量條點喇叭才出現（直向）；序＝播、時間、進度、總長、音量、全螢幕 |
+| 2026-08-20 | **私下播兩路 Range：** 同一檔最多兩個 `transferId` 同時泵（頭＋尾）；第三路淘汰較遠的。下載仍一次一個檔 |

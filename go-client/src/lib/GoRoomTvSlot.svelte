@@ -6,13 +6,12 @@
     GO_ROOM_TV_PAUSE,
     GO_ROOM_TV_PLAY,
     GO_ROOM_TV_VOLUME,
-    applyTvSinkVolume,
     attachMediaStream,
     roomTvClockLabel,
     roomTvHudDefaultSink,
     roomTvHudHasTransport,
     roomTvSinkMuted,
-    roomTvVolumePanelAfterIconClick,
+    roomTvVolumeIconClick,
     type RoomTvHudKind,
   } from "$lib/goRoom";
 
@@ -72,8 +71,13 @@
   });
 
   $effect(() => {
-    attachMediaStream(videoEl, tvStream, { volume, muted: volMuted });
-    applyTvSinkVolume(videoEl, { volume, muted: volMuted });
+    attachMediaStream(videoEl, tvStream, {
+      volume,
+      muted: volMuted,
+      onAutoplayMuted: () => {
+        volMuted = true;
+      },
+    });
   });
 
   function onVolumeInput(ev: Event) {
@@ -83,7 +87,14 @@
   }
 
   function onVolumeIcon() {
-    volPanel = roomTvVolumePanelAfterIconClick(volPanel);
+    const next = roomTvVolumeIconClick({
+      quiet,
+      panelOpen: volPanel,
+      volume,
+    });
+    volMuted = next.muted;
+    volPanel = next.panelOpen;
+    volume = next.volume;
   }
 </script>
 
@@ -92,6 +103,7 @@
     bind:this={videoEl}
     class={["tv-video", !tvOn && "tv-video--off"].filter(Boolean).join(" ")}
     autoplay
+    muted
     playsinline
     controls={false}
     aria-label="包廂電視"

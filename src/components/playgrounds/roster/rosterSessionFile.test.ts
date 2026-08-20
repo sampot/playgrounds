@@ -102,6 +102,42 @@ describe("session_file control", () => {
     ).toBe(true);
   });
 
+  it("accepts a play request with a byte offset", () => {
+    expect(
+      isSessionFileControl({
+        type: SESSION_FILE_TYPE,
+        v: 1,
+        op: "request",
+        id: "file-1",
+        transferId: "tr-2",
+        from: "g",
+        offset: 4096,
+      })
+    ).toBe(true);
+    expect(
+      isSessionFileControl({
+        type: SESSION_FILE_TYPE,
+        v: 1,
+        op: "request",
+        id: "file-1",
+        transferId: "tr-2",
+        from: "g",
+        offset: -1,
+      })
+    ).toBe(false);
+    expect(
+      isSessionFileControl({
+        type: SESSION_FILE_TYPE,
+        v: 1,
+        op: "request",
+        id: "file-1",
+        transferId: "tr-2",
+        from: "g",
+        offset: 1.5,
+      })
+    ).toBe(false);
+  });
+
   it("blocks typical executable names", () => {
     expect(isBlockedSessionFileName("Setup.exe")).toBe(true);
     expect(isBlockedSessionFileName("note.APK")).toBe(true);

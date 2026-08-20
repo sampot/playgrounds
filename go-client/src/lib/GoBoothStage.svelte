@@ -15,6 +15,7 @@
   } from "$lib/goBoothHotspots";
   import {
     attachMediaStream,
+    roomTvHudDefaultSink,
     ROOM_SHORT_LANDSCAPE_MQ,
     type RoomOccupant,
   } from "$lib/goRoom";
@@ -156,7 +157,7 @@
   }
 
   $effect(() => {
-    attachMediaStream(tvEl, tvStream);
+    attachMediaStream(tvEl, tvStream, roomTvHudDefaultSink());
   });
 
   $effect(() => {
@@ -216,6 +217,7 @@
         style:width={`${overlay.width}px`}
         style:height={`${overlay.height}px`}
         autoplay
+        muted
         playsinline
         aria-label="包廂電視"
       ></video>

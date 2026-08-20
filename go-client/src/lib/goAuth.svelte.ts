@@ -16,6 +16,7 @@ import {
   clearPgProvisionHashFromLocation,
   fetchFieldMe,
   goLoginUrl,
+  isFieldCredentialRejected,
   mintPlatformInvite,
   parsePgProvisionFromLocation,
   redeemFieldProvision,
@@ -200,8 +201,9 @@ class GoAuth {
    * fetch profile → clear hash. Same as play (DEC-052). Fails soft.
    *
    * When no fresh provision is present but a session-scoped key was rehydrated
-   * (same-tab refresh / direct URL entry), revalidate it against `/v1/field/me`
-   * so a rotated-out key is dropped back to logged-out.
+   * (same-tab refresh / direct URL entry), revalidate it against `/v1/field/me`.
+   * Only drop the session when Platform rejects the key (401／403); network／
+   * offline failures keep the same-tab login + stored profile.
    */
   async initFromLocation(): Promise<void> {
     if (typeof window === "undefined") return;
@@ -227,23 +229,30 @@ class GoAuth {
 
         chromeSession.setFlash(BOSS_FLASH.loggedIn);
       } catch (err) {
-        this.#clearApiKey();
-        chromeSession.setFlash(BOSS_FLASH.loginExpired);
+        if (this.#apiKey && !isFieldCredentialRejected(err)) {
+          // Redeemed, but /me could not reach Platform (offline) — stay signed in.
+          chromeSession.setFlash(BOSS_FLASH.loggedIn);
+        } else {
+          this.#clearApiKey();
+          chromeSession.setFlash(BOSS_FLASH.loginExpired);
+        }
       } finally {
         this.busy = false;
       }
       return;
     }
 
-    // Rehydrated session key: refresh profile silently; on revalidation failure
-    // the constructor already marked loggedIn — drop it here.
+    // Rehydrated session key: refresh profile silently. Network blips keep login;
+    // only a rejected credential clears the session.
     if (this.#apiKey) {
       this.busy = true;
       try {
         const me = await fetchFieldMe(this.#apiKey);
         this.#applyFieldMe(me);
-      } catch {
-        this.#clearApiKey();
+      } catch (err) {
+        if (isFieldCredentialRejected(err)) {
+          this.#clearApiKey();
+        }
       } finally {
         this.busy = false;
       }
@@ -314,9 +323,12 @@ class GoAuth {
     try {
       const me = await fetchFieldMe(key);
       return this.#applyFieldMe(me);
-    } catch {
-      this.#clearApiKey();
-      return null;
+    } catch (err) {
+      if (isFieldCredentialRejected(err)) {
+        this.#clearApiKey();
+        return null;
+      }
+      return this.profile;
     }
   }
 

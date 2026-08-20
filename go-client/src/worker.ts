@@ -10,6 +10,10 @@ function isInvitePath(pathname: string): boolean {
   return pathname === "/i" || pathname.startsWith("/i/");
 }
 
+function isRoomPlayPath(pathname: string): boolean {
+  return pathname === "/room-play" || pathname.startsWith("/room-play/");
+}
+
 function isLegacyChatPath(pathname: string): boolean {
   return pathname === "/chat" || pathname.startsWith("/chat/");
 }
@@ -21,6 +25,12 @@ export default {
       const dest = new URL("/room", url);
       dest.search = url.search;
       return Response.redirect(dest, 308);
+    }
+    if (isRoomPlayPath(url.pathname)) {
+      return new Response(null, {
+        status: 404,
+        headers: { "Cache-Control": "no-store" },
+      });
     }
     if (!isInvitePath(url.pathname)) {
       return env.ASSETS.fetch(request);

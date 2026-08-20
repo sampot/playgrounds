@@ -3,6 +3,7 @@ import { BOOTH_TRANSCEIVER_SLOTS } from "@pg/roster/rosterBoothMedia";
 import { SESSION_CAST_TYPE } from "@pg/roster/rosterSessionCast";
 import { SESSION_CAMERA_TYPE, SESSION_MIC_TYPE } from "@pg/roster/rosterSessionCamera";
 import { createRoomMedia } from "./goRoomMedia";
+import { roomTvStream } from "./goRoom";
 
 function track(kind: "audio" | "video", id = kind) {
   return {
@@ -237,6 +238,108 @@ describe("createRoomMedia", () => {
     expect(media.getState().programName).toBe("MTV.mp4");
     expect(media.getState().localProgramStream).not.toBeNull();
     expect(media.getState().streamingFileId).toBeNull();
+  });
+
+  it("keeps the host TV on the local capture when a new peer joins with muted program receivers", async () => {
+    class FakeStream {
+      constructor(public tracks: MediaStreamTrack[]) {}
+    }
+    vi.stubGlobal("MediaStream", FakeStream);
+    const a = mockPc();
+    const b = mockPc();
+    const video = track("video", "prog-v");
+    Object.defineProperty(video, "muted", { value: false, configurable: true });
+    const placeholder = track("video", "guest-prog-placeholder");
+    Object.defineProperty(placeholder, "muted", {
+      value: true,
+      configurable: true,
+    });
+    Object.defineProperty(placeholder, "getSettings", {
+      value: () => ({}),
+      configurable: true,
+    });
+    b.transceivers[3]!.receiver.track = placeholder as unknown as {
+      kind: string;
+      id: string;
+      readyState: "live" | "ended";
+    };
+    let peers = [{ peerId: "g-a", pc: a, via: "entrance" as const }];
+    const file = new File([new Uint8Array(4)], "MTV.mp4", { type: "video/mp4" });
+    const media = createRoomMedia({
+      localAgentId: "host",
+      occupantCount: () => peers.length + 1,
+      peers: () => peers,
+      sendJson: () => {},
+      captureProgram: async () => ({
+        audio: null,
+        video,
+        stop: vi.fn(),
+      }),
+    });
+    expect((await media.startProgram(file)).ok).toBe(true);
+    const before = media.getState();
+    expect(before.localProgramStream).not.toBeNull();
+
+    peers = [
+      { peerId: "g-a", pc: a, via: "entrance" },
+      { peerId: "g-b", pc: b, via: "entrance" },
+    ];
+    await media.refresh();
+
+    const after = media.getState();
+    expect(after.programName).toBe("MTV.mp4");
+    expect(after.localProgramStream).not.toBeNull();
+    // Joiner PC may expose a muted program placeholder; TV must still prefer local.
+    expect(
+      roomTvStream({
+        programStream: after.programStream,
+        localProgramStream: after.localProgramStream,
+      })
+    ).toBe(after.localProgramStream);
+    expect(b.transceivers[3]!.sender.replaceTrack).toHaveBeenCalledWith(video);
+  });
+
+  it("exposes a muted remote program so joiners can bind the TV before the first frame", async () => {
+    class FakeStream {
+      constructor(public tracks: MediaStreamTrack[]) {}
+    }
+    vi.stubGlobal("MediaStream", FakeStream);
+    const pc = mockPc();
+    const remote = track("video", "host-prog");
+    Object.defineProperty(remote, "muted", { value: true, configurable: true });
+    Object.defineProperty(remote, "getSettings", {
+      value: () => ({}),
+      configurable: true,
+    });
+    pc.transceivers[3]!.receiver.track = remote as unknown as {
+      kind: string;
+      id: string;
+      readyState: "live" | "ended";
+    };
+    const media = createRoomMedia({
+      localAgentId: "g-b",
+      occupantCount: () => 2,
+      peers: () => [{ peerId: "host", pc, via: "entrance" }],
+      sendJson: () => {},
+    });
+    await media.onControl({
+      type: SESSION_CAST_TYPE,
+      v: 1,
+      op: "offer",
+      from: "host",
+      kind: "video",
+      name: "MTV.mp4",
+      id: "file-1",
+    });
+    await media.refresh();
+    expect(media.getState().watchingProgram).toBe(true);
+    expect(media.getState().programStream).not.toBeNull();
+    expect(
+      roomTvStream({
+        programStream: media.getState().programStream,
+        localProgramStream: media.getState().localProgramStream,
+      })
+    ).toBe(media.getState().programStream);
   });
 
   it("tags the catalog file id when the host puts a hanging file on the TV", async () => {

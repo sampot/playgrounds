@@ -12,7 +12,7 @@
     "binding": "ASSETS",
     // `/index.html` is the prerendered home page. Dynamic Invite routes need
     // SvelteKit's client fallback (`/200.html`) instead.
-    "run_worker_first": ["/i", "/i/*"]
+    "run_worker_first": ["/i", "/i/*", "/room-play", "/room-play/*"]
   },
   "routes": [
     {

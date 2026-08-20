@@ -2,8 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   SESSION_FILE_PLAY_BUFFER_MAX,
   createPlayByteWindow,
-  createPlayFeedGate,
+  createRoomPlaySink,
 } from "./goRoomFilePlay";
+import { createRoomPlayRegistry } from "./goRoomPlayRegistry";
 
 describe("createPlayByteWindow", () => {
   it("drops old bytes so the buffer stays under the cap", async () => {
@@ -29,21 +30,80 @@ describe("createPlayByteWindow", () => {
   });
 });
 
-describe("createPlayFeedGate", () => {
-  it("holds chunks until mp4box is ready, then feeds them in arrival order", async () => {
-    const starts: number[] = [];
-    const gate = createPlayFeedGate({
-      onMp4Chunk(_buf, fileStart) {
-        starts.push(fileStart);
-      },
+describe("createRoomPlaySink", () => {
+  it("exposes a same-origin play URL whose body is the received bytes", async () => {
+    const sessions = createRoomPlayRegistry();
+    const sink = createRoomPlaySink({
+      playId: "tr-1",
+      mime: "video/mp4",
+      size: 4,
+      sessions,
     });
-    void gate.push(new Uint8Array(4));
-    void gate.push(new Uint8Array(4));
-    expect(gate.pendingBytes()).toBe(8);
-    expect(starts).toEqual([]);
-    await gate.readyMp4();
-    await gate.push(new Uint8Array(4));
-    expect(starts).toEqual([0, 4, 8]);
-    expect(gate.pendingBytes()).toBe(0);
+    expect(sink.url).toBe("/room-play/tr-1");
+    await sink.append(new Uint8Array([9, 8, 7, 6]));
+    sink.end();
+    const stream = sessions.liveBody("tr-1");
+    const reader = stream.getReader();
+    const first = await reader.read();
+    expect(Array.from(first.value ?? [])).toEqual([9, 8, 7, 6]);
+  });
+
+  it("uses the same-origin play URL for a file larger than the RAM window", () => {
+    const sessions = createRoomPlayRegistry();
+    const sink = createRoomPlaySink({
+      playId: "big",
+      mime: "video/mp4",
+      size: 400 * 1024 * 1024,
+      sessions,
+    });
+    expect(sink.url).toBe("/room-play/big");
+  });
+
+  it("does not construct MediaSource when a playId is set", () => {
+    const g = globalThis as { MediaSource?: unknown };
+    const prev = g.MediaSource;
+    let constructed = 0;
+    g.MediaSource = class {
+      constructor() {
+        constructed += 1;
+      }
+      addEventListener() {}
+      static isTypeSupported() {
+        return true;
+      }
+    };
+    try {
+      const sink = createRoomPlaySink({
+        playId: "big",
+        mime: "video/mp4",
+        size: 400 * 1024 * 1024,
+      });
+      expect(sink.url).toBe("/room-play/big");
+      expect(constructed).toBe(0);
+    } finally {
+      g.MediaSource = prev;
+    }
+  });
+
+  it("does not construct MediaSource when falling back to the byte window", () => {
+    const g = globalThis as { MediaSource?: unknown };
+    const prev = g.MediaSource;
+    let constructed = 0;
+    g.MediaSource = class {
+      constructor() {
+        constructed += 1;
+      }
+      addEventListener() {}
+      static isTypeSupported() {
+        return true;
+      }
+    };
+    try {
+      const sink = createRoomPlaySink({ mime: "video/mp4" });
+      expect(sink.url).toMatch(/^blob:/);
+      expect(constructed).toBe(0);
+    } finally {
+      g.MediaSource = prev;
+    }
   });
 });

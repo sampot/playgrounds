@@ -55,7 +55,7 @@ describe("roomFileShareMatches", () => {
 });
 
 describe("roomFileShareActions", () => {
-  it("lets everyone download and preview; only host casts; owner or host deletes", () => {
+  it("lets peers download and preview; owner skips those; only host casts; owner or host deletes", () => {
     expect(GO_ROOM_FILE_PREVIEW).toBe("預覽");
     expect(GO_ROOM_FILE_CAST).toBe("推播至大電視");
     expect(GO_ROOM_FILE_DELETE).toBe("撤回");
@@ -71,9 +71,17 @@ describe("roomFileShareActions", () => {
     expect(
       roomFileShareActions({ role: "guest", mine: true, kind: "image" })
     ).toEqual({
-      download: true,
-      preview: true,
+      download: false,
+      preview: false,
       cast: false,
+      remove: true,
+    });
+    expect(
+      roomFileShareActions({ role: "host", mine: true, kind: "video" })
+    ).toEqual({
+      download: false,
+      preview: false,
+      cast: true,
       remove: true,
     });
     expect(

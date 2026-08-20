@@ -68,6 +68,8 @@ export type SessionFileControl = {
   ownerName?: string;
   transferId?: string;
   from?: string;
+  /** Byte start for this transfer. Play Range／seek; omit or 0 = from the start. */
+  offset?: number;
   items?: SessionFileShareItem[];
   kind?: "file" | "dir" | "device";
   device?: "camera" | "mic";
@@ -166,6 +168,17 @@ export function isSessionFileControl(
     return false;
   }
   if (m.from !== undefined && typeof m.from !== "string") return false;
+  if (m.offset !== undefined) {
+    if (
+      typeof m.offset !== "number" ||
+      !Number.isFinite(m.offset) ||
+      !Number.isInteger(m.offset) ||
+      m.offset < 0 ||
+      m.offset > SESSION_FILE_MAX_BYTES
+    ) {
+      return false;
+    }
+  }
   if (m.size !== undefined) {
     if (typeof m.size !== "number" || !Number.isFinite(m.size) || m.size < 0) {
       return false;

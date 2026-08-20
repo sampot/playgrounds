@@ -66,8 +66,8 @@ export function roomFileShareActions(opts: {
 } {
   const av = opts.kind === "video" || opts.kind === "audio";
   return {
-    download: true,
-    preview: true,
+    download: !opts.mine,
+    preview: !opts.mine,
     cast: opts.role === "host" && av,
     remove: opts.mine || opts.role === "host",
   };

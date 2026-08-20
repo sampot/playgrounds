@@ -38,7 +38,7 @@ function isGoCanvasSwUsableSync(): boolean {
 }
 
 /** Bump with go-client/static/sw.js GO_SW_REV so phones pick up bridge fixes. */
-const SW_URL = "/sw.js?v=7";
+const SW_URL = "/sw.js?v=27";
 
 function withCanvasBridge(files: FileMap, storageScope?: string): FileMap {
   const out: FileMap = { ...files };

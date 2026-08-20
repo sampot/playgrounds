@@ -121,3 +121,21 @@ export async function replaceBoothTrack(
     return false;
   }
 }
+
+/**
+ * Answerer must keep sendrecv in the SDP even with empty senders.
+ * Otherwise Chrome settles host=recvonly / guest=sendonly and later
+ * replaceTrack never produces outbound RTP (currentDirection stays recvonly).
+ */
+export function ensureBoothTransceiversSendrecv(
+  pc: BoothTransceiverPc
+): number {
+  let changed = 0;
+  for (const tr of pc.getTransceivers()) {
+    if (tr.direction && tr.direction !== "sendrecv") {
+      tr.direction = "sendrecv";
+      changed += 1;
+    }
+  }
+  return changed;
+}

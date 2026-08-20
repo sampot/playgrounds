@@ -150,9 +150,24 @@ export async function fetchFieldMe(
     headers: { Authorization: `Bearer ${apiKey}` },
   });
   if (!res.ok) {
-    throw new Error("無法讀取身分資料");
+    const err = new Error("無法讀取身分資料") as Error & {
+      code?: string;
+      status?: number;
+    };
+    err.status = res.status;
+    if (res.status === 401 || res.status === 403) {
+      err.code = "unauthorized";
+    }
+    throw err;
   }
   return (await res.json()) as FieldMeProfile;
+}
+
+/** True when Platform rejected the field API key (not a network blip). */
+export function isFieldCredentialRejected(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const code = (err as { code?: string }).code;
+  return code === "unauthorized" || code === "not_provisioned";
 }
 
 export type MintInviteResult = {

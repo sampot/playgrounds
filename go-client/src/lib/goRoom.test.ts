@@ -64,10 +64,12 @@ import {
   roomTvHudHasTransport,
   roomTvHudRestore,
   roomTvHudDefaultSink,
+  roomTvVolumeIconClick,
   roomTvVolumePanelAfterIconClick,
   roomTvSinkMuted,
   roomTvVolumeFromInput,
   roomInviteDoorRow,
+  roomHostLoginGate,
   roomShowAdSlot,
   roomShellActiveTab,
   roomShellDefaultPane,
@@ -192,8 +194,22 @@ describe("roomTvLabel", () => {
 
 describe("roomTvStream", () => {
   it("prefers the remote program RTP over the local capture", () => {
-    const remote = { id: "remote" } as unknown as MediaStream;
-    const local = { id: "local" } as unknown as MediaStream;
+    const remoteTrack = {
+      readyState: "live",
+      muted: false,
+    } as MediaStreamTrack;
+    const localTrack = {
+      readyState: "live",
+      muted: false,
+    } as MediaStreamTrack;
+    const remote = {
+      id: "remote",
+      getTracks: () => [remoteTrack],
+    } as unknown as MediaStream;
+    const local = {
+      id: "local",
+      getTracks: () => [localTrack],
+    } as unknown as MediaStream;
     expect(roomTvStream({ programStream: remote, localProgramStream: local })).toBe(
       remote
     );
@@ -201,6 +217,47 @@ describe("roomTvStream", () => {
       local
     );
     expect(roomTvStream({ programStream: null, localProgramStream: null })).toBeNull();
+  });
+
+  it("falls back to the local capture when the remote program is only a muted placeholder", () => {
+    const emptyRemote = {
+      id: "remote-empty",
+      getTracks: () => [
+        {
+          readyState: "live",
+          muted: true,
+          getSettings: () => ({}),
+        } as MediaStreamTrack,
+      ],
+    } as unknown as MediaStream;
+    const local = {
+      id: "local",
+      getTracks: () => [
+        {
+          readyState: "live",
+          muted: false,
+        } as MediaStreamTrack,
+      ],
+    } as unknown as MediaStream;
+    expect(
+      roomTvStream({ programStream: emptyRemote, localProgramStream: local })
+    ).toBe(local);
+  });
+
+  it("still binds a muted remote program for joiners who have no local capture", () => {
+    const mutedRemote = {
+      id: "joiner-remote",
+      getTracks: () => [
+        {
+          readyState: "live",
+          muted: true,
+          getSettings: () => ({}),
+        } as MediaStreamTrack,
+      ],
+    } as unknown as MediaStream;
+    expect(
+      roomTvStream({ programStream: mutedRemote, localProgramStream: null })
+    ).toBe(mutedRemote);
   });
 });
 
@@ -587,6 +644,41 @@ describe("booth copy", () => {
     expect(GO_ROOM_GATE_BODY).not.toContain("一起看電視");
   });
 
+  it("hides the host login gate until the client is ready", () => {
+    expect(
+      roomHostLoginGate({
+        role: "host",
+        loggedIn: false,
+        phase: "idle",
+        clientReady: false,
+      })
+    ).toBe(false);
+    expect(
+      roomHostLoginGate({
+        role: "host",
+        loggedIn: false,
+        phase: "idle",
+        clientReady: true,
+      })
+    ).toBe(true);
+    expect(
+      roomHostLoginGate({
+        role: "host",
+        loggedIn: true,
+        phase: "idle",
+        clientReady: true,
+      })
+    ).toBe(false);
+    expect(
+      roomHostLoginGate({
+        role: "guest",
+        loggedIn: false,
+        phase: "idle",
+        clientReady: true,
+      })
+    ).toBe(false);
+  });
+
   it("warns that hung items and live pulls stop when the Host ends the booth", () => {
     expect(GO_ROOM_END_CONFIRM_HOST).toBe(
       "關掉後在場的人會斷線，目錄會沒了，電視與鏡頭會停，進行中的遊戲會停。已存到硬碟的檔不受影響。"
@@ -763,6 +855,32 @@ describe("attachMediaStream", () => {
       expect(el.muted).toBe(true);
     });
     expect(play).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps the element muted when autoplay fallback wins over an unmuted sink", async () => {
+    const stream = {} as MediaStream;
+    const play = vi
+      .fn()
+      .mockRejectedValueOnce(new DOMException("NotAllowedError"))
+      .mockResolvedValueOnce(undefined);
+    const el = {
+      srcObject: null as MediaStream | null,
+      paused: true,
+      muted: false,
+      volume: 1,
+      play,
+    };
+    const onAutoplayMuted = vi.fn();
+    attachMediaStream(el, stream, {
+      volume: 1,
+      muted: false,
+      onAutoplayMuted,
+    });
+    await vi.waitFor(() => {
+      expect(play).toHaveBeenCalledTimes(2);
+    });
+    expect(el.muted).toBe(true);
+    expect(onAutoplayMuted).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -1083,11 +1201,23 @@ describe("room TV HUD", () => {
     expect(roomTvVolumePanelAfterIconClick(true)).toBe(false);
   });
 
-  it("starts the speaker at full volume, matching the slider", () => {
+  it("starts the TV muted at full volume; user turns sound on", () => {
     const sink = roomTvHudDefaultSink();
     expect(sink.volume).toBe(1);
-    expect(sink.muted).toBe(false);
-    expect(roomTvSinkMuted(sink.volume, sink.muted)).toBe(false);
+    expect(sink.muted).toBe(true);
+    expect(roomTvSinkMuted(sink.volume, sink.muted)).toBe(true);
+  });
+
+  it("unmutes on the first speaker tap when the TV is quiet", () => {
+    expect(
+      roomTvVolumeIconClick({ quiet: true, panelOpen: false, volume: 1 })
+    ).toEqual({ muted: false, panelOpen: true, volume: 1 });
+    expect(
+      roomTvVolumeIconClick({ quiet: true, panelOpen: false, volume: 0 })
+    ).toEqual({ muted: false, panelOpen: true, volume: 1 });
+    expect(
+      roomTvVolumeIconClick({ quiet: false, panelOpen: false, volume: 1 })
+    ).toEqual({ muted: false, panelOpen: true, volume: 1 });
   });
 
   it("clamps local TV volume and treats zero as muted", () => {

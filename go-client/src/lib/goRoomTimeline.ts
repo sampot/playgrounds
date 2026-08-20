@@ -176,11 +176,13 @@ export function roomShareCatalogChanges(
   return next.filter((f) => !seen.has(f.id));
 }
 
-export function roomSystemFileActions(item: CatalogItemLike): {
+export function roomSystemFileActions(
+  item: CatalogItemLike & { mine?: boolean }
+): {
   preview: boolean;
   download: boolean;
 } {
-  if (item.kind === "dir" || item.kind === "device") {
+  if (item.mine || item.kind === "dir" || item.kind === "device") {
     return { preview: false, download: false };
   }
   const acts = catalogConsumes(item);

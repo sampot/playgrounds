@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { tick } from "svelte";
+  import { onMount, tick } from "svelte";
   import { goto } from "$app/navigation";
   import {
     SESSION_CHAT_MAX_TEXT_CHARS,
@@ -59,6 +59,7 @@
     roomEscStep,
     roomInviteDoorRow,
     roomInviteRemainLabel,
+    roomHostLoginGate,
     roomHostMemberMenu,
     roomMemberCard,
     roomMemberCardsSorted,
@@ -175,6 +176,7 @@
   }: Props = $props();
 
   let draft = $state("");
+  let clientReady = $state(false);
   let listEl = $state<HTMLDivElement | null>(null);
   let quickOpen = $state(false);
   let floatOpen = $state(false);
@@ -300,11 +302,15 @@
     )
   );
   const loginGate = $derived(
-    role === "host" && !loggedIn && phase === "idle"
+    roomHostLoginGate({ role, loggedIn, phase, clientReady })
   );
   const overlayOpen = $derived(
     phase === "connecting" || phase === "error" || phase === "ended"
   );
+
+  onMount(() => {
+    clientReady = true;
+  });
   const tvHudKind = $derived(
     roomTvHudKind({
       tvOn,
