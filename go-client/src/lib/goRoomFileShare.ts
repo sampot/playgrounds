@@ -7,6 +7,7 @@ export const GO_ROOM_FILE_CAST = "推播至大電視";
 export const GO_ROOM_FILE_DELETE = "撤回";
 export const GO_ROOM_FILE_ON_AIR = "電視播放中";
 export const GO_ROOM_FILE_DOWNLOAD = "下載";
+export const GO_ROOM_FILE_DROP = "拖進來或點這裡掛上檔案";
 export const GO_ROOM_FILE_DELETE_CONFIRM =
   "撤回後在場的人看不到這個檔。已存到硬碟的不受影響。";
 

@@ -27,6 +27,8 @@ export const ROOM_SHORT_LANDSCAPE_MQ = `(orientation: landscape) and (max-height
 
 /** 48rem — desktop TV + right rail. Keep in sync with CSS min-width. */
 export const ROOM_SHELL_DESKTOP_MIN_PX = 768;
+/** >1280px — wide control: files | members/chat. Keep in sync with CSS. */
+export const ROOM_SHELL_WIDE_MIN_PX = 1281;
 
 export type RoomShellMode =
   | "portrait"
@@ -989,8 +991,8 @@ function playbackSrcOf(el: { src: string; getAttribute?: (name: string) => strin
 }
 
 /**
- * Bind a blob / HTTP playback URL without resetting media src on every roster emit.
- * Re-assigning the same blob: MediaSource URL closes the source and leaves a black frame.
+ * Bind a playback URL without resetting media src on every roster emit.
+ * Re-assigning the same blob: URL can close the source and leave a black frame.
  */
 export function attachPlaybackUrl(
   el: {
@@ -998,6 +1000,7 @@ export function attachPlaybackUrl(
     paused: boolean;
     muted: boolean;
     play: () => Promise<void>;
+    load?: () => void;
     getAttribute?: (name: string) => string | null;
     removeAttribute?: (name: string) => void;
   } | null | undefined,
@@ -1016,6 +1019,7 @@ export function attachPlaybackUrl(
     return;
   }
   el.src = url;
+  el.load?.();
   void tryPlay(el);
 }
 

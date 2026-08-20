@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   GO_ROOM_FILE_CAST,
   GO_ROOM_FILE_DELETE,
+  GO_ROOM_FILE_DROP,
   GO_ROOM_FILE_FILTERS,
   GO_ROOM_FILE_FILTER_LABEL,
   GO_ROOM_FILE_ON_AIR,
@@ -58,6 +59,7 @@ describe("roomFileShareActions", () => {
     expect(GO_ROOM_FILE_PREVIEW).toBe("預覽");
     expect(GO_ROOM_FILE_CAST).toBe("推播至大電視");
     expect(GO_ROOM_FILE_DELETE).toBe("撤回");
+    expect(GO_ROOM_FILE_DROP).toBe("拖進來或點這裡掛上檔案");
     expect(
       roomFileShareActions({ role: "guest", mine: false, kind: "video" })
     ).toEqual({

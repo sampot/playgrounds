@@ -75,6 +75,7 @@ import {
   roomShellPanesConcurrent,
   roomShellShowPane,
   roomShellTabPanes,
+  ROOM_SHELL_WIDE_MIN_PX,
   roomStageStatus,
   roomTvLabel,
   roomTvStream,
@@ -633,6 +634,20 @@ describe("attachPlaybackUrl", () => {
     expect(play).toHaveBeenCalledTimes(1);
   });
 
+  it("calls load after assigning a same-origin play URL", () => {
+    const load = vi.fn();
+    const el = {
+      src: "",
+      paused: true,
+      muted: false,
+      play: async () => {},
+      load,
+    };
+    attachPlaybackUrl(el, "/room-play/tr-1");
+    expect(el.src).toBe("/room-play/tr-1");
+    expect(load).toHaveBeenCalledTimes(1);
+  });
+
   it("mutes and retries when autoplay with audio is blocked", async () => {
     const play = vi
       .fn()
@@ -790,6 +805,7 @@ describe("roomShellMode", () => {
     expect(roomShellPanesConcurrent("desktop")).toBe(false);
     expect(roomShellFilesPinned("desktop")).toBe(true);
     expect(roomShellTabPanes("desktop")).toEqual(["members", "chat"]);
+    expect(ROOM_SHELL_WIDE_MIN_PX).toBe(1281);
   });
 
   it("pins files on the desktop rail and tabs members with chat", () => {

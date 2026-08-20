@@ -95,6 +95,7 @@
     GO_ROOM_FILE_DELETE,
     GO_ROOM_FILE_DELETE_CONFIRM,
     GO_ROOM_FILE_DOWNLOAD,
+    GO_ROOM_FILE_DROP,
     GO_ROOM_FILE_FILTERS,
     GO_ROOM_FILE_FILTER_LABEL,
     GO_ROOM_FILE_ON_AIR,
@@ -175,6 +176,7 @@
   let draft = $state("");
   let listEl = $state<HTMLDivElement | null>(null);
   let quickOpen = $state(false);
+  let floatOpen = $state(false);
   let shareOpen = $state(false);
   let confirmEnd = $state(false);
   let leaveAfterEnd = $state(false);
@@ -192,6 +194,7 @@
   let previewOpen = $state(false);
   let previewId = $state<string | null>(null);
   let previewDialog = $state<HTMLDialogElement | null>(null);
+  let overlayDialog = $state<HTMLDialogElement | null>(null);
   let deleteFileId = $state<string | null>(null);
   let now = $state(Date.now());
   let pane = $state<RoomShellPane>(roomShellDefaultPane());
@@ -308,7 +311,6 @@
       fileTransport: goRoomMedia.programTransport,
     })
   );
-  const shellMode = $derived(roomShellMode(shellBox));
   const selectedPerson = $derived(
     selectedPeerId
       ? (roster.find((p) => p.peerId === selectedPeerId) ?? null)
@@ -340,6 +342,10 @@
     role === "guest"
       ? phase === "ready"
       : phase === "open" || (loggedIn && phase === "idle")
+  );
+  /** Logged-out／connecting／ended: full-width TV, not the in-booth rail split. */
+  const shellMode = $derived(
+    inBooth ? roomShellMode(shellBox) : "portrait"
   );
   const doorRow = $derived(
     roomInviteDoorRow({
@@ -679,6 +685,13 @@
   });
 
   $effect(() => {
+    const el = overlayDialog;
+    if (!el) return;
+    if (overlayOpen && !el.open) el.showModal();
+    if (!overlayOpen && el.open) el.close();
+  });
+
+  $effect(() => {
     const openId = hostMenuPeerId;
     if (!openId) return;
     const onPtr = (e: PointerEvent) => {
@@ -715,12 +728,18 @@
     void previewOpen;
     void tick().then(() => {
       if ((goRoomFiles.playback?.url ?? null) !== url) return;
+      if (!previewOpen) return;
       if (kind === "image") {
         const target = filePreviewImg ?? img;
         if (target) target.src = url ?? "";
         return;
       }
-      attachPlaybackUrl(filePlayEl ?? el, url);
+      const bind = () => attachPlaybackUrl(filePlayEl ?? el, url);
+      if (previewDialog && !previewDialog.open) {
+        void tick().then(bind);
+        return;
+      }
+      bind();
     });
   });
 
@@ -812,6 +831,16 @@
     if (!goSessionChat.sendQuickReply(q)) return;
     composerInputEl?.focus();
     quickOpen = false;
+  }
+
+  function toggleQuickOpen() {
+    quickOpen = !quickOpen;
+    if (quickOpen) floatOpen = false;
+  }
+
+  function toggleFloatOpen() {
+    floatOpen = !floatOpen;
+    if (floatOpen) quickOpen = false;
   }
 
   async function shareFiles(list: FileList | File[]): Promise<void> {
@@ -1310,7 +1339,7 @@
               aria-pressed={paneTabOn("chat")}
               onclick={() => onPaneTab("chat")}
             >
-              文字{#if feed.length > 0} · {feed.length}{/if}
+              聊天{#if feed.length > 0} · {feed.length}{/if}
             </button>
           {/if}
         </nav>
@@ -1322,9 +1351,13 @@
             <p class="room-pane-title pixel-text">成員</p>
           {/if}
           {#if role === "host"}
-            <p class="muted">{doorRow.label}</p>
-            <div class="file-actions">
-              <button type="button" class="pixel-btn pixel-btn--primary" onclick={() => inviteInBooth()}>
+            <div class="door-row">
+              <p class="muted door-row-label">{doorRow.label}</p>
+              <button
+                type="button"
+                class="pixel-btn pixel-btn--primary door-row-action"
+                onclick={() => inviteInBooth()}
+              >
                 {doorRow.action}
               </button>
             </div>
@@ -1407,7 +1440,7 @@
             if (list) void shareFiles(list);
           }}
         >
-          {#if panesConcurrent || filesPinned}
+          {#if panesConcurrent}
             <p class="room-pane-title pixel-text">檔案</p>
           {/if}
           <div class="file-filters" role="tablist" aria-label="檔案分類">
@@ -1430,7 +1463,7 @@
             class="file-drop"
             onclick={() => fileInput?.click()}
           >
-            <span class="file-drop-title">拖進來或點這裡掛上</span>
+            <span class="file-drop-title">{GO_ROOM_FILE_DROP}</span>
             {#if shareHang.total > 0}
               <progress class="file-drop-bar" max="100" value={sharePct}></progress>
               <span class="muted">{shareHang.done}/{shareHang.total}</span>
@@ -1542,23 +1575,14 @@
       {/if}
 
       {#if showChat && showComposer}
-        <section class="room-pane room-pane--chat" aria-label="包廂文字">
+        <section class="room-pane room-pane--chat" aria-label="包廂聊天">
           {#if panesConcurrent}
-            <p class="room-pane-title pixel-text">文字</p>
+            <p class="room-pane-title pixel-text">聊天</p>
           {/if}
-          {#if role === "host"}
-            <button
-              type="button"
-              class={["pixel-btn", textLocked && "pixel-btn--primary"].filter(Boolean).join(" ")}
-              aria-pressed={textLocked}
-              onclick={() => goSessionChat.setTextLocked(!textLocked)}
-            >
-              {textLocked ? GO_ROOM_TEXT_UNLOCK : GO_ROOM_TEXT_LOCK}
-            </button>
-          {:else if !canSpeak}
-            <p class="muted">{composerHint}</p>
+          {#if !canSpeak}
+            <p class="muted chat-speak-hint">{composerHint}</p>
           {/if}
-          <div class="room-timeline" bind:this={listEl} role="log" aria-label="包廂文字">
+          <div class="room-timeline" bind:this={listEl} role="log" aria-label="包廂聊天">
             {#if feed.length === 0}
               <p class="muted">{GO_ROOM_EMPTY_TIMELINE}</p>
             {/if}
@@ -1754,22 +1778,26 @@
               {/if}
             {/each}
           </div>
-          {#if quickReplies.length > 0}
-            <button
-              type="button"
-              class="quick-toggle"
-              aria-expanded={quickOpen}
-              onclick={() => (quickOpen = !quickOpen)}
-            >
-              {quickOpen ? "▾" : "▸"} 快捷語
-            </button>
-            {#if quickOpen}
-              <div class="quick" role="group" aria-label="快捷語">
-                {#each quickReplies as q (q)}
-                  <button type="button" class="pixel-btn" onclick={() => onQuick(q)}>{q}</button>
-                {/each}
-              </div>
-            {/if}
+          {#if quickOpen && quickReplies.length > 0}
+            <div class="quick" role="group" aria-label="快捷語">
+              {#each quickReplies as q (q)}
+                <button type="button" class="pixel-btn" onclick={() => onQuick(q)}>{q}</button>
+              {/each}
+            </div>
+          {/if}
+          {#if floatOpen}
+            <div class="float-bar" role="group" aria-label="飄浮表情">
+              {#each SESSION_CHAT_FLOAT_EMOJIS as emoji (emoji)}
+                <button
+                  type="button"
+                  class="float-btn"
+                  aria-label={`飄浮 ${emoji}`}
+                  onclick={() => goSessionChat.floatEmoji(emoji)}
+                >
+                  {emoji}
+                </button>
+              {/each}
+            </div>
           {/if}
           <form class="composer" onsubmit={onSubmit}>
             {#if mentionHits.length > 0}
@@ -1787,36 +1815,92 @@
                 {/each}
               </ul>
             {/if}
-            <div class="float-bar" role="group" aria-label="飄浮表情">
-              {#each SESSION_CHAT_FLOAT_EMOJIS as emoji (emoji)}
+            <div class="composer-row">
+              {#if role === "host"}
                 <button
                   type="button"
-                  class="float-btn"
-                  aria-label={`飄浮 ${emoji}`}
-                  onclick={() => goSessionChat.floatEmoji(emoji)}
+                  class={[
+                    "pixel-btn",
+                    "composer-tool",
+                    textLocked && "pixel-btn--primary",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  aria-label={textLocked ? GO_ROOM_TEXT_UNLOCK : GO_ROOM_TEXT_LOCK}
+                  aria-pressed={textLocked}
+                  title={textLocked ? GO_ROOM_TEXT_UNLOCK : GO_ROOM_TEXT_LOCK}
+                  onclick={() => goSessionChat.setTextLocked(!textLocked)}
                 >
-                  {emoji}
+                  <svg class="dock-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    {#if textLocked}
+                      <rect x="5" y="11" width="14" height="10" rx="2" />
+                      <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+                    {:else}
+                      <rect x="5" y="11" width="14" height="10" rx="2" />
+                      <path d="M8 11V7a4 4 0 0 1 8 0" />
+                    {/if}
+                  </svg>
                 </button>
-              {/each}
+              {/if}
+              {#if quickReplies.length > 0}
+                <button
+                  type="button"
+                  class={["pixel-btn", "composer-tool", quickOpen && "pixel-btn--primary"]
+                    .filter(Boolean)
+                    .join(" ")}
+                  aria-label="快捷語"
+                  aria-expanded={quickOpen}
+                  title="快捷語"
+                  onclick={() => toggleQuickOpen()}
+                >
+                  <svg class="dock-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M4 6h16" />
+                    <path d="M4 12h10" />
+                    <path d="M4 18h14" />
+                  </svg>
+                </button>
+              {/if}
+              <button
+                type="button"
+                class={["pixel-btn", "composer-tool", floatOpen && "pixel-btn--primary"]
+                  .filter(Boolean)
+                  .join(" ")}
+                aria-label="飄浮表情"
+                aria-expanded={floatOpen}
+                title="飄浮表情"
+                onclick={() => toggleFloatOpen()}
+              >
+                <svg class="dock-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M8 14s1.5 2.5 4 2.5 4-2.5 4-2.5" />
+                  <line x1="9" y1="9.5" x2="9.01" y2="9.5" />
+                  <line x1="15" y1="9.5" x2="15.01" y2="9.5" />
+                </svg>
+              </button>
+              <input
+                bind:this={composerInputEl}
+                class="pixel-input composer-input"
+                type="text"
+                maxlength={SESSION_CHAT_MAX_TEXT_CHARS}
+                placeholder={composerHint}
+                autocomplete="off"
+                enterkeyhint="send"
+                disabled={!canSpeak}
+                bind:value={draft}
+              />
+              <button
+                type="submit"
+                class="pixel-btn pixel-btn--primary composer-send"
+                aria-label="送出"
+                title="送出"
+                disabled={!canSpeak || !draft.trim()}
+              >
+                <svg class="dock-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <line x1="22" y1="2" x2="11" y2="13" />
+                  <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                </svg>
+              </button>
             </div>
-            <input
-              bind:this={composerInputEl}
-              class="pixel-input composer-input"
-              type="text"
-              maxlength={SESSION_CHAT_MAX_TEXT_CHARS}
-              placeholder={composerHint}
-              autocomplete="off"
-              enterkeyhint="send"
-              disabled={!canSpeak}
-              bind:value={draft}
-            />
-            <button
-              type="submit"
-              class="pixel-btn pixel-btn--primary"
-              disabled={!canSpeak || !draft.trim()}
-            >
-              送出
-            </button>
           </form>
         </section>
       {/if}
@@ -1848,45 +1932,51 @@
     ></video>
   {/if}
 
-  {#if overlayOpen}
-    <div class="room-sheet" role="dialog" aria-modal="true">
-      {#if role === "host" && !loggedIn && phase === "idle"}
-        <div class="booth-sheet pixel-box">
-          <p class="booth-sheet-title pixel-text">開包廂</p>
-          <p>開這一間是為了請人進來一起看電視。被請進來的人不必有通行證。</p>
-          <button type="button" class="pixel-btn pixel-btn--primary" onclick={() => onLogin?.()}>
-            登入後開包廂
+  <dialog
+    bind:this={overlayDialog}
+    class="room-sheet"
+    aria-labelledby="room-overlay-title"
+    oncancel={(e) => {
+      /* Login／connecting／error／ended stay until the phase changes. */
+      e.preventDefault();
+    }}
+  >
+    {#if role === "host" && !loggedIn && phase === "idle"}
+      <div class="booth-sheet pixel-box">
+        <p id="room-overlay-title" class="booth-sheet-title pixel-text">開包廂</p>
+        <p>開這一間是為了請人進來一起看電視。被請進來的人不必有通行證。</p>
+        <button type="button" class="pixel-btn pixel-btn--primary" onclick={() => onLogin?.()}>
+          登入後開包廂
+        </button>
+        <p class="muted">{GO_ROOM_LOGIN_HINT} 單機小品不受影響。</p>
+      </div>
+    {:else if phase === "connecting"}
+      <div class="booth-sheet pixel-box">
+        <p id="room-overlay-title">{message || "正在進包廂…"}</p>
+      </div>
+    {:else if phase === "error"}
+      <div class="booth-sheet pixel-box">
+        <p id="room-overlay-title" class="err">{error || "無法開始"}</p>
+        {#if role === "host"}
+          <button type="button" class="pixel-btn pixel-btn--primary" onclick={() => onInvite?.()}>
+            再試一次
           </button>
-          <p class="muted">{GO_ROOM_LOGIN_HINT} 單機小品不受影響。</p>
-        </div>
-      {:else if phase === "connecting"}
-        <div class="booth-sheet pixel-box">
-          <p>{message || "正在進包廂…"}</p>
-        </div>
-      {:else if phase === "error"}
-        <div class="booth-sheet pixel-box">
-          <p class="err">{error || "無法開始"}</p>
-          {#if role === "host"}
-            <button type="button" class="pixel-btn pixel-btn--primary" onclick={() => onInvite?.()}>
-              再試一次
+        {/if}
+      </div>
+    {:else if phase === "ended"}
+      <div class="booth-sheet pixel-box">
+        <p id="room-overlay-title">{message || "這一間已結束"}</p>
+        <div class="room-actions">
+          {#if role === "host" && loggedIn}
+            <button type="button" class="pixel-btn pixel-btn--primary" onclick={() => onReissue?.()}>
+              再開一間
             </button>
           {/if}
+          <a class="pixel-btn" href="/">回遊樂場大廳</a>
         </div>
-      {:else if phase === "ended"}
-        <div class="booth-sheet pixel-box">
-          <p>{message || "這一間已結束"}</p>
-          <div class="room-actions">
-            {#if role === "host" && loggedIn}
-              <button type="button" class="pixel-btn pixel-btn--primary" onclick={() => onReissue?.()}>
-                再開一間
-              </button>
-            {/if}
-            <a class="pixel-btn" href="/">回遊樂場大廳</a>
-          </div>
-        </div>
-      {/if}
-    </div>
-  {/if}
+      </div>
+    {/if}
+  </dialog>
 
   <dialog
     bind:this={previewDialog}
@@ -1918,6 +2008,7 @@
           bind:this={filePlayEl}
           class="file-player-audio"
           controls
+          preload="auto"
           playsinline
           ontimeupdate={() => goRoomFiles.notePlayhead(filePlayEl?.currentTime ?? 0)}
           aria-label="播放 {previewFile?.name ?? ""}"
@@ -1927,6 +2018,7 @@
           bind:this={filePlayEl}
           class="media-video media-video--program"
           controls
+          preload="auto"
           playsinline
           ontimeupdate={() => goRoomFiles.notePlayhead(filePlayEl?.currentTime ?? 0)}
           aria-label="播放 {previewFile?.name ?? ""}"
@@ -2046,7 +2138,7 @@
   }
   .room--portrait.room--chrome-overlay:not(.room--cinema) {
     display: grid;
-    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
     grid-template-columns: minmax(0, 1fr);
     gap: 0.4rem;
   }
@@ -2056,12 +2148,14 @@
     flex-direction: column;
   }
   .room--portrait.room--chrome-overlay:not(.room--cinema) .room-tv-stage {
-    flex: 1 1 auto;
+    flex: 0 0 auto;
     min-height: 0;
+    width: 100%;
   }
   .room--portrait.room--chrome-overlay:not(.room--cinema) .room-tv-col :global(.tv-slot) {
-    height: 100%;
-    aspect-ratio: auto;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 9;
   }
   .room--portrait.room--chrome-overlay .room-lower {
     min-height: 0;
@@ -2185,6 +2279,36 @@
     flex-direction: column;
     min-height: 10rem;
   }
+  .room--portrait .room-pane--chat {
+    min-height: 0;
+    padding-top: 0.25rem;
+  }
+  .room--portrait .room-dock {
+    gap: 0.25rem;
+  }
+  .room--portrait .room-tabs {
+    gap: 0.25rem;
+  }
+  .room--portrait .room-tabs .pixel-btn {
+    padding-left: 0.45rem;
+    padding-right: 0.45rem;
+  }
+  .door-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 0.55rem;
+    margin: 0 0 0.15rem;
+  }
+  .door-row-label {
+    margin: 0;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .door-row-action {
+    flex: 0 0 auto;
+    min-height: 44px;
+  }
   .member-list {
     list-style: none;
     margin: 0.4rem 0 0;
@@ -2218,14 +2342,25 @@
     stroke-linejoin: round;
   }
   .room-sheet {
-    position: fixed;
-    inset: 0;
-    z-index: 12;
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+  }
+  .room-sheet[open] {
     display: flex;
     align-items: flex-end;
+  }
+  .room-sheet::backdrop {
     background: color-mix(in oklab, rgb(var(--ink)) 28%, transparent);
   }
   .booth-sheet {
+    position: relative;
+    z-index: 1;
     width: 100%;
     max-height: min(80%, 32rem);
     overflow: auto;
@@ -2233,6 +2368,7 @@
     background: rgb(var(--card));
     border-radius: var(--radius) var(--radius) 0 0;
     border-top: var(--pixel-edge) solid rgb(var(--ink));
+    pointer-events: auto;
   }
   .booth-sheet-bar {
     display: flex;
@@ -2406,7 +2542,12 @@
     gap: 0.25rem;
   }
   .float-bar {
-    flex: 1 1 100%;
+    flex: 0 0 auto;
+    padding: 0.15rem 0 0.25rem;
+  }
+  .chat-speak-hint {
+    margin: 0 0 0.25rem;
+    flex: 0 0 auto;
   }
   .msg-menu .pixel-btn {
     min-height: 44px;
@@ -2607,30 +2748,29 @@
     max-height: 12rem;
     background: #000;
   }
-  .quick-toggle {
-    min-height: 44px;
-    margin: 0.35rem 0;
-    border: none;
-    background: none;
-    font: inherit;
-    cursor: pointer;
-    text-align: left;
-  }
   .quick {
     display: flex;
     flex-wrap: wrap;
     gap: 0.35rem;
-    margin-bottom: 0.4rem;
+    margin: 0 0 0.25rem;
+    flex: 0 0 auto;
   }
   .composer {
     position: relative;
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
     gap: 0.35rem;
-    margin-top: auto;
+    margin-top: 0.15rem;
+    flex: 0 0 auto;
+  }
+  .composer-row {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 0.3rem;
+    min-width: 0;
   }
   .mention-list {
-    flex: 1 1 100%;
     list-style: none;
     margin: 0;
     padding: 0.25rem;
@@ -2661,6 +2801,17 @@
     flex: 1 1 auto;
     min-width: 0;
     min-height: 44px;
+  }
+  .composer-send,
+  .composer-tool {
+    flex: 0 0 auto;
+    min-height: 44px;
+    min-width: 44px;
+    width: 44px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
   .confirm-dialog {
     border: none;
@@ -2701,12 +2852,24 @@
       min-height: 0;
       padding: 0;
     }
+    /* Gate／ended: no control rail — keep the TV full-width 16:9. */
+    .room--desktop:not(.room--cinema):not(:has(.room-lower)) {
+      display: flex;
+      flex-direction: column;
+      height: auto;
+      max-width: 56rem;
+      margin-inline: auto;
+      padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom, 0px));
+    }
     .room--desktop:not(.room--cinema) .room-tv-col {
       grid-column: 1;
       min-height: 0;
       display: flex;
       flex-direction: column;
       padding: 0.35rem 0.65rem;
+    }
+    .room--desktop:not(.room--cinema):not(:has(.room-lower)) .room-tv-col {
+      padding: 0;
     }
     .room--desktop:not(.room--cinema) .room-tv-stage {
       flex: 1 1 auto;
@@ -2715,6 +2878,10 @@
     .room--desktop:not(.room--cinema) .room-tv-col :global(.tv-slot) {
       height: 100%;
       aspect-ratio: auto;
+    }
+    .room--desktop:not(.room--cinema):not(:has(.room-lower)) .room-tv-col :global(.tv-slot) {
+      height: auto;
+      aspect-ratio: 16 / 9;
     }
     .room--desktop .room-lower {
       display: flex;
@@ -2760,6 +2927,32 @@
     .room--desktop .room-pane--members,
     .room--desktop .room-pane--chat {
       grid-area: lower;
+    }
+  }
+  /* Wide hall (>1280px): control panel splits files | members/chat. */
+  @media (min-width: 80.0625rem) {
+    .room--desktop:not(.room--cinema) {
+      grid-template-columns: minmax(0, 1fr) minmax(36rem, 44rem);
+    }
+    .room--desktop .room-shell {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      grid-template-areas:
+        "files tabs"
+        "files lower";
+      grid-template-rows: auto minmax(0, 1fr);
+      gap: 0;
+    }
+    .room--desktop .room-pane--files {
+      border-bottom: none;
+      border-right: 1px solid color-mix(in oklab, rgb(var(--ink)) 18%, transparent);
+      padding-right: 0.45rem;
+    }
+    .room--desktop .room-tabs {
+      padding-left: 0.45rem;
+    }
+    .room--desktop .room-pane--members,
+    .room--desktop .room-pane--chat {
+      padding-left: 0.45rem;
     }
   }
   @media (orientation: landscape) and (max-height: 560px) {
