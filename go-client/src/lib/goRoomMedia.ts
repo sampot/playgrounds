@@ -1,6 +1,6 @@
 /**
  * 包廂在場／節目媒體：replaceTrack on booth 2+2。
- * 節目＝房級大螢幕；在場聲＝開麥即送；在場影像仍要 request（PG-GO-ROOM-PLAN §9.8）。
+ * 節目＝房級大螢幕；在場聲＝開麥即送（星狀下 Host 混音，§9.8.1）；在場影像仍要 request。
  */
 
 import {
@@ -37,6 +37,10 @@ import {
   goRoomCastCaptureError,
   htmlMediaCaptureStreamSupported,
 } from "./goRoom";
+import {
+  createPresenceAudioMixer,
+  type PresenceAudioSource,
+} from "./goRoomPresenceAudioMix";
 import { roomFilePath } from "./goRoomPlayRegistry";
 
 export type RoomMediaPeer = {
@@ -282,6 +286,46 @@ export function createRoomMedia(opts: {
   let programCache: { ids: string; stream: MediaStream } | null = null;
   let localProgramCache: { ids: string; stream: MediaStream } | null = null;
   let localCache: { ids: string; stream: MediaStream } | null = null;
+  const presenceMixer = opts.forward ? createPresenceAudioMixer() : null;
+
+  function collectMicSources(): PresenceAudioSource[] {
+    const sources: PresenceAudioSource[] = [];
+    if (isLiveTrack(mic)) {
+      sources.push({ peerId: opts.localAgentId, track: mic });
+    }
+    for (const live of remoteLives) {
+      if (!live.mic) continue;
+      const peer = opts.peers().find((p) => p.peerId === live.peerId);
+      if (!peer) continue;
+      const t = receiverTrack(peer.pc, "presence", "audio");
+      if (t) sources.push({ peerId: live.peerId, track: t });
+    }
+    return sources;
+  }
+
+  async function pushPresenceAudio(): Promise<void> {
+    if (!opts.forward || !presenceMixer) {
+      for (const peer of opts.peers()) {
+        if (!peer.peerId) continue;
+        const presenceAudio =
+          mic && micListeners.has(peer.peerId) ? mic : null;
+        await replaceBoothTrack(peer.pc, "presence", "audio", presenceAudio);
+      }
+      return;
+    }
+    presenceMixer.setSources(collectMicSources());
+    for (const peer of opts.peers()) {
+      if (!peer.peerId) continue;
+      if (!micListeners.has(peer.peerId)) {
+        await replaceBoothTrack(peer.pc, "presence", "audio", null);
+        continue;
+      }
+      const out = presenceMixer.trackFor(peer.peerId);
+      await replaceBoothTrack(peer.pc, "presence", "audio", out);
+    }
+    const listen = presenceMixer.localListenTrack(opts.localAgentId);
+    if (listen) remotePresenceAudio = listen;
+  }
 
   function programClockState(): Pick<
     RoomMediaState,
@@ -723,12 +767,6 @@ export function createRoomMedia(opts: {
           await replaceBoothTrack(dest.pc, "presence", "video", video);
         }
       }
-      if (!mic && micListeners.has(dest.peerId)) {
-        const audio = receiverTrack(from.pc, "presence", "audio");
-        if (audio) {
-          await replaceBoothTrack(dest.pc, "presence", "audio", audio);
-        }
-      }
       if (programFromLive && programWatchers.has(dest.peerId)) {
         const audio =
           program?.audio ?? receiverTrack(from.pc, "presence", "audio");
@@ -749,6 +787,8 @@ export function createRoomMedia(opts: {
       if (sendAudio) await replaceBoothTrack(dest.pc, "program", "audio", sendAudio);
       if (sendVideo) await replaceBoothTrack(dest.pc, "program", "video", sendVideo);
     }
+    // Presence audio is always hub-mixed (§9.8.1), not single-track forward.
+    await pushPresenceAudio();
   }
 
   async function becomeListedProgramSource(
@@ -787,14 +827,12 @@ export function createRoomMedia(opts: {
       remoteProgramFrom !== opts.localAgentId &&
       !program &&
       !programFromLive;
+    await pushPresenceAudio();
     for (const peer of opts.peers()) {
       if (!peer.peerId) continue;
       const presenceVideo =
         camera && cameraWatchers.has(peer.peerId) ? camera : null;
-      const presenceAudio =
-        mic && micListeners.has(peer.peerId) ? mic : null;
       const sendProgram = Boolean(program && programWatchers.has(peer.peerId));
-      await replaceBoothTrack(peer.pc, "presence", "audio", presenceAudio);
       await replaceBoothTrack(peer.pc, "presence", "video", presenceVideo);
       // Remote file cast: program RTP is Hub-forwarded from owner. Do not
       // null the program senders here — that undoes forwardFrom for joiners.
@@ -1458,6 +1496,11 @@ export function createRoomMedia(opts: {
               return;
             }
             await push();
+            emit();
+            return;
+          }
+          if (opts.forward) {
+            await pushPresenceAudio();
           }
           emit();
           return;
@@ -1465,10 +1508,7 @@ export function createRoomMedia(opts: {
         if (data.op === "request") {
           if (!mic && !opts.forward) return;
           micListeners.add(data.from);
-          if (mic) await push();
-          else if (opts.forward && remoteMicFrom && remoteMicFrom !== data.from) {
-            await this.forwardFrom(remoteMicFrom);
-          }
+          if (mic || opts.forward) await pushPresenceAudio();
           emit();
           return;
         }
@@ -1661,6 +1701,7 @@ export function createRoomMedia(opts: {
       streamingFileId = null;
       revokeOwnerDecode();
       clearIngest();
+      presenceMixer?.close();
       listeners.clear();
     },
   };

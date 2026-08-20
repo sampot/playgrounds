@@ -1607,4 +1607,150 @@ describe("createRoomMedia", () => {
     });
     expect(media.getState().mic).toBe(true);
   });
+
+  it("forwards a single guest mic to the other guest without mixing", async () => {
+    const a = mockPc();
+    const b = mockPc();
+    const micA = track("audio", "mic-a");
+    a.transceivers[0]!.receiver.track = micA as unknown as {
+      kind: string;
+      id: string;
+      readyState: "live" | "ended";
+    };
+    const media = createRoomMedia({
+      localAgentId: "host",
+      occupantCount: () => 3,
+      peers: () => [
+        { peerId: "g-a", pc: a, via: "entrance" },
+        { peerId: "g-b", pc: b, via: "entrance" },
+      ],
+      sendJson: () => {},
+      forward: true,
+    });
+    await media.onControl({
+      type: SESSION_MIC_TYPE,
+      v: 1,
+      op: "offer",
+      from: "g-a",
+    });
+    expect(b.transceivers[0]!.sender.replaceTrack).toHaveBeenCalledWith(micA);
+    expect(a.transceivers[0]!.sender.replaceTrack).toHaveBeenCalledWith(null);
+  });
+
+  it("mixes host mic with a guest mic for the other guest", async () => {
+    const mixed = track("audio", "mixed-out");
+    const connects: string[] = [];
+    class FakeStream {
+      constructor(public tracks: MediaStreamTrack[]) {}
+      getAudioTracks() {
+        return this.tracks;
+      }
+    }
+    vi.stubGlobal("MediaStream", FakeStream);
+    vi.stubGlobal(
+      "AudioContext",
+      class {
+        createMediaStreamSource(stream: MediaStream) {
+          const t = stream.getAudioTracks()[0];
+          if (t) connects.push(t.id);
+          return { connect() {} };
+        }
+        createMediaStreamDestination() {
+          return {
+            stream: { getAudioTracks: () => [mixed] },
+          };
+        }
+        resume = vi.fn(async () => {});
+        close = vi.fn();
+      }
+    );
+
+    const a = mockPc();
+    const b = mockPc();
+    const micA = track("audio", "mic-a");
+    a.transceivers[0]!.receiver.track = micA as unknown as {
+      kind: string;
+      id: string;
+      readyState: "live" | "ended";
+    };
+    const hostMic = track("audio", "host-mic");
+    const media = createRoomMedia({
+      localAgentId: "host",
+      occupantCount: () => 3,
+      peers: () => [
+        { peerId: "g-a", pc: a, via: "entrance" },
+        { peerId: "g-b", pc: b, via: "entrance" },
+      ],
+      sendJson: () => {},
+      forward: true,
+      getUserMedia: async () =>
+        ({
+          getVideoTracks: () => [],
+          getAudioTracks: () => [hostMic],
+        }) as unknown as MediaStream,
+    });
+    expect((await media.enableMic()).ok).toBe(true);
+    await media.onControl({
+      type: SESSION_MIC_TYPE,
+      v: 1,
+      op: "offer",
+      from: "g-a",
+    });
+    // g-b hears host+A mixed; g-a hears only host (single → no mix graph needed for A)
+    expect(b.transceivers[0]!.sender.replaceTrack).toHaveBeenCalledWith(mixed);
+    expect(connects.sort()).toEqual(["host-mic", "mic-a"]);
+    expect(a.transceivers[0]!.sender.replaceTrack).toHaveBeenCalledWith(hostMic);
+  });
+
+  it("re-mixes remaining mics when one guest unoffers", async () => {
+    const a = mockPc();
+    const b = mockPc();
+    const micA = track("audio", "mic-a");
+    const micB = track("audio", "mic-b");
+    a.transceivers[0]!.receiver.track = micA as unknown as {
+      kind: string;
+      id: string;
+      readyState: "live" | "ended";
+    };
+    b.transceivers[0]!.receiver.track = micB as unknown as {
+      kind: string;
+      id: string;
+      readyState: "live" | "ended";
+    };
+    const media = createRoomMedia({
+      localAgentId: "host",
+      occupantCount: () => 3,
+      peers: () => [
+        { peerId: "g-a", pc: a, via: "entrance" },
+        { peerId: "g-b", pc: b, via: "entrance" },
+      ],
+      sendJson: () => {},
+      forward: true,
+    });
+    await media.onControl({
+      type: SESSION_MIC_TYPE,
+      v: 1,
+      op: "offer",
+      from: "g-a",
+    });
+    await media.onControl({
+      type: SESSION_MIC_TYPE,
+      v: 1,
+      op: "offer",
+      from: "g-b",
+    });
+    expect(a.transceivers[0]!.sender.replaceTrack).toHaveBeenCalledWith(micB);
+    expect(b.transceivers[0]!.sender.replaceTrack).toHaveBeenCalledWith(micA);
+
+    a.transceivers[0]!.sender.replaceTrack.mockClear();
+    b.transceivers[0]!.sender.replaceTrack.mockClear();
+    await media.onControl({
+      type: SESSION_MIC_TYPE,
+      v: 1,
+      op: "unoffer",
+      from: "g-a",
+    });
+    expect(b.transceivers[0]!.sender.replaceTrack).toHaveBeenCalledWith(null);
+    expect(a.transceivers[0]!.sender.replaceTrack).toHaveBeenCalledWith(micB);
+  });
 });

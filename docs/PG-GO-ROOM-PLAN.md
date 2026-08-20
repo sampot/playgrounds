@@ -861,7 +861,7 @@ session_camera.release  { from }
 
 **否決：** 用多路視訊合成／監視牆／會議小格來滿足「在場感」；用加 presence audio m-line 或雲端 SFU 當初期解。mesh 延後打開後可再評估直連音是否取代混音。
 
-**現況缺口：** 實作若仍 `forwardFrom` 單軌轉麥，則 ≥3 人同時開口聽不全——屬 **2f** 待補，不是契約允許。
+**實作：** `go-client` `goRoomPresenceAudioMix`＋Hub `pushPresenceAudio`（**2f 已落地**）。單開麥轉發；≥2 開 `AudioContext` 混音；關麥重推。
 
 ### 9.9 其他預留
 
@@ -870,7 +870,7 @@ session_camera.release  { from }
 | **別人掛的檔上大螢幕** | 主持 `session_cast` → owner 本機渲染 → Hub 轉節目軌（影／音先；圖同模型） | §5.7；對齊既有 `forwardFrom` live 路徑 |
 | **圖檔上大螢幕** | owner canvas 靜態／低幀 video 軌；無 seek HUD | 同上 |
 | **可預覽 doc 上大螢幕** | 僅來源端可 capture 的表面；不承諾任意 MIME | 不阻塞影／音／圖 |
-| **在場聲混音（2f）** | Host `AudioContext` 混多麥 → 各 peer 一條 presence audio | §9.8.1；契約已凍 |
+| **在場聲混音（2f）** | Host `AudioContext` 混多麥 → 各 peer 一條 presence audio | §9.8.1；**已落地** |
 | **在包廂開一局** | 已有 PC → 重用；大螢幕槽掛 SAM；主持選遊戲＋指定／自動入座；觀戰＝未入座仍看畫布 | DEC-045 重用；§5.9。**不要**散場再鑄遊戲邀請當快樂路徑 |
 | **螢幕分享** | 同一條在場 live；與鏡頭互斥；可被指定上大螢幕 | 不阻塞大螢幕 |
 
@@ -1011,7 +1011,7 @@ Esc 回大廳（現況 `goEscapeHome` 含 `/chat` → 改 `/room`）。**劇院�
 | 檔案 | 共用 `rosterSessionFile.ts`＋單測；索取端一律 **`/room-file/<id>`**＋既有 SW；**本機 File SW 直出（不經 DC）**；遠端 chunk **現況經 Host star**、**每 HTTP ↔ 一 `transferId`**；禁止組整檔 Blob／object URL 產品路徑；**只掛檔、不掛資料夾** |
 | Mesh | **延後。** `session_mesh` 模組留著；`GO_ROOM_MESH_ENABLED = false`。Host 不介紹、Guest 不建第二條 PC |
 | Peer | 進門 booth 2+2 helper（勿把遊戲 DC-only／現況 1+1 默默改掉）。mesh 邊日後同一套 |
-| 媒體 | **節目槽＝片子／live**（進門綁 program `<video>`；房級送**單一路**來源；電影 `captureStream`）。開局＝大螢幕槽掛 SAM，節目可 unoffer。在場＝開口／可指定上大螢幕。**在場聲＝Host 混音**（§9.8.1；待 2f）。目錄「要」＝同源 HTTP。人數不關鏡頭。**不做**多路視訊合成 |
+| 媒體 | **節目槽＝片子／live**（進門綁 program `<video>`；房級送**單一路**來源；電影 `captureStream`）。開局＝大螢幕槽掛 SAM，節目可 unoffer。在場＝開口／可指定上大螢幕。**在場聲＝Host 混音**（§9.8.1／2f）。目錄「要」＝同源 HTTP。人數不關鏡頭。**不做**多路視訊合成 |
 | 殼面 | 主視訊區 16:9（槽內無字）＋廳態三區／劇院態 overlay（§5.8）。內景降級為外框／沒訊號雪花。**不要**重用 `GoShopLobby`。chrome hideable 對齊對弈 overlay。**不要**用系統全螢幕冒充劇院態 |
 | 開局 | **延後。** 契約：`session_play`；重用進門 PC；席次從協議 roles；自動＝主持＋進門序。現況不介紹、主面不露玩遊戲 |
 | 分享 | `GoShareSheet` 邀請模式；title「邀請你進包廂」；**必備**「另一台請掃碼、不要再開一間」 |
@@ -1031,12 +1031,12 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 | **1. 文字＋傳檔** | 進 `/room` 即主面；按需 mint `invite.room`、`/i/` consent、DC、`session_chat` fanout、`session_file` **分享目錄＋`/room-file/<id>`**（本機直出；遠端每 HTTP ↔ transfer；SW 開 id＋交付完成權威）；answer loop 持續作答 | 會員不必先邀請就見包廂 UI（無 TTL）；同一短鏈 ≥2 Guest 與 Host 互傳文字；分享區可掛檔；對 `/room-file/<id>` 發 HTTP 才有 bytes；落盤優先 Save picker＋串流；Platform 無正文／無檔 bytes；未登入不能開這一間；`/chat`→`/room`；門牌過期包廂仍在 | **按需鑄／兩個時鐘已落地；HTTP↔transfer 隧道（開＋完成權威）已對齊；多人傳檔 e2e 手測仍待；現況 star；不掛資料夾** |
 | **1b. SDP 2+2** | 進門 offer／answer **2 audio + 2 video**（軌空）；具名 booth helper；遊戲 SDP 不動 | 進門 SDP 含兩組 `m=audio`、兩組 `m=video`；遊戲 compose 仍無須 2+2 | **已落地**（`reserveBoothMediaTransceivers`） |
 | **1c. Mesh 直連** | `session_mesh`；邊＝2+2＋DC；檔 chunk 與 RTP 直連／star 備援 | 兩位 Guest 之間：下載與節目／麥可不經 Host 組裝 | **延後**（`GO_ROOM_MESH_ENABLED = false`；先把 Hub 查清楚） |
-| **2a. Live（鏡頭／麥／畫面）** | 開在名單；在場**影像**仍 `request` 才送；麥＝房級；`getUserMedia` XOR `getDisplayMedia`；不做格子牆 | 不經 Platform 二次 O／A；預設未開相機；無指定則零在場影像 RTP | **已落地**（單軌轉麥；多人混音見 **2f**） |
+| **2a. Live（鏡頭／麥／畫面）** | 開在名單；在場**影像**仍 `request` 才送；麥＝房級；`getUserMedia` XOR `getDisplayMedia`；不做格子牆 | 不經 Platform 二次 O／A；預設未開相機；無指定則零在場影像 RTP | **已落地**（房級麥；多人混音 **2f**） |
 | **2b. 目錄影音私下播** | 掛在目錄的影片／音樂經同源 URL 邊收邊播；不走節目 RTP | 片源不出雲；可 seek；**不**當大螢幕；與下載／檢視同一 HTTP 門面 | **影音 SW 片源已落地；下載／圖仍待收斂到同一門面** |
 | **2c. 包廂大螢幕＋內景** | 靜態內景；節目槽＝大螢幕；主持指定來源（**本機**檔 `captureStream` 或 peer live）；房級收節目／在場聲；文字收成抽屜 | 沒訊號大螢幕佔主高度；一起看 MTV 走 RTP；私下播與大螢幕並行；不走動 | **已落地**（`GoBoothStage`；節目 RTP；文字／分享抽屜）。殼面改大螢幕槽＋三區見 **2d**；別人掛的檔見 **2e** |
 | **2d. 大螢幕槽殼面** | 主視訊區（沒訊號也佔；槽內無字）；廳態三區 RWD；**劇院態滿窗＋三區／底列 overlay**；頂列 overlay 可收；家具熱點降為非主導航 | 直／橫／平板／桌機可用；看電影時主視訊滿窗、其餘 overlay；請人在成員區／drawer | **進行中**（廳態＋劇院態已接；手測／RWD 收斂中） |
 | **2e. 別人掛的檔上大螢幕** | 主持 `session_cast` → **owner** 本機渲染 → Hub 轉節目；先 video／audio；image 同模型；doc 延後 | 主持可把 Guest 掛的片子／歌放到大螢幕；不能 capture → reject＋頁內說明；**不**為上大螢幕拉檔到主持 | **video／audio 已落地**（`fromPeer`；image／doc 仍延後） |
-| **2f. 在場聲混音** | 星狀下 Host `AudioContext` 混多路上行麥 → 各 peer 一條 presence audio；單開麥可轉發；排除自迴音；節目音不混入 | ≥2 開麥者彼此聽得到；關麥即離混；**不做**多路視訊合成 | **契約已凍；實作待補**（現況單軌 `forwardFrom`） |
+| **2f. 在場聲混音** | 星狀下 Host `AudioContext` 混多路上行麥 → 各 peer 一條 presence audio；單開麥可轉發；排除自迴音；節目音不混入 | ≥2 開麥者彼此聽得到；關麥即離混；**不做**多路視訊合成 | **已落地**（`goRoomPresenceAudioMix`；Hub `pushPresenceAudio`） |
 | **3. 重用 peer 開局** | 包廂已連 → `session_play`；大螢幕槽掛 SAM；主持選遊戲＋指定／自動入座；觀戰看同一畫布 | 不必再掃 compose；Guest 留 `/i/`；終局可結束這一局而包廂還在。第一刀：五子棋 2 席 | **延後**（契約已凍；主面不露玩遊戲。先把 2d／2e／片子／live／傳檔做穩） |
 
 建議實作順序 **0 → 1（含同源 HTTP 門面＋HTTP↔transfer 隧道對齊）→ 1b**（已落地）→ **2c**（已落地）→ **2d（殼面，進行中）** → **2e（別人掛的檔）** → **2f（在場聲混音）**；**1c mesh 延後**；**3 開局延後**。2b 私下播保留在檔案區，不要當主面播放器；下載／圖檢視應收斂到與 2b 同一 `/room-file/` 門面。現況**不要**排開局。**不要**排多路視訊合成。
@@ -1103,9 +1103,9 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 - [x] **進門即主面：** 已登入開 `/room` 即包廂 UI，不必先按邀請；主面＝主視訊區（2d）
 - [x] **不鎖 1:1 入座：** 同一短鏈多人可進；時間線 fanout；分享目錄同步（內容不全員推送）
 - [x] **兩個時鐘：** 包廂＝Host document；門牌 TTL 分開；按需鑄；Guest 留 `/i/`
-- [x] **契約本刀：** 主面＝主視訊區；廳態／劇院態；兩層螢幕；片子／live＝節目 RTP；開局＝重用 PC（延後）；**目錄索取＝同源靜態檔 HTTP**；主持導播；槽內無字；頂列可收；房級收節目／在場聲（§5.6–5.9／§8.2／§9／§10）；**單主畫面＋否決視訊合成；在場聲混音契約（§9.8.1／#32；2f 待實作）**
+- [x] **契約本刀：** 主面＝主視訊區；廳態／劇院態；兩層螢幕；片子／live＝節目 RTP；開局＝重用 PC（延後）；**目錄索取＝同源靜態檔 HTTP**；主持導播；槽內無字；頂列可收；房級收節目／在場聲（§5.6–5.9／§8.2／§9／§10）；**單主畫面＋否決視訊合成；在場聲混音（§9.8.1／#32／2f）**
 - [ ] **2d：** 殼面進行中（廳態＋劇院態已接 UI；手測／RWD 收斂中）
-- [ ] **2f：** 星狀在場聲混音（≥2 開麥彼此聽得到；節目音不混）
+- [x] **2f：** 星狀在場聲混音（≥2 開麥彼此聽得到；節目音不混）
 - [ ] **3：** 包廂開局 **延後**（契約已凍；不排 `session_play`）
 
 **Phase 1（實作後）**
@@ -1188,7 +1188,8 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 | 2026-08-20 | **索取端＝同源靜態檔（硬）：** 分享目錄每一檔對索取端像同源 web 靜態資源；下載／檢視／私下播同一 HTTP 門面（建議 `/room-file/<id>`；過渡可沿用 `/room-play/`）；SW 編成標準 Response；運輸仍 `session_file` DC。撤「下載禁止 SW」；仍禁止整檔 Blob／OPFS／Cache。凍結 #5／#17／#19／#23 修訂；§8.2 重寫 |
 | 2026-08-20 | **Safari 下載＝頁面 fetch（硬）：** WebKit 下載管理員遇 `Content-Disposition`／`<a download href=/room-file>` 會繞過 SW 打源站 404；遠端落盤一律 `fetch(/room-file/…)`→writable；無 Save picker 僅在 HTTP 收完後用 `blob:` 橋。SW：GET／HEAD／Range → 200／206／404／416／405，不靠 attachment 觸發下載 |
 | 2026-08-20 | **大檔 save 不提早 end／不裁未讀：** DC 完成時 UI 可已顯示完整大小，但 play 窗口 trim 若裁掉 pin 前方未讀 bytes＋提早 `end()` → Safari「檔案不完整」。save mode 只丟已讀前綴；`download()` pipe 完才 `end`；SW `v=34` |
-| 2026-08-20 | **單主畫面＋在場聲混音：** 否決瀏覽器多路視訊合成進節目（監視牆／會議小格烤一路）。大螢幕維持主持切台一路。星狀下在場聲＝Host `AudioContext` 混音再送（§9.8.1）；節目音不混開口。凍結 #18／#27／#32；Phase **2f**；現況單軌轉麥＝缺口 |
+| 2026-08-20 | **單主畫面＋在場聲混音：** 否決瀏覽器多路視訊合成進節目（監視牆／會議小格烤一路）。大螢幕維持主持切台一路。星狀下在場聲＝Host `AudioContext` 混音再送（§9.8.1）；節目音不混開口。凍結 #18／#27／#32；Phase **2f** |
+| 2026-08-20 | **2f 實作：** `goRoomPresenceAudioMix`；Hub `pushPresenceAudio`（單開麥轉發、≥2 混音、排除自迴音）；關麥重推；節目音不混入 |
 | 2026-08-20 | **HTTP↔transfer 隧道綁定（硬）：** 對前端 SW＝標準 HTTP server；每筆 `fetch`／媒體 GET／Range＝完整 roundtrip＝一條虛擬 connection（`transferId`，共用實體 DC）。幾次 request 由 downloader／`<video>` 決定，非 SW。完成權威＝SW 交完該 response 宣告長度；owner `done`＝源端泵完≠成功。否決 file-level 常駐池與 DC／HTTP 認定分裂。§2／§4／§8.2／§9.4／§9.7／凍結 #5／#19；實作仍待對齊 |
 | 2026-08-20 | **索取路徑凍結 `/room-file/<id>`：** 契約 URL 僅此形；撤規範面「過渡 `/room-play/`」；下載／檢視／私下播同一路徑 |
 | 2026-08-20 | **本機掛檔 SW 直出（硬）：** 前端目錄檔一律 `/room-file/<id>`；自己掛的 `File` 由 SW 滿足 HTTP（可 Range），**不開 transfer、不經 DataChannel**；遠端仍每 roundtrip ↔ transfer。撤「本機可用 object URL」產品路徑 |
