@@ -263,6 +263,11 @@
       ? fileShareKind({ mime: previewFile.mime, name: previewFile.name })
       : "doc"
   );
+  const previewPlayUrl = $derived(
+    previewOpen && goRoomFiles.playback && goRoomFiles.playback.id === previewId
+      ? goRoomFiles.playback.url
+      : undefined
+  );
   const roster = $derived(
     roomOccupantRows({
       localPeerId: "local",
@@ -766,7 +771,10 @@
         if (target) target.src = url ?? "";
         return;
       }
-      const bind = () => attachPlaybackUrl(filePlayEl ?? el, url);
+      const bind = () =>
+        attachPlaybackUrl(filePlayEl ?? el, url, {
+          muted: kind === "video",
+        });
       if (previewDialog && !previewDialog.open) {
         void tick().then(bind);
         return;
@@ -2109,33 +2117,43 @@
         {/if}
       </h2>
       {#if previewKind === "image"}
-        <img
-          bind:this={filePreviewImg}
-          class="file-preview-img"
-          alt={previewFile?.name ?? ""}
-        />
+        {#if previewPlayUrl}
+          <img
+            bind:this={filePreviewImg}
+            class="file-preview-img"
+            src={previewPlayUrl}
+            alt={previewFile?.name ?? ""}
+          />
+        {/if}
       {:else if previewKind === "audio"}
-        <audio
-          bind:this={filePlayEl}
-          class="file-player-audio"
-          controls
-          preload="metadata"
-          playsinline
-          webkit-playsinline
-          ontimeupdate={() => goRoomFiles.notePlayhead(filePlayEl?.currentTime ?? 0)}
-          aria-label="播放 {previewFile?.name ?? ""}"
-        ></audio>
+        {#if previewPlayUrl}
+          <audio
+            bind:this={filePlayEl}
+            class="file-player-audio"
+            src={previewPlayUrl}
+            controls
+            preload="metadata"
+            playsinline
+            webkit-playsinline
+            ontimeupdate={() => goRoomFiles.notePlayhead(filePlayEl?.currentTime ?? 0)}
+            aria-label="播放 {previewFile?.name ?? ""}"
+          ></audio>
+        {/if}
       {:else if previewKind === "video"}
-        <video
-          bind:this={filePlayEl}
-          class="media-video media-video--program"
-          controls
-          preload="metadata"
-          playsinline
-          webkit-playsinline
-          ontimeupdate={() => goRoomFiles.notePlayhead(filePlayEl?.currentTime ?? 0)}
-          aria-label="播放 {previewFile?.name ?? ""}"
-        ></video>
+        {#if previewPlayUrl}
+          <video
+            bind:this={filePlayEl}
+            class="media-video media-video--program"
+            src={previewPlayUrl}
+            controls
+            muted
+            preload="metadata"
+            playsinline
+            webkit-playsinline
+            ontimeupdate={() => goRoomFiles.notePlayhead(filePlayEl?.currentTime ?? 0)}
+            aria-label="播放 {previewFile?.name ?? ""}"
+          ></video>
+        {/if}
       {:else}
         <p class="muted">這個檔在本機預覽不了，請下載查看。</p>
       {/if}

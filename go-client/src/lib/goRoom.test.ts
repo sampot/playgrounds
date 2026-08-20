@@ -863,11 +863,113 @@ describe("attachPlaybackUrl", () => {
       .mockRejectedValueOnce(new DOMException("NotAllowedError"))
       .mockResolvedValueOnce(undefined);
     const el = { src: "", paused: true, muted: false, play };
-    attachPlaybackUrl(el, "blob:play-2");
+    attachPlaybackUrl(el, "/room-file/play-2");
     await vi.waitFor(() => {
       expect(el.muted).toBe(true);
     });
     expect(play).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps src as /room-file/<id> on the attribute (Safari must not see blob: or an absolute URL)", () => {
+    const attrs: Record<string, string> = {};
+    const assigned: string[] = [];
+    const el = {
+      paused: true,
+      muted: false,
+      play: async () => {},
+      _src: "",
+      get src() {
+        return this._src.startsWith("/")
+          ? `https://go.example${this._src}`
+          : this._src;
+      },
+      set src(v: string) {
+        assigned.push(v);
+        this._src = v.startsWith("http") ? v : `https://go.example${v}`;
+        attrs.src = this._src;
+      },
+      getAttribute(name: string) {
+        return attrs[name] ?? null;
+      },
+      setAttribute(name: string, value: string) {
+        attrs[name] = value;
+        if (name === "src") this._src = value;
+      },
+      removeAttribute(name: string) {
+        delete attrs[name];
+      },
+    };
+    attachPlaybackUrl(el, "/room-file/clip-1");
+    expect(el.getAttribute("src")).toBe("/room-file/clip-1");
+    expect(assigned).toEqual([]);
+  });
+
+  it("still assigns .src=/room-file/<id> when setAttribute does not stick", () => {
+    const el = {
+      src: "",
+      paused: true,
+      muted: false,
+      play: async () => {},
+      getAttribute: () => null,
+      setAttribute: vi.fn(),
+    };
+    attachPlaybackUrl(el, "/room-file/clip-1");
+    expect(el.src).toBe("/room-file/clip-1");
+    expect(el.setAttribute).toHaveBeenCalledWith("src", "/room-file/clip-1");
+  });
+
+  it("does not reassign when .src resolved to an absolute /room-file/ URL", () => {
+    const setAttribute = vi.fn();
+    const el = {
+      src: "https://go.example/room-file/tr-1",
+      paused: false,
+      muted: false,
+      play: vi.fn(async () => {}),
+      load: vi.fn(),
+      getAttribute: (name: string) =>
+        name === "src" ? "https://go.example/room-file/tr-1" : null,
+      setAttribute,
+    };
+    attachPlaybackUrl(el, "/room-file/tr-1");
+    expect(setAttribute).not.toHaveBeenCalled();
+    expect(el.load).not.toHaveBeenCalled();
+    expect(el.play).not.toHaveBeenCalled();
+  });
+
+  it("mutes a /room-file/ video preview before play so Safari can autoplay", async () => {
+    const play = vi.fn(async () => {});
+    const el = {
+      src: "",
+      paused: true,
+      muted: false,
+      defaultMuted: false,
+      play,
+      getAttribute: () => null,
+      setAttribute: vi.fn(),
+    };
+    attachPlaybackUrl(el, "/room-file/clip-1", { muted: true });
+    expect(el.muted).toBe(true);
+    expect(el.defaultMuted).toBe(true);
+    expect(el.setAttribute).toHaveBeenCalledWith("muted", "");
+    expect(el.setAttribute).toHaveBeenCalledWith("src", "/room-file/clip-1");
+    await vi.waitFor(() => {
+      expect(play).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("does not remute a /room-file/ preview after the user turns sound on", () => {
+    const el = {
+      src: "https://go.example/room-file/clip-1",
+      paused: false,
+      muted: false,
+      play: vi.fn(async () => {}),
+      getAttribute: (name: string) =>
+        name === "src" ? "/room-file/clip-1" : null,
+      setAttribute: vi.fn(),
+    };
+    attachPlaybackUrl(el, "/room-file/clip-1", { muted: true });
+    expect(el.muted).toBe(false);
+    expect(el.setAttribute).not.toHaveBeenCalled();
   });
 });
 

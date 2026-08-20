@@ -1149,21 +1149,56 @@ function playbackSrcOf(el: { src: string; getAttribute?: (name: string) => strin
   return el.src || "";
 }
 
+/** Compare media src so `/room-file/id` matches a resolved absolute URL. */
+export function samePlaybackSrc(a: string, b: string): boolean {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const pathOf = (s: string): string => {
+    if (s.startsWith("/")) return s.split("?")[0] ?? s;
+    try {
+      return new URL(s).pathname;
+    } catch {
+      return s;
+    }
+  };
+  return pathOf(a) === pathOf(b);
+}
+
+type PlaybackEl = {
+  src: string;
+  paused: boolean;
+  muted: boolean;
+  defaultMuted?: boolean;
+  play: () => Promise<void>;
+  load?: () => void;
+  getAttribute?: (name: string) => string | null;
+  setAttribute?: (name: string, value: string) => void;
+  removeAttribute?: (name: string) => void;
+};
+
+function applyPlaybackMute(el: PlaybackEl): void {
+  el.muted = true;
+  el.defaultMuted = true;
+  el.setAttribute?.("muted", "");
+}
+
+function assignPlaybackSrc(el: PlaybackEl, url: string): void {
+  /** Prefer the relative `/room-file/<id>` attribute; IDL `.src` may resolve. */
+  el.setAttribute?.("src", url);
+  if (!samePlaybackSrc(playbackSrcOf(el), url) && !samePlaybackSrc(el.src, url)) {
+    el.src = url;
+  }
+}
+
 /**
  * Bind a playback URL without resetting media src on every roster emit.
- * Re-assigning the same blob: URL can close the source and leave a black frame.
+ * Re-assigning the same URL (blob: or a resolved `/room-file/` absolute) can
+ * abort Safari's first Range and leave a black frame.
  */
 export function attachPlaybackUrl(
-  el: {
-    src: string;
-    paused: boolean;
-    muted: boolean;
-    play: () => Promise<void>;
-    load?: () => void;
-    getAttribute?: (name: string) => string | null;
-    removeAttribute?: (name: string) => void;
-  } | null | undefined,
-  url: string | null
+  el: PlaybackEl | null | undefined,
+  url: string | null,
+  opts?: { muted?: boolean }
 ): void {
   if (!el) return;
   if (!url) {
@@ -1173,12 +1208,15 @@ export function attachPlaybackUrl(
     }
     return;
   }
-  if (playbackSrcOf(el) === url || el.src === url) {
+  const current = playbackSrcOf(el);
+  if (samePlaybackSrc(current, url) || samePlaybackSrc(el.src, url)) {
     if (el.paused) void tryPlay(el);
     return;
   }
-  const hadSrc = Boolean(playbackSrcOf(el));
-  el.src = url;
+  /** Mute before src so Safari autoplay is allowed; do not remute on re-bind. */
+  if (opts?.muted) applyPlaybackMute(el);
+  const hadSrc = Boolean(current);
+  assignPlaybackSrc(el, url);
   /** First assign: setting src already loads. A second load() aborts Safari's first Range. */
   if (hadSrc) el.load?.();
   void tryPlay(el);
