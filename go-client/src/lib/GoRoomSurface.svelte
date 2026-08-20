@@ -915,9 +915,22 @@
     if (ready) {
       /**
        * Second click under a fresh user gesture — Safari will honor `<a download>`.
-       * Keep the prepared blob so they can save again without re-fetching.
+       * Drop pending immediately so the button returns to「下載」and the ~file
+       * blob can be GC’d (revoke after the OS grab has started).
        */
-      triggerBrowserDownload(ready.url, ready.name);
+      const { url, name } = ready;
+      triggerBrowserDownload(url, name);
+      const next = new Map(pendingBrowserSaves);
+      next.delete(id);
+      pendingBrowserSaves = next;
+      fileHint = "";
+      setTimeout(() => {
+        try {
+          URL.revokeObjectURL(url);
+        } catch {
+          /* ignore */
+        }
+      }, 60_000);
       return;
     }
     /**
@@ -962,6 +975,7 @@
   function onCancelDownload(id: string) {
     fileError = "";
     fileHint = "";
+    clearPendingBrowserSave(id);
     goRoomFiles.cancelDownload(id);
   }
 

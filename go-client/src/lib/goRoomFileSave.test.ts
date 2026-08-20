@@ -182,6 +182,73 @@ describe("pipeResponseToWritable", () => {
     );
   });
 
+  it("finishes when written reaches expectLen even if the reader never signals done (Safari SW)", async () => {
+    const parts: Uint8Array[] = [];
+    let closed = false;
+    const writable: RoomFileWritable = {
+      write: (data) => {
+        parts.push(
+          data instanceof Uint8Array
+            ? data
+            : new Uint8Array(data as ArrayBuffer)
+        );
+      },
+      close: () => {
+        closed = true;
+      },
+    };
+    /** Stream delivers full Content-Length then hangs — WebKit never surfaces done. */
+    const body = new ReadableStream<Uint8Array>({
+      start(c) {
+        c.enqueue(new Uint8Array([1, 2, 3]));
+        /* never close */
+      },
+    });
+    expect(await pipeResponseToWritable(body, writable, { expectLen: 3 })).toBe(
+      3
+    );
+    expect(closed).toBe(true);
+    expect(parts.map((p) => Array.from(p))).toEqual([[1, 2, 3]]);
+  });
+
+  it("drains the page mirror when fetch stalls before Content-Length (Safari)", async () => {
+    const parts: Uint8Array[] = [];
+    let closed = false;
+    const writable: RoomFileWritable = {
+      write: (data) => {
+        parts.push(
+          data instanceof Uint8Array
+            ? data
+            : new Uint8Array(data as ArrayBuffer)
+        );
+      },
+      close: () => {
+        closed = true;
+      },
+    };
+    const mirror = new Uint8Array([1, 2, 3, 4, 5]);
+    let resolveDrain!: () => void;
+    const mirrorDrain = new Promise<void>((r) => {
+      resolveDrain = r;
+    });
+    const body = new ReadableStream<Uint8Array>({
+      start(c) {
+        c.enqueue(new Uint8Array([1, 2]));
+        /* stall — remaining bytes only in the page mirror */
+      },
+    });
+    const pending = pipeResponseToWritable(body, writable, {
+      expectLen: 5,
+      mirrorDrain,
+      readMirror: (start, end) => mirror.subarray(start, end),
+    });
+    await Promise.resolve();
+    resolveDrain();
+    expect(await pending).toBe(5);
+    expect(closed).toBe(true);
+    expect(parts.reduce((n, p) => n + p.byteLength, 0)).toBe(5);
+  });
+
   it("aborts the writable when the stream errors", async () => {
     let aborted = false;
     const writable: RoomFileWritable = {

@@ -30,7 +30,27 @@ export type RoomPlaySink = {
   destroy(): void;
   bufferedBytes(): number;
   covers?(start: number, end: number): boolean;
+  /**
+   * Save mode: bytes the page fetch／writable has actually kept.
+   * Page trim must not advance past this (SW pin can race ahead under WebKit).
+   */
+  noteSaveConsumed?(at: number): void;
+  /** Read a covered range from the page mirror (save drain fallback). */
+  read?(start: number, end: number): Uint8Array | null;
 };
+
+/**
+ * Save-mode page trim pin: never drop bytes the writable has not consumed yet,
+ * even if the SW HTTP pin raced ahead (WebKit buffers the Response body).
+ */
+export function savePageTrimPin(
+  writableConsumed: number,
+  swPin: number | null
+): number {
+  const consumed = Math.max(0, Math.floor(writableConsumed));
+  if (swPin == null || !Number.isFinite(swPin)) return consumed;
+  return Math.max(0, Math.min(consumed, Math.floor(swPin)));
+}
 
 export type PlaySinkOpts = {
   mime?: string;
@@ -175,13 +195,14 @@ export function createRegistryPlaySink(opts: PlaySinkOpts = {}): RoomPlaySink {
   const size = opts.size ?? 0;
   const highBytes = opts.highBytes ?? SESSION_FILE_PLAY_BUFFER_HIGH;
   const lowBytes = opts.lowBytes ?? SESSION_FILE_PLAY_BUFFER_LOW;
+  const saveMode = opts.mode === "save";
   sessions.open(playId, {
     mime,
     size,
     maxBytes: opts.maxBytes,
     highBytes,
     lowBytes,
-    mode: opts.mode === "save" ? "save" : "play",
+    mode: saveMode ? "save" : "play",
   });
   notifyRoomPlaySw({
     type: "go-room-play",
@@ -190,11 +211,32 @@ export function createRegistryPlaySink(opts: PlaySinkOpts = {}): RoomPlaySink {
     mime,
     size,
     name: opts.name,
-    mode: opts.mode === "save" ? "save" : "play",
+    mode: saveMode ? "save" : "play",
   });
   let dead = false;
+  /** Save: SW may report pin ahead of fetch→writable; trim uses the min. */
+  let writableConsumed = 0;
+  const swPins = new Map<string, number>();
+  const SAVE_TRIM_KEY = "page-save-trim";
+
+  function applySaveTrimPin(): void {
+    if (!saveMode || dead) return;
+    let swMin: number | null = null;
+    for (const p of swPins.values()) {
+      swMin = swMin == null ? p : Math.min(swMin, p);
+    }
+    const at = savePageTrimPin(writableConsumed, swMin);
+    sessions.pin(playId, SAVE_TRIM_KEY, at);
+  }
+
   const stopPin = listenRoomPlayPin((id, streamKey, at) => {
     if (dead || id !== playId) return;
+    if (saveMode) {
+      if (at == null) swPins.delete(streamKey);
+      else swPins.set(streamKey, at);
+      applySaveTrimPin();
+      return;
+    }
     if (at == null) sessions.unpin(playId, streamKey);
     else sessions.pin(playId, streamKey, at);
   });
@@ -235,6 +277,14 @@ export function createRegistryPlaySink(opts: PlaySinkOpts = {}): RoomPlaySink {
     },
     covers(start, end) {
       return sessions.covers(playId, start, end);
+    },
+    read(start, end) {
+      return sessions.read(playId, start, end);
+    },
+    noteSaveConsumed(at) {
+      if (!saveMode || dead) return;
+      writableConsumed = Math.max(writableConsumed, Math.floor(at));
+      applySaveTrimPin();
     },
     async evictUntil() {
       if (dead) return "low";

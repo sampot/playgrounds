@@ -3,8 +3,17 @@ import {
   SESSION_FILE_PLAY_BUFFER_MAX,
   createPlayByteWindow,
   createRoomPlaySink,
+  savePageTrimPin,
 } from "./goRoomFilePlay";
 import { createRoomPlayRegistry } from "./goRoomPlayRegistry";
+
+describe("savePageTrimPin", () => {
+  it("never advances past writable consumption even if SW pin raced ahead", () => {
+    expect(savePageTrimPin(10, 100)).toBe(10);
+    expect(savePageTrimPin(50, 40)).toBe(40);
+    expect(savePageTrimPin(0, null)).toBe(0);
+  });
+});
 
 describe("createPlayByteWindow", () => {
   it("drops old bytes so the buffer stays under the cap", async () => {

@@ -230,6 +230,10 @@ export function createRoomFileTransfer(
     writable: RoomFileWritable | null;
     userCancelled: boolean;
   } | null = null;
+  /** Safari: resolve when DC save mirror has the full file so pipe can drain. */
+  let saveMirrorDrainResolve: (() => void) | null = null;
+  /** Latched if owner done arrives before pipe subscribes to mirrorDrain. */
+  let saveMirrorReadyFileId: string | null = null;
   const makePlaySink =
     deps.createPlaySink ??
     ((opts: {
@@ -625,13 +629,15 @@ export function createRoomFileTransfer(
             res.status === 404 ? "找不到這個檔" : `下載失敗（HTTP ${res.status}）`
           );
         }
-        const written = await pipeResponseToWritable(res.body, writable);
         const expectLen = (() => {
           const raw = res.headers.get("Content-Length");
           if (raw == null || raw === "") return entry.size;
           const n = Number(raw);
           return Number.isFinite(n) && n >= 0 ? n : entry.size;
         })();
+        const written = await pipeResponseToWritable(res.body, writable, {
+          expectLen,
+        });
         if (written !== expectLen) throw new Error("檔案不完整");
         return { ok: true, id };
       } catch (e) {
@@ -664,6 +670,7 @@ export function createRoomFileTransfer(
     /** Drop private-play state so save-cancel／transfer-end can clear this HTTP session. */
     revokePlayback();
     saveSwComplete.delete(id);
+    if (saveMirrorReadyFileId === id) saveMirrorReadyFileId = null;
     playSink = makePlaySink({
       mime: entry.mime,
       name: entry.name,
@@ -691,16 +698,28 @@ export function createRoomFileTransfer(
           res.status === 404 ? "找不到這個檔" : `下載失敗（HTTP ${res.status}）`
         );
       }
-      const written = await pipeResponseToWritable(res.body, writable);
       const expectLen = (() => {
         const raw = res.headers.get("Content-Length");
         if (raw == null || raw === "") return entry.size;
         const n = Number(raw);
         return Number.isFinite(n) && n >= 0 ? n : entry.size;
       })();
+      const mirrorDrain = new Promise<void>((resolve) => {
+        saveMirrorDrainResolve = resolve;
+        if (saveMirrorReadyFileId === id) resolve();
+      });
+      const written = await pipeResponseToWritable(res.body, writable, {
+        expectLen,
+        onProgress: (n) => playSink?.noteSaveConsumed?.(n),
+        mirrorDrain,
+        readMirror: (start, end) => playSink?.read?.(start, end) ?? null,
+      });
+      saveMirrorDrainResolve = null;
+      if (saveMirrorReadyFileId === id) saveMirrorReadyFileId = null;
       if (written !== expectLen) {
         throw new Error("檔案不完整");
       }
+      saveSwComplete.add(id);
       for (const cur of [...inbounds.values()]) {
         if (cur.fileId === id && cur.purpose === "save") {
           inbounds.delete(cur.transferId);
@@ -738,6 +757,8 @@ export function createRoomFileTransfer(
       emit();
       return { ok: false, error: msg };
     } finally {
+      saveMirrorDrainResolve = null;
+      if (saveMirrorReadyFileId === id) saveMirrorReadyFileId = null;
       if (activeDownload?.fileId === id) activeDownload = null;
       if (httpFileId === id) clearHttpSink();
       const cur = entries.find((e) => e.id === id);
@@ -1330,11 +1351,22 @@ export function createRoomFileTransfer(
                   : cur.size,
               error: undefined,
             });
+            /**
+             * Safari: fetch often stalls with the last few MiB stuck in the
+             * Response buffer while DC already finished. Signal pipe to drain
+             * the page mirror (pin is capped by writable progress).
+             */
+            if (cur.purpose === "save") {
+              /** Do not playSink.end() here — Edge／Safari fetch may still be reading. */
+              saveMirrorReadyFileId = cur.fileId;
+              saveMirrorDrainResolve?.();
+              saveMirrorDrainResolve = null;
+            }
           }
           /**
            * Owner done = source exhausted only. Do not closeInbound / mark
-           * listed — wait for SW transfer-complete／abort (HTTP delivery).
-           * Save must not playSink.end() here (Edge／Safari: fetch still reading).
+           * listed — wait for SW transfer-complete／abort (HTTP delivery),
+           * or Safari mirror drain above.
            */
         });
       }
@@ -1350,6 +1382,20 @@ export function createRoomFileTransfer(
   }): void {
     const cur = inbounds.get(msg.transferId);
     if (!cur || cur.fileId !== msg.fileId) return;
+    /**
+     * Mirror-drain／expectLen complete cancels the fetch reader — SW may post
+     * transfer-abort. Do not flip the row to error while download() owns the
+     * outcome (or after save already marked complete).
+     */
+    if (
+      !msg.ok &&
+      cur.purpose === "save" &&
+      (saveSwComplete.has(msg.fileId) ||
+        activeDownload?.fileId === msg.fileId)
+    ) {
+      inbounds.delete(msg.transferId);
+      return;
+    }
     if (msg.ok) {
       const expect = cur.expectBytes;
       const delivered =

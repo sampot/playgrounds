@@ -154,20 +154,67 @@ export function createBrowserSaveWritable(
 /** Stream an HTTP Response body into a save writable; returns bytes written. */
 export async function pipeResponseToWritable(
   body: ReadableStream<Uint8Array> | null,
-  writable: RoomFileWritable
+  writable: RoomFileWritable,
+  opts?: {
+    expectLen?: number;
+    onProgress?: (written: number) => void;
+    /** Resolves when the DC／page mirror has the full file — drain if fetch stalls. */
+    mirrorDrain?: Promise<void>;
+    readMirror?: (start: number, end: number) => Uint8Array | null;
+  }
 ): Promise<number> {
   if (!body) {
     throw new Error("下載失敗");
   }
+  const expectLen =
+    typeof opts?.expectLen === "number" &&
+    Number.isFinite(opts.expectLen) &&
+    opts.expectLen >= 0
+      ? Math.floor(opts.expectLen)
+      : undefined;
   const reader = body.getReader();
   let written = 0;
+  const never = new Promise<never>(() => {});
   try {
     for (;;) {
-      const { done, value } = await reader.read();
+      if (expectLen !== undefined && written >= expectLen) {
+        break;
+      }
+      const raced = await Promise.race([
+        reader.read().then((r) => ({ kind: "read" as const, r })),
+        (opts?.mirrorDrain ?? never).then(() => ({ kind: "drain" as const })),
+      ]);
+      if (raced.kind === "drain") {
+        try {
+          await reader.cancel();
+        } catch {
+          /* ignore */
+        }
+        if (opts?.readMirror && expectLen !== undefined) {
+          while (written < expectLen) {
+            const end = Math.min(written + 512 * 1024, expectLen);
+            const piece = opts.readMirror(written, end);
+            if (!piece?.byteLength) break;
+            await writable.write(piece);
+            written += piece.byteLength;
+            opts.onProgress?.(written);
+          }
+        }
+        break;
+      }
+      const { done, value } = raced.r;
       if (done) break;
       if (value?.byteLength) {
         written += value.byteLength;
         await writable.write(value);
+        opts?.onProgress?.(written);
+        /**
+         * Safari／WebKit: SW ReadableStream often delivers the full body but
+         * never surfaces done to fetch. Content-Length is completion authority.
+         */
+        if (expectLen !== undefined && written >= expectLen) {
+          break;
+        }
       }
     }
     await writable.close();

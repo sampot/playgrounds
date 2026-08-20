@@ -12,7 +12,7 @@ export const GO_ROOM_FILE_CANCEL = "取消";
 /** Safari／無 Save picker：第一次「下載」只拉齊 bytes；就緒後改此文案再點才存到本機。 */
 export const GO_ROOM_FILE_SAVE = "存檔";
 export const GO_ROOM_FILE_SAVE_READY_HINT =
-  "檔已就緒。再按「存檔」才會存到這台。";
+  "檔已就緒。再按「存檔」才會存到這台；存完會釋放暫存。";
 export const GO_ROOM_FILE_DROP = "拖進來或點這裡掛上檔案";
 export const GO_ROOM_FILE_DELETE_CONFIRM =
   "撤回後在場的人看不到這個檔。已存到硬碟的不受影響。";
