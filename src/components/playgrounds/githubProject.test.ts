@@ -134,18 +134,19 @@ describe("fetchGithubProjectFromManifest", () => {
 
 describe("fetchGithubSamTipRev", () => {
   it("returns manifest rev from raw", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () =>
-        new Response(
-          JSON.stringify({
-            version: 1,
-            rev: "tip-rev",
-            files: ["index.html"],
-          })
-        )
-      )
-    );
+    const fetchMock = vi.fn(async (input: RequestInfo) => {
+      const url = String(input);
+      expect(url).toContain("/refs/heads/main/sam-manifest.json");
+      expect(url).not.toMatch(/\/pg-gomoku\/main\/sam-manifest/);
+      return new Response(
+        JSON.stringify({
+          version: 1,
+          rev: "tip-rev",
+          files: ["index.html"],
+        })
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
     vi.resetModules();
     const { fetchGithubSamTipRev } = await import("./githubProject");
     await expect(

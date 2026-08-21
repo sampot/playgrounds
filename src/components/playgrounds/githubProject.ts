@@ -151,8 +151,22 @@ export type FetchGithubProjectResult = {
   tipRev: string;
 };
 
+function githubRawRefPath(rawRef: string): string {
+  // Branch names via /main are often CDN-sticky on raw.githubusercontent.com;
+  // refs/heads/<branch> stays fresher. Leave full SHAs and existing refs/ alone.
+  const t = rawRef.trim();
+  if (!t) return "refs/heads/main";
+  if (t.startsWith("refs/")) return t;
+  if (/^[0-9a-f]{7,40}$/i.test(t)) return t;
+  return `refs/heads/${t}`;
+}
+
 function githubRawBase(ref: GithubRef, rawRef: string): string {
-  return `https://raw.githubusercontent.com/${ref.owner}/${ref.repo}/${encodeURIComponent(rawRef)}`;
+  const path = githubRawRefPath(rawRef)
+    .split("/")
+    .map((p) => encodeURIComponent(p))
+    .join("/");
+  return `https://raw.githubusercontent.com/${ref.owner}/${ref.repo}/${path}`;
 }
 
 /**
