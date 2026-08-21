@@ -6,10 +6,12 @@ import {
   mediaRangeForBufferedBody,
   parseByteRange,
   parseRoomFilePath,
+  parseRoomFilePurpose,
   parseRoomPlayPath,
   playFetchRange,
   isBytesRangeHeader,
   roomFileContentType,
+  roomFileDownloadPath,
   roomFileHttpBodyKind,
   roomFileMethodAllowed,
   roomFilePath,
@@ -40,11 +42,26 @@ async function readAll(
 describe("room file path", () => {
   it("uses /room-file/ as the canonical same-origin URL", () => {
     expect(roomFilePath("tr-1")).toBe("/room-file/tr-1");
-    expect(roomPlayPath("tr-1")).toBe("/room-file/tr-1");
+    expect(roomPlayPath("tr-1")).toBe("/room-file/tr-1?purpose=play");
     expect(parseRoomFilePath("/room-file/tr-1")).toBe("tr-1");
     expect(parseRoomFilePath("/room-play/tr-1")).toBe("tr-1");
     expect(parseRoomPlayPath("/room-play/legacy")).toBe("legacy");
+    expect(parseRoomFilePath("/room-file/tr-1?purpose=play")).toBe("tr-1");
     expect(parseRoomFilePath("/room/tr-1")).toBeNull();
+  });
+
+  it("can carry ?purpose= so the Page tells SW task priority (not ?download=)", () => {
+    expect(roomFilePath("tr-1", { purpose: "play" })).toBe(
+      "/room-file/tr-1?purpose=play"
+    );
+    expect(roomFilePath("tr-1", { purpose: "save" })).toBe(
+      "/room-file/tr-1?purpose=save"
+    );
+    expect(roomFileDownloadPath("tr-1")).toBe("/room-file/tr-1?purpose=save");
+    expect(parseRoomFilePurpose("?purpose=play")).toBe("play");
+    expect(parseRoomFilePurpose("?purpose=save")).toBe("save");
+    expect(parseRoomFilePurpose("?purpose=other")).toBeUndefined();
+    expect(parseRoomFilePurpose("")).toBeUndefined();
   });
 });
 

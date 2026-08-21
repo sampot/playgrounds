@@ -7,7 +7,7 @@
  * GO_SW_REV＝橋／room-play 邏輯；GO_SHELL_CACHE_REV＝殼 Cache 名。
  * 只改 room-play／canvas 時只 bump GO_SW_REV，勿清掉已暖好的離線殼。
  */
-const GO_SW_REV = 39;
+const GO_SW_REV = 43;
 /** Bump only when shell cache policy or cacheable path set changes. */
 const GO_SHELL_CACHE_REV = 26;
 const CANVAS_PREFIX = "/canvas/";
@@ -553,6 +553,17 @@ function parseRoomPlayPath(pathname) {
   }
 }
 
+/** Optional `?purpose=play|save` from the Page’s HTTP request — priority hint only. */
+function parseRoomFilePurpose(searchParams) {
+  try {
+    const p = searchParams && searchParams.get("purpose");
+    if (p === "play" || p === "save") return p;
+  } catch {
+    /* ignore */
+  }
+  return undefined;
+}
+
 function parseByteRange(header, size) {
   if (!header || size <= 0) return null;
   const m = /^bytes=(\d*)-(\d*)$/i.exec(String(header).trim());
@@ -708,38 +719,35 @@ function trimPlaySpans(s) {
     s.spans = [];
     return;
   }
-  if (s.mode === "save") {
-    const pinList =
-      s.pins && s.pins.size > 0 ? Array.from(s.pins.values()) : [0];
-    const minPin = Math.max(0, Math.min.apply(null, pinList));
-    if (minPin > 0) {
-      const clipped = [];
-      for (const span of s.spans) {
-        const end = span.start + span.bytes.byteLength;
-        if (end <= minPin) continue;
-        if (span.start < minPin) {
-          clipped.push({
-            start: minPin,
-            bytes: span.bytes.subarray(minPin - span.start),
-          });
-        } else {
-          clipped.push(span);
-        }
-      }
-      s.spans = clipped.reduce(
-        (acc, sp) => putPlaySpan(acc, sp.start, sp.bytes),
-        []
-      );
-    }
-    return;
-  }
+  /** Never drop bytes still needed by any pin (download／media alike). */
   const pinList =
-    s.pins && s.pins.size > 0
-      ? Array.from(s.pins.values()).sort((a, b) => a - b)
-      : [0];
-  const share = Math.max(1, Math.floor(maxBytes / pinList.length));
-  const clipped = [];
-  for (const pin of pinList) {
+    s.pins && s.pins.size > 0 ? Array.from(s.pins.values()) : [0];
+  const minPin = Math.max(0, Math.min.apply(null, pinList));
+  if (minPin > 0) {
+    const clipped = [];
+    for (const span of s.spans) {
+      const end = span.start + span.bytes.byteLength;
+      if (end <= minPin) continue;
+      if (span.start < minPin) {
+        clipped.push({
+          start: minPin,
+          bytes: span.bytes.subarray(minPin - span.start),
+        });
+      } else {
+        clipped.push(span);
+      }
+    }
+    s.spans = clipped.reduce(
+      (acc, sp) => putPlaySpan(acc, sp.start, sp.bytes),
+      []
+    );
+  }
+  if (playStoredBytes(s.spans) <= maxBytes) return;
+  /** Soft cap: keep windows around pins when over budget. */
+  const sorted = pinList.slice().sort((a, b) => a - b);
+  const share = Math.max(1, Math.floor(maxBytes / sorted.length));
+  const kept = [];
+  for (const pin of sorted) {
     const from = Math.max(0, pin);
     const to = from + share;
     for (const span of s.spans) {
@@ -747,27 +755,18 @@ function trimPlaySpans(s) {
       const a = Math.max(span.start, from);
       const b = Math.min(end, to);
       if (b <= a) continue;
-      clipped.push({
+      kept.push({
         start: a,
         bytes: span.bytes.subarray(a - span.start, b - span.start),
       });
     }
   }
-  s.spans = clipped.reduce(
+  s.spans = kept.reduce(
     (acc, sp) => putPlaySpan(acc, sp.start, sp.bytes),
     []
   );
   while (playStoredBytes(s.spans) > maxBytes && s.spans.length > 0) {
-    const last = s.spans[s.spans.length - 1];
-    const overflow = playStoredBytes(s.spans) - maxBytes;
-    if (overflow >= last.bytes.byteLength) {
-      s.spans.pop();
-      continue;
-    }
-    s.spans[s.spans.length - 1] = {
-      start: last.start,
-      bytes: last.bytes.subarray(0, last.bytes.byteLength - overflow),
-    };
+    s.spans.pop();
   }
 }
 
@@ -839,10 +838,12 @@ function applyRoomPlayMessage(data) {
       size: Number(data.size) || 0,
       maxBytes: ROOM_PLAY_MAX,
       name: typeof data.name === "string" ? data.name : "",
-      mode: data.mode === "save" ? "save" : "play",
+      /** job id ≡ file id；tasks = open HTTP transferIds */
+      tasks: new Set(),
       spans: [],
       appendAt: 0,
       pins: new Map(),
+      rejectedTransfers: new Set(),
       ended: false,
       aborted: false,
       waiters: [],
@@ -890,26 +891,44 @@ function applyRoomPlayMessage(data) {
     s.spans = [];
     wakePlay(s);
     roomPlays.delete(id);
+    return;
+  }
+  if (data.op === "reject-transfer") {
+    const tid = typeof data.transferId === "string" ? data.transferId.trim() : "";
+    if (!tid) return;
+    if (!s.rejectedTransfers) s.rejectedTransfers = new Set();
+    s.rejectedTransfers.add(tid);
+    jobReleaseTask(s, tid);
+    if (s.pins) {
+      s.pins.delete(tid);
+      trimPlaySpans(s);
+    }
+    wakePlay(s);
   }
 }
 
-function livePlayStream(id) {
+function livePlayStream(id, purpose) {
   let sent = 0;
   let settled = false;
-  const streamKey = `live-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-  const s0 = roomPlays.get(id);
   const transferId = allocRoomTransferId();
-  const purpose = s0 && s0.mode === "save" ? "save" : "play";
-  const expectSize = s0 && s0.size > 0 ? s0.size : 0;
+  const streamKey = transferId;
+  const s0 = roomPlays.get(id);
+  if (!s0 || !jobRegisterTask(s0, transferId)) {
+    return new ReadableStream({
+      start(c) {
+        c.error(new Error("job-full"));
+      },
+    });
+  }
+  const expectSize = s0.size > 0 ? s0.size : 0;
   const endExclusive = expectSize > 0 ? expectSize - 1 : undefined;
   void notifyOpenTransfer(id, transferId, 0, endExclusive, purpose);
-  if (s0) {
-    if (!s0.pins) s0.pins = new Map();
-    s0.pins.set(streamKey, sent);
-  }
+  if (!s0.pins) s0.pins = new Map();
+  s0.pins.set(streamKey, sent);
   const settle = (ok, reason) => {
     if (settled) return;
     settled = true;
+    jobReleaseTask(roomPlays.get(id), transferId);
     void notifyTransferEnd(id, transferId, ok, sent, reason);
   };
   return new ReadableStream({
@@ -918,6 +937,11 @@ function livePlayStream(id) {
       if (!s || s.aborted) {
         settle(false, "aborted");
         controller.close();
+        return;
+      }
+      if (s.rejectedTransfers && s.rejectedTransfers.has(transferId)) {
+        settle(false, "job-full");
+        controller.error(new Error("job-full"));
         return;
       }
       if (expectSize > 0 && sent >= expectSize) {
@@ -934,6 +958,11 @@ function livePlayStream(id) {
       ) {
         await flushPendingPlayPin(id);
         await waitPlay(s);
+        if (s.rejectedTransfers && s.rejectedTransfers.has(transferId)) {
+          settle(false, "job-full");
+          controller.error(new Error("job-full"));
+          return;
+        }
         avail = playContiguousEnd(s.spans, sent);
       }
       const cur = roomPlays.get(id);
@@ -1014,7 +1043,9 @@ function allocRoomTransferId() {
   return `rt-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-/** One HTTP response ↔ one transferId; page must session_file.request with this id. */
+const ROOM_FILE_JOB_MAX_TASKS = 10;
+
+/** One HTTP response ↔ one transferId under job＝file id. */
 async function notifyOpenTransfer(id, transferId, offset, end, purpose) {
   const clients = await self.clients.matchAll({
     type: "window",
@@ -1022,19 +1053,35 @@ async function notifyOpenTransfer(id, transferId, offset, end, purpose) {
   });
   for (const client of clients) {
     try {
-      client.postMessage({
+      const msg = {
         type: "go-room-play",
         op: "open-transfer",
         id,
+        jobId: id,
         transferId,
         offset,
         end,
-        purpose,
-      });
+      };
+      if (purpose === "play" || purpose === "save") {
+        msg.purpose = purpose;
+      }
+      client.postMessage(msg);
     } catch {
       /* ignore */
     }
   }
+}
+
+function jobRegisterTask(s, transferId) {
+  if (!s.tasks) s.tasks = new Set();
+  if (s.tasks.has(transferId)) return true;
+  if (s.tasks.size >= ROOM_FILE_JOB_MAX_TASKS) return false;
+  s.tasks.add(transferId);
+  return true;
+}
+
+function jobReleaseTask(s, transferId) {
+  if (s && s.tasks) s.tasks.delete(transferId);
 }
 
 /** Completion authority: HTTP body delivered (or aborted) for this transferId. */
@@ -1111,24 +1158,30 @@ function emptyPlayStream() {
   });
 }
 
-function rangePlayStream(id, range) {
+function rangePlayStream(id, range, purpose) {
   const limit = range.end + 1;
   let sent = range.start;
   let settled = false;
-  const streamKey = `range-${range.start}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-  const s0 = roomPlays.get(id);
   const transferId = allocRoomTransferId();
-  const purpose = s0 && s0.mode === "save" ? "save" : "play";
-  void notifyOpenTransfer(id, transferId, range.start, range.end, purpose);
-  if (s0) {
-    if (!s0.pins) s0.pins = new Map();
-    s0.pins.set(streamKey, sent);
-    trimPlaySpans(s0);
-    void notifyPlayPin(id, streamKey, sent);
+  /** Same key as page primePin(transferId) — one pin per HTTP Range. */
+  const streamKey = transferId;
+  const s0 = roomPlays.get(id);
+  if (!s0 || !jobRegisterTask(s0, transferId)) {
+    return new ReadableStream({
+      start(c) {
+        c.error(new Error("job-full"));
+      },
+    });
   }
+  void notifyOpenTransfer(id, transferId, range.start, range.end, purpose);
+  if (!s0.pins) s0.pins = new Map();
+  s0.pins.set(streamKey, sent);
+  trimPlaySpans(s0);
+  void notifyPlayPin(id, streamKey, sent);
   const settle = (ok, reason) => {
     if (settled) return;
     settled = true;
+    jobReleaseTask(roomPlays.get(id), transferId);
     void notifyTransferEnd(id, transferId, ok, sent - range.start, reason);
   };
   return new ReadableStream({
@@ -1143,6 +1196,11 @@ function rangePlayStream(id, range) {
         if (!s || s.aborted) {
           settle(false, "aborted");
           controller.close();
+          return;
+        }
+        if (s.rejectedTransfers && s.rejectedTransfers.has(transferId)) {
+          settle(false, "job-full");
+          controller.error(new Error("job-full"));
           return;
         }
         const avail = Math.min(limit, playContiguousEnd(s.spans, sent));
@@ -1190,7 +1248,7 @@ function rangePlayStream(id, range) {
   });
 }
 
-function servePlayRange(id, range) {
+function servePlayRange(id, range, purpose) {
   const s = roomPlays.get(id);
   if (!s || s.aborted) {
     return { start: range.start, end: range.start - 1, body: emptyPlayStream() };
@@ -1198,7 +1256,7 @@ function servePlayRange(id, range) {
   return {
     start: range.start,
     end: range.end,
-    body: rangePlayStream(id, range),
+    body: rangePlayStream(id, range, purpose),
   };
 }
 
@@ -1266,6 +1324,13 @@ async function respondRoomPlay(id, request) {
         "Cache-Control": "no-store",
       },
     });
+  }
+
+  let purpose;
+  try {
+    purpose = parseRoomFilePurpose(new URL(request.url).searchParams);
+  } catch {
+    purpose = undefined;
   }
 
   const ua =
@@ -1397,7 +1462,7 @@ async function respondRoomPlay(id, request) {
     }
     if (bodyKind === "blob-media") {
       try {
-        const served = servePlayRange(id, servedRange);
+        const served = servePlayRange(id, servedRange, purpose);
         if (served.end < served.start) {
           return new Response(null, {
             status: 416,
@@ -1432,7 +1497,7 @@ async function respondRoomPlay(id, request) {
         });
       }
     }
-    const served = servePlayRange(id, servedRange);
+    const served = servePlayRange(id, servedRange, purpose);
     if (served.end < served.start) {
       return new Response(null, {
         status: 416,
@@ -1460,7 +1525,7 @@ async function respondRoomPlay(id, request) {
     "Cache-Control": "no-store",
   };
   if (size > 0) headers["Content-Length"] = String(size);
-  return new Response(livePlayStream(id), { status: 200, headers });
+  return new Response(livePlayStream(id, purpose), { status: 200, headers });
 }
 
 self.addEventListener("fetch", event => {

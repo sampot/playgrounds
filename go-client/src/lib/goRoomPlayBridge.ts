@@ -15,7 +15,6 @@ export type RoomPlaySwOp =
       mime: string;
       size: number;
       name?: string;
-      mode?: "play" | "save";
     }
   | {
       type: typeof ROOM_PLAY_MSG;
@@ -51,6 +50,14 @@ export type RoomPlaySwOp =
       type: typeof ROOM_PLAY_MSG;
       op: "abort";
       id: string;
+    }
+  | {
+      type: typeof ROOM_PLAY_MSG;
+      /** Page rejected admit (per-file task cap) — fail this HTTP body. */
+      op: "reject-transfer";
+      id: string;
+      transferId: string;
+      reason?: string;
     };
 
 function controller(): ServiceWorker | null {
@@ -109,9 +116,15 @@ export async function waitRoomPlaySw(): Promise<boolean> {
 
 export type RoomOpenTransferMsg = {
   fileId: string;
+  /** Same as fileId — SW job id. */
+  jobId?: string;
   transferId: string;
   offset: number;
   end?: number;
+  /**
+   * Echo of `?purpose=` that **this page** put on the HTTP request.
+   * Authority is the Page URL／open session — not SW inventing purpose.
+   */
   purpose?: "play" | "save";
 };
 
@@ -139,10 +152,14 @@ export function listenRoomOpenTransfer(
       }
       onOpen({
         fileId: data.id,
+        jobId: typeof data.jobId === "string" ? data.jobId : data.id,
         transferId: data.transferId,
         offset: Math.max(0, Math.floor(data.offset)),
         end: typeof data.end === "number" ? data.end : undefined,
-        purpose: data.purpose === "save" ? "save" : "play",
+        purpose:
+          data.purpose === "save" || data.purpose === "play"
+            ? data.purpose
+            : undefined,
       });
     };
     navigator.serviceWorker.addEventListener("message", onMsg);
@@ -291,5 +308,20 @@ export function unregisterLocalRoomFile(id: string): void {
     type: ROOM_PLAY_MSG,
     op: "unregister-local",
     id,
+  });
+}
+
+/** Admit failed — tell SW to error this HTTP roundtrip (do not wait for DC). */
+export function rejectRoomHttpTransfer(
+  fileId: string,
+  transferId: string,
+  reason?: string
+): void {
+  notifyRoomPlaySw({
+    type: ROOM_PLAY_MSG,
+    op: "reject-transfer",
+    id: fileId,
+    transferId,
+    reason,
   });
 }

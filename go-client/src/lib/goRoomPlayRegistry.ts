@@ -9,8 +9,6 @@ export const SESSION_FILE_PLAY_BUFFER_HIGH = 24 * 1024 * 1024;
 export const SESSION_FILE_PLAY_BUFFER_LOW = 8 * 1024 * 1024;
 /** Keep the start of the file when sliding the play window. */
 export const SESSION_FILE_PLAY_HEAD_KEEP = 2 * 1024 * 1024;
-/** Same-file HTTP Ranges in flight (browser may open two connections). */
-export const SESSION_FILE_PLAY_MAX_INFLIGHT = 2;
 /** Granularity for SW → page `need` while waiting on a hole. */
 export const SESSION_FILE_PLAY_RANGE_SLICE = 512 * 1024;
 /**
@@ -69,7 +67,14 @@ type Session = {
   pins: Map<string, number>;
   ended: boolean;
   aborted: boolean;
+  /** waitSpace — woken by successful push／pin／abort. */
   waiters: Array<() => void>;
+  /** waitPin — woken only by pin／unpin／abort／interrupt (not by other-offset push). */
+  pinWaiters: Array<{
+    resolve: () => void;
+    at?: number;
+    len?: number;
+  }>;
 };
 
 function minPinOf(s: Session): number {
@@ -198,21 +203,57 @@ function pressureOf(bytes: number, high: number, low: number): PlayPressure {
   return "ok";
 }
 
-export function roomFilePath(id: string): string {
-  return `${ROOM_FILE_PATH_PREFIX}${encodeURIComponent(id)}`;
+export type RoomFilePurpose = "play" | "save";
+
+export function roomFilePath(
+  id: string,
+  opts?: { purpose?: RoomFilePurpose }
+): string {
+  const base = `${ROOM_FILE_PATH_PREFIX}${encodeURIComponent(id)}`;
+  if (opts?.purpose === "play" || opts?.purpose === "save") {
+    return `${base}?purpose=${opts.purpose}`;
+  }
+  return base;
 }
 
 /**
- * Same as roomFilePath — do NOT add Content-Disposition／?download=.
- * WebKit’s download manager bypasses the SW for those and hits origin 404.
+ * Download fetch URL. Page tells SW `?purpose=save` for task priority — **not**
+ * Content-Disposition／`?download=`（WebKit download manager bypasses SW）.
  */
 export function roomFileDownloadPath(id: string): string {
-  return roomFilePath(id);
+  return roomFilePath(id, { purpose: "save" });
 }
 
-/** @deprecated Prefer roomFilePath — same canonical /room-file/ URL. */
+/** @deprecated Prefer roomFilePath(id, { purpose: "play" }). */
 export function roomPlayPath(id: string): string {
-  return roomFilePath(id);
+  return roomFilePath(id, { purpose: "play" });
+}
+
+/** Parse Page-supplied `?purpose=` from a search string or URL (SW／tests). */
+export function parseRoomFilePurpose(
+  searchOrUrl: string | URLSearchParams | null | undefined
+): RoomFilePurpose | undefined {
+  if (!searchOrUrl) return undefined;
+  let params: URLSearchParams;
+  if (searchOrUrl instanceof URLSearchParams) {
+    params = searchOrUrl;
+  } else {
+    const s = String(searchOrUrl);
+    try {
+      if (s.includes("://") || s.startsWith("/")) {
+        params = new URL(s, "http://go.local").searchParams;
+      } else {
+        params = new URLSearchParams(
+          s.startsWith("?") ? s.slice(1) : s
+        );
+      }
+    } catch {
+      return undefined;
+    }
+  }
+  const p = params.get("purpose");
+  if (p === "play" || p === "save") return p;
+  return undefined;
 }
 
 function idFromPrefixedPath(pathname: string, prefix: string): string | null {
@@ -227,9 +268,10 @@ function idFromPrefixedPath(pathname: string, prefix: string): string | null {
 }
 
 export function parseRoomFilePath(pathname: string): string | null {
+  const pathOnly = pathname.split(/[?#]/, 1)[0] ?? pathname;
   return (
-    idFromPrefixedPath(pathname, ROOM_FILE_PATH_PREFIX) ??
-    idFromPrefixedPath(pathname, ROOM_PLAY_PATH_PREFIX)
+    idFromPrefixedPath(pathOnly, ROOM_FILE_PATH_PREFIX) ??
+    idFromPrefixedPath(pathOnly, ROOM_PLAY_PATH_PREFIX)
   );
 }
 
@@ -471,12 +513,21 @@ export type RoomPlayRegistry = {
   push(id: string, chunk: Uint8Array, at?: number): PlayPressure;
   /** Resolve when pin／trim may allow a previously-rejected chunk. */
   waitSpace(id: string): Promise<void>;
+  /**
+   * Resolve when the pin set may allow storing at `at` (or on interrupt／abort).
+   * Unrelated pin crawls must not busy-wake far waiters (Edge main-thread freeze).
+   */
+  waitPin(id: string, at?: number, len?: number): Promise<void>;
+  /** Wake all waitSpace／waitPin waiters (dropped Range／interrupt in-flight append). */
+  wakeWaiters(id: string): void;
   end(id: string): void;
   abort(id: string): void;
   /** Advance a named HTTP stream read cursor (bytes before `at` may be trimmed). */
   pin(id: string, streamKey: string, at: number): void;
   unpin(id: string, streamKey: string): void;
   covers(id: string, start: number, end: number): boolean;
+  /** True if [at, at+len) overlaps any active HTTP pin window (may still be full). */
+  inPinWindow(id: string, at: number, len: number): boolean;
   read(id: string, start: number, end: number): Uint8Array | null;
   peek(id: string, start: number, max: number): Uint8Array;
   meta(id: string): { mime: string; size: number; received: number; ended: boolean } | null;
@@ -498,9 +549,47 @@ export function createRoomPlayRegistry(): RoomPlayRegistry {
     for (const w of waiters) w();
   }
 
+  function wakePin(s: Session, mode: "all" | "progress" = "progress"): void {
+    if (mode === "all") {
+      const pinWaiters = s.pinWaiters.splice(0);
+      for (const w of pinWaiters) w.resolve();
+      wake(s);
+      return;
+    }
+    const remain: typeof s.pinWaiters = [];
+    for (const w of s.pinWaiters) {
+      if (
+        w.at == null ||
+        chunkOverlapsPinWindow(s, w.at, Math.max(1, w.len ?? 1))
+      ) {
+        w.resolve();
+      } else {
+        remain.push(w);
+      }
+    }
+    s.pinWaiters = remain;
+    wake(s);
+  }
+
   function wait(s: Session): Promise<void> {
     return new Promise((resolve) => {
       s.waiters.push(resolve);
+    });
+  }
+
+  function waitForPin(
+    s: Session,
+    at?: number,
+    len?: number
+  ): Promise<void> {
+    if (
+      at != null &&
+      chunkOverlapsPinWindow(s, at, Math.max(1, len ?? 1))
+    ) {
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => {
+      s.pinWaiters.push({ resolve, at, len });
     });
   }
 
@@ -543,7 +632,7 @@ export function createRoomPlayRegistry(): RoomPlayRegistry {
       const prev = sessions.get(id);
       if (prev) {
         prev.aborted = true;
-        wake(prev);
+        wakePin(prev, "all");
       }
       sessions.set(id, {
         mime: opts.mime || "video/mp4",
@@ -559,6 +648,7 @@ export function createRoomPlayRegistry(): RoomPlayRegistry {
         ended: false,
         aborted: false,
         waiters: [],
+        pinWaiters: [],
       });
     },
     registerLocal(id, file) {
@@ -566,7 +656,7 @@ export function createRoomPlayRegistry(): RoomPlayRegistry {
       const prev = sessions.get(id);
       if (prev) {
         prev.aborted = true;
-        wake(prev);
+        wakePin(prev, "all");
         sessions.delete(id);
       }
     },
@@ -598,18 +688,28 @@ export function createRoomPlayRegistry(): RoomPlayRegistry {
       if (!s || s.aborted || s.ended) return Promise.resolve();
       return wait(s);
     },
+    waitPin(id, at, len) {
+      const s = get(id);
+      if (!s || s.aborted || s.ended) return Promise.resolve();
+      return waitForPin(s, at, len);
+    },
+    wakeWaiters(id) {
+      const s = get(id);
+      if (!s) return;
+      wakePin(s, "all");
+    },
     end(id) {
       const s = get(id);
       if (!s) return;
       s.ended = true;
-      wake(s);
+      wakePin(s, "all");
     },
     abort(id) {
       const s = get(id);
       if (!s) return;
       s.aborted = true;
       s.spans = [];
-      wake(s);
+      wakePin(s, "all");
       sessions.delete(id);
     },
     pin(id, streamKey, at) {
@@ -618,14 +718,14 @@ export function createRoomPlayRegistry(): RoomPlayRegistry {
       const pos = Math.max(0, Math.floor(at));
       s.pins.set(streamKey, pos);
       trimPlaySpans(s);
-      wake(s);
+      wakePin(s);
     },
     unpin(id, streamKey) {
       const s = get(id);
       if (!s) return;
       s.pins.delete(streamKey);
       trimPlaySpans(s);
-      wake(s);
+      wakePin(s);
     },
     covers(id, start, end) {
       const file = localFiles.get(id);
@@ -633,6 +733,12 @@ export function createRoomPlayRegistry(): RoomPlayRegistry {
       const s = get(id);
       if (!s) return false;
       return fileSpansCover(s.spans, start, end);
+    },
+    inPinWindow(id, at, len) {
+      if (localFiles.has(id)) return true;
+      const s = get(id);
+      if (!s || s.aborted) return false;
+      return chunkOverlapsPinWindow(s, at, len);
     },
     read(id, start, end) {
       const s = get(id);
@@ -672,6 +778,7 @@ export function createRoomPlayRegistry(): RoomPlayRegistry {
       const streamKey = `live-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
       let sent = 0;
       s0.pins.set(streamKey, sent);
+      wakePin(s0);
       return new ReadableStream<Uint8Array>({
         async pull(controller) {
           const s = get(id);
@@ -694,7 +801,7 @@ export function createRoomPlayRegistry(): RoomPlayRegistry {
             sent += piece.byteLength;
             s.pins.set(streamKey, sent);
             trimPlaySpans(s);
-            wake(s);
+            wakePin(s);
             controller.enqueue(piece);
             return;
           }
@@ -710,7 +817,7 @@ export function createRoomPlayRegistry(): RoomPlayRegistry {
           if (!s) return;
           s.pins.delete(streamKey);
           trimPlaySpans(s);
-          wake(s);
+          wakePin(s);
         },
       });
     },
@@ -726,7 +833,7 @@ export function createRoomPlayRegistry(): RoomPlayRegistry {
       if (s0) {
         s0.pins.set(streamKey, sent);
         trimPlaySpans(s0);
-        wake(s0);
+        wakePin(s0);
       }
       return new ReadableStream<Uint8Array>({
         async pull(controller) {
@@ -746,7 +853,7 @@ export function createRoomPlayRegistry(): RoomPlayRegistry {
               sent += piece.byteLength;
               s.pins.set(streamKey, sent);
               trimPlaySpans(s);
-              wake(s);
+              wakePin(s);
               controller.enqueue(piece);
               return;
             }
@@ -766,7 +873,7 @@ export function createRoomPlayRegistry(): RoomPlayRegistry {
           if (!s) return;
           s.pins.delete(streamKey);
           trimPlaySpans(s);
-          wake(s);
+          wakePin(s);
         },
       });
     },

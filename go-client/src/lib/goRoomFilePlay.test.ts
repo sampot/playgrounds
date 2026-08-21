@@ -48,7 +48,7 @@ describe("createRoomPlaySink", () => {
       size: 4,
       sessions,
     });
-    expect(sink.url).toBe("/room-file/tr-1");
+    expect(sink.url).toBe("/room-file/tr-1?purpose=play");
     await sink.append(new Uint8Array([9, 8, 7, 6]));
     sink.end();
     const stream = sessions.liveBody("tr-1");
@@ -99,7 +99,81 @@ describe("createRoomPlaySink", () => {
       size: 400 * 1024 * 1024,
       sessions,
     });
-    expect(sink.url).toBe("/room-file/big");
+    expect(sink.url).toBe("/room-file/big?purpose=play");
+  });
+
+  it("does not waitSpace-spin when a play chunk is outside the pin window", async () => {
+    const sessions = createRoomPlayRegistry();
+    const sink = createRoomPlaySink({
+      playId: "far",
+      mime: "video/mp4",
+      size: 80 * 1024 * 1024,
+      sessions,
+      maxBytes: 32 * 1024 * 1024,
+    });
+    sessions.pin("far", "http-0", 0);
+    const at = 40 * 1024 * 1024;
+    const pending = sink.append(new Uint8Array(64), at);
+    /** In-window pushes must not resolve a far append waiting on waitPin. */
+    for (let i = 0; i < 20; i++) {
+      sessions.push("far", new Uint8Array(64).fill(i), i * 64);
+    }
+    await new Promise((r) => setTimeout(r, 20));
+    let settled: string | undefined;
+    void pending.then((p) => {
+      settled = p;
+    });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(settled).toBeUndefined();
+    sink.interruptAppends?.();
+    expect(await pending).toBe("low");
+    expect(sessions.covers("far", at, at + 64)).toBe(false);
+  });
+
+  it("does not waitPin-spin when another stream's pin advances elsewhere", async () => {
+    const sessions = createRoomPlayRegistry();
+    const sink = createRoomPlaySink({
+      playId: "spin",
+      mime: "video/mp4",
+      size: 80 * 1024 * 1024,
+      sessions,
+      maxBytes: 32 * 1024 * 1024,
+    });
+    sessions.pin("spin", "http-0", 0);
+    const at = 40 * 1024 * 1024;
+    const pending = sink.append(new Uint8Array(64), at);
+    let settled: string | undefined;
+    void pending.then((p) => {
+      settled = p;
+    });
+    /** Head pin crawling forward must not resolve a far waitPin. */
+    for (let i = 1; i <= 40; i++) {
+      sessions.pin("spin", "http-0", i * 64 * 1024);
+    }
+    await new Promise((r) => setTimeout(r, 20));
+    expect(settled).toBeUndefined();
+    sessions.pin("spin", "http-seek", at);
+    expect(await pending).not.toBeUndefined();
+    expect(sessions.covers("spin", at, at + 64)).toBe(true);
+  });
+
+  it("stores a far-seek chunk after the HTTP pin moves to that offset", async () => {
+    const sessions = createRoomPlayRegistry();
+    const sink = createRoomPlaySink({
+      playId: "seek",
+      mime: "video/mp4",
+      size: 80 * 1024 * 1024,
+      sessions,
+      maxBytes: 32 * 1024 * 1024,
+    });
+    sessions.pin("seek", "http-0", 0);
+    const at = 40 * 1024 * 1024;
+    const pending = sink.append(new Uint8Array([1, 2, 3, 4]), at);
+    queueMicrotask(() => {
+      sessions.pin("seek", "http-seek", at);
+    });
+    await pending;
+    expect(sessions.covers("seek", at, at + 4)).toBe(true);
   });
 
   it("does not construct MediaSource when a playId is set", () => {
@@ -121,7 +195,7 @@ describe("createRoomPlaySink", () => {
         mime: "video/mp4",
         size: 400 * 1024 * 1024,
       });
-      expect(sink.url).toBe("/room-file/big");
+      expect(sink.url).toBe("/room-file/big?purpose=play");
       expect(constructed).toBe(0);
     } finally {
       g.MediaSource = prev;

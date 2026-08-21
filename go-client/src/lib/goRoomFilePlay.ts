@@ -37,6 +37,16 @@ export type RoomPlaySink = {
   noteSaveConsumed?(at: number): void;
   /** Read a covered range from the page mirror (save drain fallback). */
   read?(start: number, end: number): Uint8Array | null;
+  /** True if [at, at+len) overlaps an active HTTP pin window. */
+  inPinWindow?(at: number, len: number): boolean;
+  /**
+   * Open a page-side pin so far-seek chunks can store before the SW HTTP
+   * reader reports its cursor (avoids dropping mid-file Ranges).
+   */
+  primePin?(streamKey: string, at: number): void;
+  clearPin?(streamKey: string): void;
+  /** Drop in-flight append waiters (Range cancelled／superseded). */
+  interruptAppends?(): void;
 };
 
 /**
@@ -211,9 +221,10 @@ export function createRegistryPlaySink(opts: PlaySinkOpts = {}): RoomPlaySink {
     mime,
     size,
     name: opts.name,
-    mode: saveMode ? "save" : "play",
   });
   let dead = false;
+  /** Bumped when a Range is dropped so in-flight append waitSpace loops exit. */
+  let appendEpoch = 0;
   /** Save: SW may report pin ahead of fetch→writable; trim uses the min. */
   let writableConsumed = 0;
   const swPins = new Map<string, number>();
@@ -243,7 +254,7 @@ export function createRegistryPlaySink(opts: PlaySinkOpts = {}): RoomPlaySink {
 
   return {
     get url() {
-      return roomFilePath(playId);
+      return roomFilePath(playId, { purpose: saveMode ? "save" : "play" });
     },
     async append(chunk, fileOffset) {
       if (dead) return "low";
@@ -251,17 +262,25 @@ export function createRegistryPlaySink(opts: PlaySinkOpts = {}): RoomPlaySink {
       const at = fileOffset ?? 0;
       const end = at + copy.byteLength;
       let pressure: PlayPressure = "low";
+      const epoch = appendEpoch;
       /**
        * Stream-through save／play: never skip a sequential chunk because the
        * 32 MiB pin window has not advanced yet — wait for the HTTP reader.
-       * Only notify the SW after the page mirror actually stores the bytes.
+       * Outside the pin window (far seek): waitPin only — waitSpace would be
+       * woken by every other-offset push and freeze Edge's main thread.
        */
-      while (!dead) {
+      while (!dead && epoch === appendEpoch) {
         pressure = sessions.push(playId, copy, at);
         if (sessions.covers(playId, at, end)) break;
-        await sessions.waitSpace(playId);
+        if (!sessions.inPinWindow(playId, at, copy.byteLength)) {
+          await sessions.waitPin(playId, at, copy.byteLength);
+        } else {
+          await sessions.waitSpace(playId);
+        }
       }
-      if (dead || !sessions.covers(playId, at, end)) return "low";
+      if (dead || epoch !== appendEpoch || !sessions.covers(playId, at, end)) {
+        return "low";
+      }
       const bytes = copy.buffer.slice(
         copy.byteOffset,
         copy.byteOffset + copy.byteLength
@@ -278,8 +297,23 @@ export function createRegistryPlaySink(opts: PlaySinkOpts = {}): RoomPlaySink {
     covers(start, end) {
       return sessions.covers(playId, start, end);
     },
+    inPinWindow(at, len) {
+      return sessions.inPinWindow(playId, at, len);
+    },
     read(start, end) {
       return sessions.read(playId, start, end);
+    },
+    primePin(streamKey, at) {
+      if (dead) return;
+      sessions.pin(playId, streamKey, Math.max(0, Math.floor(at)));
+    },
+    clearPin(streamKey) {
+      if (dead) return;
+      sessions.unpin(playId, streamKey);
+    },
+    interruptAppends() {
+      appendEpoch += 1;
+      sessions.wakeWaiters(playId);
     },
     noteSaveConsumed(at) {
       if (!saveMode || dead) return;

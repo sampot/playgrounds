@@ -75,6 +75,13 @@ export type SessionFileControl = {
    * Omit = pump to EOF from offset. Partial Range／WebKit media caps must set this.
    */
   length?: number;
+  /** Optional DC scheduler priority (higher = sooner quantum). */
+  priority?: number;
+  /**
+   * Product job id (`play:<fileId>`／`save:<fileId>`).
+   * Owner DC sched picks job then task; omit = treat transfer as its own job.
+   */
+  jobId?: string;
   items?: SessionFileShareItem[];
   kind?: "file" | "dir" | "device";
   device?: "camera" | "mic";
@@ -192,6 +199,22 @@ export function isSessionFileControl(
       m.length <= 0 ||
       m.length > SESSION_FILE_MAX_BYTES
     ) {
+      return false;
+    }
+  }
+  if (m.priority !== undefined) {
+    if (
+      typeof m.priority !== "number" ||
+      !Number.isFinite(m.priority) ||
+      !Number.isInteger(m.priority) ||
+      m.priority < 0 ||
+      m.priority > 1000
+    ) {
+      return false;
+    }
+  }
+  if (m.jobId !== undefined) {
+    if (typeof m.jobId !== "string" || !m.jobId || m.jobId.length > 128) {
       return false;
     }
   }

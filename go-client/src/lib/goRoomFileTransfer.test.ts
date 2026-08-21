@@ -6,11 +6,12 @@ import {
   encodeSessionFileChunk,
 } from "@pg/roster/rosterSessionFile";
 import { createRoomFileTransfer } from "./goRoomFileTransfer";
-import { createPlayByteWindow, createRegistryPlaySink } from "./goRoomFilePlay";
+import { createPlayByteWindow, createRegistryPlaySink, createRoomPlaySink } from "./goRoomFilePlay";
 import {
   createRoomPlayRegistry,
   defaultRoomPlaySessions,
   parseRoomFilePath,
+  parseRoomFilePurpose,
 } from "./goRoomPlayRegistry";
 import { GO_ROOM_HANG_FILES_ONLY } from "./goRoom";
 import type { RoomFileWritable } from "./goRoomFileSave";
@@ -185,12 +186,14 @@ function httpFacade() {
       }
       const range = { start: 0, end: meta.size - 1 };
       const transferId = `sw-tr-${++trN}`;
+      const purpose = parseRoomFilePurpose(new URL(url, "http://go.local").search);
       openHandler?.({
         fileId: id,
+        jobId: id,
         transferId,
         offset: 0,
         end: range.end,
-        purpose: meta.mode === "save" ? "save" : "play",
+        purpose,
       });
       const raw = await sessions.rangeBody(id, range);
       const body = watchBody(id, transferId, raw, meta.size);
@@ -342,7 +345,7 @@ describe("createRoomFileTransfer", () => {
     expect(guest.getState().busy).toBe(false);
   });
 
-  it("clears transferring when SW completes save even if playback id still matches", async () => {
+  it("clears transferring when SW completes save", async () => {
     const guest = createRoomFileTransfer({
       localAgentId: "g",
       localName: "訪客",
@@ -360,7 +363,7 @@ describe("createRoomFileTransfer", () => {
       size: 4,
       owner: "h",
     });
-    expect((await guest.play("file-1")).ok).toBe(true);
+    expect((await guest.openRemoteHttp("file-1", "save")).ok).toBe(true);
     expect(
       guest.acceptHttpTransfer({
         fileId: "file-1",
@@ -369,7 +372,6 @@ describe("createRoomFileTransfer", () => {
         purpose: "save",
       }).ok
     ).toBe(true);
-    /** Simulate download() having switched the sink to save while playback lingers. */
     guest.onBinary(
       encodeSessionFileChunk({
         transferId: "sw-save",
@@ -644,7 +646,7 @@ describe("createRoomFileTransfer", () => {
     expect((await xfer.shareLocalFile(fileOf("note.txt", 4))).ok).toBe(true);
     const played = await xfer.play("file-1");
     expect(played.ok).toBe(true);
-    expect(xfer.getState().playback?.url).toBe("/room-file/file-1");
+    expect(xfer.getState().playback?.url).toBe("/room-file/file-1?purpose=play");
     expect(xfer.getState().playback?.url.startsWith("blob:")).toBe(false);
 
     const sink = mockWritable();
@@ -659,7 +661,7 @@ describe("createRoomFileTransfer", () => {
     const primed = xfer.primeBrowserDownload("file-1");
     expect(primed.ok).toBe(true);
     if (primed.ok) {
-      expect(primed.url).toBe("/room-file/file-1");
+      expect(primed.url).toBe("/room-file/file-1?purpose=save");
       expect(primed.name).toBe("note.txt");
     }
   });
@@ -718,7 +720,7 @@ describe("createRoomFileTransfer", () => {
     const sink = mockWritable();
     const started = await guest.download("file-1", async () => sink.writable);
     expect(started.ok).toBe(true);
-    expect(fetched).toEqual(["/room-file/file-1"]);
+    expect(fetched).toEqual(["/room-file/file-1?purpose=save"]);
 
     await vi.waitFor(() => {
       expect(sink.isClosed()).toBe(true);
@@ -1033,7 +1035,7 @@ describe("createRoomFileTransfer", () => {
     expect((await guest.play("file-1")).ok).toBe(true);
     expect(guest.getState().playback?.id).toBe("file-1");
     await vi.waitFor(() => {
-      expect(guest.getState().playback?.url).toBe("/room-file/file-1");
+      expect(guest.getState().playback?.url).toBe("/room-file/file-1?purpose=play");
     });
     expect(guest.getState().playback?.name).toBe("clip.mp4");
     expect(guest.getState().playback?.kind).toBe("video");
@@ -1059,12 +1061,12 @@ describe("createRoomFileTransfer", () => {
     });
     await owner.shareLocalFile(fileOf("shot.png", 6, "image/png"));
     expect((await guest.play("pic-1")).ok).toBe(true);
-    expect(guest.getState().playback?.url).toBe("/room-file/pic-1");
+    expect(guest.getState().playback?.url).toBe("/room-file/pic-1?purpose=play");
     expect(guest.getState().playback?.kind).toBe("image");
     expect(guest.getState().playback?.url.startsWith("blob:")).toBe(false);
   });
 
-  it("exposes the same /room-file/<id> for remote play and download of one file", async () => {
+  it("exposes the same /room-file/<id> path for remote play and download (purpose query differs)", async () => {
     let guest!: ReturnType<typeof createRoomFileTransfer>;
     const http = httpFacade();
     const fetched: string[] = [];
@@ -1091,14 +1093,16 @@ describe("createRoomFileTransfer", () => {
     await owner.shareLocalFile(fileOf("clip.mp4", 4, "video/mp4"));
     expect((await guest.play("shared-1")).ok).toBe(true);
     const playUrl = guest.getState().playback?.url;
-    expect(playUrl).toBe("/room-file/shared-1");
+    expect(playUrl).toBe("/room-file/shared-1?purpose=play");
     guest.stopPlay();
     const sink = mockWritable();
     expect((await guest.download("shared-1", async () => sink.writable)).ok).toBe(
       true
     );
-    expect(fetched).toEqual(["/room-file/shared-1"]);
-    expect(fetched[0]).toBe(playUrl);
+    expect(fetched).toEqual(["/room-file/shared-1?purpose=save"]);
+    expect(parseRoomFilePath(playUrl ?? "")).toBe(
+      parseRoomFilePath(fetched[0] ?? "")
+    );
   });
 
   it("keeps the same playback object while remote play chunks arrive", async () => {
@@ -1281,9 +1285,12 @@ describe("createRoomFileTransfer", () => {
       offset: 40 * 1024 * 1024,
       transferId: "sw-tr-2",
     });
+    expect(
+      json.filter((m) => (m as { op?: string }).op === "cancel")
+    ).toHaveLength(0);
   });
 
-  it("drops the farther play Range when a third seek arrives", async () => {
+  it("accepts a third concurrent play Range without cancelling prior ones", async () => {
     const json: unknown[] = [];
     let n = 0;
     const sink = createPlayByteWindow({ mime: "video/mp4" });
@@ -1328,10 +1335,190 @@ describe("createRoomFileTransfer", () => {
       }).ok
     ).toBe(true);
     const requests = json.filter((m) => (m as { op?: string }).op === "request");
-    expect(requests.length).toBeGreaterThanOrEqual(3);
+    expect(requests).toHaveLength(3);
     expect(
-      json.filter((m) => (m as { op?: string }).op === "cancel").length
-    ).toBeGreaterThanOrEqual(1);
+      json.filter((m) => (m as { op?: string }).op === "cancel")
+    ).toHaveLength(0);
+  });
+
+  it("rejects an eleventh concurrent play Range when the job has 10 tasks", async () => {
+    const json: unknown[] = [];
+    const sink = createPlayByteWindow({ mime: "video/mp4" });
+    const guest = createRoomFileTransfer({
+      localAgentId: "g",
+      localName: "訪客",
+      sendJson: (m) => json.push(m),
+      sendBinary: () => {},
+      createPlaySink: () => sink,
+    });
+    guest.onControl({
+      type: SESSION_FILE_TYPE,
+      v: 1,
+      op: "share",
+      id: "big",
+      name: "movie.mp4",
+      size: 200 * 1024 * 1024,
+      mime: "video/mp4",
+      owner: "h",
+    });
+    expect((await guest.play("big")).ok).toBe(true);
+    for (let i = 1; i <= 10; i++) {
+      expect(
+        guest.acceptHttpTransfer({
+          fileId: "big",
+          transferId: `sw-tr-${i}`,
+          offset: (i - 1) * 10 * 1024 * 1024,
+        }).ok
+      ).toBe(true);
+    }
+    const eleventh = guest.acceptHttpTransfer({
+      fileId: "big",
+      transferId: "sw-tr-11",
+      offset: 100 * 1024 * 1024,
+    });
+    expect(eleventh.ok).toBe(false);
+    if (!eleventh.ok) expect(eleventh.error).toMatch(/同一檔案最多 10/);
+    expect(
+      json.filter((m) => (m as { op?: string }).op === "request")
+    ).toHaveLength(10);
+  });
+
+  it("openRemoteHttp save admits ten concurrent GETs and rejects an eleventh", async () => {
+    const json: unknown[] = [];
+    const http = httpFacade();
+    const guest = createRoomFileTransfer({
+      localAgentId: "g",
+      localName: "訪客",
+      sendJson: (m) => json.push(m),
+      sendBinary: () => {},
+      createPlaySink: http.createPlaySink,
+    });
+    guest.onControl({
+      type: SESSION_FILE_TYPE,
+      v: 1,
+      op: "share",
+      id: "burst",
+      name: "burst.bin",
+      size: 48 * 1024,
+      mime: "application/octet-stream",
+      owner: "h",
+    });
+    expect((await guest.openRemoteHttp("burst", "save")).ok).toBe(true);
+    for (let i = 1; i <= 10; i++) {
+      expect(
+        guest.acceptHttpTransfer({
+          fileId: "burst",
+          transferId: `sw-tr-${i}`,
+          offset: 0,
+          purpose: "save",
+        }).ok
+      ).toBe(true);
+    }
+    const eleventh = guest.acceptHttpTransfer({
+      fileId: "burst",
+      transferId: "sw-tr-11",
+      offset: 0,
+      purpose: "save",
+    });
+    expect(eleventh.ok).toBe(false);
+    if (!eleventh.ok) expect(eleventh.error).toMatch(/同一檔案最多 10/);
+    const requests = json.filter((m) => (m as { op?: string }).op === "request");
+    expect(requests).toHaveLength(10);
+    expect(
+      json.filter((m) => (m as { op?: string }).op === "pause")
+    ).toHaveLength(0);
+    for (const req of requests) {
+      expect(req).toMatchObject({ jobId: "burst", priority: 80 });
+    }
+  });
+
+  it("does not pause sibling Ranges when admitting another play task", async () => {
+    const json: unknown[] = [];
+    const sink = createPlayByteWindow({ mime: "video/mp4" });
+    const guest = createRoomFileTransfer({
+      localAgentId: "g",
+      localName: "訪客",
+      sendJson: (m) => json.push(m),
+      sendBinary: () => {},
+      createPlaySink: () => sink,
+    });
+    guest.onControl({
+      type: SESSION_FILE_TYPE,
+      v: 1,
+      op: "share",
+      id: "big",
+      name: "movie.mp4",
+      size: 200 * 1024 * 1024,
+      mime: "video/mp4",
+      owner: "h",
+    });
+    expect((await guest.play("big")).ok).toBe(true);
+    expect(
+      guest.acceptHttpTransfer({
+        fileId: "big",
+        transferId: "sw-tr-1",
+        offset: 0,
+      }).ok
+    ).toBe(true);
+    expect(
+      guest.acceptHttpTransfer({
+        fileId: "big",
+        transferId: "sw-tr-2",
+        offset: 40 * 1024 * 1024,
+      }).ok
+    ).toBe(true);
+    expect(
+      json.filter((m) => (m as { op?: string }).op === "pause")
+    ).toHaveLength(0);
+    expect(
+      json.filter((m) => (m as { op?: string }).op === "request")
+    ).toHaveLength(2);
+  });
+
+  it("notifies SW reject-transfer when the client job is full", async () => {
+    const rejected: { fileId: string; transferId: string; reason?: string }[] =
+      [];
+    const sink = createPlayByteWindow({ mime: "video/mp4" });
+    const guest = createRoomFileTransfer({
+      localAgentId: "g",
+      localName: "訪客",
+      sendJson: () => {},
+      sendBinary: () => {},
+      createPlaySink: () => sink,
+      rejectHttpTransfer: (fileId, transferId, reason) => {
+        rejected.push({ fileId, transferId, reason });
+      },
+    });
+    guest.onControl({
+      type: SESSION_FILE_TYPE,
+      v: 1,
+      op: "share",
+      id: "big",
+      name: "movie.mp4",
+      size: 200 * 1024 * 1024,
+      mime: "video/mp4",
+      owner: "h",
+    });
+    expect((await guest.play("big")).ok).toBe(true);
+    for (let i = 1; i <= 10; i++) {
+      expect(
+        guest.acceptHttpTransfer({
+          fileId: "big",
+          transferId: `sw-tr-${i}`,
+          offset: (i - 1) * 10 * 1024 * 1024,
+        }).ok
+      ).toBe(true);
+    }
+    expect(
+      guest.acceptHttpTransfer({
+        fileId: "big",
+        transferId: "sw-tr-11",
+        offset: 100 * 1024 * 1024,
+      }).ok
+    ).toBe(false);
+    expect(rejected).toEqual([
+      { fileId: "big", transferId: "sw-tr-11", reason: "job-full" },
+    ]);
   });
 
   it("pauses the owner when the play window is full", async () => {
@@ -1614,11 +1801,115 @@ describe("createRoomFileTransfer", () => {
     await vi.waitFor(() => {
       expect(log.some((e) => e === "chunk:tr-head")).toBe(true);
       expect(log.some((e) => e === "chunk:tr-tail")).toBe(true);
+      expect(log.some((e) => e === "done:tr-head")).toBe(true);
+      expect(log.some((e) => e === "done:tr-tail")).toBe(true);
     });
-    const firstTail = log.indexOf("chunk:tr-tail");
-    const doneHead = log.indexOf("done:tr-head");
-    expect(firstTail).toBeGreaterThanOrEqual(0);
-    if (doneHead >= 0) expect(firstTail).toBeLessThan(doneHead);
+  });
+
+  it("shares DC by quantum — no transfer dumps unbounded while another is ready", async () => {
+    const { DC_SCHED_QUANTUM_CHUNKS, dcPriorityQuantumWeight } = await import(
+      "./goRoomFileDcScheduler"
+    );
+    const ids: string[] = [];
+    const owner = createRoomFileTransfer({
+      localAgentId: "h",
+      localName: "太郎",
+      sendJson: () => {},
+      sendBinary: (buf) => {
+        const chunk = decodeSessionFileChunk(buf);
+        if (chunk) ids.push(chunk.transferId);
+      },
+      newId: () => "file-1",
+    });
+    /** 16 chunks each → several quanta. */
+    const size = 16 * 16 * 1024;
+    const clip = new File([new Uint8Array(size).fill(7)], "big.bin");
+    await owner.shareLocalFile(clip);
+    owner.onControl({
+      type: SESSION_FILE_TYPE,
+      v: 1,
+      op: "request",
+      id: "file-1",
+      transferId: "tr-a",
+      from: "g",
+      offset: 0,
+      length: size / 2,
+      priority: 40,
+    });
+    owner.onControl({
+      type: SESSION_FILE_TYPE,
+      v: 1,
+      op: "request",
+      id: "file-1",
+      transferId: "tr-b",
+      from: "g",
+      offset: size / 2,
+      length: size / 2,
+      priority: 40,
+    });
+    await vi.waitFor(() => {
+      expect(ids.filter((x) => x === "tr-a").length).toBe(8);
+      expect(ids.filter((x) => x === "tr-b").length).toBe(8);
+    });
+    let run = 1;
+    let maxRun = 1;
+    for (let i = 1; i < ids.length; i++) {
+      if (ids[i] === ids[i - 1]) {
+        run += 1;
+        maxRun = Math.max(maxRun, run);
+      } else run = 1;
+    }
+    const cap =
+      DC_SCHED_QUANTUM_CHUNKS * dcPriorityQuantumWeight(40);
+    expect(maxRun).toBeLessThanOrEqual(cap);
+  });
+
+  it("serves higher-priority request before lower when both are queued", async () => {
+    const ids: string[] = [];
+    const owner = createRoomFileTransfer({
+      localAgentId: "h",
+      localName: "太郎",
+      sendJson: () => {},
+      sendBinary: (buf) => {
+        const chunk = decodeSessionFileChunk(buf);
+        if (chunk) ids.push(chunk.transferId);
+      },
+      newId: () => "file-1",
+    });
+    const size = 8 * 16 * 1024;
+    const clip = new File([new Uint8Array(size).fill(3)], "big.bin");
+    await owner.shareLocalFile(clip);
+    /** Enqueue low first — high should still win the first quantum. */
+    owner.onControl({
+      type: SESSION_FILE_TYPE,
+      v: 1,
+      op: "request",
+      id: "file-1",
+      transferId: "tr-low",
+      from: "g",
+      offset: 0,
+      length: size / 2,
+      priority: 10,
+    });
+    owner.onControl({
+      type: SESSION_FILE_TYPE,
+      v: 1,
+      op: "request",
+      id: "file-1",
+      transferId: "tr-high",
+      from: "g",
+      offset: size / 2,
+      length: size / 2,
+      priority: 90,
+    });
+    await vi.waitFor(() => {
+      expect(ids.length).toBeGreaterThan(0);
+    });
+    expect(ids[0]).toBe("tr-high");
+    await vi.waitFor(() => {
+      expect(ids.filter((x) => x === "tr-high").length).toBe(4);
+      expect(ids.filter((x) => x === "tr-low").length).toBe(4);
+    });
   });
 
   it("retargets a remote play transfer when the player seeks far ahead", async () => {
@@ -1804,7 +2095,6 @@ describe("createRoomFileTransfer", () => {
     expect((await guest.play("clip")).ok).toBe(true);
     const playId = parseRoomFilePath(guest.getState().playback?.url ?? "");
     expect(playId).toBeTruthy();
-    sessions.pin(playId!, "r0", 0);
     expect(
       guest.acceptHttpTransfer({
         fileId: "clip",
@@ -1812,6 +2102,8 @@ describe("createRoomFileTransfer", () => {
         offset: 0,
       }).ok
     ).toBe(true);
+    /** accept primes pin at 0; keep a single pin so maxBytes=16 is one window. */
+    expect(sessions.inPinWindow(playId!, 0, 8)).toBe(true);
     const transferId = "sw-tr-1";
     guest.onBinary(
       encodeSessionFileChunk({
@@ -2111,5 +2403,228 @@ describe("createRoomFileTransfer", () => {
       expect(guest.getState().entries[0]?.status).toBe("error");
     });
     expect(guest.getState().entries[0]?.error).toMatch(/不完整|失敗/);
+  });
+
+  it("keeps playback when media cancels a play Range (seek abort)", async () => {
+    const guest = createRoomFileTransfer({
+      localAgentId: "g",
+      localName: "訪客",
+      sendJson: () => {},
+      sendBinary: () => {},
+      createPlaySink: () => createPlayByteWindow({ mime: "video/mp4" }),
+    });
+    guest.onControl({
+      type: SESSION_FILE_TYPE,
+      v: 1,
+      op: "share",
+      id: "clip",
+      name: "clip.mp4",
+      size: 80 * 1024 * 1024,
+      mime: "video/mp4",
+      owner: "h",
+    });
+    expect((await guest.play("clip")).ok).toBe(true);
+    expect(
+      guest.acceptHttpTransfer({
+        fileId: "clip",
+        transferId: "sw-mid",
+        offset: 40 * 1024 * 1024,
+      }).ok
+    ).toBe(true);
+    expect(guest.getState().playback?.id).toBe("clip");
+    guest.noteHttpTransferEnd({
+      fileId: "clip",
+      transferId: "sw-mid",
+      ok: false,
+      reason: "cancelled",
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(guest.getState().playback?.id).toBe("clip");
+    expect(guest.getState().entries[0]?.status).not.toBe("error");
+  });
+
+  it("keeps playback when offset-0 cancels after a mid-file seek", async () => {
+    const guest = createRoomFileTransfer({
+      localAgentId: "g",
+      localName: "訪客",
+      sendJson: () => {},
+      sendBinary: () => {},
+      createPlaySink: () => createPlayByteWindow({ mime: "video/mp4" }),
+    });
+    guest.onControl({
+      type: SESSION_FILE_TYPE,
+      v: 1,
+      op: "share",
+      id: "clip",
+      name: "clip.mp4",
+      size: 80 * 1024 * 1024,
+      mime: "video/mp4",
+      owner: "h",
+    });
+    expect((await guest.play("clip")).ok).toBe(true);
+    expect(
+      guest.acceptHttpTransfer({
+        fileId: "clip",
+        transferId: "sw-mid",
+        offset: 40 * 1024 * 1024,
+      }).ok
+    ).toBe(true);
+    /** Browser often opens offset 0 after／with a seek, then cancels a body. */
+    expect(
+      guest.acceptHttpTransfer({
+        fileId: "clip",
+        transferId: "sw-head",
+        offset: 0,
+      }).ok
+    ).toBe(true);
+    guest.noteHttpTransferEnd({
+      fileId: "clip",
+      transferId: "sw-head",
+      ok: false,
+      reason: "cancelled",
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(guest.getState().playback?.id).toBe("clip");
+    expect(guest.getState().entries[0]?.status).not.toBe("error");
+  });
+
+  it("re-lists after stopPlay so preview is not stuck disabled", async () => {
+    const guest = createRoomFileTransfer({
+      localAgentId: "g",
+      localName: "訪客",
+      sendJson: () => {},
+      sendBinary: () => {},
+      createPlaySink: () => createPlayByteWindow({ mime: "video/mp4" }),
+    });
+    guest.onControl({
+      type: SESSION_FILE_TYPE,
+      v: 1,
+      op: "share",
+      id: "clip",
+      name: "clip.mp4",
+      size: 8,
+      mime: "video/mp4",
+      owner: "h",
+    });
+    expect((await guest.play("clip")).ok).toBe(true);
+    expect(
+      guest.acceptHttpTransfer({
+        fileId: "clip",
+        transferId: "sw-1",
+        offset: 0,
+      }).ok
+    ).toBe(true);
+    expect(guest.getState().entries[0]?.status).toBe("transferring");
+    guest.stopPlay();
+    expect(guest.getState().playback).toBeNull();
+    expect(guest.getState().entries[0]?.status).toBe("listed");
+  });
+
+  it("primes the play pin on accept so the seek offset is in-window immediately", async () => {
+    const sessions = createRoomPlayRegistry();
+    const playId = "sf-prime";
+    const guest = createRoomFileTransfer({
+      localAgentId: "g",
+      localName: "訪客",
+      sendJson: () => {},
+      sendBinary: () => {},
+      createPlaySink: (opts) =>
+        createRoomPlaySink({
+          ...opts,
+          playId,
+          sessions,
+          maxBytes: 32 * 1024 * 1024,
+        }),
+    });
+    guest.onControl({
+      type: SESSION_FILE_TYPE,
+      v: 1,
+      op: "share",
+      id: playId,
+      name: "clip.mp4",
+      size: 80 * 1024 * 1024,
+      mime: "video/mp4",
+      owner: "h",
+    });
+    expect((await guest.play(playId)).ok).toBe(true);
+    const at = 40 * 1024 * 1024;
+    expect(
+      guest.acceptHttpTransfer({
+        fileId: playId,
+        transferId: "sw-mid",
+        offset: at,
+      }).ok
+    ).toBe(true);
+    expect(sessions.inPinWindow(playId, at, 64)).toBe(true);
+  });
+
+  it("does not cancel a prior play Range when a new HTTP Range opens", async () => {
+    const json: unknown[] = [];
+    const guest = createRoomFileTransfer({
+      localAgentId: "g",
+      localName: "訪客",
+      sendJson: (m) => json.push(m),
+      sendBinary: () => {},
+      createPlaySink: () => createPlayByteWindow({ mime: "video/mp4" }),
+    });
+    guest.onControl({
+      type: SESSION_FILE_TYPE,
+      v: 1,
+      op: "share",
+      id: "clip",
+      name: "clip.mp4",
+      size: 80 * 1024 * 1024,
+      mime: "video/mp4",
+      owner: "h",
+    });
+    expect((await guest.play("clip")).ok).toBe(true);
+    expect(
+      guest.acceptHttpTransfer({
+        fileId: "clip",
+        transferId: "sw-head",
+        offset: 0,
+      }).ok
+    ).toBe(true);
+    guest.onBinary(
+      encodeSessionFileChunk({
+        transferId: "sw-head",
+        seq: 0,
+        payload: new Uint8Array(64),
+      })
+    );
+    await Promise.resolve();
+    expect(
+      guest.acceptHttpTransfer({
+        fileId: "clip",
+        transferId: "sw-mid",
+        offset: 32,
+      }).ok
+    ).toBe(true);
+    expect(
+      json.filter((m) => (m as { op?: string }).op === "cancel")
+    ).toHaveLength(0);
+    expect(
+      json.filter(
+        (m) =>
+          (m as { op?: string }).op === "request" &&
+          (m as { transferId?: string }).transferId === "sw-mid"
+      ).length
+    ).toBe(1);
+    guest.noteHttpTransferEnd({
+      fileId: "clip",
+      transferId: "sw-head",
+      ok: false,
+      reason: "cancelled",
+    });
+    await Promise.resolve();
+    expect(
+      json.some(
+        (m) =>
+          (m as { op?: string }).op === "cancel" &&
+          (m as { transferId?: string }).transferId === "sw-head"
+      )
+    ).toBe(true);
   });
 });

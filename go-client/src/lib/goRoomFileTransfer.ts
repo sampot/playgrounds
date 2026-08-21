@@ -26,15 +26,25 @@ import { createRoomPlaySink, type RoomPlaySink } from "./goRoomFilePlay";
 import {
   registerLocalRoomFile,
   unregisterLocalRoomFile,
+  rejectRoomHttpTransfer,
   waitRoomPlaySw,
 } from "./goRoomPlayBridge";
 import { fileShareKind } from "./goRoomFileShare";
 import {
-  SESSION_FILE_PLAY_MAX_INFLIGHT,
   SESSION_FILE_PLAY_SEEK_SLACK,
   roomFileContentType,
+  roomFileDownloadPath,
   roomFilePath,
 } from "./goRoomPlayRegistry";
+import {
+  DC_PRIORITY,
+  createDcPumpScheduler,
+  priorityForPurpose,
+} from "./goRoomFileDcScheduler";
+import {
+  ROOM_FILE_JOB_MAX_TASKS,
+  createRoomFileJobRegistry,
+} from "./goRoomFileJobs";
 
 export type { RoomFileWritable };
 export { SESSION_FILE_PLAY_BUFFER_MAX } from "./goRoomFilePlay";
@@ -99,6 +109,16 @@ export type RoomFileTransfer = {
   cancelDownload(fileId: string): void;
   play(id: string): Promise<RoomFileResult>;
   /**
+   * Open the SW `/room-file/<id>` session without issuing HTTP yet.
+   * Callers then `fetch(roomFilePath(id))` (page＝HTTP client；SW＝server).
+   * `save`／`play` are page UI modes under the same file job (cap＝ROOM_FILE_JOB_MAX_TASKS).
+   * Page policy today: one active remote job at a time (`busy`).
+   */
+  openRemoteHttp(
+    id: string,
+    mode?: "play" | "save"
+  ): Promise<RoomFileResult>;
+  /**
    * SW opened one HTTP roundtrip — page only relays session_file.request
    * with SW’s transferId (never invents ids).
    */
@@ -120,6 +140,15 @@ export type RoomFileTransfer = {
     delivered?: number;
     reason?: string;
   }): void;
+  /** In-flight HTTP／DC tasks (harness／diagnostics). */
+  inboundSnaps(): {
+    transferId: string;
+    fileId: string;
+    purpose: "save" | "play";
+    received: number;
+    expectBytes: number;
+    sourceDone: boolean;
+  }[];
   /**
    * Resume an in-flight transfer near offset. Does not open transfers —
    * new Ranges are HTTP → SW → acceptHttpTransfer.
@@ -159,6 +188,15 @@ export type RoomFileTransferDeps = {
   /** Register owned File for `/room-file/<id>` (no DC). */
   registerLocalFile?: (id: string, file: File) => void;
   unregisterLocalFile?: (id: string) => void;
+  /**
+   * Admit failed for this SW-opened transfer — fail the HTTP body
+   * (`reject-transfer` → SW).
+   */
+  rejectHttpTransfer?: (
+    fileId: string,
+    transferId: string,
+    reason?: string
+  ) => void;
 };
 
 const BUFFER_HIGH = 64 * 1024;
@@ -202,16 +240,24 @@ export function createRoomFileTransfer(
   const listeners = new Set<(s: RoomFileState) => void>();
   const outboundFiles = new Map<string, File>();
   const inbounds = new Map<string, Inbound>();
-  const outboundPumps = new Map<
-    string,
-    {
-      transferId: string;
-      fileId: string;
-      destPeerId?: string;
-      abort: boolean;
-      paused: boolean;
+  /** transferId → fileId for abort-by-file / busy. */
+  const outboundMeta = new Map<string, { fileId: string; destPeerId?: string }>();
+
+  async function waitDrain(destPeerId?: string): Promise<void> {
+    const get = deps.bufferedAmount ?? (() => 0);
+    while (get(destPeerId) > BUFFER_HIGH) {
+      await new Promise((r) => setTimeout(r, 16));
     }
-  >();
+  }
+
+  const dcSched = createDcPumpScheduler({
+    waitDrain,
+  });
+  const fileJobs = createRoomFileJobRegistry({
+    maxTasksPerJob: ROOM_FILE_JOB_MAX_TASKS,
+  });
+  /** Open product job for the current remote file session (job id＝file id). */
+  let activeJobId: string | null = null;
   let playback: RoomFilePlayback | null = null;
   let playSink: RoomPlaySink | null = null;
   /** File id for the open `/room-file/` session (play or download). */
@@ -256,12 +302,21 @@ export function createRoomFileTransfer(
     ((id: string) => {
       unregisterLocalRoomFile(id);
     });
+  const rejectHttp =
+    deps.rejectHttpTransfer ??
+    ((fileId: string, transferId: string, reason?: string) => {
+      rejectRoomHttpTransfer(fileId, transferId, reason);
+    });
 
   function playInbounds(): Inbound[] {
     return [...inbounds.values()].filter((i) => i.purpose === "play");
   }
 
   function clearHttpSink(): void {
+    if (activeJobId) {
+      fileJobs.close(activeJobId);
+      activeJobId = null;
+    }
     playSink?.destroy();
     playSink = null;
     httpFileId = null;
@@ -272,7 +327,7 @@ export function createRoomFileTransfer(
   function busy(): boolean {
     return (
       inbounds.size > 0 ||
-      outboundPumps.size > 0 ||
+      dcSched.size() > 0 ||
       /**
        * Remote download HTTP session (not private play). Once SW has delivered
        * the save body, Edge may keep the page fetch open while closing the
@@ -282,11 +337,6 @@ export function createRoomFileTransfer(
         playback == null &&
         !saveSwComplete.has(httpFileId))
     );
-  }
-
-  function pumpsForPeer(peer?: string) {
-    const key = peer ?? "";
-    return [...outboundPumps.values()].filter((p) => (p.destPeerId ?? "") === key);
   }
 
   function snap(): RoomFileState {
@@ -329,8 +379,8 @@ export function createRoomFileTransfer(
   }
 
   function abortOutboundForFile(fileId: string): void {
-    for (const p of outboundPumps.values()) {
-      if (p.fileId === fileId) p.abort = true;
+    for (const [transferId, meta] of outboundMeta) {
+      if (meta.fileId === fileId) dcSched.abort(transferId);
     }
   }
 
@@ -348,37 +398,13 @@ export function createRoomFileTransfer(
     }
   }
 
-  function evictPlayInboundFor(at: number): Inbound | undefined {
-    const plays = playInbounds();
-    if (plays.length < SESSION_FILE_PLAY_MAX_INFLIGHT) return undefined;
-    const pool = plays.filter(
-      (p) => !(p.baseOffset === 0 && p.received < p.size - p.baseOffset)
-    );
-    const candidates = pool.length > 0 ? pool : plays;
-    let worst = candidates[0];
-    let worstScore = -1;
-    for (const p of candidates) {
-      const pumped = p.baseOffset + p.received;
-      const dist =
-        at < p.baseOffset ? p.baseOffset - at : at > pumped ? at - pumped : 0;
-      const score = dist * 2 + p.baseOffset;
-      if (score > worstScore) {
-        worst = p;
-        worstScore = score;
-      }
-    }
-    return worst;
-  }
-
-  function dropPlayInbound(cur: Inbound): void {
-    if (inbounds.get(cur.transferId) !== cur) return;
-    inbounds.delete(cur.transferId);
-    sendSafe(
-      buildSessionFileControl({
-        op: "cancel",
-        id: cur.fileId,
-        transferId: cur.transferId,
-      })
+  /** Media seek／Range cancel — keep the play sink for the next HTTP Range. */
+  function isBenignPlayRangeEnd(error?: string): boolean {
+    if (!error) return false;
+    return (
+      error === "cancelled" ||
+      error === "aborted" ||
+      error === "已停止播放"
     );
   }
 
@@ -407,95 +433,101 @@ export function createRoomFileTransfer(
     }
   }
 
-  async function waitDrain(destPeerId?: string): Promise<void> {
-    const get = deps.bufferedAmount ?? (() => 0);
-    while (get(destPeerId) > BUFFER_HIGH) {
-      await new Promise((r) => setTimeout(r, 16));
-    }
-  }
-
   async function pumpOutbound(
     fileId: string,
     file: File,
     transferId: string,
     destPeerId?: string,
     startOffset = 0,
-    length?: number
+    length?: number,
+    priority = DC_PRIORITY.DEFAULT,
+    jobId?: string
   ): Promise<void> {
-    const pump = {
-      transferId,
-      fileId,
-      destPeerId,
-      abort: false,
-      paused: false,
-    };
-    outboundPumps.set(transferId, pump);
     const from = Math.max(0, Math.min(file.size, Math.floor(startOffset)));
     const limit =
       typeof length === "number" && Number.isFinite(length) && length > 0
         ? Math.min(file.size, from + Math.floor(length))
         : file.size;
+    outboundMeta.set(transferId, { fileId, destPeerId });
     patch(fileId, { status: "transferring", received: from, error: undefined });
-    try {
-      let offset = from;
-      let seq = 0;
-      while (offset < limit) {
-        if (pump.abort) return;
-        while (pump.paused && !pump.abort) {
-          await new Promise((r) => setTimeout(r, 16));
-        }
-        if (pump.abort) return;
-        await waitDrain(destPeerId);
-        if (pump.abort) return;
-        const end = Math.min(offset + SESSION_FILE_CHUNK_PAYLOAD_MAX, limit);
-        const slice = file.slice(offset, end);
-        const buf = new Uint8Array(await slice.arrayBuffer());
-        deps.sendBinary(
-          encodeSessionFileChunk({
-            transferId,
-            seq,
-            payload: buf,
-          }),
-          destPeerId
-        );
-        offset += buf.byteLength;
-        seq += 1;
-        const listed = entries.find((e) => e.id === fileId);
-        patch(fileId, {
-          received: Math.max(listed?.received ?? 0, offset),
-        });
-      }
-      if (pump.abort) return;
-      sendSafe(
-        buildSessionFileControl({
-          op: "done",
-          id: fileId,
-          transferId,
-        })
-      );
-      patch(fileId, {
-        status: "listed",
-        received: Math.max(
-          entries.find((e) => e.id === fileId)?.received ?? 0,
-          limit
-        ),
-      });
-    } catch (e) {
-      patch(fileId, {
-        status: "error",
-        error: e instanceof Error ? e.message : "傳送失敗",
-      });
-      sendSafe(
-        buildSessionFileControl({
-          op: "cancel",
-          id: fileId,
-          transferId,
-        })
-      );
-    } finally {
-      outboundPumps.delete(transferId);
+
+    let offset = from;
+    let seq = 0;
+    let settled = false;
+    const finishMeta = () => {
+      outboundMeta.delete(transferId);
       emit();
-    }
+    };
+
+    await new Promise<void>((resolve) => {
+      const settle = () => {
+        if (settled) return;
+        settled = true;
+        finishMeta();
+        resolve();
+      };
+      dcSched.enqueue({
+        id: transferId,
+        jobId: jobId ?? transferId,
+        priority,
+        destPeerId,
+        sendOne: async () => {
+          if (offset >= limit) return "done";
+          const end = Math.min(offset + SESSION_FILE_CHUNK_PAYLOAD_MAX, limit);
+          const slice = file.slice(offset, end);
+          const buf = new Uint8Array(await slice.arrayBuffer());
+          deps.sendBinary(
+            encodeSessionFileChunk({
+              transferId,
+              seq,
+              payload: buf,
+            }),
+            destPeerId
+          );
+          offset += buf.byteLength;
+          seq += 1;
+          const listed = entries.find((e) => e.id === fileId);
+          patch(fileId, {
+            received: Math.max(listed?.received ?? 0, offset),
+          });
+          return offset >= limit ? "done" : "more";
+        },
+        onComplete: () => {
+          sendSafe(
+            buildSessionFileControl({
+              op: "done",
+              id: fileId,
+              transferId,
+            })
+          );
+          patch(fileId, {
+            status: "listed",
+            received: Math.max(
+              entries.find((e) => e.id === fileId)?.received ?? 0,
+              limit
+            ),
+          });
+          settle();
+        },
+        onError: (e) => {
+          patch(fileId, {
+            status: "error",
+            error: e instanceof Error ? e.message : "傳送失敗",
+          });
+          sendSafe(
+            buildSessionFileControl({
+              op: "cancel",
+              id: fileId,
+              transferId,
+            })
+          );
+          settle();
+        },
+        onAbort: () => {
+          settle();
+        },
+      });
+    });
   }
 
   async function shareLocalFile(file: File): Promise<RoomFileResult> {
@@ -621,7 +653,7 @@ export function createRoomFileTransfer(
         userCancelled: false,
       };
       try {
-        const res = await fetchRoomFile(roomFilePath(id), {
+        const res = await fetchRoomFile(roomFileDownloadPath(id), {
           signal: abort.signal,
         });
         if (!res.ok && res.status !== 206) {
@@ -666,19 +698,12 @@ export function createRoomFileTransfer(
     if (!writable) {
       return { ok: false, error: "已取消", cancelled: true };
     }
-    await waitRoomPlaySw();
-    /** Drop private-play state so save-cancel／transfer-end can clear this HTTP session. */
-    revokePlayback();
-    saveSwComplete.delete(id);
-    if (saveMirrorReadyFileId === id) saveMirrorReadyFileId = null;
-    playSink = makePlaySink({
-      mime: entry.mime,
-      name: entry.name,
-      size: entry.size,
-      playId: id,
-      mode: "save",
-    });
-    httpFileId = id;
+    /**
+     * Same SW save session priming as harness concurrent GETs
+     * (`openRemoteHttp(id, "save")` → fetch `/room-file/<id>`).
+     */
+    const opened = await openRemoteHttp(id, "save");
+    if (!opened.ok) return opened;
     const abort = new AbortController();
     activeDownload = {
       fileId: id,
@@ -686,11 +711,9 @@ export function createRoomFileTransfer(
       writable,
       userCancelled: false,
     };
-    patch(id, { status: "transferring", received: 0, error: undefined });
-    emit();
     /** Transfer opens when SW handles this GET (open-transfer → acceptHttpTransfer). */
     try {
-      const res = await fetchRoomFile(roomFilePath(id), {
+      const res = await fetchRoomFile(roomFileDownloadPath(id), {
         signal: abort.signal,
       });
       if (!res.ok && res.status !== 206) {
@@ -723,6 +746,7 @@ export function createRoomFileTransfer(
       for (const cur of [...inbounds.values()]) {
         if (cur.fileId === id && cur.purpose === "save") {
           inbounds.delete(cur.transferId);
+          fileJobs.releaseTask(cur.transferId);
         }
       }
       playSink?.end();
@@ -744,6 +768,7 @@ export function createRoomFileTransfer(
           })
         );
         inbounds.delete(cur.transferId);
+        fileJobs.releaseTask(cur.transferId);
       }
       clearHttpSink();
       if (cancelled) {
@@ -791,7 +816,7 @@ export function createRoomFileTransfer(
       };
     }
     if (!outboundFiles.get(id)) return { ok: false, error: "找不到這個檔" };
-    return { ok: true, id, url: roomFilePath(id), name: entry.name };
+    return { ok: true, id, url: roomFileDownloadPath(id), name: entry.name };
   }
 
   function cancelHttpSave(fileId: string): void {
@@ -849,7 +874,10 @@ export function createRoomFileTransfer(
     }
   }
 
-  async function play(id: string): Promise<RoomFileResult> {
+  async function openRemoteHttp(
+    id: string,
+    mode: "play" | "save" = "play"
+  ): Promise<RoomFileResult> {
     const entry = entries.find((e) => e.id === id);
     if (!entry) {
       return { ok: false, error: "找不到這個檔" };
@@ -861,13 +889,17 @@ export function createRoomFileTransfer(
       if (!outboundFiles.get(id)) return { ok: false, error: "找不到這個檔" };
       revokePlayback();
       await waitRoomPlaySw();
-      playback = {
-        id,
-        url: roomFilePath(id),
-        name: entry.name,
-        mime: roomFileContentType(entry.mime, entry.name),
-        kind: playbackKindOf(entry.mime, entry.name),
-      };
+      if (mode === "play") {
+        playback = {
+          id,
+          url: roomFilePath(id, { purpose: "play" }),
+          name: entry.name,
+          mime: roomFileContentType(entry.mime, entry.name),
+          kind: playbackKindOf(entry.mime, entry.name),
+        };
+      } else {
+        httpFileId = id;
+      }
       emit();
       return { ok: true, id };
     }
@@ -875,26 +907,35 @@ export function createRoomFileTransfer(
       return { ok: false, error: "一次只能傳一個檔" };
     }
     revokePlayback();
+    saveSwComplete.delete(id);
+    if (saveMirrorReadyFileId === id) saveMirrorReadyFileId = null;
     await waitRoomPlaySw();
     playSink = makePlaySink({
       mime: roomFileContentType(entry.mime, entry.name),
       name: entry.name,
       size: entry.size,
-      /** Stable per file so remount／re-play keeps the same `/room-file/<id>`. */
       playId: id,
+      mode,
     });
     httpFileId = id;
-    playback = {
-      id,
-      url: playSink.url,
-      name: entry.name,
-      mime: roomFileContentType(entry.mime, entry.name),
-      kind: playbackKindOf(entry.mime, entry.name),
-    };
-    /** HTTP Ranges open transfers via SW open-transfer → acceptHttpTransfer. */
+    if (mode === "play") {
+      playback = {
+        id,
+        url: playSink.url,
+        name: entry.name,
+        mime: roomFileContentType(entry.mime, entry.name),
+        kind: playbackKindOf(entry.mime, entry.name),
+      };
+    }
+    const job = fileJobs.open(id, priorityForPurpose(mode));
+    activeJobId = job.id;
     patch(id, { status: "transferring", received: 0, error: undefined });
     emit();
     return { ok: true, id };
+  }
+
+  async function play(id: string): Promise<RoomFileResult> {
+    return openRemoteHttp(id, "play");
   }
 
   function acceptHttpTransfer(msg: {
@@ -938,10 +979,18 @@ export function createRoomFileTransfer(
     ) {
       return { ok: false, error: "一次只能傳一個檔" };
     }
+    /**
+     * Page owns purpose (put on `?purpose=` when issuing HTTP). SW may echo it
+     * on open-transfer; prefer the open session, else the echo.
+     */
     const purpose =
-      msg.purpose === "save" || (!playback && httpFileId === fileId)
+      !playback && httpFileId === fileId
         ? "save"
-        : "play";
+        : playback
+          ? "play"
+          : msg.purpose === "save" || msg.purpose === "play"
+            ? msg.purpose
+            : "play";
     /**
      * Edge／Chrome often cancel() a finished save body then reopen GET.
      * SW already delivered — do not open another DC transfer or flip UI busy.
@@ -949,18 +998,39 @@ export function createRoomFileTransfer(
     if (purpose === "save" && saveSwComplete.has(fileId)) {
       return { ok: true, id: fileId };
     }
-    /** Far seek: drop transfers that cannot serve this offset. */
-    for (const cur of [...inbounds.values()]) {
-      if (cur.fileId !== fileId) continue;
-      if (cur.purpose === "save" && cur.baseOffset === 0) continue;
-      const pumped = cur.baseOffset + cur.received;
-      const near =
-        at >= cur.baseOffset - SESSION_FILE_PLAY_SEEK_SLACK &&
-        at <= pumped + SESSION_FILE_PLAY_SEEK_SLACK;
-      if (!near) dropPlayInbound(cur);
+    /**
+     * Job＝file id（與 SW 同）。Page 現況一頁一個 activeJobId（政策可改）。
+     * Play vs download purpose is chosen by the Page（URL `?purpose=`／open session），not job id.
+     */
+    if (!activeJobId) {
+      rejectHttp(fileId, transferId, "no-client-job");
+      return { ok: false, error: "沒有進行中的工作" };
     }
-    const victim = evictPlayInboundFor(at);
-    if (victim) dropPlayInbound(victim);
+    if (activeJobId !== fileId) {
+      rejectHttp(fileId, transferId, "job-mismatch");
+      return { ok: false, error: "沒有進行中的工作" };
+    }
+    const job = fileJobs.get(activeJobId);
+    if (!job) {
+      rejectHttp(fileId, transferId, "no-client-job");
+      return { ok: false, error: "沒有進行中的工作" };
+    }
+    const admitted = fileJobs.admitTask(activeJobId, transferId);
+    if (!admitted.ok) {
+      rejectHttp(fileId, transferId, "job-full");
+      return { ok: false, error: admitted.error };
+    }
+    /**
+     * Client／media already opened this HTTP — we only admit under the job
+     * (per-client concurrent cap). Do not invent, cancel, or pause siblings;
+     * DC sched shares bytes among admitted tasks. Lifecycle = client
+     * finished／cancel／abort → closeInbound.
+     * Prime the page pin immediately so DC chunks at `at` are in-window
+     * before the SW pin postMessage arrives (avoids waitPin busy-spin).
+     */
+    if (purpose === "play" && playSink?.primePin) {
+      playSink.primePin(transferId, at);
+    }
     lastSeekOpenAt = at;
     lastSeekOpenTs = Date.now();
     const endInclusive =
@@ -972,6 +1042,8 @@ export function createRoomFileTransfer(
         ? Math.min(entry.size - at, endInclusive - at + 1)
         : Math.max(0, entry.size - at);
     if (expectBytes <= 0) {
+      fileJobs.releaseTask(transferId);
+      rejectHttp(fileId, transferId, "bad-range");
       return { ok: false, error: "無法跳到那裡" };
     }
     inbounds.set(transferId, {
@@ -1000,6 +1072,8 @@ export function createRoomFileTransfer(
         from: deps.localAgentId,
         offset: at,
         length: expectBytes,
+        priority: priorityForPurpose(purpose),
+        jobId: activeJobId,
       })
     );
     emit();
@@ -1055,6 +1129,7 @@ export function createRoomFileTransfer(
   }
 
   function stopPlay(): void {
+    const stopIds = [...new Set(playInbounds().map((c) => c.fileId))];
     for (const cur of playInbounds()) {
       sendSafe(
         buildSessionFileControl({
@@ -1066,6 +1141,22 @@ export function createRoomFileTransfer(
       void closeInbound(cur, false, "已停止播放");
     }
     revokePlayback();
+    /** Sync re-list — closeInbound is async and must not leave transferring stuck
+     * (preview button disables while status===transferring && !playback). */
+    for (const id of stopIds) {
+      const entry = entries.find((e) => e.id === id);
+      if (!entry || entry.status !== "transferring") continue;
+      entries = entries.map((e) =>
+        e.id === id
+          ? {
+              ...e,
+              status: "listed" as const,
+              received: Math.max(e.received, playReceivedAbs(id)),
+              error: undefined,
+            }
+          : e
+      );
+    }
     emit();
   }
 
@@ -1099,6 +1190,7 @@ export function createRoomFileTransfer(
       if (!ids.includes(cur.fileId)) continue;
       void cur.writable?.abort?.();
       inbounds.delete(cur.transferId);
+      fileJobs.releaseTask(cur.transferId);
     }
     if (playback && ids.includes(playback.id)) revokePlayback();
     entries = entries.filter((e) => e.ownerId !== ownerId);
@@ -1112,6 +1204,11 @@ export function createRoomFileTransfer(
     error?: string
   ): Promise<void> {
     if (inbounds.get(cur.transferId) === cur) inbounds.delete(cur.transferId);
+    fileJobs.releaseTask(cur.transferId);
+    if (cur.purpose === "play") {
+      playSink?.clearPin?.(cur.transferId);
+      playSink?.interruptAppends?.();
+    }
     /**
      * Stop owner pump for this transferId — SW already finished (or aborted)
      * the HTTP body; further chunks are wasted.
@@ -1190,7 +1287,13 @@ export function createRoomFileTransfer(
       }
     } else {
       if (cur.purpose === "save") saveSwComplete.delete(cur.fileId);
-      if (cur.purpose === "play" && playInbounds().length === 0) {
+      const benignPlayEnd =
+        cur.purpose === "play" && isBenignPlayRangeEnd(error);
+      if (
+        cur.purpose === "play" &&
+        playInbounds().length === 0 &&
+        !benignPlayEnd
+      ) {
         revokePlayback();
       }
       /**
@@ -1201,7 +1304,15 @@ export function createRoomFileTransfer(
       if (cur.purpose === "save" && !cur.writable) {
         playSink?.end();
       }
-      if (cur.purpose !== "play" || playInbounds().length === 0) {
+      if (benignPlayEnd) {
+        if (playInbounds().length === 0) {
+          patch(cur.fileId, {
+            status: "listed",
+            received: playReceivedAbs(cur.fileId),
+            error: undefined,
+          });
+        }
+      } else if (cur.purpose !== "play" || playInbounds().length === 0) {
         patch(cur.fileId, {
           status: "error",
           error: error || (cur.purpose === "play" ? "播放失敗" : "下載失敗"),
@@ -1300,28 +1411,32 @@ export function createRoomFileTransfer(
         }
         return;
       }
-      const peerPumps = pumpsForPeer(data.from);
-      if (peerPumps.length >= SESSION_FILE_PLAY_MAX_INFLIGHT) {
-        peerPumps[0]!.abort = true;
-      }
+      const priority =
+        typeof data.priority === "number" && Number.isFinite(data.priority)
+          ? data.priority
+          : DC_PRIORITY.DEFAULT;
+      const jobId =
+        typeof data.jobId === "string" && data.jobId.trim()
+          ? data.jobId.trim()
+          : undefined;
       void pumpOutbound(
         data.id,
         file,
         transferId,
         data.from,
         data.offset ?? 0,
-        data.length
+        data.length,
+        priority,
+        jobId
       );
       return;
     }
     if (data.op === "pause") {
-      const pump = data.transferId ? outboundPumps.get(data.transferId) : undefined;
-      if (pump) pump.paused = true;
+      if (data.transferId) dcSched.setPaused(data.transferId, true);
       return;
     }
     if (data.op === "resume") {
-      const pump = data.transferId ? outboundPumps.get(data.transferId) : undefined;
-      if (pump) pump.paused = false;
+      if (data.transferId) dcSched.setPaused(data.transferId, false);
       return;
     }
     if (data.op === "reject" || data.op === "cancel") {
@@ -1333,8 +1448,7 @@ export function createRoomFileTransfer(
           data.op === "reject" ? "現在傳不了" : "已取消"
         );
       }
-      const pump = data.transferId ? outboundPumps.get(data.transferId) : undefined;
-      if (pump) pump.abort = true;
+      if (data.transferId) dcSched.abort(data.transferId);
       return;
     }
     if (data.op === "done") {
@@ -1394,6 +1508,7 @@ export function createRoomFileTransfer(
         activeDownload?.fileId === msg.fileId)
     ) {
       inbounds.delete(msg.transferId);
+      fileJobs.releaseTask(msg.transferId);
       return;
     }
     if (msg.ok) {
@@ -1447,6 +1562,26 @@ export function createRoomFileTransfer(
       if (cur.purpose === "play" || cur.purpose === "save") {
         if (!playSink) return;
         const end = Math.min(cur.size, at + payload.byteLength);
+        /**
+         * Ahead of the HTTP pin window: pause owner before waitPin so DC
+         * chunks do not pile onto the writes chain (seek／畫面跟不上).
+         */
+        if (
+          playSink.inPinWindow &&
+          !playSink.inPinWindow(at, payload.byteLength) &&
+          !(playSink.covers?.(at, end) ?? false)
+        ) {
+          if (!cur.playPaused) {
+            cur.playPaused = true;
+            sendSafe(
+              buildSessionFileControl({
+                op: "pause",
+                id: cur.fileId,
+                transferId: cur.transferId,
+              })
+            );
+          }
+        }
         const pressure = await playSink.append(payload, at);
         if (inbounds.get(cur.transferId) !== cur || !playSink) return;
         /** append waits until stored — only then advance received. */
@@ -1478,7 +1613,7 @@ export function createRoomFileTransfer(
   }
 
   function dispose(): void {
-    for (const p of outboundPumps.values()) p.abort = true;
+    dcSched.abortAll();
     for (const cur of inbounds.values()) void cur.writable?.abort?.();
     inbounds.clear();
     for (const id of outboundFiles.keys()) {
@@ -1490,7 +1625,10 @@ export function createRoomFileTransfer(
     }
     outboundFiles.clear();
     entries = [];
-    outboundPumps.clear();
+    outboundMeta.clear();
+    dcSched.clear();
+    fileJobs.clear();
+    activeJobId = null;
     revokePlayback();
     emit();
   }
@@ -1505,8 +1643,18 @@ export function createRoomFileTransfer(
     cancelHttpSave,
     cancelDownload,
     play,
+    openRemoteHttp,
     acceptHttpTransfer,
     noteHttpTransferEnd,
+    inboundSnaps: () =>
+      [...inbounds.values()].map((cur) => ({
+        transferId: cur.transferId,
+        fileId: cur.fileId,
+        purpose: cur.purpose,
+        received: cur.received,
+        expectBytes: cur.expectBytes,
+        sourceDone: Boolean(cur.sourceDone),
+      })),
     seekPlay,
     stopPlay,
     notePlayhead,

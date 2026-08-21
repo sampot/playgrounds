@@ -563,7 +563,7 @@ Host **只轉**這些 JSON（將來），不 `setRemoteDescription` 別人的 me
 ```text
 client 發出一筆 HTTP request（GET／HEAD／Range）→ /room-file/<id>
   → SW 確認非本機 File → **SW 分配** transferId（虛擬 connection；共用同一條 DC）
-  → SW → 頁面 `open-transfer`（含 id／transferId／offset／end／purpose）
+  → SW 讀 request 的 `?purpose=`（Page 給的 priority 提示）→ `open-transfer`（id／transferId／offset／end；purpose＝回傳該 request 上的值）
   → 頁面只發 session_file.request（**不得**自造 transferId）；Owner 依該 transfer 泵 chunk
   → SW 把宣告範圍的 bytes 完整交給此 response 的 body（或 client abort／錯誤結束）
   → SW → 頁面 `transfer-complete`／`transfer-abort`
@@ -645,9 +645,12 @@ client 同一形 HTTP request → /room-file/<id>
 | --- | --- |
 | **下載**（stream-through） | 本機：SW 直出，無 DC。遠端每筆 GET transfer：飛在路上的 ≤約一幀 chunk＋DC `bufferedAmount` 背壓。Safari 無 Save picker：HTTP 仍串流進頁，收完後短暫組 Blob 只為 `blob:` 橋（WebKit 例外） |
 | **檢視／私下播** | 本機：SW 直出。遠端每筆 Range／GET transfer 滑動窗口軟頂 **32 MiB**；滿則 `pause` **該** transfer；關預覽／播放器即 abort **進行中**的 HTTP／transfer |
-| **同時** | 遠端同檔同時 HTTP（因而 transfer）最多 **兩路**（對齊媒體雙連線）；第三路淘汰較遠的。本機無 transfer 上限問題（仍受瀏覽器對同 URL 連線數約束） |
+| **同時** | 遠端同檔可同時多筆 HTTP（＝task）。**Job＝檔案 id**；每 job 最高 concurrent tasks 初值 **10**（滿則 reject，不排隊）。**Page 政策（現況）：** 同時只開一個遠端 job（`busy`／一次一個檔）——**可改**。開哪些 task＝HTTP client／媒體。**Page** 用 URL **`?purpose=play|save`** 告訴 SW priority。本機掛檔 SW 直出、不開 task |
+| **共用 DC 排程（硬）** | 實體 DataChannel **一條共用**。排程只做**已 admit 的**泵送：先 **job**（file id）再 **task**（`transferId`）。Priority：**Page** 決定 purpose → HTTP `?purpose=` → SW 知悉（可 echo 於 `open-transfer`）→ page `request.priority`（save＞play＞default）。背壓仍用 per-`transferId` `pause`／`resume`＋`bufferedAmount` |
 
 背壓不足、把整檔 slice 完塞進 JS 佇列＝變相整檔進記憶體，同樣否決（Safari `blob:` 橋除外，且僅在 HTTP 完成之後）。
+
+**否決：** Owner 對每個 `request` 各自狂灌 DC；同一 file job 超過 concurrent cap 仍 admit；scheduler 發明要開哪幾筆 Range；用 `?download=`／attachment 當 purpose。**要：** Page 開 HTTP（自帶 `?purpose=`）→ SW（job＝file id）配 `transferId`、讀 purpose → page admit／`request.priority` → DC job→task quantum。
 
 #### Wire
 
@@ -657,7 +660,7 @@ client 同一形 HTTP request → /room-file/<id>
 session_file.share     { id, name, size, mime, owner }   // 掛上：僅檔 metadata。本客戶端不送 kind:dir／parentId
 session_file.unshare   { id }                      // 撤一檔
 session_file.catalog   { items: share[] }          // 晚進門：Host 重放目錄
-session_file.request   { id, transferId, from, offset?, length? }  // 對應一筆 HTTP／Range；owner 從 offset 泵 length（omit＝到 EOF）
+session_file.request   { id, transferId, from, offset?, length?, priority?, jobId? }  // task＝此一 HTTP；jobId＝file id；priority＝Page 依自己給 SW 的 purpose（save＞play）
 session_file.reject    { id, transferId }          // 已撤回／擁有者離席／忙碌／無法服務
 session_file.pause     { id, transferId }          // 該 transfer 背壓；owner 停泵、transfer 仍在
 session_file.resume    { id, transferId }          // 續泵
@@ -677,9 +680,9 @@ session_file.cancel    { id, transferId }
 | 項 | Phase 1 初值（可調；寫進測試） |
 | --- | --- |
 | 單檔上限 | 2 GiB（傳輸時長／惡意檔保險，**不是** RAM 預算；內容仍按 chunk 串流） |
-| 同時傳送 | 見上「同時」；可排隊 |
+| 同時傳送 | **job＝file id**（SW／page 同）；每 job **最多 10 concurrent task**；**page 現況**一頁一遠端 job（可改）；開哪些 task＝HTTP client；**Page** 用 `?purpose=` 告訴 SW priority（非 Response 分支） |
 | 掛檔 | 分享區選檔／drop；可多份。**不提供選資料夾** |
-| 索取 URL | 每檔 **`/room-file/<id>`**（本機／遠端同一形）；下載／檢視／播同一 URL；遠端**每筆 HTTP 各一 transfer**；本機不開 transfer |
+| 索取 URL | 每檔 **`/room-file/<id>`**；**Page** 可選帶 **`?purpose=play|save`**（給 SW）；**禁止** `?download=`；遠端**每筆 HTTP 各一 transfer**；本機不開 transfer |
 | 下載 | HTTP（`fetch`→writable；Safari 無 picker 則收完後 `blob:` 橋）；**禁止**以 `/room-file/` + Content-Disposition／`<a download>` 觸發下載管理員 |
 | 預覽／播 | 同一 URL：`<img src>`／`<video src>`／`<audio src>`（可 Range；媒體自開的每筆 Range＝各一 transfer） |
 | 目錄列 | 檔名＋大小＋誰掛的；**不**為縮圖先傳內容（縮圖若做＝另發 HTTP，仍走同一門面、另開 transfer） |
@@ -774,7 +777,7 @@ Guest ↔ Guest 不另建 PC；控制面經 Host fanout；內容經 Host 轉幀�
 | 可 | 不可 |
 | --- | --- |
 | 攔截 `/room-file/<id>`；本機直出或遠端串流一筆 `Response` | 頁面直讀 DC chunk；另註冊第二個 SW；本機改走 object URL 產品路徑 |
-| Range／雙連線（遠端最多兩路同時 HTTP＝兩路 transfer） | `Cache.put`／OPFS／IndexedDB 存整檔 |
+| Range／多連線（每筆 HTTP＝一條 transfer；以 client abort／完成收尾） | `Cache.put`／OPFS／IndexedDB 存整檔 |
 | 遠端：該 response body 交完（或 abort）→ 收尾對應 transfer | 用每人 HTTP 預覽／DC **冒充**包廂大螢幕；以 owner `done` 代替 SW 交付完成 |
 
 **禁止**用 WebRTC 當「我這台播目錄檔」的路徑。**必須**用 WebRTC 當包廂大螢幕。
@@ -821,7 +824,7 @@ session_cast.reject   { from: owner, id?, reason? }                          // 
 - **片子時鐘由主持遙控**（`state`）；owner 執行並回報進度。收看端（含非主持 Guest）不可獨立 seek。**音量＝本機喇叭**（HUD 本機 sink），不遙控來源端。
 - 收看端**不必**再 `request` 節目（房級已收）。開局不走 `session_cast`（見 §9.9 `session_play`）。
 
-**私下播／檢視／下載不走 `session_cast`。** 前端一律 `/room-file/<id>`。**本機掛檔：** SW 直出，不經 DC。**遠端：** 每一筆 HTTP → SW 開一條 `transferId` → `session_file.request`／chunk；**SW 交完該 response body 後**該 transfer 才結束（owner `done`＝源端泵完，見 §8.2）。同一檔同時最多 **兩路** 遠端 HTTP／`transferId`。第三路 Range 淘汰較遠的那條。緩衝滿／下載背壓時 `pause`／`resume` **各** `transferId`。
+**私下播／檢視／下載不走 `session_cast`。** 前端一律 `/room-file/<id>`。**本機掛檔：** SW 直出，不經 DC。**遠端：** 每一筆 HTTP → SW 開一條 `transferId` → `session_file.request`／chunk；**SW 交完該 response body 後**該 transfer 才結束（owner `done`＝源端泵完，見 §8.2）。同檔可同時多筆遠端 HTTP／`transferId`；**不**在開新 Range 時主動 cancel 舊的——各條以 client finished／cancel／abort 收尾。緩衝滿／下載背壓時 `pause`／`resume` **各** `transferId`。
 
 **鏡頭** `session_camera`：
 
@@ -1178,6 +1181,15 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 | 2026-08-19 | **HUD 還原＋音量：** 已全螢幕（槽或劇院態）圖示改還原；控制列加本機音量／靜音 |
 | 2026-08-19 | **大螢幕一直開著：** 沒來源＝沒訊號（雪花），不是關機。讀者面 `沒訊號`／`從大螢幕拿掉`；`unoffer` 只清輸入 |
 | 2026-08-20 | **私下播兩路 Range：** 同一檔最多兩個 `transferId` 同時泵（頭＋尾）；第三路淘汰較遠的（對齊媒體雙連線；下載通常一路 stream-through） |
+| 2026-08-21 | **撤「最多兩路／淘汰較遠」：** 同檔可多筆 transfer；開新 Range 不主動 cancel 舊的；各條依 client finished／cancel／abort（SW transfer-complete／abort）收尾 |
+| 2026-08-21 | **共用 DC 排程＋priority（硬）：** 多 `transferId` 共用一條 DC；禁止單一 transfer 長佔泵送；Owner 調度器依 priority 分 quantum（playhead／save ＞ prefetch）；低優先 `pause`／少量子，非 UI 互斥。Harness 已可再現 `<video>` 佔線餓死 Range；根治在 DC 排程非躲測試順序。§8.2 RAM／背壓 |
+| 2026-08-21 | **實作 `goRoomFileDcScheduler`：** Owner 單迴圈 quantum 泵送；`request.priority`（save＞play）；加權 streak＋anti-starvation；`acceptHttpTransfer` 帶 purpose priority |
+| 2026-08-21 | **Job／task 兩層：** job＝file id；每 job 最多 4 concurrent task（滿則 reject）；DC pick＝job→task；`request.jobId`；`goRoomFileJobs` |
+| 2026-08-21 | **Job＝file id：** 關聯同一 `/room-file/<id>` 的 HTTP tasks；**不**由 scheduler 決定開哪些 transfer。Page 一頁一遠端 job＝政策（可改）。§8.2 |
+| 2026-08-21 | **實作對齊：** admit 只綁 `openRemoteHttp` 的 active file job（不自動開 job）；滿槽 `reject-transfer`→SW 失敗該 HTTP；`GO_SW_REV=40` |
+| 2026-08-21 | **Job＝file id（硬）：** 一檔一 job（`<img>`／`<video>`／下載同 id）；SW 以 file id 當 job id、追蹤 tasks；page 現況一頁一遠端 job（政策可改）。`GO_SW_REV=41` |
+| 2026-08-21 | **大影片 scrub 獨立：** 真實旅程不含 video；`runVideoScrub`＝隨機快轉＋Host `ioDelayMs` 模擬檔案 I/O；不掛 `<video>`（避 HTTP 連線額度）。 |
+| 2026-08-21 | **每檔 task 上限 10；** `runDirectDownloadSched`＝跳過 SW、對 `xf-sched`（1 MiB＋`ioDelayMs`）admit 10 路，**等齊每路 DC 泵滿**＋soft elapsed floor（第 11 路 reject）。`GO_SW_REV=43` |
 | 2026-08-20 | **讀者面用語：** `電視` → `大螢幕`（包廂大螢幕／放到大螢幕上／從大螢幕拿掉／沒訊號；計劃與 GLOSSARY 一併） |
 | 2026-08-20 | **別人掛的檔上大螢幕：** `file { owner, id }`＝持檔端本機渲染 → 節目 RTP（可 Guest 掛的檔）；呈現型別影→音→圖遞增；doc／任意 MIME 不承諾；否決主持拉檔再播、否決 DC 冒充大螢幕。Phase **2e**；凍結 #31 |
 | 2026-08-20 | **2e 實作（video／audio）：** `session_cast.fromPeer`；host `startListedProgram` 遠端檔；owner capture＋Hub `forwardFrom`；reject／持檔端解碼提示 |

@@ -36,6 +36,7 @@ describe("listenRoomOpenTransfer", () => {
       type: ROOM_PLAY_MSG,
       op: "open-transfer",
       id: "file-1",
+      jobId: "file-1",
       transferId: "sw-tr-9",
       offset: 0,
       end: 99,
@@ -44,6 +45,7 @@ describe("listenRoomOpenTransfer", () => {
     expect(seen).toEqual([
       {
         fileId: "file-1",
+        jobId: "file-1",
         transferId: "sw-tr-9",
         offset: 0,
         end: 99,

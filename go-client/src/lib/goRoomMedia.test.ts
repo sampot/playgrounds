@@ -428,7 +428,7 @@ describe("createRoomMedia", () => {
       resolveLocalFile: (id) => (id === "file-1" ? file : null),
     });
     expect((await media.warmProgram("file-1")).ok).toBe(true);
-    expect(media.getState().ownerDecodeUrl).toBe("/room-file/file-1");
+    expect(media.getState().ownerDecodeUrl).toBe("/room-file/file-1?purpose=play");
     expect(media.getState().ownerDecodeUrl?.startsWith("blob:")).toBe(false);
   });
 

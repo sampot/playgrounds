@@ -903,7 +903,7 @@ export function createRoomMedia(opts: {
       opts.captureProgram ??
       ((f: File) =>
         fileId
-          ? captureProgramFromHttp(roomFilePath(fileId), f)
+          ? captureProgramFromHttp(roomFilePath(fileId, { purpose: "play" }), f)
           : Promise.resolve(null));
     const next = await capture(file);
     const castErr = goRoomCastCaptureError();
@@ -1282,7 +1282,7 @@ export function createRoomMedia(opts: {
       program?.stop();
       program = null;
       revokeOwnerDecode();
-      ownerDecodeUrl = roomFilePath(id);
+      ownerDecodeUrl = roomFilePath(id, { purpose: "play" });
       ownerDecodeKind = programKindOfFile(file);
       streamingFileId = id;
       programName = file.name.trim() || "影片";
