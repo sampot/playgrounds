@@ -951,6 +951,8 @@ describe("attachPlaybackUrl", () => {
     expect(el.muted).toBe(true);
     expect(el.defaultMuted).toBe(true);
     expect(el.setAttribute).toHaveBeenCalledWith("muted", "");
+    expect(el.setAttribute).toHaveBeenCalledWith("playsinline", "");
+    expect(el.setAttribute).toHaveBeenCalledWith("webkit-playsinline", "");
     expect(el.setAttribute).toHaveBeenCalledWith("src", "/room-file/clip-1");
     await vi.waitFor(() => {
       expect(play).toHaveBeenCalledTimes(1);

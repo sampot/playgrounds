@@ -386,6 +386,26 @@ export function mediaRangeForBufferedBody(
   return { start: 0, end: Math.min(Math.max(0, size - 1), cap - 1) };
 }
 
+/**
+ * HTTP Range the SW should serve for `/room-file` media.
+ * Play always slices (Safari blob-media *and* Chromium stream) so one seek
+ * does not pin the DC to EOF — that is what made Edge scrub stall.
+ * Save keeps the client Range／full body (stream-through download).
+ */
+export function roomFileServeByteRange(opts: {
+  range: ByteRange | null;
+  size: number;
+  purpose?: "play" | "save";
+  bodyKind: RoomFileHttpBodyKind;
+}): ByteRange | null {
+  const sizeHint =
+    opts.size > 0 ? opts.size : opts.range ? opts.range.end + 1 : 0;
+  if (opts.bodyKind === "blob-media" || opts.purpose === "play") {
+    return mediaRangeForBufferedBody(opts.range, sizeHint);
+  }
+  return opts.range;
+}
+
 export type RoomFileHttpBodyKind = "blob-local" | "blob-media" | "stream";
 
 export function roomFileHttpBodyKind(opts: {

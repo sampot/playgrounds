@@ -46,6 +46,8 @@ export function catalogTransferHint(opts: {
   status: string;
   playing: boolean;
 }): "播放中" | "傳送中" | null {
+  /** Private play holds the job across seek Range gaps (status may flicker). */
+  if (opts.playing) return "播放中";
   if (opts.status !== "transferring") return null;
-  return opts.playing ? "播放中" : "傳送中";
+  return "傳送中";
 }

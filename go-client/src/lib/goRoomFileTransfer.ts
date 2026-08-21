@@ -31,6 +31,7 @@ import {
 } from "./goRoomPlayBridge";
 import { fileShareKind } from "./goRoomFileShare";
 import {
+  SESSION_FILE_PLAY_MEDIA_BLOB_MAX,
   SESSION_FILE_PLAY_SEEK_SLACK,
   roomFileContentType,
   roomFileDownloadPath,
@@ -406,6 +407,23 @@ export function createRoomFileTransfer(
       error === "aborted" ||
       error === "已停止播放"
     );
+  }
+
+  /**
+   * Far scrub: drop play Ranges that cannot serve `at` so DC／HTTP slots
+   * follow the new seek (Edge otherwise keeps pumping the old open-ended body).
+   */
+  function dropFarPlayInbounds(fileId: string, at: number): void {
+    for (const cur of [...inbounds.values()]) {
+      if (cur.fileId !== fileId || cur.purpose !== "play") continue;
+      const pumped = cur.baseOffset + cur.received;
+      const near =
+        at >= cur.baseOffset - SESSION_FILE_PLAY_SEEK_SLACK &&
+        at <= pumped + SESSION_FILE_PLAY_SEEK_SLACK;
+      if (near) continue;
+      dcSched.abort(cur.transferId);
+      void closeInbound(cur, false, "cancelled");
+    }
   }
 
   function applyPlayPressure(pressure: "ok" | "high" | "low"): void {
@@ -998,6 +1016,9 @@ export function createRoomFileTransfer(
     if (purpose === "save" && saveSwComplete.has(fileId)) {
       return { ok: true, id: fileId };
     }
+    if (purpose === "play") {
+      dropFarPlayInbounds(fileId, at);
+    }
     /**
      * Job＝file id（與 SW 同）。Page 現況一頁一個 activeJobId（政策可改）。
      * Play vs download purpose is chosen by the Page（URL `?purpose=`／open session），not job id.
@@ -1037,9 +1058,21 @@ export function createRoomFileTransfer(
       typeof msg.end === "number" && Number.isFinite(msg.end)
         ? Math.floor(msg.end)
         : undefined;
+    /**
+     * Play: never request EOF on an open-ended Range (Chromium often sends
+     * `bytes=N-`). Cap like Safari blob-media so scrub can retarget quickly.
+     */
+    const playCapEnd =
+      purpose === "play"
+        ? Math.min(
+            entry.size - 1,
+            at + SESSION_FILE_PLAY_MEDIA_BLOB_MAX - 1,
+            endInclusive ?? at + SESSION_FILE_PLAY_MEDIA_BLOB_MAX - 1
+          )
+        : endInclusive;
     const expectBytes =
-      endInclusive !== undefined && endInclusive >= at
-        ? Math.min(entry.size - at, endInclusive - at + 1)
+      playCapEnd !== undefined && playCapEnd >= at
+        ? Math.min(entry.size - at, playCapEnd - at + 1)
         : Math.max(0, entry.size - at);
     if (expectBytes <= 0) {
       fileJobs.releaseTask(transferId);

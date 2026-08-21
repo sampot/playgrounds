@@ -22,6 +22,7 @@ import {
   type RoomFileWritable,
 } from "./goRoomFileTransfer";
 import { attachPlaybackUrl } from "./goRoom";
+import { ROOM_FILE_PREVIEW_VIDEO_PRELOAD } from "./goRoomFileShare";
 import {
   ensureRoomFileSw,
   listenRoomOpenTransfer,
@@ -747,7 +748,7 @@ export async function runImagePreviewScenario(
 }
 
 /**
- * ④ 私下播大影片 — **產品順序**：play() → attachPlaybackUrl(`<video preload=metadata>`)
+ * ④ 私下播大影片 — **產品順序**：play() → attachPlaybackUrl(`<video preload=auto>`)
  * → 仍掛著 video 時做頭尾並發／前後 scrub Range。
  *
  * 若 `<video>` 佔滿同 origin 連線（約 6 路），後續 Range 會 `Failed to fetch`——
@@ -784,7 +785,7 @@ export async function runVideoPrivatePlayScenario(
   video.setAttribute("playsinline", "");
   video.setAttribute("webkit-playsinline", "");
   /** Same as GoRoomSurface private play. */
-  video.preload = "metadata";
+  video.preload = ROOM_FILE_PREVIEW_VIDEO_PRELOAD;
   video.muted = true;
   let attached = false;
   try {

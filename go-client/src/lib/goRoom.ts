@@ -1182,6 +1182,11 @@ function applyPlaybackMute(el: PlaybackEl): void {
   el.setAttribute?.("muted", "");
 }
 
+function applyPlaybackInline(el: PlaybackEl): void {
+  el.setAttribute?.("playsinline", "");
+  el.setAttribute?.("webkit-playsinline", "");
+}
+
 function assignPlaybackSrc(el: PlaybackEl, url: string): void {
   /** Prefer the relative `/room-file/<id>` attribute; IDL `.src` may resolve. */
   el.setAttribute?.("src", url);
@@ -1215,6 +1220,8 @@ export function attachPlaybackUrl(
   }
   /** Mute before src so Safari autoplay is allowed; do not remute on re-bind. */
   if (opts?.muted) applyPlaybackMute(el);
+  /** Inline before src so iOS does not steal the node into the native player. */
+  applyPlaybackInline(el);
   const hadSrc = Boolean(current);
   assignPlaybackSrc(el, url);
   /** First assign: setting src already loads. A second load() aborts Safari's first Range. */

@@ -20,7 +20,10 @@ describe("catalogConsumes", () => {
     expect(
       catalogTransferHint({ status: "transferring", playing: false })
     ).toBe("傳送中");
-    expect(catalogTransferHint({ status: "listed", playing: true })).toBeNull();
+    expect(catalogTransferHint({ status: "listed", playing: true })).toBe(
+      "播放中"
+    );
+    expect(catalogTransferHint({ status: "listed", playing: false })).toBeNull();
   });
 
   it("does not treat a camera or mic as a catalog item", () => {

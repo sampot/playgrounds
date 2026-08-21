@@ -107,14 +107,18 @@
     GO_ROOM_FILE_FILTERS,
     GO_ROOM_FILE_FILTER_LABEL,
     GO_ROOM_FILE_ON_AIR,
-    GO_ROOM_FILE_PREVIEW,
+    ROOM_FILE_PREVIEW_VIDEO_PRELOAD,
     fileShareIcon,
     fileShareKind,
     formatFileShareSize,
+    roomFileDownloadDisabled,
     roomFileDownloadMode,
     roomFileOnAir,
+    roomFilePreviewMountsMedia,
+    roomFilePreviewShouldAttachUrl,
     roomFileShareActions,
     roomFileShareMatches,
+    roomFileShareOpenLabel,
     roomFileShareProgress,
     type RoomFileShareFilter,
   } from "$lib/goRoomFileShare";
@@ -208,7 +212,6 @@
   let shareHang = $state({ done: 0, total: 0 });
   let previewOpen = $state(false);
   let previewId = $state<string | null>(null);
-  let previewDialog = $state<HTMLDialogElement | null>(null);
   let overlayDialog = $state<HTMLDialogElement | null>(null);
   let deleteFileId = $state<string | null>(null);
   let now = $state(Date.now());
@@ -264,11 +267,6 @@
     previewFile
       ? fileShareKind({ mime: previewFile.mime, name: previewFile.name })
       : "doc"
-  );
-  const previewPlayUrl = $derived(
-    previewOpen && goRoomFiles.playback && goRoomFiles.playback.id === previewId
-      ? goRoomFiles.playback.url
-      : undefined
   );
   const roster = $derived(
     roomOccupantRows({
@@ -748,12 +746,6 @@
   });
 
   $effect(() => {
-    const el = previewDialog;
-    if (!el) return;
-    if (previewOpen && !el.open) el.showModal();
-    if (!previewOpen && el.open) el.close();
-  });
-  $effect(() => {
     attachMediaStream(presenceVideoEl, goRoomMedia.presenceStream);
   });
   $effect(() => {
@@ -767,21 +759,15 @@
     void previewOpen;
     void tick().then(() => {
       if ((goRoomFiles.playback?.url ?? null) !== url) return;
-      if (!previewOpen) return;
+      if (!roomFilePreviewShouldAttachUrl({ open: previewOpen, url })) return;
       if (kind === "image") {
         const target = filePreviewImg ?? img;
         if (target) target.src = url ?? "";
         return;
       }
-      const bind = () =>
-        attachPlaybackUrl(filePlayEl ?? el, url, {
-          muted: kind === "video",
-        });
-      if (previewDialog && !previewDialog.open) {
-        void tick().then(bind);
-        return;
-      }
-      bind();
+      attachPlaybackUrl(filePlayEl ?? el, url, {
+        muted: kind === "video",
+      });
     });
   });
 
@@ -1011,9 +997,11 @@
   }
 
   function downloadButtonDisabled(status: string | undefined, id: string): boolean {
-    if (downloadSlotMode(status, id) === "cancel") return false;
-    if (pendingBrowserSaves.has(id)) return false;
-    return status === "transferring";
+    return roomFileDownloadDisabled({
+      status,
+      pendingSave: pendingBrowserSaves.has(id),
+      playing: goRoomFiles.playback?.id === id,
+    });
   }
 
   async function onToggleCamera() {
@@ -1080,6 +1068,7 @@
       goRoomFiles.stopPlay();
       return;
     }
+    await tick();
     const out = await goRoomFiles.play(id);
     if (!out.ok) fileError = out.error;
   }
@@ -1702,7 +1691,9 @@
                       disabled={f.status === "transferring" && goRoomFiles.playback?.id !== f.id}
                       onclick={() => void onPlayFile(f.id)}
                     >
-                      {GO_ROOM_FILE_PREVIEW}
+                      {roomFileShareOpenLabel(
+                        fileShareKind({ mime: f.mime, name: f.name })
+                      )}
                     </button>
                   {/if}
                   {#if acts.download}
@@ -1776,7 +1767,12 @@
                           disabled={!listed}
                           onclick={() => onSystemPreview(row.system.file!.id)}
                         >
-                          預覽
+                          {roomFileShareOpenLabel(
+                            fileShareKind({
+                              mime: listed?.mime,
+                              name: listed?.name ?? row.system.file.name,
+                            })
+                          )}
                         </button>
                       {/if}
                       {#if row.system.file.download}
@@ -2150,40 +2146,37 @@
     {/if}
   </dialog>
 
-  <dialog
-    bind:this={previewDialog}
-    class="confirm-dialog file-preview-dialog"
-    aria-labelledby="file-preview-title"
-    oncancel={(e) => {
-      e.preventDefault();
-      closePreview();
-    }}
-    onclick={(e) => {
-      if (e.target === previewDialog) closePreview();
-    }}
-  >
+  {#if previewOpen}
+    <div
+      class="file-preview-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="file-preview-title"
+      tabindex="-1"
+      onclick={(e) => {
+        if (e.currentTarget === e.target) closePreview();
+      }}
+    >
     <div class="confirm pixel-frame file-preview">
       <h2 id="file-preview-title" class="confirm-title">
-        {GO_ROOM_FILE_PREVIEW}
+        {roomFileShareOpenLabel(previewKind)}
         {#if previewFile}
           · {previewFile.name}
         {/if}
       </h2>
-      {#if previewKind === "image"}
-        {#if previewPlayUrl}
+      {#if previewKind === "image" && roomFilePreviewMountsMedia(previewKind)}
+        <div class="file-preview-player">
           <img
             bind:this={filePreviewImg}
             class="file-preview-img"
-            src={previewPlayUrl}
             alt={previewFile?.name ?? ""}
           />
-        {/if}
-      {:else if previewKind === "audio"}
-        {#if previewPlayUrl}
+        </div>
+      {:else if previewKind === "audio" && roomFilePreviewMountsMedia(previewKind)}
+        <div class="file-preview-player">
           <audio
             bind:this={filePlayEl}
             class="file-player-audio"
-            src={previewPlayUrl}
             controls
             preload="metadata"
             playsinline
@@ -2191,24 +2184,23 @@
             ontimeupdate={() => goRoomFiles.notePlayhead(filePlayEl?.currentTime ?? 0)}
             aria-label="播放 {previewFile?.name ?? ""}"
           ></audio>
-        {/if}
-      {:else if previewKind === "video"}
-        {#if previewPlayUrl}
+        </div>
+      {:else if previewKind === "video" && roomFilePreviewMountsMedia(previewKind)}
+        <div class="file-preview-player">
           <video
             bind:this={filePlayEl}
             class="media-video media-video--program"
-            src={previewPlayUrl}
             controls
             muted
-            preload="metadata"
+            preload={ROOM_FILE_PREVIEW_VIDEO_PRELOAD}
             playsinline
             webkit-playsinline
             ontimeupdate={() => goRoomFiles.notePlayhead(filePlayEl?.currentTime ?? 0)}
             aria-label="播放 {previewFile?.name ?? ""}"
           ></video>
-        {/if}
+        </div>
       {:else}
-        <p class="muted">這個檔在本機預覽不了，請下載查看。</p>
+        <p class="muted">這個檔在本機打不開，請到檔案區下載查看。</p>
       {/if}
       {#if fileError}
         <p class="err" role="alert">{fileError}</p>
@@ -2217,33 +2209,11 @@
         <p class="muted" role="status">{fileHint}</p>
       {/if}
       <div class="confirm-actions">
-        <button type="button" class="pixel-btn" onclick={() => closePreview()}>關閉</button>
-        {#if previewId}
-          <button
-            type="button"
-            class="pixel-btn pixel-btn--primary"
-            disabled={downloadButtonDisabled(
-              files.find((f) => f.id === previewId)?.status,
-              previewId
-            )}
-            onclick={() => {
-              const st = files.find((f) => f.id === previewId)?.status;
-              if (downloadSlotMode(st, previewId!) === "cancel") {
-                onCancelDownload(previewId!);
-                return;
-              }
-              void onDownload(previewId!);
-            }}
-          >
-            {downloadButtonLabel(
-              previewId,
-              files.find((f) => f.id === previewId)?.status
-            )}
-          </button>
-        {/if}
+        <button type="button" class="pixel-btn pixel-btn--primary" onclick={() => closePreview()}>關閉</button>
       </div>
     </div>
-  </dialog>
+    </div>
+  {/if}
 
   <dialog
     bind:this={confirmDialog}
@@ -2961,6 +2931,23 @@
   .file-actions .pixel-btn {
     min-height: 44px;
   }
+  .file-preview-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 0.75rem;
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+    background: color-mix(in oklab, rgb(var(--ink)) 45%, transparent);
+    box-sizing: border-box;
+  }
+  .file-preview-overlay .file-preview {
+    width: min(28rem, 100%);
+    max-height: min(90dvh, 40rem);
+    overflow: auto;
+  }
   .file-preview-img {
     display: block;
     width: 100%;
@@ -2968,9 +2955,30 @@
     object-fit: contain;
     background: #111;
   }
-  .file-preview .file-player-audio,
-  .file-preview .media-video--program {
+  .file-preview-player {
     width: 100%;
+    margin: 0 0 0.5rem;
+    background: #111;
+  }
+  .file-preview-player .file-player-audio,
+  .file-preview-player .media-video--program {
+    display: block;
+    width: 100%;
+    position: static;
+    z-index: auto;
+    transform: none;
+  }
+  .file-preview-player .media-video--program {
+    min-height: 10rem;
+    max-height: min(50dvh, 16rem);
+    aspect-ratio: 16 / 9;
+    object-fit: contain;
+    background: #000;
+  }
+  @media (min-width: 48rem) {
+    .file-preview-overlay {
+      align-items: center;
+    }
   }
   .file-hidden {
     position: absolute;

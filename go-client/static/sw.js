@@ -7,7 +7,7 @@
  * GO_SW_REV＝橋／room-play 邏輯；GO_SHELL_CACHE_REV＝殼 Cache 名。
  * 只改 room-play／canvas 時只 bump GO_SW_REV，勿清掉已暖好的離線殼。
  */
-const GO_SW_REV = 43;
+const GO_SW_REV = 44;
 /** Bump only when shell cache policy or cacheable path set changes. */
 const GO_SHELL_CACHE_REV = 26;
 const CANVAS_PREFIX = "/canvas/";
@@ -647,6 +647,16 @@ function mediaRangeForBufferedBody(range, size, maxBytes) {
     };
   }
   return { start: 0, end: Math.min(Math.max(0, size - 1), cap - 1) };
+}
+
+/** Play always slices; save keeps the client Range (see roomFileServeByteRange). */
+function roomFileServeByteRange(opts) {
+  const sizeHint =
+    opts.size > 0 ? opts.size : opts.range ? opts.range.end + 1 : 0;
+  if (opts.bodyKind === "blob-media" || opts.purpose === "play") {
+    return mediaRangeForBufferedBody(opts.range, sizeHint);
+  }
+  return opts.range;
 }
 
 function roomFileHttpBodyKind(opts) {
@@ -1435,11 +1445,13 @@ async function respondRoomPlay(id, request) {
     if (size > 0) headers["Content-Length"] = String(size);
     return new Response(null, { status: 200, headers });
   }
-  if (range || bodyKind === "blob-media") {
-    const servedRange =
-      bodyKind === "blob-media"
-        ? mediaRangeForBufferedBody(range, size > 0 ? size : (range ? range.end + 1 : 0))
-        : range;
+  if (range || bodyKind === "blob-media" || purpose === "play") {
+    const servedRange = roomFileServeByteRange({
+      range,
+      size: size > 0 ? size : range ? range.end + 1 : 0,
+      purpose,
+      bodyKind,
+    });
     if (!servedRange) {
       return new Response(null, {
         status: 416,

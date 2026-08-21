@@ -1285,12 +1285,17 @@ describe("createRoomFileTransfer", () => {
       offset: 40 * 1024 * 1024,
       transferId: "sw-tr-2",
     });
+    /** Far scrub cancels the old open-ended Range so DC follows the seek. */
     expect(
-      json.filter((m) => (m as { op?: string }).op === "cancel")
-    ).toHaveLength(0);
+      json.some(
+        (m) =>
+          (m as { op?: string; transferId?: string }).op === "cancel" &&
+          (m as { transferId?: string }).transferId === "sw-tr-1"
+      )
+    ).toBe(true);
   });
 
-  it("accepts a third concurrent play Range without cancelling prior ones", async () => {
+  it("keeps near concurrent play Ranges; far scrub cancels the old one", async () => {
     const json: unknown[] = [];
     let n = 0;
     const sink = createPlayByteWindow({ mime: "video/mp4" });
@@ -1324,9 +1329,12 @@ describe("createRoomFileTransfer", () => {
       guest.acceptHttpTransfer({
         fileId: "big",
         transferId: "sw-tr-2",
-        offset: 40 * 1024 * 1024,
+        offset: 512 * 1024,
       }).ok
     ).toBe(true);
+    expect(
+      json.filter((m) => (m as { op?: string }).op === "cancel")
+    ).toHaveLength(0);
     expect(
       guest.acceptHttpTransfer({
         fileId: "big",
@@ -1334,11 +1342,15 @@ describe("createRoomFileTransfer", () => {
         offset: 80 * 1024 * 1024,
       }).ok
     ).toBe(true);
-    const requests = json.filter((m) => (m as { op?: string }).op === "request");
-    expect(requests).toHaveLength(3);
     expect(
-      json.filter((m) => (m as { op?: string }).op === "cancel")
-    ).toHaveLength(0);
+      json.some(
+        (m) =>
+          (m as { op?: string; transferId?: string }).op === "cancel" &&
+          ((m as { transferId?: string }).transferId === "sw-tr-1" ||
+            (m as { transferId?: string }).transferId === "sw-tr-2")
+      )
+    ).toBe(true);
+    expect(guest.inboundSnaps().map((s) => s.transferId)).toEqual(["sw-tr-3"]);
   });
 
   it("rejects an eleventh concurrent play Range when the job has 10 tasks", async () => {
@@ -1362,19 +1374,20 @@ describe("createRoomFileTransfer", () => {
       owner: "h",
     });
     expect((await guest.play("big")).ok).toBe(true);
+    /** Near offsets stay admitted together (within SEEK_SLACK). */
     for (let i = 1; i <= 10; i++) {
       expect(
         guest.acceptHttpTransfer({
           fileId: "big",
           transferId: `sw-tr-${i}`,
-          offset: (i - 1) * 10 * 1024 * 1024,
+          offset: (i - 1) * 64 * 1024,
         }).ok
       ).toBe(true);
     }
     const eleventh = guest.acceptHttpTransfer({
       fileId: "big",
       transferId: "sw-tr-11",
-      offset: 100 * 1024 * 1024,
+      offset: 10 * 64 * 1024,
     });
     expect(eleventh.ok).toBe(false);
     if (!eleventh.ok) expect(eleventh.error).toMatch(/同一檔案最多 10/);
@@ -1505,7 +1518,7 @@ describe("createRoomFileTransfer", () => {
         guest.acceptHttpTransfer({
           fileId: "big",
           transferId: `sw-tr-${i}`,
-          offset: (i - 1) * 10 * 1024 * 1024,
+          offset: (i - 1) * 64 * 1024,
         }).ok
       ).toBe(true);
     }
@@ -1513,7 +1526,7 @@ describe("createRoomFileTransfer", () => {
       guest.acceptHttpTransfer({
         fileId: "big",
         transferId: "sw-tr-11",
-        offset: 100 * 1024 * 1024,
+        offset: 10 * 64 * 1024,
       }).ok
     ).toBe(false);
     expect(rejected).toEqual([
@@ -1956,6 +1969,53 @@ describe("createRoomFileTransfer", () => {
     expect(requests[1]).toMatchObject({
       offset: 40 * 1024 * 1024,
       transferId: "sw-tr-2",
+    });
+    /** Far seek must cancel the old Range so DC is not stuck pumping EOF. */
+    expect(
+      json.some(
+        (m) =>
+          (m as { op?: string; transferId?: string }).op === "cancel" &&
+          (m as { transferId?: string }).transferId === "sw-tr-1"
+      )
+    ).toBe(true);
+    expect(
+      guest.inboundSnaps().every((s) => s.transferId !== "sw-tr-1")
+    ).toBe(true);
+    expect(guest.inboundSnaps().map((s) => s.transferId)).toEqual(["sw-tr-2"]);
+  });
+
+  it("caps an open-ended play Range so Chromium does not request the rest of the file", async () => {
+    const json: unknown[] = [];
+    const guest = createRoomFileTransfer({
+      localAgentId: "g",
+      localName: "訪客",
+      sendJson: (m) => json.push(m),
+      sendBinary: () => {},
+      createPlaySink: () => createPlayByteWindow({ mime: "video/mp4" }),
+    });
+    guest.onControl({
+      type: SESSION_FILE_TYPE,
+      v: 1,
+      op: "share",
+      id: "big",
+      name: "movie.mp4",
+      size: 80 * 1024 * 1024,
+      mime: "video/mp4",
+      owner: "h",
+    });
+    expect((await guest.play("big")).ok).toBe(true);
+    expect(
+      guest.acceptHttpTransfer({
+        fileId: "big",
+        transferId: "sw-open",
+        offset: 10 * 1024 * 1024,
+      }).ok
+    ).toBe(true);
+    expect(json[0]).toMatchObject({
+      op: "request",
+      transferId: "sw-open",
+      offset: 10 * 1024 * 1024,
+      length: 2 * 1024 * 1024,
     });
   });
 

@@ -60,6 +60,32 @@ export function roomFileShareMatches(
   return kind === "doc" || kind === "image";
 }
 
+/**
+ * Keep the preview media node in the tree for the whole overlay session.
+ * Gating `<video>` on playback.url remounts it after the layer is already
+ * open — Safari then drops the compositor layer / first Range.
+ */
+export function roomFilePreviewMountsMedia(kind: FileShareKind): boolean {
+  return kind === "video" || kind === "audio" || kind === "image";
+}
+
+/**
+ * Bind `/room-file` only when the overlay is open *and* the URL exists.
+ * Do not clear src while waiting for SW open — that aborts Safari's Range.
+ */
+export function roomFilePreviewShouldAttachUrl(opts: {
+  open: boolean;
+  url: string | null | undefined;
+}): boolean {
+  return Boolean(opts.open && opts.url);
+}
+
+/**
+ * Muted autoplay starts the play Range immediately. `metadata` makes Safari
+ * abort a probe GET, then often give up on the remote `/room-file` body.
+ */
+export const ROOM_FILE_PREVIEW_VIDEO_PRELOAD = "auto" as const;
+
 export function roomFileShareActions(opts: {
   role: "host" | "guest";
   mine: boolean;
@@ -119,4 +145,32 @@ export function roomFileDownloadMode(opts: {
   if (opts.pendingSave) return "save";
   if (opts.status === "transferring" && !opts.playing) return "cancel";
   return "download";
+}
+
+/**
+ * Download stays disabled for the whole private-play session — seek Range
+ * churn must not re-enable it (status may briefly leave transferring).
+ */
+export function roomFileDownloadDisabled(opts: {
+  status?: string;
+  pendingSave?: boolean;
+  playing?: boolean;
+}): boolean {
+  const mode = roomFileDownloadMode(opts);
+  if (mode === "cancel") return false;
+  if (opts.pendingSave) return false;
+  if (opts.playing) return true;
+  return opts.status === "transferring";
+}
+
+export const GO_ROOM_FILE_VIEW = "檢視";
+export const GO_ROOM_FILE_PLAY = "播放";
+export const GO_ROOM_FILE_LISTEN = "收聽";
+
+/** File-row open action: 檢視 image／播放 video／收聽 audio. */
+export function roomFileShareOpenLabel(kind: FileShareKind): string {
+  if (kind === "image") return GO_ROOM_FILE_VIEW;
+  if (kind === "audio") return GO_ROOM_FILE_LISTEN;
+  if (kind === "video") return GO_ROOM_FILE_PLAY;
+  return GO_ROOM_FILE_PREVIEW;
 }

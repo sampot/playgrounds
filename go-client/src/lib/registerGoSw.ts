@@ -3,7 +3,7 @@
 import { isGoCanvasSwUsable } from "./goCanvasSupport";
 
 /** Bump with go-client/static/sw.js GO_SW_REV so phones pick up bridge fixes. */
-export const GO_SW_URL = "/sw.js?v=43";
+export const GO_SW_URL = "/sw.js?v=44";
 
 /**
  * Dev helper: drop controlling SW + go shell caches (manual／tests).

@@ -15,6 +15,7 @@ import {
   roomFileHttpBodyKind,
   roomFileMethodAllowed,
   roomFilePath,
+  roomFileServeByteRange,
   roomPlayPath,
   SESSION_FILE_PLAY_MEDIA_BLOB_MAX,
 } from "./goRoomPlayRegistry";
@@ -352,6 +353,30 @@ describe("createRoomPlayRegistry", () => {
         local: true,
       })
     ).toBe("blob-local");
+  });
+
+  it("caps Chromium play stream Ranges like Safari so scrub does not pin DC to EOF", () => {
+    const openEnded = { start: 40 * 1024 * 1024, end: 80 * 1024 * 1024 - 1 };
+    const size = 80 * 1024 * 1024;
+    expect(
+      roomFileServeByteRange({
+        range: openEnded,
+        size,
+        purpose: "play",
+        bodyKind: "stream",
+      })
+    ).toEqual({
+      start: 40 * 1024 * 1024,
+      end: 40 * 1024 * 1024 + SESSION_FILE_PLAY_MEDIA_BLOB_MAX - 1,
+    });
+    expect(
+      roomFileServeByteRange({
+        range: openEnded,
+        size,
+        purpose: "save",
+        bodyKind: "stream",
+      })
+    ).toEqual(openEnded);
   });
 
   it("serves a registered local File without DC spans (full GET + Range)", async () => {
