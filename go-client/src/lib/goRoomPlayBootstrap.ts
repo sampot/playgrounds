@@ -10,12 +10,21 @@ import {
   type GoCatalogEntry,
   type HostableProtocol,
 } from "./goCatalog";
-import { resolveGoSamFiles } from "./goSamResolve";
+import {
+  resolveGoSamFiles,
+  type GoSamUpdatePolicy,
+} from "./goSamResolve";
 import { goLoadProgressFromFiles } from "./goLoadProgress";
 import { mountGoCanvas, type MountedGoCanvas } from "./mountGoCanvas";
 import type { HostRuntime } from "./hostRuntime";
 import { createHostRuntime } from "./hostRuntime";
 import { handleGoFunctionsApi } from "./goFunctionsRuntime";
+
+/**
+ * Booth play must tip-check — `local-first` can mount a stale offline pack
+ * missing newer modules（e.g. shellSurface.js）and break `pg_surface=room`.
+ */
+export const ROOM_PLAY_SAM_UPDATE_POLICY: GoSamUpdatePolicy = "check-tip";
 
 export type RoomPlaySamBundle = {
   catalogId: string;
@@ -39,7 +48,8 @@ export async function loadRoomPlaySam(opts: {
   if (!source) throw new Error("小品缺少來源");
   const resolved = await resolveGoSamFiles({
     source,
-    updatePolicy: "local-first",
+    catalogId,
+    updatePolicy: ROOM_PLAY_SAM_UPDATE_POLICY,
     onProgress: (p) => {
       opts.onProgress?.(goLoadProgressFromFiles(p));
     },
