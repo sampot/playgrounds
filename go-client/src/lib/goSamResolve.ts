@@ -3,7 +3,8 @@
  *
  * Policies:
  * - `local-first`（`/s/`）：有同 source 離線包即重用；tip 同步僅經「更新遊戲」。
- * - `check-tip`（Invite Guest）：入座前比 GitHub tree SHA；沒包或 tipRev 過期才重抓。
+ * - `check-tip`（Invite／包廂開局）：入座前拉 raw `sam-manifest.json` 的 `rev`
+ *   （**不**呼叫 `api.github.com`／Trees）；沒包或 tipRev 過期才重抓。
  */
 
 import type { FileMap } from "@pg/projectTypes";
@@ -137,7 +138,8 @@ export async function resolveGoSamFiles(
     }
   }
 
-  // check-tip（Invite）：先讀 tip；本機 tipRev 相符才跳過全量下載。
+  // check-tip：先讀 raw sam-manifest `rev`；本機 tipRev 相符才跳過全量下載。
+  // （fetchSamTipRev → fetchGithubSamTipRev；禁止 Trees／api.github.com）
   let tipRev: string | null = null;
   try {
     tipRev = await fetchSamTipRev(source, { signal: opts.signal });

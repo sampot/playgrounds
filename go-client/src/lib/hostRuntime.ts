@@ -48,6 +48,7 @@ import { composeWantsRelay } from "@pg/platform/platformCompose";
 import { goAuth } from "./goAuth.svelte";
 import { chromeSession } from "./chromeSession.svelte";
 import { goSessionChat } from "./goSessionChat.svelte";
+import { buildHostSessionPresenceBody } from "./hostSessionPresence";
 import { publishGoMemoryBroadcast } from "./goMemoryCanvas";
 import type { FileMap } from "@pg/projectTypes";
 import type { HostableProtocol } from "./goCatalog";
@@ -124,6 +125,8 @@ export type HostRuntimeDeps = {
     path: string,
     init?: { method?: string; headers?: Record<string, string>; body?: string }
   ) => Promise<unknown>;
+  /** Booth／compose host label for SAM seat names（optional）. */
+  getHostDisplayName?: () => string | null | undefined;
 };
 
 /** Host role default when the protocol doesn't declare one. */
@@ -165,6 +168,7 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
   let loop: ReturnType<typeof startPlatformHostAnswerLoop> | null = null;
   let inviteExpiryTimer: ReturnType<typeof setTimeout> | null = null;
   const localAgentId = `go-host-${crypto.randomUUID().slice(0, 8)}`;
+  /** peerId that already received seat_bound（booth reuses one inviteId）. */
   const seatBoundSent = new Set<string>();
   const sessionInviteSent = new Set<string>();
   /** peerAgentId → session (one DataChannel per connected Guest). */
@@ -408,8 +412,8 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
       );
       return;
     }
-    if (seatBoundSent.has(payload.inviteId)) return;
-    seatBoundSent.add(payload.inviteId);
+    if (seatBoundSent.has(fromPeerId)) return;
+    seatBoundSent.add(fromPeerId);
     const role = payload.role?.trim() || guestRoles[0] || "player";
     const seatId = `seat-${crypto.randomUUID().slice(0, 8)}`;
     const displayName =
@@ -451,7 +455,15 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
       await hostSessionFetch("/api/session/presence", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ playerSeated: true, seats: status.seats }),
+        body: JSON.stringify(
+          buildHostSessionPresenceBody({
+            hostRole,
+            hostDisplayName:
+              deps.getHostDisplayName?.() || SESSION_CHAT_HOST_DISPLAY_NAME,
+            seats: status.seats,
+            playerSeated: true,
+          })
+        ),
       });
     } catch {
       /* presence is best-effort */
@@ -495,16 +507,16 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
       void close({ message, reason: "opponent_left" });
       return;
     }
-    const removedInviteIds = new Set(
+    const removedPeerIds = new Set(
       status.seats
         .filter(s => (peerId ? s.peerId === peerId : false))
-        .map(s => s.inviteId)
+        .map(s => s.peerId)
     );
     if (peerId) {
       peerSessions.delete(peerId);
       sessionInviteSent.delete(peerId);
     }
-    for (const inviteId of removedInviteIds) seatBoundSent.delete(inviteId);
+    for (const id of removedPeerIds) seatBoundSent.delete(id);
     const seats = peerId
       ? status.seats.filter(s => s.peerId !== peerId)
       : status.seats;
@@ -537,10 +549,15 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
       void hostSessionFetch("/api/session/presence", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          playerSeated: seats.length > 0,
-          seats,
-        }),
+        body: JSON.stringify(
+          buildHostSessionPresenceBody({
+            hostRole,
+            hostDisplayName:
+              deps.getHostDisplayName?.() || SESSION_CHAT_HOST_DISPLAY_NAME,
+            seats,
+            playerSeated: seats.length > 0,
+          })
+        ),
       }).catch(() => {
         /* presence is best-effort */
       });
@@ -1040,9 +1057,11 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
         slot.lost = true;
         slot.session = null;
       }
-      const removed = status.seats.filter((s) => s.peerId === id);
-      for (const s of removed) seatBoundSent.delete(s.inviteId);
-      if (removed.length) {
+      const removedPeerIds = new Set(
+        status.seats.filter((s) => s.peerId === id).map((s) => s.peerId)
+      );
+      for (const pid of removedPeerIds) seatBoundSent.delete(pid);
+      if (removedPeerIds.size) {
         set({ seats: status.seats.filter((s) => s.peerId !== id) });
       }
     },

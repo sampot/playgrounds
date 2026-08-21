@@ -54,11 +54,13 @@ import {
   createRoomPlayHostRuntime,
   loadRoomPlaySam,
   mountRoomPlayHostCanvas,
+  roomPlaySamCheckProgress,
 } from "./goRoomPlayBootstrap";
 import {
   getGoCatalogEntry,
   hostableProtocolFor,
 } from "./goCatalog";
+import type { GoLoadProgress } from "./goLoadProgress";
 import type { HostRuntime } from "./hostRuntime";
 import type { MountedGoCanvas } from "./mountGoCanvas";
 import type { FileMap } from "@pg/projectTypes";
@@ -99,6 +101,8 @@ export type RoomStatus = {
   occupantPeers: { peerId: string; name: string }[];
   /** Booth play canvas (TV slot); null when idle. */
   playCatalogId: string | null;
+  /** Tip-check／auto-update while mounting booth play SAM. */
+  playLoadProgress: GoLoadProgress | null;
   playCanvasUrl: string | null;
   playCanvasSrcdoc: string | null;
   playCanvasMode: "sw" | "memory" | null;
@@ -144,6 +148,7 @@ export function createRoomRuntime(opts?: {
     occupantNames: [],
     occupantPeers: [],
     playCatalogId: null,
+    playLoadProgress: null,
     playCanvasUrl: null,
     playCanvasSrcdoc: null,
     playCanvasMode: null,
@@ -193,6 +198,7 @@ export function createRoomRuntime(opts?: {
     playHost = null;
     set({
       playCatalogId: null,
+      playLoadProgress: null,
       playCanvasUrl: null,
       playCanvasSrcdoc: null,
       playCanvasMode: null,
@@ -840,7 +846,17 @@ export function createRoomRuntime(opts?: {
   ): Promise<void> {
     const seq = ++playBootstrapSeq;
     try {
-      const bundle = await loadRoomPlaySam({ catalogId });
+      set({
+        playCatalogId: catalogId,
+        playLoadProgress: roomPlaySamCheckProgress(),
+      });
+      const bundle = await loadRoomPlaySam({
+        catalogId,
+        onProgress: (playLoadProgress) => {
+          if (seq !== playBootstrapSeq) return;
+          set({ playLoadProgress });
+        },
+      });
       if (seq !== playBootstrapSeq) return;
       playFiles = bundle.files;
       playGeneration += 1;
@@ -868,6 +884,7 @@ export function createRoomRuntime(opts?: {
       }
       set({
         playCatalogId: catalogId,
+        playLoadProgress: null,
         playCanvasUrl: playCanvas.canvasUrl,
         playCanvasSrcdoc: playCanvas.canvasSrcdoc,
         playCanvasMode: playCanvas.canvasMode,
@@ -911,7 +928,10 @@ export function createRoomRuntime(opts?: {
     void goRoomMedia.stopProgram();
     fanoutPlay(out.message);
     // Hide house ad immediately（不等 SAM 載完）.
-    set({ playCatalogId: input.catalogId });
+    set({
+      playCatalogId: input.catalogId,
+      playLoadProgress: roomPlaySamCheckProgress(),
+    });
     void bootstrapPlayHost(input.catalogId, input.seats);
     return { ok: true, state: out.state };
   }
@@ -1038,6 +1058,7 @@ export function createRoomRuntime(opts?: {
       occupantNames: [],
       occupantPeers: [],
       playCatalogId: null,
+      playLoadProgress: null,
       playCanvasUrl: null,
       playCanvasSrcdoc: null,
       playCanvasMode: null,

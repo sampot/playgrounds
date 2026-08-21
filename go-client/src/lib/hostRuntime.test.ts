@@ -605,6 +605,123 @@ describe("hostRuntime room-play peer reuse", () => {
     rt.dispose();
   });
 
+  it("binds every guest when booth play reuses one inviteId across seats", async () => {
+    const invokeHostSession = vi.fn(async (path: string) => {
+      if (path.includes("/open")) return { ok: true };
+      return { ok: true };
+    });
+    const sendA = vi.fn();
+    const sendB = vi.fn();
+    const rt = createHostRuntime({
+      getFiles: () => ({ "index.html": "<html></html>" }) as FileMap,
+      getSandboxId: () => "go-sb-room-multi",
+      protocol: {
+        protocolId: "redpick.v1",
+        apiVersion: "1",
+        roles: ["host", "p2", "p3", "p4"],
+      },
+      invokeHostSession,
+    });
+    await rt.open();
+    const peerA = {
+      send: sendA,
+      close: vi.fn(),
+      getChannel: () => ({ readyState: "open" as const, send: vi.fn() }),
+      pc: { addEventListener: vi.fn() },
+    };
+    const peerB = {
+      send: sendB,
+      close: vi.fn(),
+      getChannel: () => ({ readyState: "open" as const, send: vi.fn() }),
+      pc: { addEventListener: vi.fn() },
+    };
+    rt.attachExistingPeer({
+      peerId: "g-a",
+      session: peerA as never,
+      displayName: "甲",
+    });
+    rt.attachExistingPeer({
+      peerId: "g-b",
+      session: peerB as never,
+      displayName: "乙",
+    });
+    const out = rt.inviteRoomPlayPeers({
+      seats: [
+        { role: "host", peerId: "host-local" },
+        { role: "p2", peerId: "g-a" },
+        { role: "p3", peerId: "g-b" },
+      ],
+    });
+    expect(out.sent).toBe(2);
+
+    rt.handleAvatarRelay(
+      {
+        type: "avatar_relay",
+        from: "g-a",
+        payload: {
+          kind: "session_invite_accept",
+          inviteId: out.inviteId,
+          sessionId: rt.getStatus().sessionId,
+          role: "p2",
+          homeSandboxId: "guest-a",
+        },
+      },
+      "g-a"
+    );
+    rt.handleAvatarRelay(
+      {
+        type: "avatar_relay",
+        from: "g-b",
+        payload: {
+          kind: "session_invite_accept",
+          inviteId: out.inviteId,
+          sessionId: rt.getStatus().sessionId,
+          role: "p3",
+          homeSandboxId: "guest-b",
+        },
+      },
+      "g-b"
+    );
+    await vi.waitFor(() => {
+      expect(rt.getStatus().seats.map((s) => s.peerId).sort()).toEqual([
+        "g-a",
+        "g-b",
+      ]);
+    });
+    expect(sendA).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: "g-a",
+        payload: expect.objectContaining({ kind: "session_seat_bound" }),
+      })
+    );
+    expect(sendB).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: "g-b",
+        payload: expect.objectContaining({ kind: "session_seat_bound" }),
+      })
+    );
+    const presenceCalls = invokeHostSession.mock.calls.filter((c) =>
+      String(c[0]).includes("/presence")
+    );
+    expect(presenceCalls.length).toBeGreaterThanOrEqual(2);
+    const lastPresenceBody = JSON.parse(
+      String(presenceCalls[presenceCalls.length - 1]?.[1]?.body || "{}")
+    ) as {
+      seatedRoles: string[];
+      seats: { role: string; displayName?: string }[];
+    };
+    expect(lastPresenceBody.seatedRoles).toEqual(
+      expect.arrayContaining(["host", "p2", "p3"])
+    );
+    expect(lastPresenceBody.seats).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ role: "p2", displayName: "甲" }),
+        expect.objectContaining({ role: "p3", displayName: "乙" }),
+      ])
+    );
+    rt.dispose();
+  });
+
   it("enableKeepPeersOnClose makes close() keep PeerConnections", async () => {
     const invokeHostSession = vi.fn(async (path: string) => {
       if (path.includes("/open")) return { ok: true };

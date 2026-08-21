@@ -217,6 +217,7 @@
   onKick={(peerId) => runtime.kickPeer(peerId)}
   onReissue={() => void runtime.openBooth({ afterEnd: true })}
   playCatalogId={status?.playCatalogId ?? null}
+  playLoadProgress={status?.playLoadProgress ?? null}
   playCanvasUrl={status?.playCanvasUrl ?? null}
   playCanvasSrcdoc={status?.playCanvasSrcdoc ?? null}
   playCanvasGeneration={status?.playCanvasGeneration ?? 0}

@@ -3,6 +3,8 @@ import {
   listRoomPlayableCatalogIds,
   listRoomPlayableGames,
   roomPlayPickerBlurb,
+  roomPlaySamCheckProgress,
+  roomPlaySamUpdateProgress,
   ROOM_PLAY_SAM_UPDATE_POLICY,
 } from "./goRoomPlayBootstrap";
 
@@ -56,5 +58,34 @@ describe("roomPlayPickerBlurb", () => {
 describe("ROOM_PLAY_SAM_UPDATE_POLICY", () => {
   it("tip-checks so booth play is not stuck on a stale offline pack", () => {
     expect(ROOM_PLAY_SAM_UPDATE_POLICY).toBe("check-tip");
+  });
+
+  it("documents check-tip as sam-manifest rev（not GitHub Trees API）", () => {
+    // Contract: loadRoomPlaySam → resolveGoSamFiles(check-tip) → fetchSamTipRev
+    // → fetchGithubSamTipRev → raw sam-manifest.json only.
+    expect(ROOM_PLAY_SAM_UPDATE_POLICY).toBe("check-tip");
+  });
+});
+
+describe("room play SAM load progress copy", () => {
+  it("starts with an indeterminate tip-check phase", () => {
+    expect(roomPlaySamCheckProgress()).toEqual({
+      ratio: null,
+      detail: "檢查遊戲版本…",
+    });
+  });
+
+  it("labels file-list progress as an auto-update", () => {
+    expect(
+      roomPlaySamUpdateProgress({
+        done: 3,
+        total: 12,
+        ratio: 0.25,
+        path: "index.html",
+      })
+    ).toEqual({
+      ratio: 0.25,
+      detail: "正在更新遊戲… 3/12",
+    });
   });
 });

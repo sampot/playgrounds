@@ -133,11 +133,13 @@ describe("fetchGithubProjectFromManifest", () => {
 });
 
 describe("fetchGithubSamTipRev", () => {
-  it("returns manifest rev from raw", async () => {
+  it("returns manifest rev from raw only (no api.github.com)", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo) => {
       const url = String(input);
+      expect(url).toContain("raw.githubusercontent.com");
       expect(url).toContain("/refs/heads/main/sam-manifest.json");
       expect(url).not.toMatch(/\/pg-gomoku\/main\/sam-manifest/);
+      expect(url).not.toContain("api.github.com");
       return new Response(
         JSON.stringify({
           version: 1,
@@ -152,6 +154,15 @@ describe("fetchGithubSamTipRev", () => {
     await expect(
       fetchGithubSamTipRev({ owner: "sampot", repo: "pg-gomoku" })
     ).resolves.toBe("tip-rev");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(
+      fetchMock.mock.calls.every(
+        (c) => !String(c[0]).includes("api.github.com")
+      )
+    ).toBe(true);
+    expect(
+      fetchMock.mock.calls.every((c) => !String(c[0]).includes("/git/trees/"))
+    ).toBe(true);
     vi.unstubAllGlobals();
   });
 });

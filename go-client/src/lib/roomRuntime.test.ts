@@ -71,6 +71,10 @@ vi.mock("./goRoomPlayBootstrap", () => ({
   createRoomPlayHostRuntime: vi.fn(),
   mountRoomPlayHostCanvas: vi.fn(),
   listRoomPlayableCatalogIds: () => ["pg-gomoku"],
+  roomPlaySamCheckProgress: () => ({
+    ratio: null,
+    detail: "檢查遊戲版本…",
+  }),
 }));
 
 function mockSession() {
@@ -581,6 +585,8 @@ describe("roomRuntime", () => {
       ],
     });
     expect(out.ok).toBe(true);
+    expect(rt.getStatus().playCatalogId).toBe("pg-gomoku");
+    expect(rt.getStatus().playLoadProgress?.detail).toMatch(/檢查遊戲版本/);
     expect(goRoomMedia.stopProgram).toHaveBeenCalled();
     expect(fixtures.mint).toHaveBeenCalledTimes(1);
     expect(a.send).toHaveBeenCalledWith(

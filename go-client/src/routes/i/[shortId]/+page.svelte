@@ -15,7 +15,11 @@
     goInviteCanonicalUrl,
     goOgMeta,
   } from "$lib/goShareMeta";
-  import { composeSamSource, isRoomInvite } from "@pg/platform/platformCompose";
+  import {
+    composeSamSource,
+    isRoomInvite,
+  } from "@pg/platform/platformCompose";
+  import { guestInviteShowsRoomSurface } from "$lib/goGuestInviteUi";
   import GoRoomSurface from "$lib/GoRoomSurface.svelte";
   import GoRoomDevProbe from "$lib/GoRoomDevProbe.svelte";
   import {
@@ -105,6 +109,13 @@
   const showCanvas = $derived(
     status?.phase === "ready" &&
       (Boolean(status.canvasUrl) || Boolean(status.canvasSrcdoc))
+  );
+
+  const showRoomSurface = $derived(
+    guestInviteShowsRoomSurface({
+      isRoom,
+      phase: status?.phase ?? "",
+    })
   );
 
   function onMemoryFrameLoad(ev: Event) {
@@ -397,10 +408,10 @@
     </div>
   </div>
   {/if}
-{:else if isRoom && (status.phase === "connecting" || status.phase === "ready")}
+{:else if showRoomSurface && status}
   <GoRoomSurface
     role="guest"
-    phase={status.phase === "ready" ? "ready" : "connecting"}
+    phase={status.phase === "connecting" ? "connecting" : "ready"}
     message={status.message}
     error={status.error}
     shortUrl={null}
@@ -411,6 +422,7 @@
     directPeerIds={status.directPeerIds ?? []}
     onEnd={() => runtime.leaveRoom()}
     playCatalogId={status.playCatalogId ?? null}
+    playLoadProgress={status.playLoadProgress ?? null}
     playCanvasUrl={status.playCanvasUrl ?? null}
     playCanvasSrcdoc={status.playCanvasSrcdoc ?? null}
     playCanvasGeneration={status.playCanvasGeneration ?? 0}

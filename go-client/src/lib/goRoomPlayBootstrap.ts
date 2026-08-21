@@ -12,30 +12,58 @@ import {
 } from "./goCatalog";
 import {
   resolveGoSamFiles,
+  type GoSamResolveOrigin,
   type GoSamUpdatePolicy,
 } from "./goSamResolve";
-import { goLoadProgressFromFiles } from "./goLoadProgress";
+import {
+  goLoadProgressFromFiles,
+  type GoLoadProgress,
+} from "./goLoadProgress";
+import type { FileListProgress } from "@pg/transferProgress";
 import { mountGoCanvas, type MountedGoCanvas } from "./mountGoCanvas";
 import type { HostRuntime } from "./hostRuntime";
 import { createHostRuntime } from "./hostRuntime";
 import { handleGoFunctionsApi } from "./goFunctionsRuntime";
+import { goAuth } from "./goAuth.svelte";
+import { roomHostDisplayName } from "./goRoom";
 
 /**
- * Booth play must tip-check — `local-first` can mount a stale offline pack
- * missing newer modules（e.g. shellSurface.js）and break `pg_surface=room`.
+ * Booth play must tip-check via raw `sam-manifest.json` `rev`
+ * （`fetchSamTipRev` → `fetchGithubSamTipRev`；**不**走 `api.github.com`／Trees）.
+ * `local-first` can mount a stale offline pack missing newer modules
+ * （e.g. shellSurface.js）and break `pg_surface=room`.
  */
 export const ROOM_PLAY_SAM_UPDATE_POLICY: GoSamUpdatePolicy = "check-tip";
+
+/** Indeterminate bar while tipRev is compared to the offline pack. */
+export function roomPlaySamCheckProgress(): GoLoadProgress {
+  return { ratio: null, detail: "檢查遊戲版本…" };
+}
+
+/** Determinate／indeterminate bar while a newer tip is downloaded. */
+export function roomPlaySamUpdateProgress(
+  p: FileListProgress
+): GoLoadProgress {
+  const base = goLoadProgressFromFiles(p);
+  return {
+    ratio: base.ratio,
+    detail: base.detail
+      ? `正在更新遊戲… ${base.detail}`
+      : "正在更新遊戲…",
+  };
+}
 
 export type RoomPlaySamBundle = {
   catalogId: string;
   entry: GoCatalogEntry;
   protocol: HostableProtocol;
   files: FileMap;
+  origin: GoSamResolveOrigin;
 };
 
 export async function loadRoomPlaySam(opts: {
   catalogId: string;
-  onProgress?: (p: { ratio: number | null; detail: string }) => void;
+  onProgress?: (p: GoLoadProgress) => void;
 }): Promise<RoomPlaySamBundle> {
   const catalogId = opts.catalogId.trim();
   const entry = getGoCatalogEntry(catalogId);
@@ -46,12 +74,13 @@ export async function loadRoomPlaySam(opts: {
   }
   const source = entry.source?.trim();
   if (!source) throw new Error("小品缺少來源");
+  opts.onProgress?.(roomPlaySamCheckProgress());
   const resolved = await resolveGoSamFiles({
     source,
     catalogId,
     updatePolicy: ROOM_PLAY_SAM_UPDATE_POLICY,
     onProgress: (p) => {
-      opts.onProgress?.(goLoadProgressFromFiles(p));
+      opts.onProgress?.(roomPlaySamUpdateProgress(p));
     },
   });
   return {
@@ -59,6 +88,7 @@ export async function loadRoomPlaySam(opts: {
     entry,
     protocol,
     files: resolved.files,
+    origin: resolved.origin,
   };
 }
 
@@ -85,6 +115,7 @@ export function createRoomPlayHostRuntime(opts: {
     getFiles,
     getSandboxId,
     protocol: bundle.protocol,
+    getHostDisplayName: () => roomHostDisplayName(goAuth.profile),
     async invokeHostSession(
       path: string,
       init?: {

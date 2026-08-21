@@ -372,6 +372,11 @@ class GoAuth {
     if (!key) this.#turnPrefer = false;
   }
 
+  /** Test seam: inject profile label for Host display name. */
+  __setProfileForTests(profile: GoProfile | null): void {
+    this.profile = profile;
+  }
+
   /** Test seam: set Host turn_prefer without field/me. */
   __setTurnPreferForTests(prefer: boolean): void {
     this.#turnPrefer = prefer;

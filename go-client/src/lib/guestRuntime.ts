@@ -72,7 +72,7 @@ import {
   type RoomSessionPlayController,
   type RoomSessionPlayState,
 } from "./goRoomSessionPlay";
-import { loadRoomPlaySam } from "./goRoomPlayBootstrap";
+import { loadRoomPlaySam, roomPlaySamCheckProgress } from "./goRoomPlayBootstrap";
 import { mountGoCanvas, type MountedGoCanvas } from "./mountGoCanvas";
 import { hostableProtocolFor, getGoCatalogEntry } from "./goCatalog";
 import {
@@ -149,6 +149,8 @@ export type GuestStatus = {
   directPeerIds: string[];
   /** Booth play canvas in TV slot. */
   playCatalogId: string | null;
+  /** Tip-check／auto-update while mounting booth play SAM. */
+  playLoadProgress: GoLoadProgress | null;
   playCanvasUrl: string | null;
   playCanvasSrcdoc: string | null;
   playCanvasMode: GuestCanvasMode | null;
@@ -198,6 +200,7 @@ export function createGuestRuntime() {
     occupantPeers: [],
     directPeerIds: [],
     playCatalogId: null,
+    playLoadProgress: null,
     playCanvasUrl: null,
     playCanvasSrcdoc: null,
     playCanvasMode: null,
@@ -337,6 +340,7 @@ export function createGuestRuntime() {
       canvasSrcdoc: null,
       canvasMode: null,
       playCatalogId: null,
+      playLoadProgress: null,
       playCanvasUrl: null,
       playCanvasSrcdoc: null,
       playCanvasMode: null,
@@ -424,6 +428,7 @@ export function createGuestRuntime() {
       canvasMode = null;
       set({
         playCatalogId: null,
+        playLoadProgress: null,
         playCanvasUrl: null,
         playCanvasSrcdoc: null,
         playCanvasMode: null,
@@ -463,7 +468,22 @@ export function createGuestRuntime() {
     const seq = ++playBootstrapSeq;
     const seatedRole = sessionPlay?.seatRoleFor(localAgentId) ?? null;
     try {
-      const bundle = await loadRoomPlaySam({ catalogId });
+      set({
+        playCatalogId: catalogId,
+        playLoadProgress: roomPlaySamCheckProgress(),
+        message: "檢查遊戲版本…",
+        error: null,
+      });
+      const bundle = await loadRoomPlaySam({
+        catalogId,
+        onProgress: (playLoadProgress) => {
+          if (seq !== playBootstrapSeq) return;
+          set({
+            playLoadProgress,
+            message: playLoadProgress.detail,
+          });
+        },
+      });
       if (seq !== playBootstrapSeq) return;
       const entry = getGoCatalogEntry(catalogId);
       const protocol = hostableProtocolFor(entry ?? null);
@@ -484,6 +504,7 @@ export function createGuestRuntime() {
       accepted = false;
       set({
         playCatalogId: catalogId,
+        playLoadProgress: null,
         playCanvasUrl: playCanvas.canvasUrl,
         playCanvasSrcdoc: playCanvas.canvasSrcdoc,
         playCanvasMode: playCanvas.canvasMode,
@@ -504,6 +525,7 @@ export function createGuestRuntime() {
       set({
         error: friendlySamDownloadError(e),
         message: "",
+        playLoadProgress: null,
       });
     }
   }
@@ -511,7 +533,14 @@ export function createGuestRuntime() {
   async function acceptInvite(peerId: string): Promise<void> {
     const invite = pendingInvite;
     if (!invite || !sandboxId) return;
-    set({ phase: "seating", message: "正在入座…", error: null });
+    const booth = status.surface === "room";
+    // Booth: stay on GoRoomSurface（phase ready）— TV already holds the game.
+    // Compose invite: full-page seating chrome is OK.
+    if (!booth) {
+      set({ phase: "seating", message: "正在入座…", error: null });
+    } else {
+      set({ error: null });
+    }
     try {
       sendAvatarRelay(
         {
@@ -525,7 +554,9 @@ export function createGuestRuntime() {
       );
       homeSandboxByInvite.set(invite.inviteId, sandboxId);
       pendingInvite = null;
-      set({ phase: "seating", message: "已接受入座，等待座位確認…" });
+      if (!booth) {
+        set({ phase: "seating", message: "已接受入座，等待座位確認…" });
+      }
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       sendAvatarRelay(
@@ -562,9 +593,11 @@ export function createGuestRuntime() {
     if (isSessionInvitePayload(payload)) {
       pendingInvite = payload;
       if (!peerAgentId) peerAgentId = msg.from;
-      set({
-        message: `收到入座邀請（${payload.protocol.protocolId}）`,
-      });
+      if (status.surface !== "room") {
+        set({
+          message: `收到入座邀請（${payload.protocol.protocolId}）`,
+        });
+      }
       tryAutoAccept(msg.from);
       return;
     }
@@ -586,16 +619,21 @@ export function createGuestRuntime() {
       activePlaySeatId = binding.seatId;
       registerSessionBridge(binding.seatId, homeId, bridge);
       tunnelChannelBySession.set(binding.sessionId, binding.channelName);
-      set({
-        phase: "seating",
-        message: "已入座 — 正在進入對玩…",
-        error: null,
-      });
+      const booth = status.surface === "room";
+      if (!booth) {
+        set({
+          phase: "seating",
+          message: "已入座 — 正在進入對玩…",
+          error: null,
+        });
+      } else {
+        set({ error: null });
+      }
       void remountCanvasAfterSeat()
         .then(partial => {
           set({
             phase: "ready",
-            message: "已入座 — 等待主持開始",
+            message: booth ? "" : "已入座 — 等待主持開始",
             error: null,
             ...(partial || {}),
           });
@@ -916,7 +954,10 @@ export function createGuestRuntime() {
             } else if (isSessionPlayMessage(data)) {
               const applied = sessionPlay?.applyRemote(data);
               if (applied?.ok && data.op === "offer") {
-                set({ playCatalogId: data.catalogId });
+                set({
+                  playCatalogId: data.catalogId,
+                  playLoadProgress: roomPlaySamCheckProgress(),
+                });
                 void bootstrapGuestPlay(data.catalogId);
               } else if (data.op === "end") {
                 endRoomPlayOnly();
@@ -1313,6 +1354,7 @@ export function createGuestRuntime() {
       surface: "room",
       directPeerIds: [],
       playCatalogId: null,
+      playLoadProgress: null,
       playCanvasUrl: null,
       playCanvasSrcdoc: null,
       playCanvasMode: null,
@@ -1373,6 +1415,8 @@ export function createGuestRuntime() {
         getChannel: () => null,
         pc: { addEventListener: noop },
       } as never;
+      sandboxId = "go-guest-test";
+      composeProtocolId = "gomoku.v1";
       set({
         phase: "ready",
         surface: "room",
@@ -1392,6 +1436,10 @@ export function createGuestRuntime() {
     },
     __testOnChannelClose() {
       markHostEnded("主持已結束連線");
+    },
+    /** @internal Vitest */
+    __testLocalAgentId(): string {
+      return localAgentId;
     },
     /** @internal Vitest — apply room session_play without WebRTC. */
     __testApplySessionPlay(raw: unknown) {

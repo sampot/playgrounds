@@ -21,7 +21,9 @@
   import GoRoomMemberCard from "$lib/GoRoomMemberCard.svelte";
   import GoRoomFileCard from "$lib/GoRoomFileCard.svelte";
   import GoRoomPlayPicker from "$lib/GoRoomPlayPicker.svelte";
+  import GoSamLoadBar from "$lib/GoSamLoadBar.svelte";
   import { listRoomPlayableGames } from "$lib/goRoomPlayBootstrap";
+  import type { GoLoadProgress } from "$lib/goLoadProgress";
   import { goAuth } from "$lib/goAuth.svelte";
   import { roomAdClickAction } from "$lib/goAds";
   import { chromeSession } from "$lib/chromeSession.svelte";
@@ -182,6 +184,7 @@
     onReissue?: () => void;
     onKick?: (peerId: string) => void;
     playCatalogId?: string | null;
+    playLoadProgress?: GoLoadProgress | null;
     playCanvasUrl?: string | null;
     playCanvasSrcdoc?: string | null;
     playCanvasGeneration?: number;
@@ -209,6 +212,7 @@
     onReissue,
     onKick,
     playCatalogId = null,
+    playLoadProgress = null,
     playCanvasUrl = null,
     playCanvasSrcdoc = null,
     playCanvasGeneration = 0,
@@ -1527,6 +1531,17 @@
             </div>
           {/if}
         </div>
+      {:else if playLoadProgress}
+        <div
+          class="room-tv-gate room-tv-gate--play-load"
+          role="status"
+          aria-labelledby="room-play-load-title"
+        >
+          <p id="room-play-load-title" class="room-tv-gate-title pixel-text">
+            準備遊戲
+          </p>
+          <GoSamLoadBar progress={playLoadProgress} label="遊戲更新進度" />
+        </div>
       {:else if showAd}
         <div class="room-ad">
           <GoAdSlot onNavigate={onAdNavigate} />
@@ -1717,7 +1732,11 @@
                 {doorRow.action}
               </button>
             </div>
-            {#if playCatalogId}
+            {#if playLoadProgress}
+              <div class="door-row">
+                <p class="muted door-row-label">{playLoadProgress.detail}</p>
+              </div>
+            {:else if playCatalogId}
               <div class="door-row">
                 <p class="muted door-row-label">正在玩遊戲</p>
                 <button
@@ -2659,6 +2678,12 @@
   .room-tv-gate-hint {
     margin: 0;
     color: color-mix(in oklab, #f4efe4 88%, transparent);
+  }
+  .room-tv-gate--play-load {
+    gap: 0.75rem;
+  }
+  .room-tv-gate--play-load :global(.go-load-bar) {
+    width: min(100%, 18rem);
   }
   @container (min-width: 28rem) {
     .room-tv-gate {

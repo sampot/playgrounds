@@ -85,4 +85,45 @@ describe("guestRuntime host-ended notification", () => {
     expect(status.error).toBeNull();
     expect(status.playCatalogId).toBeNull();
   });
+
+  it("in booth, auto-accept play seat keeps phase ready (TV stays mounted)", () => {
+    const runtime = createGuestRuntime();
+    runtime.__testMarkRoomReady();
+    runtime.__testSetRoomHostPeer("host-1");
+    const localId = runtime.__testLocalAgentId();
+    const applied = runtime.__testApplySessionPlay({
+      type: "session_play",
+      v: 1,
+      op: "offer",
+      from: "host-1",
+      catalogId: "pg-gomoku",
+      seats: [
+        { role: "host", peerId: "host-1" },
+        { role: "player", peerId: localId },
+      ],
+    });
+    expect(applied.ok).toBe(true);
+    expect(runtime.getPlayState().seats.some((s) => s.peerId === localId)).toBe(
+      true
+    );
+
+    runtime.__testOnRelay({
+      type: "avatar_relay",
+      from: "host-1",
+      payload: {
+        kind: "session_invite",
+        inviteId: "play-inv-1",
+        sessionId: "sess-play-1",
+        role: "player",
+        protocol: {
+          protocolId: "gomoku.v1",
+          apiVersion: "1",
+          roles: ["host", "player"],
+        },
+      },
+    });
+    expect(runtime.getStatus().phase).toBe("ready");
+    expect(runtime.getStatus().surface).toBe("room");
+    expect(runtime.getStatus().playCanvasUrl).toBeTruthy();
+  });
 });

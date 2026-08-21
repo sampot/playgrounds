@@ -199,15 +199,48 @@ describe("createGoHostBinding — listSeats", () => {
     const rt = makeRuntime();
     const binding = createGoHostBinding({ getHostRuntime: () => rt });
     const seats = await binding.listSeats();
-    expect(seats).toEqual([
-      {
-        seatId: "host",
-        role: "host",
-        kind: "human",
-        sandboxId: null,
-        paused: false,
-      },
-    ]);
+    expect(seats).toHaveLength(1);
+    expect(seats[0]).toMatchObject({
+      seatId: "host",
+      role: "host",
+      kind: "human",
+      sandboxId: null,
+      paused: false,
+    });
+    expect(typeof (seats[0] as { name?: string }).name).toBe("string");
+    expect((seats[0] as { name?: string }).name!.length).toBeGreaterThan(0);
+  });
+
+  it("puts host display name and guest names on listSeats for the SAM", async () => {
+    goAuth.__setProfileForTests({
+      user_id: "u-test",
+      role: "user",
+      label: "主持測試",
+      avatar_url: null,
+      default_field_url: "https://play.samkuo.me",
+    });
+    const rt = makeRuntime({
+      seats: [
+        {
+          seatId: "seat-1",
+          role: "p2",
+          peerId: "peer-1",
+          inviteId: "inv-1",
+          displayName: "G1",
+        },
+      ],
+    });
+    const binding = createGoHostBinding({ getHostRuntime: () => rt });
+    const seats = await binding.listSeats();
+    expect(seats[0]).toMatchObject({
+      seatId: "host",
+      name: "主持測試",
+    });
+    expect(seats[1]).toMatchObject({
+      role: "p2",
+      name: "G1",
+    });
+    goAuth.__setProfileForTests(null);
   });
 
   it("appends guest seats with their peerId as sandboxId", async () => {

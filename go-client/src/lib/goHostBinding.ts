@@ -38,6 +38,7 @@ import { HostBridgeError } from "@pg/hostBridge";
 import { composeWantsRelay } from "@pg/platform/platformCompose";
 import type { HostRuntime } from "./hostRuntime";
 import { goAuth } from "./goAuth.svelte";
+import { roomHostDisplayName } from "./goRoom";
 import { emitGoShellPlatformEvent } from "./goShellPlatform";
 
 export interface GoHostBindingDeps {
@@ -252,6 +253,7 @@ export function createGoHostBinding(deps: GoHostBindingDeps): GoHostBinding {
       const rt = deps.getHostRuntime();
       if (!rt) return [];
       const status = rt.getStatus();
+      const hostName = roomHostDisplayName(goAuth.profile) || undefined;
       // Host seat (self) — match the field shell `listSeats` contract:
       // `kind: "human"`, `sandboxId: null` for the local Host.
       const hostSeat = {
@@ -260,6 +262,7 @@ export function createGoHostBinding(deps: GoHostBindingDeps): GoHostBinding {
         kind: "human" as const,
         sandboxId: null,
         paused: false,
+        ...(hostName ? { name: hostName } : {}),
       };
       const guestSeats = status.seats.map(s => ({
         seatId: s.seatId,
