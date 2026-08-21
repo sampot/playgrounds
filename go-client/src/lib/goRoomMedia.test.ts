@@ -418,6 +418,42 @@ describe("createRoomMedia", () => {
     });
   });
 
+  it("casts a private OPFS file with scope private and no share resolve", async () => {
+    const video = track("video", "prog-v");
+    const file = new File([new Uint8Array(4)], "secret.mp4", {
+      type: "video/mp4",
+    });
+    const json: unknown[] = [];
+    const resolveLocal = vi.fn(() => null);
+    const media = createRoomMedia({
+      localAgentId: "host",
+      occupantCount: () => 2,
+      peers: () => [{ peerId: "g-a", pc: mockPc(), via: "entrance" }],
+      sendJson: (m) => json.push(m),
+      resolveLocalFile: resolveLocal,
+      resolvePrivateFile: async (id) => (id === "pvt_aabb" ? file : null),
+      captureProgram: async () => ({
+        audio: null,
+        video,
+        stop: vi.fn(),
+      }),
+    });
+    expect((await media.startPrivateProgram("pvt_aabb")).ok).toBe(true);
+    expect(media.getState().streamingFileId).toBe("pvt_aabb");
+    expect(media.getState().programScope).toBe("private");
+    expect(resolveLocal).not.toHaveBeenCalled();
+    expect(json).toContainEqual({
+      type: SESSION_CAST_TYPE,
+      v: 1,
+      op: "offer",
+      from: "host",
+      kind: "video",
+      name: "secret.mp4",
+      id: "pvt_aabb",
+      scope: "private",
+    });
+  });
+
   it("warms owner decode from /room-file/<id>, not an object URL", async () => {
     const file = new File([new Uint8Array(4)], "MTV.mp4", { type: "video/mp4" });
     const media = createRoomMedia({

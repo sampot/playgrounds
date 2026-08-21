@@ -84,6 +84,8 @@ export type RoomMediaState = {
   tvSourcePeerId: string | null;
   /** Catalog file currently on the TV (local capture or remote offer id). */
   streamingFileId: string | null;
+  /** share｜private when a file is on the TV; null for live／off. */
+  programScope: "share" | "private" | null;
 };
 
 export type RoomMediaResult =
@@ -164,6 +166,8 @@ export type RoomMedia = {
   disableMic(): Promise<void>;
   startProgram(file: File): Promise<RoomMediaResult>;
   startListedProgram(id: string): Promise<RoomMediaResult>;
+  /** Host OPFS private library — offer with scope:private; never /room-file. */
+  startPrivateProgram(id: string): Promise<RoomMediaResult>;
   stopProgram(): Promise<void>;
   pauseProgram(): void;
   playProgram(): void;
@@ -238,6 +242,8 @@ export function createRoomMedia(opts: {
   getDisplayMedia?: (c?: DisplayMediaStreamOptions) => Promise<MediaStream>;
   captureProgram?: (file: File) => Promise<CapturedProgram | null>;
   resolveLocalFile?: (id: string) => File | null;
+  /** Async resolve for Host private OPFS ids (`pvt_…`). */
+  resolvePrivateFile?: (id: string) => Promise<File | null>;
   ownerOf?: (id: string) => string | null;
   fileMeta?: (id: string) => { name: string; kind: "audio" | "video" } | null;
 }): RoomMedia {
@@ -278,6 +284,8 @@ export function createRoomMedia(opts: {
   let remoteMicOffered = false;
   let listening = false;
   let watchingProgram = false;
+  let streamingFileId: string | null = null;
+  let programScope: "share" | "private" | null = null;
   const cameraWatchers = new Set<string>();
   const micListeners = new Set<string>();
   const programWatchers = new Set<string>();
@@ -495,6 +503,7 @@ export function createRoomMedia(opts: {
       streamingFileId: programFromLive
         ? null
         : streamingFileId || remoteProgramFileId,
+      programScope: programFromLive ? null : programScope,
     };
   }
 
@@ -675,6 +684,7 @@ export function createRoomMedia(opts: {
     watchingProgram = false;
     clearRemoteProgramClock();
     streamingFileId = null;
+    programScope = null;
     revokeOwnerDecode();
     await push();
     emit();
@@ -708,6 +718,7 @@ export function createRoomMedia(opts: {
         name: programName ?? remoteProgramName ?? "節目",
         id: streamingFileId ?? remoteProgramFileId ?? undefined,
         fromPeer: owner,
+        scope: programScope === "private" ? "private" : undefined,
       })
     );
   }
@@ -813,6 +824,7 @@ export function createRoomMedia(opts: {
     remoteProgramFrom = null;
     watchingProgram = false;
     if (nameHint?.trim()) programName = nameHint.trim();
+    programScope = "share";
     markAll(programWatchers);
     await push();
     publishProgramClock();
@@ -863,7 +875,6 @@ export function createRoomMedia(opts: {
     }
   }
 
-  let streamingFileId: string | null = null;
   let ownerDecodeUrl: string | null = null;
   let ownerDecodeKind: "audio" | "video" | null = null;
   let ownerDecodeEl: HTMLMediaElement | null = null;
@@ -897,14 +908,15 @@ export function createRoomMedia(opts: {
   async function captureLocalFile(
     file: File,
     quiet = false,
-    fileId?: string
+    fileId?: string,
+    via: "http" | "blob" = fileId ? "http" : "blob"
   ): Promise<RoomMediaResult> {
     const capture =
       opts.captureProgram ??
       ((f: File) =>
-        fileId
+        via === "http" && fileId
           ? captureProgramFromHttp(roomFilePath(fileId, { purpose: "play" }), f)
-          : Promise.resolve(null));
+          : captureProgramFromBlob(f));
     const next = await capture(file);
     const castErr = goRoomCastCaptureError();
     if (!next || (!next.audio && !next.video)) {
@@ -1121,6 +1133,7 @@ export function createRoomMedia(opts: {
       const out = await captureLocalFile(file);
       if (!out.ok) return out;
       streamingFileId = null;
+      programScope = null;
       markAll(programWatchers);
       offerProgram();
       await push();
@@ -1132,6 +1145,7 @@ export function createRoomMedia(opts: {
       if (local) {
         const out = await ensureCaptured(id);
         if (!out.ok) return out;
+        programScope = "share";
         markAll(programWatchers);
         offerProgram();
         await push();
@@ -1144,7 +1158,26 @@ export function createRoomMedia(opts: {
         emit();
         return { ok: false, error: GO_ROOM_CAST_UNSUPPORTED };
       }
-      return offerRemoteListedProgram(id, owner);
+      const remote = await offerRemoteListedProgram(id, owner);
+      if (remote.ok) programScope = "share";
+      return remote;
+    },
+    async startPrivateProgram(id) {
+      const file = (await opts.resolvePrivateFile?.(id)) ?? null;
+      if (!file) {
+        error = GO_ROOM_CAST_UNSUPPORTED;
+        emit();
+        return { ok: false, error: GO_ROOM_CAST_UNSUPPORTED };
+      }
+      const out = await captureLocalFile(file, false, id, "blob");
+      if (!out.ok) return out;
+      streamingFileId = id;
+      programScope = "private";
+      markAll(programWatchers);
+      offerProgram();
+      await push();
+      emit();
+      return { ok: true };
     },
     pauseProgram() {
       if (program?.pause) {
@@ -1223,6 +1256,7 @@ export function createRoomMedia(opts: {
       remoteProgramName = null;
       remoteProgramKind = null;
       streamingFileId = null;
+      programScope = null;
       error = null;
       markAll(programWatchers);
       offerProgram();
@@ -1524,7 +1558,9 @@ export function createRoomMedia(opts: {
       if (data.op === "offer") {
         const fileId = data.id?.trim() || "";
         const fromPeer = data.fromPeer?.trim() || "";
+        const privateOffer = data.scope === "private";
         const iAmSource =
+          !privateOffer &&
           Boolean(fileId) &&
           (fromPeer === opts.localAgentId ||
             (!fromPeer && Boolean(opts.resolveLocalFile?.(fileId)))) &&
@@ -1533,7 +1569,7 @@ export function createRoomMedia(opts: {
           await becomeListedProgramSource(fileId, data.name);
           return;
         }
-        if (fromPeer === opts.localAgentId && fileId) {
+        if (!privateOffer && fromPeer === opts.localAgentId && fileId) {
           opts.sendJson(
             buildSessionCastMessage({
               op: "reject",
@@ -1548,6 +1584,8 @@ export function createRoomMedia(opts: {
         remoteProgramKind = data.kind ?? "video";
         remoteProgramFileId = fileId || null;
         remoteProgramFrom = fromPeer || data.from;
+        if (privateOffer) programScope = "private";
+        else if (fileId) programScope = "share";
         emit();
         if (!watchingProgram) void this.watchProgram();
         if (opts.forward) {
@@ -1561,6 +1599,7 @@ export function createRoomMedia(opts: {
           program.stop();
           program = null;
           streamingFileId = null;
+          programScope = null;
           programName = null;
           revokeOwnerDecode();
           await push();
@@ -1620,6 +1659,7 @@ export function createRoomMedia(opts: {
         watchingProgram = false;
         if (streamingFileId === data.id || remoteProgramFileId === data.id) {
           streamingFileId = null;
+          programScope = null;
           programName = null;
           remoteProgramName = null;
           remoteProgramKind = null;
@@ -1699,6 +1739,7 @@ export function createRoomMedia(opts: {
       program = null;
       programName = null;
       streamingFileId = null;
+      programScope = null;
       revokeOwnerDecode();
       clearIngest();
       presenceMixer?.close();
@@ -1842,6 +1883,39 @@ function captureFromMediaElement(el: HTMLMediaElement): CapturedProgram | null {
         } catch {
           /* ignore */
         }
+      }
+    },
+  };
+}
+
+async function captureProgramFromBlob(
+  file: File
+): Promise<CapturedProgram | null> {
+  if (
+    typeof URL === "undefined" ||
+    typeof URL.createObjectURL !== "function"
+  ) {
+    return null;
+  }
+  const url = URL.createObjectURL(file);
+  const captured = await captureProgramFromHttp(url, file);
+  if (!captured) {
+    try {
+      URL.revokeObjectURL(url);
+    } catch {
+      /* ignore */
+    }
+    return null;
+  }
+  const innerStop = captured.stop.bind(captured);
+  return {
+    ...captured,
+    stop() {
+      innerStop();
+      try {
+        URL.revokeObjectURL(url);
+      } catch {
+        /* ignore */
       }
     },
   };

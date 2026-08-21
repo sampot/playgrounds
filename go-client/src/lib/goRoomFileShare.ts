@@ -17,6 +17,23 @@ export const GO_ROOM_FILE_DROP = "拖進來或點這裡掛上檔案";
 export const GO_ROOM_FILE_DELETE_CONFIRM =
   "撤回後在場的人看不到這個檔。已存到硬碟的不受影響。";
 
+export const GO_ROOM_FILE_ZONE = ["share", "private"] as const;
+export type RoomFileZone = (typeof GO_ROOM_FILE_ZONE)[number];
+
+export const GO_ROOM_FILE_ZONE_LABEL: Record<RoomFileZone, string> = {
+  share: "分享",
+  private: "私有",
+};
+
+export const GO_ROOM_PRIVATE_IMPORT = "匯入私有";
+export const GO_ROOM_PRIVATE_DROP = "拖進來或點這裡匯入私有檔";
+export const GO_ROOM_PRIVATE_MOUNT = "掛到分享";
+export const GO_ROOM_PRIVATE_DELETE = "刪除";
+export const GO_ROOM_PRIVATE_DELETE_CONFIRM =
+  "刪除後這台私有片庫裡就沒有這個檔。已掛到分享的不受影響。";
+export const GO_ROOM_PRIVATE_UNSUPPORTED_HINT =
+  "這台瀏覽器沒有私有片庫（需要 OPFS）。可改用分享區掛檔。";
+
 export const GO_ROOM_FILE_FILTERS = ["all", "av", "doc"] as const;
 export type RoomFileShareFilter = (typeof GO_ROOM_FILE_FILTERS)[number];
 
@@ -102,6 +119,25 @@ export function roomFileShareActions(opts: {
     preview: !opts.mine,
     cast: opts.role === "host" && av,
     remove: opts.mine || opts.role === "host",
+  };
+}
+
+/** Host-only private library row — no peer download／preview. */
+export function roomFilePrivateActions(opts: {
+  kind: FileShareKind;
+}): {
+  cast: boolean;
+  mount: boolean;
+  remove: boolean;
+  preview: boolean;
+} {
+  const av = opts.kind === "video" || opts.kind === "audio";
+  const image = opts.kind === "image";
+  return {
+    cast: av,
+    mount: true,
+    remove: true,
+    preview: av || image,
   };
 }
 

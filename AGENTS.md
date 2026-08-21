@@ -61,7 +61,7 @@ Reader-facing narrative stays personal／non-product (blog DEC-004).
 - `docs/PG-SVELTEKIT-PLAN.md` — 宿主 Astro→SvelteKit（Phase 1–6 landed）
 - `docs/PG-CATALOG-UX-PLAN.md` — 型錄人機 UX（Phase 2–5 landed）
 - `docs/PG-GO-CLIENT-PLAN.md` — 純玩版 Guest（DEC-050）
-- `docs/PG-GO-ROOM-PLAN.md` — 純玩版包廂 `/room`（Invite 一般用途隔間；Phase 1＝文字／傳檔）
+- `docs/PG-GO-ROOM-PLAN.md` — 純玩版包廂 `/room`（Invite 一般用途隔間；Phase 1＝文字／傳檔；主持私有 OPFS＝2g 契約凍）
 - `wrangler.jsonc` — single-site self-host (README Deploy to Cloudflare)
 - `wrangler.official.jsonc` — author field-net
 - `vercel.json` / `netlify.toml` — README one-click Vercel / Netlify

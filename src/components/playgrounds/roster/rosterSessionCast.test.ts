@@ -85,6 +85,40 @@ describe("session_cast", () => {
     ).toBe(false);
   });
 
+  it("accepts private scope on offer and rejects unknown scope", () => {
+    const privateOffer = buildSessionCastMessage({
+      op: "offer",
+      from: "host-1",
+      kind: "video",
+      name: "secret.mp4",
+      id: "pvt_abc",
+      scope: "private",
+    });
+    expect(isSessionCastMessage(privateOffer)).toBe(true);
+    expect(privateOffer.scope).toBe("private");
+    expect(
+      isSessionCastMessage(
+        buildSessionCastMessage({
+          op: "offer",
+          from: "host-1",
+          kind: "audio",
+          id: "file-1",
+          scope: "share",
+        })
+      )
+    ).toBe(true);
+    expect(
+      isSessionCastMessage({
+        type: SESSION_CAST_TYPE,
+        v: 1,
+        op: "offer",
+        from: "host-1",
+        kind: "video",
+        scope: "cloud",
+      })
+    ).toBe(false);
+  });
+
   it("rejects chat, missing from, start／stop, or an offer without kind", () => {
     expect(isSessionCastMessage({ type: "session_chat" })).toBe(false);
     expect(

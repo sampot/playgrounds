@@ -37,6 +37,7 @@ const EMPTY: RoomMediaState = {
   remoteLives: [],
   tvSourcePeerId: null,
   streamingFileId: null,
+  programScope: null,
 };
 
 class GoRoomMedia {
@@ -65,6 +66,7 @@ class GoRoomMedia {
   remoteLives = $state<{ peerId: string; camera: boolean; mic: boolean }[]>([]);
   tvSourcePeerId = $state<string | null>(null);
   streamingFileId = $state<string | null>(null);
+  programScope = $state<"share" | "private" | null>(null);
   #media: RoomMedia | null = null;
   #unsub: (() => void) | null = null;
 
@@ -75,6 +77,7 @@ class GoRoomMedia {
     sendJson: (msg: RoomMediaControl) => void;
     forward?: boolean;
     resolveLocalFile?: (id: string) => File | null;
+    resolvePrivateFile?: (id: string) => Promise<File | null>;
     ownerOf?: (id: string) => string | null;
     fileMeta?: (id: string) => { name: string; kind: "audio" | "video" } | null;
   }): void {
@@ -106,6 +109,7 @@ class GoRoomMedia {
       this.remoteLives = s.remoteLives;
       this.tvSourcePeerId = s.tvSourcePeerId;
       this.streamingFileId = s.streamingFileId;
+      this.programScope = s.programScope;
     });
   }
 
@@ -139,6 +143,7 @@ class GoRoomMedia {
     this.remoteLives = [];
     this.tvSourcePeerId = null;
     this.streamingFileId = null;
+    this.programScope = null;
   }
 
   enableCamera() {
@@ -206,6 +211,13 @@ class GoRoomMedia {
   startListedProgram(id: string) {
     return (
       this.#media?.startListedProgram(id) ??
+      Promise.resolve({ ok: false as const, error: "尚未連線" })
+    );
+  }
+
+  startPrivateProgram(id: string) {
+    return (
+      this.#media?.startPrivateProgram(id) ??
       Promise.resolve({ ok: false as const, error: "尚未連線" })
     );
   }

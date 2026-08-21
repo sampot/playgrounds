@@ -14,6 +14,8 @@ export type SessionCastOp =
   | "state"
   | "reject";
 export type SessionCastKind = "audio" | "video";
+/** Share catalog vs host-only OPFS library (PG-GO-ROOM-PLAN §5.5.1). */
+export type SessionCastScope = "share" | "private";
 
 export type SessionCastMessage = {
   type: typeof SESSION_CAST_TYPE;
@@ -31,6 +33,8 @@ export type SessionCastMessage = {
   fromPeer?: string;
   /** Reject／error copy for the director (e.g. Safari cannot be program source). */
   reason?: string;
+  /** Omit／share = 分享目錄；private = Host OPFS（不進 `/room-file`）. */
+  scope?: SessionCastScope;
 };
 
 const CAST_OPS = new Set<SessionCastOp>([
@@ -42,6 +46,7 @@ const CAST_OPS = new Set<SessionCastOp>([
   "reject",
 ]);
 const CAST_KINDS = new Set<SessionCastKind>(["audio", "video"]);
+const CAST_SCOPES = new Set<SessionCastScope>(["share", "private"]);
 const ID_MAX = 128;
 const NAME_MAX = 200;
 
@@ -82,6 +87,9 @@ export function isSessionCastMessage(data: unknown): data is SessionCastMessage 
   if (m.reason !== undefined) {
     if (typeof m.reason !== "string" || m.reason.length > NAME_MAX) return false;
   }
+  if (m.scope !== undefined && !CAST_SCOPES.has(m.scope as SessionCastScope)) {
+    return false;
+  }
   if (m.op === "offer") return Boolean(m.kind);
   return true;
 }
@@ -97,6 +105,7 @@ export function buildSessionCastMessage(opts: {
   id?: string;
   fromPeer?: string;
   reason?: string;
+  scope?: SessionCastScope;
 }): SessionCastMessage {
   const msg: SessionCastMessage = {
     type: SESSION_CAST_TYPE,
@@ -112,5 +121,6 @@ export function buildSessionCastMessage(opts: {
   if (opts.id) msg.id = opts.id;
   if (opts.fromPeer) msg.fromPeer = opts.fromPeer;
   if (opts.reason) msg.reason = opts.reason;
+  if (opts.scope) msg.scope = opts.scope;
   return msg;
 }

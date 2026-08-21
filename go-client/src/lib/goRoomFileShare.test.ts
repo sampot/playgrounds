@@ -21,6 +21,7 @@ import {
     roomFilePreviewMountsMedia,
     roomFilePreviewShouldAttachUrl,
     roomFileShareActions,
+    roomFilePrivateActions,
     roomFileShareMatches,
     roomFileShareOpenLabel,
     roomFileShareProgress,
@@ -108,6 +109,29 @@ describe("roomFileShareActions", () => {
       preview: true,
       cast: false,
       remove: true,
+    });
+  });
+});
+
+describe("roomFilePrivateActions", () => {
+  it("lets host cast mount remove preview; never download for peers", () => {
+    expect(roomFilePrivateActions({ kind: "video" })).toEqual({
+      cast: true,
+      mount: true,
+      remove: true,
+      preview: true,
+    });
+    expect(roomFilePrivateActions({ kind: "doc" })).toEqual({
+      cast: false,
+      mount: true,
+      remove: true,
+      preview: false,
+    });
+    expect(roomFilePrivateActions({ kind: "image" })).toEqual({
+      cast: false,
+      mount: true,
+      remove: true,
+      preview: true,
     });
   });
 });

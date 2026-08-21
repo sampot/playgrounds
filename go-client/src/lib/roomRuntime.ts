@@ -38,7 +38,9 @@ import { goAuth } from "./goAuth.svelte";
 import { chromeSession } from "./chromeSession.svelte";
 import { goSessionChat } from "./goSessionChat.svelte";
 import { goRoomFiles } from "./goRoomFiles.svelte";
+import { goRoomPrivateFiles } from "./goRoomPrivateFiles.svelte";
 import { goRoomMedia } from "./goRoomMedia.svelte";
+import { isRoomPrivateFileId } from "./goRoomPrivateOpfs";
 import { createRoomFileStarHub, type RoomFileStarHub } from "./goRoomFileStar";
 import {
   GO_ROOM_QUICK_REPLIES,
@@ -243,6 +245,7 @@ export function createRoomRuntime(opts?: {
       sendBinary: (buf) => hub.outboundBinary(buf),
       bufferedAmount: () => hub.requesterBufferedAmount(),
     });
+    goRoomPrivateFiles.attach();
     goRoomMedia.attach({
       localAgentId,
       occupantCount: () => liveGuestCount() + 1,
@@ -265,6 +268,10 @@ export function createRoomRuntime(opts?: {
       },
       forward: true,
       resolveLocalFile: (id) => goRoomFiles.localFile(id),
+      resolvePrivateFile: (id) =>
+        isRoomPrivateFileId(id)
+          ? goRoomPrivateFiles.getFile(id)
+          : Promise.resolve(null),
       ownerOf: (id) => goRoomFiles.listingOwner(id),
       fileMeta: (id) => goRoomFiles.listingMeta(id),
     });
@@ -686,6 +693,7 @@ export function createRoomRuntime(opts?: {
     loop = null;
     goSessionChat.detach();
     goRoomFiles.detach();
+    goRoomPrivateFiles.detach();
     goRoomMedia.detach();
     fileHub = null;
     surfaceAttached = false;
