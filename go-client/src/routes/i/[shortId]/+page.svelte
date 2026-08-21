@@ -19,6 +19,14 @@
   import GoRoomSurface from "$lib/GoRoomSurface.svelte";
   import GoRoomDevProbe from "$lib/GoRoomDevProbe.svelte";
   import {
+    GO_ROOM_CONNECTING_TITLE,
+    GO_ROOM_DOOR_ENTER,
+    GO_ROOM_DOOR_LEAD,
+    GO_ROOM_DOOR_NAME,
+    GO_ROOM_DOOR_TITLE,
+    GO_ROOM_GUEST_NAME_FALLBACK,
+  } from "$lib/goRoom";
+  import {
     likelyInAppBrowser,
   } from "$lib/goCanvasSupport";
   import { setGoMemoryCanvasWindow } from "$lib/goMemoryCanvas";
@@ -307,6 +315,48 @@
     </p>
   </div>
 {:else if status.phase === "consent"}
+  {#if isRoom}
+    <section class="door" aria-labelledby="door-title">
+      <div class="door-screen" aria-hidden="true">
+        <span class="door-snow"></span>
+        <span class="door-scan"></span>
+      </div>
+      <div class="door-card pixel-frame">
+        {#if inAppHint}
+          <p class="hint" role="note">
+            偵測到 App 內建瀏覽器。若加入後畫面不完整，請改用 Safari／Chrome 開啟本連結。
+          </p>
+        {/if}
+        <h1 id="door-title" class="pixel-text door-title">{GO_ROOM_DOOR_TITLE}</h1>
+        <p class="door-lead">{GO_ROOM_DOOR_LEAD}</p>
+        <label class="field">
+          <span>{GO_ROOM_DOOR_NAME}</span>
+          <input
+            class="pixel-input"
+            type="text"
+            maxlength="32"
+            bind:value={nameInput}
+            disabled={busy}
+            autocomplete="nickname"
+            placeholder={GO_ROOM_GUEST_NAME_FALLBACK}
+          />
+        </label>
+        <div class="actions">
+          <button
+            type="button"
+            class="pixel-btn pixel-btn--primary"
+            disabled={busy}
+            onclick={() => void onAccept()}
+          >
+            {busy ? GO_ROOM_CONNECTING_TITLE : GO_ROOM_DOOR_ENTER}
+          </button>
+          <button type="button" class="pixel-btn" disabled={busy} onclick={onDecline}>
+            取消
+          </button>
+        </div>
+      </div>
+    </section>
+  {:else}
   <h1 class="pixel-text">接受邀請</h1>
   <div class="pixel-frame invite-panel">
     {#if inAppHint}
@@ -315,9 +365,7 @@
       </p>
     {/if}
     <p class="lead">
-      {#if isRoom}
-        邀請你進這間包廂
-      {:else if inviteEntry?.title}
+      {#if inviteEntry?.title}
         邀請你玩「{inviteEntry.title}」
       {:else}
         有人邀請你加入這一場
@@ -341,13 +389,14 @@
         disabled={busy}
         onclick={() => void onAccept()}
       >
-        {busy ? "處理中…" : isRoom ? "進這間包廂" : "同意加入"}
+        {busy ? "處理中…" : "同意加入"}
       </button>
       <button type="button" class="pixel-btn" disabled={busy} onclick={onDecline}>
         取消
       </button>
     </div>
   </div>
+  {/if}
 {:else if isRoom && (status.phase === "connecting" || status.phase === "ready")}
   <GoRoomSurface
     role="guest"
@@ -425,6 +474,89 @@
 <style>
   .invite-panel {
     margin: 0 0 1rem;
+  }
+  .door {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    width: 100%;
+    max-width: 28rem;
+    margin: 0 auto 1rem;
+  }
+  .door-screen {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    max-height: 10.5rem;
+    overflow: hidden;
+    border: var(--pixel-edge) solid rgb(var(--ink));
+    border-radius: var(--radius);
+    background: #0a0a10;
+    box-shadow: var(--pixel-shadow);
+  }
+  .door-snow {
+    position: absolute;
+    inset: 0;
+    background:
+      repeating-linear-gradient(
+        0deg,
+        #1a1a22 0 1px,
+        #0c0c10 1px 3px
+      );
+    opacity: 0.9;
+  }
+  .door-scan {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 28%;
+    background: linear-gradient(
+      to bottom,
+      transparent,
+      color-mix(in oklab, rgb(var(--accent)) 28%, transparent),
+      transparent
+    );
+    animation: door-scan 2.4s linear infinite;
+    pointer-events: none;
+  }
+  @keyframes door-scan {
+    from {
+      transform: translateY(-120%);
+    }
+    to {
+      transform: translateY(420%);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .door-scan {
+      animation: none;
+      opacity: 0.35;
+      top: 36%;
+    }
+  }
+  .door-card {
+    margin: 0;
+    padding: 0.95rem 0.9rem 1rem;
+  }
+  .door-title {
+    margin: 0 0 0.45rem;
+    font-size: 1.05rem;
+    line-height: 1.3;
+  }
+  .door-lead {
+    margin: 0;
+    color: rgb(var(--muted));
+    font-size: 0.92rem;
+    line-height: 1.45;
+  }
+  .door .field {
+    margin: 0.85rem 0 0;
+  }
+  .door .actions {
+    margin: 0.85rem 0 0;
+  }
+  .door .pixel-btn {
+    min-height: 44px;
   }
   .field {
     display: flex;

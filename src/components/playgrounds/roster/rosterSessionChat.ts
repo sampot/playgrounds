@@ -229,13 +229,16 @@ export function parseSessionChatHintsMessage(
 
 /**
  * Best-effort: pull session status out of a domain event for shell uiPhase.
- * Supports `{ status }` or `{ state: { status } }`.
+ * Supports `{ status }` or `{ state: { status } }`, plus common match.* types.
  */
 export function sessionChatPhaseFromEvent(
   event: unknown
 ): SessionChatUiPhase | null {
   if (!event || typeof event !== "object") return null;
   const o = event as Record<string, unknown>;
+  const type = typeof o.type === "string" ? o.type : "";
+  if (type === "match.started" || type === "match.placed") return "active";
+  if (type === "match.closed" || type === "session.closed") return "ended";
   const state = o.state;
   const statusRaw =
     state && typeof state === "object"

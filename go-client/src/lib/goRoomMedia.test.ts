@@ -516,6 +516,68 @@ describe("createRoomMedia", () => {
     });
   });
 
+  it("keeps host TV on private local capture when a guest program receiver is unmuted", async () => {
+    class FakeStream {
+      constructor(public tracks: MediaStreamTrack[]) {}
+      getTracks() {
+        return this.tracks;
+      }
+    }
+    vi.stubGlobal("MediaStream", FakeStream);
+
+    const guestPc = mockPc();
+    const placeholder = track("video", "guest-placeholder");
+    Object.defineProperty(placeholder, "muted", {
+      value: false,
+      configurable: true,
+    });
+    guestPc.transceivers[3]!.receiver.track = placeholder as unknown as {
+      kind: string;
+      id: string;
+      readyState: "live" | "ended";
+    };
+
+    const localVideo = track("video", "private-local");
+    Object.defineProperty(localVideo, "muted", {
+      value: true,
+      configurable: true,
+    });
+    Object.defineProperty(localVideo, "getSettings", {
+      value: () => ({ width: 640, height: 360 }),
+      configurable: true,
+    });
+
+    const file = new File([new Uint8Array(4)], "secret.mp4", {
+      type: "video/mp4",
+    });
+    const media = createRoomMedia({
+      localAgentId: "host",
+      occupantCount: () => 2,
+      peers: () => [{ peerId: "g-a", pc: guestPc, via: "entrance" }],
+      sendJson: () => {},
+      resolvePrivateFile: async (id) => (id === "pvt_aabb" ? file : null),
+      captureProgram: async () => ({
+        audio: null,
+        video: localVideo,
+        stop: vi.fn(),
+      }),
+    });
+    await media.refresh();
+    expect((await media.startPrivateProgram("pvt_aabb")).ok).toBe(true);
+    await media.refresh();
+
+    const state = media.getState();
+    expect(state.localProgramStream).not.toBeNull();
+    expect(
+      roomTvStream({
+        programStream: state.programStream,
+        localProgramStream: state.localProgramStream,
+      })
+    ).toBe(state.localProgramStream);
+
+    vi.unstubAllGlobals();
+  });
+
   it("warms owner decode from /room-file/<id>, not an object URL", async () => {
     const file = new File([new Uint8Array(4)], "MTV.mp4", { type: "video/mp4" });
     const media = createRoomMedia({

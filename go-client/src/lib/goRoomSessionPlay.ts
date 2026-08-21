@@ -174,3 +174,29 @@ export function createRoomSessionPlay(opts: {
 }
 
 export type RoomSessionPlayController = ReturnType<typeof createRoomSessionPlay>;
+
+/**
+ * Guest booth shell `message` after a domain session event.
+ * `""` = clear seat-wait copy so occupancy／TV status can show;
+ * `undefined` = leave the current shell message alone.
+ */
+export function roomGuestShellMessageFromSessionEvent(
+  event: unknown
+): string | undefined {
+  if (!event || typeof event !== "object") return undefined;
+  const o = event as { type?: unknown; status?: unknown };
+  const type = typeof o.type === "string" ? o.type : "";
+  if (
+    type === "match.started" ||
+    type === "match.placed" ||
+    type === "match.reset"
+  ) {
+    return "";
+  }
+  if (type === "match.status") {
+    const status = typeof o.status === "string" ? o.status : "";
+    if (status === "active" || status === "ended") return "";
+  }
+  return undefined;
+}
+

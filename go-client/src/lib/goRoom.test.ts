@@ -1,7 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  GO_ROOM_CONNECTING_BODY,
+  GO_ROOM_CONNECTING_TITLE,
+  GO_ROOM_DOOR_ENTER,
+  GO_ROOM_DOOR_LEAD,
+  GO_ROOM_DOOR_NAME,
+  GO_ROOM_DOOR_TITLE,
   GO_ROOM_END_CONFIRM_HOST,
   GO_ROOM_GATE_BODY,
+  GO_ROOM_GUEST_NAME_FALLBACK,
   GO_ROOM_LEAVE_CONFIRM_GUEST,
   GO_ROOM_LOGIN_HINT,
   GO_ROOM_CAST_SOURCE_UNSUPPORTED,
@@ -77,6 +84,8 @@ import {
   roomInviteDoorRow,
   roomHostLoginGate,
   roomShowAdSlot,
+  roomGuestNameFallback,
+  roomStatusLineVisible,
   roomTvStatusGate,
   roomShellActiveTab,
   roomShellDefaultPane,
@@ -241,14 +250,15 @@ describe("roomTvBindStream", () => {
 });
 
 describe("roomTvStream", () => {
-  it("prefers the remote program RTP over the local capture", () => {
+  it("prefers the local capture while the host is sourcing the program", () => {
     const remoteTrack = {
       readyState: "live",
       muted: false,
     } as MediaStreamTrack;
     const localTrack = {
       readyState: "live",
-      muted: false,
+      muted: true,
+      getSettings: () => ({ width: 2, height: 2 }),
     } as MediaStreamTrack;
     const remote = {
       id: "remote",
@@ -258,8 +268,11 @@ describe("roomTvStream", () => {
       id: "local",
       getTracks: () => [localTrack],
     } as unknown as MediaStream;
+    // Guest program receivers can look "live" while empty; host TV must stay
+    // on the local captureStream (private／share cast) so guests still get RTP
+    // while the host sees the picture.
     expect(roomTvStream({ programStream: remote, localProgramStream: local })).toBe(
-      remote
+      local
     );
     expect(roomTvStream({ programStream: null, localProgramStream: local })).toBe(
       local
@@ -811,6 +824,40 @@ describe("booth copy", () => {
     expect(roomTvStatusGate("ready")).toBe(false);
     expect(roomTvStatusGate("open")).toBe(false);
     expect(roomTvStatusGate("idle")).toBe(false);
+  });
+
+  it("does not repeat the TV gate line under the screen", () => {
+    expect(
+      roomStatusLineVisible({ cinemaHud: true, phase: "connecting" })
+    ).toBe(false);
+    expect(roomStatusLineVisible({ cinemaHud: true, phase: "error" })).toBe(
+      false
+    );
+    expect(roomStatusLineVisible({ cinemaHud: true, phase: "ended" })).toBe(
+      false
+    );
+    expect(roomStatusLineVisible({ cinemaHud: true, phase: "ready" })).toBe(
+      true
+    );
+    expect(roomStatusLineVisible({ cinemaHud: true, phase: "open" })).toBe(
+      true
+    );
+    expect(roomStatusLineVisible({ cinemaHud: false, phase: "ready" })).toBe(
+      false
+    );
+  });
+
+  it("gives the guest door a booth, not a bare consent form", () => {
+    expect(GO_ROOM_DOOR_TITLE).toBe("邀請你進這間包廂");
+    expect(GO_ROOM_DOOR_LEAD).toContain("大螢幕");
+    expect(GO_ROOM_DOOR_LEAD).toContain("在場");
+    expect(GO_ROOM_DOOR_NAME).toBe("這次怎麼稱呼你");
+    expect(GO_ROOM_DOOR_ENTER).toBe("進這間包廂");
+    expect(GO_ROOM_CONNECTING_TITLE).toBe("正在進包廂…");
+    expect(GO_ROOM_CONNECTING_BODY).toContain("請留在這個畫面");
+    expect(GO_ROOM_GUEST_NAME_FALLBACK).toBe("訪客");
+    expect(roomGuestNameFallback(true)).toBe("訪客");
+    expect(roomGuestNameFallback(false)).toBe("對手");
   });
 
   it("warns that hung items and live pulls stop when the Host ends the booth", () => {

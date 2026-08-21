@@ -25,6 +25,8 @@
   import { chromeSession } from "$lib/chromeSession.svelte";
   import {
     GO_ROOM_CAMERA_STOP_WATCH,
+    GO_ROOM_CONNECTING_BODY,
+    GO_ROOM_CONNECTING_TITLE,
     GO_ROOM_EMPTY_TIMELINE,
     GO_ROOM_END_CONFIRM_HOST,
     GO_ROOM_GATE_BODY,
@@ -78,6 +80,7 @@
     roomShellShowPane,
     roomShellTabPanes,
     roomStageStatus,
+    roomStatusLineVisible,
     roomTvHudHasTransport,
     roomTvHudKind,
     roomTvHudRestore,
@@ -480,7 +483,7 @@
 
   const statusLabel = $derived.by(() => {
     if (error) return error;
-    if (phase === "connecting") return message || "正在進包廂…";
+    if (phase === "connecting") return message || GO_ROOM_CONNECTING_TITLE;
     if (phase === "ended") return message || "這一間已結束";
     if (inBooth) {
       const line = roomStageStatus({ guestCount, tvLabel });
@@ -489,6 +492,10 @@
     }
     return message;
   });
+
+  const statusLineVisible = $derived(
+    roomStatusLineVisible({ cinemaHud, phase })
+  );
 
   const showComposer = $derived(
     inBooth && (role === "host" || connected)
@@ -580,6 +587,7 @@
   let occPrev: RoomMentionPerson[] | null = null;
   let occGuestReady = false;
   $effect(() => {
+    if (!inBooth) return;
     if (role === "guest" && occupantPeers.length === 0 && !occGuestReady) {
       return;
     }
@@ -1422,7 +1430,9 @@
   bind:this={roomEl}
 >
   <h1 class="sr-only">包廂</h1>
+  {#if statusLabel && !statusLineVisible && !tvStatusGate}
     <p class="sr-only" role="status">{statusLabel}</p>
+  {/if}
 
   <div class="room-tv-col">
     <div class="room-tv-stage">
@@ -1477,8 +1487,9 @@
         <div class="room-tv-gate" role="region" aria-labelledby="room-status-gate-title">
           {#if phase === "connecting"}
             <p id="room-status-gate-title" class="room-tv-gate-title pixel-text">
-              {message || "正在進包廂…"}
+              {message || GO_ROOM_CONNECTING_TITLE}
             </p>
+            <p class="room-tv-gate-body">{GO_ROOM_CONNECTING_BODY}</p>
           {:else if phase === "error"}
             <p id="room-status-gate-title" class="room-tv-gate-title pixel-text err">
               {error || "無法開始"}
@@ -1516,7 +1527,7 @@
         </div>
       {/if}
     </div>
-    {#if statusLabel && cinemaHud}
+    {#if statusLabel && statusLineVisible}
       <p class="room-status">{statusLabel}</p>
     {/if}
   </div>
@@ -2606,13 +2617,14 @@
   }
   .room-tv-gate-title {
     margin: 0;
-    font-size: 1rem;
+    font-size: 1.1rem;
     color: #f4efe4;
   }
   .room-tv-gate-body {
     margin: 0;
     line-height: 1.45;
     font-size: 0.92rem;
+    max-width: 22rem;
   }
   .room-tv-gate-btn {
     min-height: 44px;

@@ -555,6 +555,7 @@ export function createRoomMedia(opts: {
     // Hub remote-file cast: program RTP arrives on the owner's PC. Other
     // guests' program receivers are uplink placeholders — do not overwrite
     // the host TV sink with those (Safari join → Chrome host black).
+    const ownLocalProgram = Boolean(program && !programFromLive);
     const programFrom =
       opts.forward &&
       remoteProgramFrom &&
@@ -563,6 +564,12 @@ export function createRoomMedia(opts: {
       !programFromLive
         ? remoteProgramFrom
         : null;
+    if (ownLocalProgram) {
+      // Host is sourcing the program — drop leftover guest program receivers
+      // so they cannot win roomTvStream over a muted captureStream track.
+      remoteProgramVideo = null;
+      remoteProgramAudio = null;
+    }
     for (const peer of rtpPeers()) {
       const pVid = receiverTrack(peer.pc, "presence", "video");
       const pAud = receiverTrack(peer.pc, "presence", "audio");
@@ -570,7 +577,10 @@ export function createRoomMedia(opts: {
       const gAud = receiverTrack(peer.pc, "program", "audio");
       if (pVid) holdRemote({ layer: "presence", kind: "video" }, pVid);
       if (pAud) holdRemote({ layer: "presence", kind: "audio" }, pAud);
-      const takeProgram = !programFrom || peer.peerId === programFrom;
+      const takeProgram =
+        ownLocalProgram
+          ? false
+          : !programFrom || peer.peerId === programFrom;
       if (takeProgram && gVid) {
         holdRemote({ layer: "program", kind: "video" }, gVid);
       }
@@ -935,6 +945,10 @@ export function createRoomMedia(opts: {
     program = next;
     programFromLive = false;
     tvSourcePeerId = null;
+    // Drop guest program receivers before emit — otherwise an unmuted
+    // placeholder can win the TV over a still-muted local capture track.
+    remoteProgramVideo = null;
+    remoteProgramAudio = null;
     programName = file.name.trim() || "影片";
     remoteProgramName = null;
     remoteProgramKind = null;

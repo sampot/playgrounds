@@ -91,6 +91,16 @@ vi.mock("./platformClient", () => ({
 describe("guestRuntime invite.room", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    const mem = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (k: string) => mem.get(k) ?? null,
+      setItem: (k: string, v: string) => {
+        mem.set(k, v);
+      },
+      removeItem: (k: string) => {
+        mem.delete(k);
+      },
+    });
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
@@ -130,6 +140,7 @@ describe("guestRuntime invite.room", () => {
     const rt = createGuestRuntime();
     await rt.bootFromShortId("room1");
     expect(rt.getStatus().phase).toBe("consent");
+    expect(rt.getStatus().displayName).toBe("訪客");
     await rt.consentAndPlay("訪客甲");
 
     expect(fixtures.resolve).not.toHaveBeenCalled();

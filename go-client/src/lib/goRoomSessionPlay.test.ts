@@ -1,6 +1,49 @@
 import { describe, expect, it } from "vitest";
 import { SESSION_PLAY_TYPE } from "@pg/roster/rosterSessionPlay";
-import { createRoomSessionPlay } from "./goRoomSessionPlay";
+import {
+  createRoomSessionPlay,
+  roomGuestShellMessageFromSessionEvent,
+} from "./goRoomSessionPlay";
+
+describe("roomGuestShellMessageFromSessionEvent", () => {
+  it("clears seat-wait copy once the match is live", () => {
+    expect(
+      roomGuestShellMessageFromSessionEvent({ type: "match.started" })
+    ).toBe("");
+    expect(
+      roomGuestShellMessageFromSessionEvent({
+        type: "match.placed",
+        status: "active",
+      })
+    ).toBe("");
+    expect(
+      roomGuestShellMessageFromSessionEvent({
+        type: "match.status",
+        status: "active",
+      })
+    ).toBe("");
+    expect(
+      roomGuestShellMessageFromSessionEvent({
+        type: "match.reset",
+        status: "active",
+      })
+    ).toBe("");
+  });
+
+  it("leaves seating／unknown events alone", () => {
+    expect(
+      roomGuestShellMessageFromSessionEvent({
+        type: "match.status",
+        status: "ready",
+      })
+    ).toBeUndefined();
+    expect(
+      roomGuestShellMessageFromSessionEvent({ type: "seat.joined" })
+    ).toBeUndefined();
+    expect(roomGuestShellMessageFromSessionEvent(null)).toBeUndefined();
+  });
+});
+
 
 describe("createRoomSessionPlay", () => {
   function hostCtl() {

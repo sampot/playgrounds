@@ -263,4 +263,12 @@ describe("sessionChatPhaseFromEvent", () => {
     ).toBe("waiting");
     expect(sessionChatPhaseFromEvent({ type: "move" })).toBeNull();
   });
+
+  it("maps match lifecycle types when status is omitted", () => {
+    expect(sessionChatPhaseFromEvent({ type: "match.started" })).toBe(
+      "active"
+    );
+    expect(sessionChatPhaseFromEvent({ type: "match.placed" })).toBe("active");
+    expect(sessionChatPhaseFromEvent({ type: "match.closed" })).toBe("ended");
+  });
 });

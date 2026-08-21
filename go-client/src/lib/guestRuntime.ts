@@ -46,9 +46,11 @@ import { goRoomFiles } from "./goRoomFiles.svelte";
 import { goRoomMedia } from "./goRoomMedia.svelte";
 import {
   GO_ROOM_CONNECT_FAILED,
+  GO_ROOM_CONNECTING_TITLE,
   GO_ROOM_KICKED,
   GO_ROOM_MESH_ENABLED,
   GO_ROOM_QUICK_REPLIES,
+  roomGuestNameFallback,
   roomOccupancyFromSnapshot,
   roomOccupantCount,
 } from "./goRoom";
@@ -66,6 +68,7 @@ import { isSessionPlayMessage } from "@pg/roster/rosterSessionPlay";
 import { createRoomMeshClient } from "./goRoomMeshClient";
 import {
   createRoomSessionPlay,
+  roomGuestShellMessageFromSessionEvent,
   type RoomSessionPlayController,
   type RoomSessionPlayState,
 } from "./goRoomSessionPlay";
@@ -624,6 +627,10 @@ export function createGuestRuntime() {
       }
       const phaseFromEv = sessionChatPhaseFromEvent(payload.event);
       if (phaseFromEv) goSessionChat.setUiPhase(phaseFromEv);
+      if (status.surface === "room") {
+        const shellMsg = roomGuestShellMessageFromSessionEvent(payload.event);
+        if (shellMsg !== undefined) set({ message: shellMsg });
+      }
       const event =
         payload.event && typeof payload.event === "object"
           ? (payload.event as { type?: unknown; reason?: unknown })
@@ -672,17 +679,20 @@ export function createGuestRuntime() {
         });
         return;
       }
+      const roomInvite = isRoomInvite(meta.kind, meta.intent);
+      let displayName = status.displayName;
       try {
         const n = localStorage.getItem("playgrounds-roster-display-name");
-        if (n?.trim()) status.displayName = n.trim();
+        if (n?.trim()) displayName = n.trim();
+        else displayName = roomGuestNameFallback(roomInvite);
       } catch {
-        /* ignore */
+        displayName = roomGuestNameFallback(roomInvite);
       }
       set({
         phase: "consent",
         meta,
         message: "請確認加入",
-        displayName: status.displayName,
+        displayName,
       });
     } catch (e) {
       set({
@@ -702,7 +712,7 @@ export function createGuestRuntime() {
   async function connectRoom(name: string, meta: InviteMeta): Promise<void> {
     set({
       phase: "connecting",
-      message: "正在進包廂…",
+      message: GO_ROOM_CONNECTING_TITLE,
       surface: "room",
       canvasUrl: null,
       canvasSrcdoc: null,
@@ -987,7 +997,9 @@ export function createGuestRuntime() {
       set({ phase: "error", error: "沒有邀請資料", message: "" });
       return;
     }
-    const name = displayName.trim() || "對手";
+    const name =
+      displayName.trim() ||
+      roomGuestNameFallback(isRoomInvite(meta.kind, meta.intent));
     try {
       localStorage.setItem("playgrounds-roster-display-name", name);
     } catch {

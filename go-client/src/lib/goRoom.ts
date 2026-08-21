@@ -235,6 +235,18 @@ export function roomTvStatusGate(phase: RoomUiPhase): boolean {
   return phase === "connecting" || phase === "error" || phase === "ended";
 }
 
+/**
+ * Hall status under the TV (人數／沒訊號). Hidden while the same copy is
+ * already on the TV gate — otherwise guests see「正在進包廂…」twice.
+ */
+export function roomStatusLineVisible(opts: {
+  cinemaHud: boolean;
+  phase: RoomUiPhase;
+}): boolean {
+  if (!opts.cinemaHud) return false;
+  return !roomTvStatusGate(opts.phase);
+}
+
 export type RoomEscStep =
   | "close-share"
   | "close-preview"
@@ -363,6 +375,20 @@ export const GO_ROOM_KEEP_OPEN = "這一間只在這個畫面開著的時候存�
 
 export const GO_ROOM_GATE_BODY =
   "請人進來：即時視訊、共享檔案。被請進來的人不必有通行證。";
+
+export const GO_ROOM_DOOR_TITLE = "邀請你進這間包廂";
+export const GO_ROOM_DOOR_LEAD =
+  "進來一起看大螢幕，也可以開口說話、傳檔。內容只在這一間還開著、在場的瀏覽器之間。";
+export const GO_ROOM_DOOR_NAME = "這次怎麼稱呼你";
+export const GO_ROOM_DOOR_ENTER = "進這間包廂";
+export const GO_ROOM_CONNECTING_TITLE = "正在進包廂…";
+export const GO_ROOM_CONNECTING_BODY =
+  "連上後會看到這一間的大螢幕。請留在這個畫面。";
+export const GO_ROOM_GUEST_NAME_FALLBACK = "訪客";
+
+export function roomGuestNameFallback(isRoom: boolean): string {
+  return isRoom ? GO_ROOM_GUEST_NAME_FALLBACK : "對手";
+}
 
 export const GO_ROOM_LOGIN_HINT =
   "被請進來的人不必有通行證；開這一間的人要留在這個畫面。另一台裝置請掃邀請進來。";
@@ -496,14 +522,6 @@ export function roomTvLabel(opts: {
   return GO_ROOM_TV_OFF;
 }
 
-function mediaStreamHasFrames(stream: MediaStream): boolean {
-  try {
-    return stream.getTracks().some((t) => mediaTrackHasFrames(t));
-  } catch {
-    return false;
-  }
-}
-
 /** TV picture is on only while a program is offered (not leftover RTP). */
 export function roomTvPictureOn(opts: {
   programName?: string | null;
@@ -516,8 +534,9 @@ export function roomTvPictureOn(opts: {
 
 /**
  * Bind the TV hole.
- * - Host casting a file: keep the local capture when remote is only a muted
- *   transceiver placeholder from a newly joined peer.
+ * - Host casting a file／live: always keep the local capture when present.
+ *   Guest program receivers can look unmuted while empty and would otherwise
+ *   steal the slot (host black; guests still get RTP).
  * - Joiners watching RTP: bind the remote program even while muted so the
  *   first frames can paint (do not drop a muted remote when there is no local).
  */
@@ -527,10 +546,8 @@ export function roomTvStream(opts: {
 }): MediaStream | null {
   const remote = opts.programStream;
   const local = opts.localProgramStream ?? null;
-  if (local && !(remote && mediaStreamHasFrames(remote))) {
-    return local;
-  }
-  return remote ?? local ?? null;
+  if (local) return local;
+  return remote ?? null;
 }
 
 /**
