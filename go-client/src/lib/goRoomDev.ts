@@ -38,6 +38,8 @@ export type GoRoomDevApi = {
   waitReady(opts?: { peerCount?: number; timeoutMs?: number }): Promise<void>;
   /** Apply a field API key (Host). Optionally remember on this browser. */
   setApiKey(key: string, opts?: { remember?: boolean }): Promise<void>;
+  /** Current memory field API key（Host／logged-in tab）；null if none. */
+  getApiKey(): string | null;
 };
 
 export type GoRoomDevAttachOpts = {
@@ -47,6 +49,7 @@ export type GoRoomDevAttachOpts = {
   mint: () => Promise<{ shortUrl: string }>;
   join: (displayName?: string) => Promise<void>;
   setApiKey?: (key: string, opts?: { remember?: boolean }) => Promise<void>;
+  getApiKey?: () => string | null;
 };
 
 export type GoRoomDevHandle = {
@@ -184,6 +187,9 @@ export function attachGoRoomDev(
       }
       await opts.setApiKey(key, setOpts);
       applySnapshot(api, opts.getSnapshot());
+    },
+    getApiKey() {
+      return opts.getApiKey?.() ?? null;
     },
   };
 

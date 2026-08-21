@@ -222,4 +222,50 @@ describe("attachGoRoomDev", () => {
     ).rejects.toThrow(/timeout|逾時/i);
     handle!.dispose();
   });
+
+  it("exposes getApiKey for the current memory field key", () => {
+    let key: string | null = "pg_sk_live";
+    const handle = attachGoRoomDev({
+      enabled: true,
+      role: "host",
+      getSnapshot: () => ({
+        phase: "open",
+        doorUrl: null,
+        guestCount: 0,
+        loggedIn: true,
+        inviteDoor: "none",
+      }),
+      mint: async () => ({ shortUrl: "" }),
+      join: async () => {},
+      getApiKey: () => key,
+    });
+    const api = (window as unknown as {
+      __goRoomDev: { getApiKey: () => string | null };
+    }).__goRoomDev;
+    expect(api.getApiKey()).toBe("pg_sk_live");
+    key = null;
+    expect(api.getApiKey()).toBeNull();
+    handle!.dispose();
+  });
+
+  it("getApiKey returns null when no getter is wired", () => {
+    const handle = attachGoRoomDev({
+      enabled: true,
+      role: "guest",
+      getSnapshot: () => ({
+        phase: "consent",
+        doorUrl: null,
+        guestCount: 0,
+        loggedIn: false,
+        inviteDoor: "none",
+      }),
+      mint: async () => ({ shortUrl: "" }),
+      join: async () => {},
+    });
+    const api = (window as unknown as {
+      __goRoomDev: { getApiKey: () => string | null };
+    }).__goRoomDev;
+    expect(api.getApiKey()).toBeNull();
+    handle!.dispose();
+  });
 });

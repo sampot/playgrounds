@@ -1,6 +1,10 @@
 <script lang="ts">
   import { goAuth } from "$lib/goAuth.svelte";
   import { goDashOrigin } from "$lib/platformClient";
+  import {
+    goRoomDevPageEnabled,
+    writeGoRoomDevRememberedKey,
+  } from "$lib/goRoomDev";
 
   type Props = {
     open: boolean;
@@ -13,6 +17,10 @@
   let wasOpen = false;
 
   const profile = $derived.by(() => goAuth.profile);
+  const devEnabled = $derived(goRoomDevPageEnabled());
+  const liveKey = $derived(
+    goAuth.loggedIn ? goAuth.getPlatformApiKeyForHostLoop() : null
+  );
 
   function label() {
     return profile?.label ?? "";
@@ -29,6 +37,9 @@
   });
 
   let busy = $state(false);
+  let revealKey = $state(false);
+  let keyHint = $state("");
+  let keyError = $state("");
 
   async function logout() {
     if (busy) return;
@@ -37,6 +48,49 @@
     goAuth.logout();
     busy = false;
   }
+
+  async function copyDevKey() {
+    const key = liveKey;
+    if (!key) {
+      keyError = "目前沒有可用的 key";
+      keyHint = "";
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(key);
+      keyHint = "已複製 field API key";
+      keyError = "";
+    } catch {
+      keyError = "無法複製，請按「顯示」後手動選取";
+      keyHint = "";
+    }
+  }
+
+  function rememberDevKey() {
+    const key = liveKey;
+    if (!key) {
+      keyError = "目前沒有可用的 key";
+      keyHint = "";
+      return;
+    }
+    writeGoRoomDevRememberedKey(key, { enabled: true });
+    keyHint = "已記住到本機；之後開包廂會自動登入";
+    keyError = "";
+  }
+
+  function forgetDevKey() {
+    writeGoRoomDevRememberedKey(null, { enabled: true });
+    keyHint = "已清除本機記住的 key";
+    keyError = "";
+  }
+
+  $effect(() => {
+    if (!open) {
+      revealKey = false;
+      keyHint = "";
+      keyError = "";
+    }
+  });
 
   $effect(() => {
     const el = dialogEl;
@@ -139,6 +193,79 @@
           登出
         </button>
       </div>
+
+      {#if devEnabled && goAuth.loggedIn}
+        <section
+          class="go-profile-dev"
+          aria-label="開發通行證"
+          data-testid="profile-dev-key"
+        >
+          <p class="go-profile-dev-title">開發通行證（僅 localhost）</p>
+          <p class="go-profile-dev-lede">
+            目前這 tab 的 field API key；給 Agent／另一台瀏覽器貼上用。
+          </p>
+          {#if liveKey}
+            <label class="go-profile-dev-field">
+              <span class="sr-only">field API key</span>
+              <input
+                class="go-profile-dev-input"
+                type={revealKey ? "text" : "password"}
+                readonly
+                value={liveKey}
+                spellcheck="false"
+                autocomplete="off"
+                data-testid="profile-dev-key-value"
+                onclick={(e) => (e.currentTarget as HTMLInputElement).select()}
+              />
+            </label>
+          {:else}
+            <p class="go-profile-dev-lede">尚無記憶體 key（請重新登入）。</p>
+          {/if}
+          <div class="go-profile-dev-actions">
+            <button
+              type="button"
+              class="go-profile-btn"
+              disabled={!liveKey}
+              onclick={() => (revealKey = !revealKey)}
+              data-testid="profile-dev-key-reveal"
+            >
+              {revealKey ? "隱藏 key" : "顯示 key"}
+            </button>
+            <button
+              type="button"
+              class="go-profile-btn"
+              disabled={!liveKey}
+              onclick={() => void copyDevKey()}
+              data-testid="profile-dev-key-copy"
+            >
+              複製 key
+            </button>
+            <button
+              type="button"
+              class="go-profile-btn"
+              disabled={!liveKey}
+              onclick={rememberDevKey}
+              data-testid="profile-dev-key-remember"
+            >
+              記住到本機
+            </button>
+            <button
+              type="button"
+              class="go-profile-btn"
+              onclick={forgetDevKey}
+              data-testid="profile-dev-key-forget"
+            >
+              清除記住
+            </button>
+          </div>
+          {#if keyError}
+            <p class="go-profile-dev-err" role="alert">{keyError}</p>
+          {/if}
+          {#if keyHint}
+            <p class="go-profile-dev-hint" role="status">{keyHint}</p>
+          {/if}
+        </section>
+      {/if}
 
       <p class="go-profile-note">
         登入只辨識你的身分，不影響遊玩。未登入仍可隨時加入與遊玩。
@@ -375,6 +502,67 @@
   .go-profile-btn:disabled {
     opacity: 0.45;
     cursor: not-allowed;
+  }
+  .go-profile-dev {
+    padding: 0.7rem 0.75rem;
+    border: 1px dashed color-mix(in oklab, rgb(var(--gp-ink)) 35%, transparent);
+    border-radius: var(--gp-radius);
+    background: color-mix(in oklab, rgb(var(--gp-fill)) 92%, rgb(var(--gp-ink)));
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+  .go-profile-dev-title {
+    margin: 0;
+    font-size: 0.8rem;
+    font-weight: 700;
+  }
+  .go-profile-dev-lede {
+    margin: 0;
+    font-size: 0.75rem;
+    line-height: 1.35;
+    color: rgb(var(--gp-muted));
+  }
+  .go-profile-dev-field {
+    display: block;
+  }
+  .go-profile-dev-input {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 2.75rem;
+    padding: 0.45rem 0.65rem;
+    border: var(--pixel-edge) solid rgb(var(--gp-ink));
+    border-radius: var(--gp-radius);
+    background: rgb(var(--gp-fill));
+    color: rgb(var(--gp-ink));
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.75rem;
+  }
+  .go-profile-dev-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+  .go-profile-dev-err {
+    margin: 0;
+    font-size: 0.75rem;
+    color: #b00020;
+  }
+  .go-profile-dev-hint {
+    margin: 0;
+    font-size: 0.75rem;
+    color: rgb(var(--gp-muted));
+  }
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
   }
   .go-profile-note {
     margin: 0;

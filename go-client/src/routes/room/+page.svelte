@@ -14,6 +14,7 @@
     goRoomDevPageEnabled,
     goRoomDevPeerCount,
     parseGoRoomDevQuery,
+    readGoRoomDevRememberedKey,
     writeGoRoomDevRememberedKey,
     type GoRoomDevHandle,
   } from "$lib/goRoomDev";
@@ -90,7 +91,23 @@
           }
           await runtime.openBooth();
         },
+        getApiKey: () => goAuth.getPlatformApiKeyForHostLoop(),
       });
+
+      if (!goAuth.loggedIn) {
+        const remembered = readGoRoomDevRememberedKey({ enabled: true });
+        if (remembered) {
+          void (async () => {
+            try {
+              await goAuth.applyFieldApiKey(remembered);
+              await runtime.openBooth();
+              devHandle?.sync();
+            } catch {
+              /* invalid remembered key — leave login gate */
+            }
+          })();
+        }
+      }
     }
 
     return () => {
@@ -123,6 +140,15 @@
     })();
   });
 
+  async function mint() {
+    try {
+      await runtime.mintInviteAndAnswer();
+      devHandle?.sync();
+    } catch {
+      /* status.error already set */
+    }
+  }
+
   function onDevKeyApplied() {
     void runtime.openBooth();
     devHandle?.sync();
@@ -136,15 +162,6 @@
           /* status.error already set */
         }
       })();
-    }
-  }
-
-  async function mint() {
-    try {
-      await runtime.mintInviteAndAnswer();
-      devHandle?.sync();
-    } catch {
-      /* status.error already set */
     }
   }
 </script>
@@ -207,6 +224,6 @@
   onEndPlay={() => void runtime.endPlay()}
 />
 
-{#if devEnabled}
+{#if devEnabled && !goAuth.loggedIn}
   <GoRoomDevKeyPanel onApplied={onDevKeyApplied} />
 {/if}

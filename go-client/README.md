@@ -24,11 +24,9 @@ itself or self-hosting.
 
 **開發通行證（最簡單）：**
 
-1. 在 localhost `/room` **先用「登入」SSO 一次**
-2. 頁頂「開發通行證」→ **記住到本機**（之後開新 tab 會自動登入）
-3. 或 **複製 key** → 貼到另一個瀏覽器／跟 Agent 說「已記住」
-
-Agent／腳本仍可用：`window.__goRoomDev.setApiKey('pg_sk_…', { remember: true })`
+1. 在 localhost **先用「登入」SSO 一次**（任意頁）→ Header 頭像 →「我的身分」→ **記住到本機**／**複製 key**
+2. 未登入開 `/room`：頁底貼上 key →「套用並記住」（登入後面板會消失；之後從「我的身分」管理）
+3. Agent／腳本：`window.__goRoomDev.getApiKey()` 或 `setApiKey('pg_sk_…', { remember: true })`
 
 **多 tab 劇本：**
 

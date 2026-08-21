@@ -111,17 +111,17 @@ Tab G  http://localhost:5174/i/<short>[?dev_…] ← 訪客；開**同一張**�
 
 | 方式 | 作法 |
 | --- | --- |
-| **頁內記住（推薦）** | localhost `/room` SSO 登入一次 →「**記住到本機**」→ 之後同瀏覽器自動套用（`localStorage.go_dev_field_api_key`，**僅** harness 閘通過時） |
-| **頁內貼上** | 未登入時「開發通行證」貼 `pg_sk_…` →「套用並記住」 |
-| **複製** | 已登入時「複製 key」→ 給 Agent／另一瀏覽器貼上 |
-| **腳本** | `window.__goRoomDev.setApiKey(key, { remember: true })` |
+| **頁內記住（推薦）** | localhost SSO 登入一次 → Header「我的身分」→「**記住到本機**」→ 之後同瀏覽器開 `/room` 自動套用（`localStorage.go_dev_field_api_key`，**僅** harness 閘通過時） |
+| **頁內貼上** | 未登入時 `/room` 頁底「開發通行證」貼 `pg_sk_…` →「套用並記住」（登入後改走「我的身分」） |
+| **顯示／複製** | 已登入時：Header「我的身分」→「顯示／複製 key」 |
+| **腳本** | `window.__goRoomDev.getApiKey()`／`setApiKey(key, { remember: true })` |
 | **舊：sessionStorage** | 仍可用；不必再開 DevTools 當主路徑 |
 
 **禁止** key 進 URL query／short_url／正式 go 的 localStorage。
 
 ### 7.3 `dev_login=1`
 
-可選；有「開發通行證」面板後**不必須**。閘通過且未登入時面板本來就在 `/room`。
+可選。閘通過且未登入時仍可走產品「登入」SSO，或腳本 `setApiKey`。
 
 ---
 
@@ -184,6 +184,10 @@ type GoRoomDevApi = {
   join(displayName?: string): Promise<void>;
   /** 輪詢就緒；逾時 throw */
   waitReady(opts?: { peerCount?: number; timeoutMs?: number }): Promise<void>;
+  /** Host：套用 field API key（可選記住本機） */
+  setApiKey(key: string, opts?: { remember?: boolean }): Promise<void>;
+  /** 目前記憶體 field API key；無則 null */
+  getApiKey(): string | null;
 };
 ```
 
@@ -285,3 +289,6 @@ TDD：先寫 `goRoomDev` 閘與 query 的失敗測試，再實作；bind 可薄�
 | 2026-08-21 | 初版 Draft：localhost Agent harness；輕前置（無 platform:dev）；與 room-xfer 切界 |
 | 2026-08-21 | Phase 1–4 landed：`goRoomDev`／`__goRoomDev`／`dev_mint`／`dev_join`／probe testid／README |
 | 2026-08-21 | 頁內「開發通行證」：貼上／記住／複製；`localStorage.go_dev_field_api_key`（僅 loopback＋DEV） |
+| 2026-08-21 | 已登入可從 Header「我的身分」顯示／複製 key；`__goRoomDev.getApiKey()` |
+| 2026-08-21 | 移除 `/room` 頁底「開發通行證」面板（全螢幕表面看不見）；改 Header 專責 |
+| 2026-08-21 | `/room` 未登入再顯示頁底貼上面板；登入後僅「我的身分」 |
