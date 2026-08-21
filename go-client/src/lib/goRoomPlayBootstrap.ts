@@ -148,6 +148,18 @@ export type RoomPlayableGame = {
   cover?: string;
 };
 
+/**
+ * Player-facing picker copy: drop parenthetical wire protocol ids
+ * （e.g. `（gomoku.v1）` / `(redpick.v1)`）.
+ */
+export function roomPlayPickerBlurb(blurb: string): string {
+  return blurb
+    .replace(/[（(]\s*[\w.-]+\.v\d+\s*[）)]/gi, "")
+    .replace(/\s+([。．.])/g, "$1")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 /** Seat slots for a hostable protocol (default 1 per role). */
 export function roomPlaySeatCount(protocol: HostableProtocol): number {
   let n = 0;
@@ -175,7 +187,7 @@ export function listRoomPlayableGames(): RoomPlayableGame[] {
     out.push({
       catalogId: id,
       title: entry.title,
-      blurb: entry.blurb,
+      blurb: roomPlayPickerBlurb(entry.blurb),
       seatCount: roomPlaySeatCount(protocol),
       ...(entry.cover ? { cover: entry.cover } : {}),
     });

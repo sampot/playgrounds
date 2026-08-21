@@ -6,6 +6,17 @@ import type { GoCatalogEntry, GoSamKind } from "./goCatalog";
 
 export type ChromePlayMode = "solo" | "invite" | null;
 
+/** Invite short links (`/i/…`) — Guest need not sign in; hide Header 登入 CTA. */
+export function showGoChromeLoginCta(opts: {
+  pathname: string;
+  loggedIn: boolean;
+}): boolean {
+  if (opts.loggedIn) return false;
+  const path = opts.pathname.replace(/\/+$/, "") || "/";
+  if (path === "/i" || path.startsWith("/i/")) return false;
+  return true;
+}
+
 class ChromeSession {
   catalogId = $state<string | null>(null);
   title = $state<string | null>(null);

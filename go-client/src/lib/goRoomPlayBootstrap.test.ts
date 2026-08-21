@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   listRoomPlayableCatalogIds,
   listRoomPlayableGames,
+  roomPlayPickerBlurb,
   ROOM_PLAY_SAM_UPDATE_POLICY,
 } from "./goRoomPlayBootstrap";
 
@@ -26,6 +27,29 @@ describe("listRoomPlayableGames", () => {
     expect(gomoku?.seatCount).toBe(2);
     expect(redpick?.title).toMatch(/撿紅點/);
     expect(redpick?.seatCount).toBe(4);
+  });
+
+  it("does not surface wire protocol ids in picker blurbs", () => {
+    const games = listRoomPlayableGames();
+    for (const g of games) {
+      expect(g.blurb).not.toMatch(/[a-z0-9-]+\.v\d+/i);
+    }
+  });
+});
+
+describe("roomPlayPickerBlurb", () => {
+  it("strips parenthetical protocol ids from catalog blurbs", () => {
+    expect(
+      roomPlayPickerBlurb(
+        "15×15 雙人／人機／AI 對 AI；可邀請遠端對手（gomoku.v1）。"
+      )
+    ).toBe("15×15 雙人／人機／AI 對 AI；可邀請遠端對手。");
+    expect(
+      roomPlayPickerBlurb(
+        "對點數撿牌，連撿／清桌加成；四人人機或包廂四人連線（redpick.v1）。"
+      )
+    ).toBe("對點數撿牌，連撿／清桌加成；四人人機或包廂四人連線。");
+    expect(roomPlayPickerBlurb("plain blurb")).toBe("plain blurb");
   });
 });
 

@@ -1,7 +1,7 @@
 title: 撿紅點
 kind: game
 series: 桌遊
-blurb: 對點數撿牌，連撿／清桌加成；四人人機或包廂四人連線（redpick.v1）。
+blurb: 對點數撿牌，連撿／清桌加成；四人人機或包廂四人連線。
 source: sampot/pg-redpick
 license: MIT
 status: listed

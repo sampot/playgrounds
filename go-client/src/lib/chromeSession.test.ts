@@ -1,5 +1,37 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { chromeSession } from "./chromeSession.svelte";
+import { chromeSession, showGoChromeLoginCta } from "./chromeSession.svelte";
+
+describe("showGoChromeLoginCta", () => {
+  it("hides login on invite short links even when not signed in", () => {
+    expect(
+      showGoChromeLoginCta({ pathname: "/i/abc", loggedIn: false })
+    ).toBe(false);
+    expect(
+      showGoChromeLoginCta({ pathname: "/i/abc/", loggedIn: false })
+    ).toBe(false);
+  });
+
+  it("shows login on lobby and solo when signed out", () => {
+    expect(showGoChromeLoginCta({ pathname: "/", loggedIn: false })).toBe(
+      true
+    );
+    expect(
+      showGoChromeLoginCta({ pathname: "/s/pg-redpick", loggedIn: false })
+    ).toBe(true);
+    expect(
+      showGoChromeLoginCta({ pathname: "/room", loggedIn: false })
+    ).toBe(true);
+  });
+
+  it("never shows the login CTA when already signed in", () => {
+    expect(
+      showGoChromeLoginCta({ pathname: "/i/abc", loggedIn: true })
+    ).toBe(false);
+    expect(showGoChromeLoginCta({ pathname: "/", loggedIn: true })).toBe(
+      false
+    );
+  });
+});
 
 describe("chromeSession game reload requests", () => {
   beforeEach(() => chromeSession.clear());

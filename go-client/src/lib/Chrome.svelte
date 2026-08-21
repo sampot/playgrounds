@@ -2,7 +2,7 @@
   import { page } from "$app/state";
   import { goto } from "$app/navigation";
   import { onMount } from "svelte";
-  import { chromeSession } from "$lib/chromeSession.svelte";
+  import { chromeSession, showGoChromeLoginCta } from "$lib/chromeSession.svelte";
   import GoMorePanel from "$lib/GoMorePanel.svelte";
   import GoProfilePanel from "$lib/GoProfilePanel.svelte";
   import GoWordmark from "$lib/GoWordmark.svelte";
@@ -105,6 +105,16 @@
   const showMore = $derived(mode !== "invite");
   /** 分享：遊戲頁分享該小品；其餘（含首頁）分享 go client 本身. Invite 不露. */
   const shareEnabled = $derived(mode !== "invite");
+  /**
+   * 未登入 CTA：Invite Guest 不必通行證（包廂／對弈同），Header 不推登入.
+   * 已登入仍可開身分面板. Pathname 判斷：包廂 Guest 不走 `setInvite`.
+   */
+  const showLoginCta = $derived(
+    showGoChromeLoginCta({
+      pathname: page.url.pathname,
+      loggedIn: goAuth.loggedIn,
+    })
+  );
   /** §5.6：僅當前小品為 `kind: game` 時露出換片／試試這些. */
   const showSwap = $derived(
     mode === "solo" &&
@@ -593,7 +603,7 @@
           <span class="profile-status" aria-hidden="true"></span>
         {/if}
       </button>
-    {:else}
+    {:else if showLoginCta}
       <button
         type="button"
         class="profile-btn profile-btn--login pixel-btn pixel-btn--primary"
