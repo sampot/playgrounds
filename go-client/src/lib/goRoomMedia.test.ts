@@ -346,6 +346,68 @@ describe("createRoomMedia", () => {
     ).toBe(media.getState().programStream);
   });
 
+  it("ignores mesh PCs for program RTP so a second guest does not black the TV", async () => {
+    class FakeStream {
+      constructor(public tracks: MediaStreamTrack[]) {}
+      getTracks() {
+        return this.tracks;
+      }
+    }
+    vi.stubGlobal("MediaStream", FakeStream);
+    const hostPc = mockPc();
+    const meshPc = mockPc();
+    const fromHost = track("video", "host-prog");
+    Object.defineProperty(fromHost, "muted", {
+      value: false,
+      configurable: true,
+    });
+    hostPc.transceivers[3]!.receiver.track = fromHost as unknown as {
+      kind: string;
+      id: string;
+      readyState: "live" | "ended";
+    };
+    const meshPlaceholder = track("video", "mesh-prog-placeholder");
+    Object.defineProperty(meshPlaceholder, "muted", {
+      value: true,
+      configurable: true,
+    });
+    meshPc.transceivers[3]!.receiver.track = meshPlaceholder as unknown as {
+      kind: string;
+      id: string;
+      readyState: "live" | "ended";
+    };
+    const media = createRoomMedia({
+      localAgentId: "g-a",
+      occupantCount: () => 3,
+      peers: () => [
+        { peerId: "host", pc: hostPc, via: "entrance" },
+        { peerId: "g-b", pc: meshPc, via: "mesh" },
+      ],
+      sendJson: () => {},
+    });
+    await media.onControl({
+      type: SESSION_CAST_TYPE,
+      v: 1,
+      op: "offer",
+      from: "host",
+      kind: "video",
+      name: "MTV.mp4",
+      id: "file-1",
+    });
+    await media.refresh();
+    expect(media.getState().watchingProgram).toBe(true);
+    expect(media.getState().remoteProgramName).toBe("MTV.mp4");
+    const tv = roomTvStream({
+      programStream: media.getState().programStream,
+      localProgramStream: media.getState().localProgramStream,
+    });
+    expect(tv).toBe(media.getState().programStream);
+    const held = (tv as unknown as { tracks: MediaStreamTrack[] }).tracks;
+    expect(held.map((t) => t.id)).toEqual(["host-prog"]);
+    expect(meshPc.transceivers[3]!.sender.replaceTrack).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
   it("drops the program stream on unoffer so receivers clear the TV picture", async () => {
     class FakeStream {
       constructor(public tracks: MediaStreamTrack[]) {}

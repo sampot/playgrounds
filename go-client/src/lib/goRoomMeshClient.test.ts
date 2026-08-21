@@ -49,7 +49,7 @@ describe("createRoomMeshClient", () => {
     expect(createOffer).toHaveBeenCalledWith(
       expect.objectContaining({
         transport: "signal",
-        media: "ready",
+        media: "none",
         localPresence: { agentId: "g-a", name: "甲" },
       })
     );
@@ -112,7 +112,7 @@ describe("createRoomMeshClient", () => {
       expect.objectContaining({
         offerWire: "offer-wire",
         transport: "signal",
-        media: "ready",
+        media: "none",
       })
     );
     expect(toHost).toContainEqual({

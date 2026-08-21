@@ -653,14 +653,8 @@ export function createGuestRuntime() {
                 via: "entrance",
               });
             }
-            for (const id of GO_ROOM_MESH_ENABLED
-              ? (meshClient?.knownPeerIds() ?? [])
-              : []) {
-              const mesh = meshClient?.sessionFor(id);
-              if (mesh?.pc) {
-                out.push({ peerId: id, pc: mesh.pc, via: "mesh" });
-              }
-            }
+            // Mesh is DataChannel-only for file bytes — never feed mesh PCs
+            // into goRoomMedia (program／presence RTP stays on the Host star).
             return out;
           },
           sendJson: (msg) => {

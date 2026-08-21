@@ -541,7 +541,7 @@ mesh     名單變動 → Host hello → Guest A↔B 試 O／A（經 Host DC 轉
 | --- | --- |
 | **誰介紹** | Host：Guest 進門／離席觸發；`hello`／`bye`；轉 `offer`／`answer`／`candidate`／`fail` |
 | **誰發起** | Guest 收到**新的** `hello` 後依 `shouldOfferMesh` 決定誰 offer（避免雙 offer）；**立刻** dial，不等傳檔 |
-| **邊長什麼** | 與進門相同 **2+2＋DC**（日後若要直連 RTP 可重用；**1c 產品用途＝檔**） |
+| **邊長什麼** | **DC-only**（`media: "none"`）。**1c 產品用途＝檔 bytes**。**禁止**在 mesh 上 `replaceTrack` 節目／在場；音視訊 RTP 一律經 Host 進門星 |
 | **一次機會（硬）** | 同一場次、同一遠端 `peerId`：**最多試建一次**。`fail`／連不上／DC 未開成 → 記入「無 mesh」；**禁止**之後再 hello 觸發重試、**禁止**傳檔時補建。該 peer **離開再進**（新 `peerId`）＝新人，可再試一次 |
 | **檔路由（硬）** | 某一 `transferId`：若 Owner↔Requester **當下已有** open mesh DC → chunk 走直連；**禁止**再經 Host 轉同一批 bytes。否則走 `goRoomFileStar`。路由＝查表，不是 dial |
 | **控制面** | `share`／`request`／`reject`／`catalog` 等仍可經 Host fanout／轉送（目錄一致）；bytes 路徑獨立選直連或 star |
@@ -1093,8 +1093,8 @@ Esc 回大廳（現況 `goEscapeHome` 含 `/chat` → 改 `/room`）。**劇院�
 | Guest | `guestRuntime`／`/i/` 依 kind **或** `intent.surface` 分流；room 進門不 `resolveGoSamFiles`；開局才載該 catalogId；同意後**不** `replaceState` `/room`；離開 ≠ 主持散場 |
 | 文字 | `goSessionChat` **三區之一**（撤全頁時間線當主面；窄屏 tab、勿蓋死大螢幕） |
 | 檔案 | 共用 `rosterSessionFile.ts`＋單測；索取端一律 **`/room-file/<id>`**＋既有 SW；**本機 File SW 直出（不經 DC）**；遠端 chunk **直連優先（1c）／Host star 備援**、**每 HTTP ↔ 一 `transferId`**；禁止組整檔 Blob／object URL 產品路徑；**只掛檔、不掛資料夾**；**私有 OPFS＝2g**（與分享 id 隔離；見 §8.3） |
-| Mesh | **1c。** 在線 Guest 變動 → Host `hello` → Guest **立刻**建邊；失敗對該 peerId **不重試**；傳檔只查 `hasDirect`。檔 chunk 直連／star；節目 RTP 仍 Hub |
-| Peer | 進門 booth 2+2 helper（勿把遊戲 DC-only／現況 1+1 默默改掉）。mesh 邊同一套 2+2＋DC |
+| Mesh | **1c。** 在線 Guest 變動 → Host `hello` → Guest **立刻**建 **DC-only** 邊；失敗對該 peerId **不重試**；傳檔只查 `hasDirect`。檔 chunk 直連／star；**節目／在場 RTP 永不走 mesh**（仍 Hub） |
+| Peer | 進門 booth 2+2 helper（勿把遊戲 DC-only／現況 1+1 默默改掉）。**mesh 邊＝DC-only**（勿再給 mesh 留 2+2 再當媒體 peers） |
 | 媒體 | **節目槽＝片子／live**（進門綁 program `<video>`；房級送**單一路**來源；電影 `captureStream`）。開局＝大螢幕槽掛 SAM，節目可 unoffer。在場＝開口／可指定上大螢幕。**在場聲＝Host 混音**（§9.8.1／2f）。目錄「要」＝同源 HTTP。人數不關鏡頭。**不做**多路視訊合成 |
 | 殼面 | 主視訊區 16:9（槽內無字）＋廳態三區／劇院態 overlay（§5.8）。內景降級為外框／沒訊號雪花。**不要**重用 `GoShopLobby`。chrome hideable 對齊對弈 overlay。**不要**用系統全螢幕冒充劇院態 |
 | 開局 | **延後。** 契約：`session_play`；重用進門 PC；席次從協議 roles；自動＝主持＋進門序。現況不介紹、主面不露玩遊戲 |
@@ -1114,7 +1114,7 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 | **0. 契約** | 本文件；GLOSSARY／交叉引用 | 包廂≠overlay≠compose；進門即主面；入座不鎖 1:1；**主面＝主視訊區**；廳態／劇院態；頂列可收；**兩層螢幕**；片子／圖／音／live＝節目 RTP（**owner 渲染**；**單主畫面**）；否決多路視訊合成；**在場聲混音**（§9.8.1）；開局＝重用 PC（延後）；**目錄＝一律 `/room-file/<id>`（本機 SW 直出；遠端 roundtrip ↔ transfer）**；主持導播（含別人掛的檔、**含私有**）；目錄只掛檔；**主持私有 OPFS（2g 延後）**；現況 Hub；兩個時鐘；按需鑄；Guest 留 `/i/`；SDP 2+2 | **本刀** |
 | **1. 文字＋傳檔** | 進 `/room` 即主面；按需 mint `invite.room`、`/i/` consent、DC、`session_chat` fanout、`session_file` **分享目錄＋`/room-file/<id>`**（本機直出；遠端每 HTTP ↔ transfer；SW 開 id＋交付完成權威）；answer loop 持續作答 | 會員不必先邀請就見包廂 UI（無 TTL）；同一短鏈 ≥2 Guest 與 Host 互傳文字；分享區可掛檔；對 `/room-file/<id>` 發 HTTP 才有 bytes；落盤優先 Save picker＋串流；Platform 無正文／無檔 bytes；未登入不能開這一間；`/chat`→`/room`；門牌過期包廂仍在 | **按需鑄／兩個時鐘已落地；HTTP↔transfer 隧道（開＋完成權威）已對齊；多人傳檔 e2e 手測仍待；Guest↔Guest 檔 bytes 見 1c；不掛資料夾** |
 | **1b. SDP 2+2** | 進門 offer／answer **2 audio + 2 video**（軌空）；具名 booth helper；遊戲 SDP 不動 | 進門 SDP 含兩組 `m=audio`、兩組 `m=video`；遊戲 compose 仍無須 2+2 | **已落地**（`reserveBoothMediaTransceivers`） |
-| **1c. Mesh 直連（檔）** | 在線 Guest 變動時主動 `session_mesh`；邊＝2+2＋DC；**一次機會**；傳檔只路由不 dial；chunk 直連／star | 進門／新人加入即試連；失敗不再對同一 guest 重試；有直連則下載／私下播不經 Host；節目 RTP 仍 Hub | **已落地**（`GO_ROOM_MESH_ENABLED`；fail／close 不重試；Host introduce） |
+| **1c. Mesh 直連（檔）** | 在線 Guest 變動時主動 `session_mesh`；邊＝**DC-only**；**一次機會**；傳檔只路由不 dial；chunk 直連／star | 進門／新人加入即試連；失敗不再對同一 guest 重試；有直連則下載／私下播不經 Host；**節目／在場 RTP 仍 Hub（mesh 不進 goRoomMedia peers）** | **已落地**（`GO_ROOM_MESH_ENABLED`；`media: "none"`；fail／close 不重試；Host introduce） |
 | **2a. Live（鏡頭／麥／畫面）** | 開在名單；在場**影像**仍 `request` 才送；麥＝房級；`getUserMedia` XOR `getDisplayMedia`；不做格子牆 | 不經 Platform 二次 O／A；預設未開相機；無指定則零在場影像 RTP | **已落地**（房級麥；多人混音 **2f**） |
 | **2b. 目錄影音私下播** | 掛在目錄的影片／音樂經同源 URL 邊收邊播；不走節目 RTP | 片源不出雲；可 seek；**不**當大螢幕；與下載／檢視同一 HTTP 門面 | **影音 SW 片源已落地；下載／圖仍待收斂到同一門面** |
 | **2c. 包廂大螢幕＋內景** | 靜態內景；節目槽＝大螢幕；主持指定來源（**本機**檔 `captureStream` 或 peer live）；房級收節目／在場聲；文字收成抽屜 | 沒訊號大螢幕佔主高度；一起看 MTV 走 RTP；私下播與大螢幕並行；不走動 | **已落地**（`GoBoothStage`；節目 RTP；文字／分享抽屜）。殼面改大螢幕槽＋三區見 **2d**；別人掛的檔見 **2e** |
@@ -1298,3 +1298,4 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 | 2026-08-21 | **Mesh 建邊＝名單變動、非傳檔：** 在線 Guest 變動（進門見既有／後續新人）Host `hello` 後**立刻** dial；同一 peerId **失敗不重試**；「要」檔只查 `hasDirect`、禁止此時建邊。§7.4／凍結 #20 修訂 |
 | 2026-08-21 | **1c 實作：** `GO_ROOM_MESH_ENABLED = true`；`goRoomMeshClient` 一次機會（fail／close 進 dead、bye 清）；Host introduce／forward；傳檔 `sendBinary(dest)` 直連優先 |
 | 2026-08-21 | **2g 實作（初刀）：** `goRoomPrivateOpfs`＋`goRoomPrivateFiles`；`session_cast.scope`；`startPrivateProgram`（blob 片源、不 register `/room-file`）；主持檔案區私有／分享分段；掛到分享→既有 `shareLocalFile`；散場 detach 不清 OPFS |
+| 2026-08-21 | **Mesh＝DC-only（修雙 Guest 大螢幕黑屏）：** `session_mesh` 改 `media: "none"`；`goRoomMedia` 忽略 `via: "mesh"`；Guest 媒體 peers 只含進門 Host。兩 Guest 時 mesh 空節目軌曾蓋掉 Host RTP → 雙黑、一人離則恢復 |

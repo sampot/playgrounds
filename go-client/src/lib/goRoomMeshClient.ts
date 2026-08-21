@@ -1,6 +1,7 @@
 /**
- * Guest-side session_mesh: build a 2+2＋DC peer to another guest on roster change.
+ * Guest-side session_mesh: DataChannel-only peer for file bytes (§7.4／1c).
  * One attempt per peerId per presence; fail／close → star only (no redial).
+ * Never carries program／presence RTP — that stays on the Host entrance star.
  * File transfer only reads hasDirect — never dials here.
  */
 
@@ -135,7 +136,7 @@ export function createRoomMeshClient(opts: {
     try {
       const result = await createOffer({
         transport: "signal",
-        media: "ready",
+        media: "none",
         localPresence: {
           agentId: opts.localAgentId,
           name: opts.localName,
@@ -173,7 +174,7 @@ export function createRoomMeshClient(opts: {
       const result = await acceptOffer({
         offerWire: sdp,
         transport: "signal",
-        media: "ready",
+        media: "none",
         localPresence: {
           agentId: opts.localAgentId,
           name: opts.localName,

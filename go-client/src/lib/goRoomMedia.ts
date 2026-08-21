@@ -296,6 +296,11 @@ export function createRoomMedia(opts: {
   let localCache: { ids: string; stream: MediaStream } | null = null;
   const presenceMixer = opts.forward ? createPresenceAudioMixer() : null;
 
+  /** Entrance／Host-star PCs only — mesh is DC file path, never RTP. */
+  function rtpPeers(): RoomMediaPeer[] {
+    return opts.peers().filter((p) => p.via !== "mesh");
+  }
+
   function collectMicSources(): PresenceAudioSource[] {
     const sources: PresenceAudioSource[] = [];
     if (isLiveTrack(mic)) {
@@ -303,7 +308,7 @@ export function createRoomMedia(opts: {
     }
     for (const live of remoteLives) {
       if (!live.mic) continue;
-      const peer = opts.peers().find((p) => p.peerId === live.peerId);
+      const peer = rtpPeers().find((p) => p.peerId === live.peerId);
       if (!peer) continue;
       const t = receiverTrack(peer.pc, "presence", "audio");
       if (t) sources.push({ peerId: live.peerId, track: t });
@@ -313,7 +318,7 @@ export function createRoomMedia(opts: {
 
   async function pushPresenceAudio(): Promise<void> {
     if (!opts.forward || !presenceMixer) {
-      for (const peer of opts.peers()) {
+      for (const peer of rtpPeers()) {
         if (!peer.peerId) continue;
         const presenceAudio =
           mic && micListeners.has(peer.peerId) ? mic : null;
@@ -322,7 +327,7 @@ export function createRoomMedia(opts: {
       return;
     }
     presenceMixer.setSources(collectMicSources());
-    for (const peer of opts.peers()) {
+    for (const peer of rtpPeers()) {
       if (!peer.peerId) continue;
       if (!micListeners.has(peer.peerId)) {
         await replaceBoothTrack(peer.pc, "presence", "audio", null);
@@ -558,7 +563,7 @@ export function createRoomMedia(opts: {
       !programFromLive
         ? remoteProgramFrom
         : null;
-    for (const peer of opts.peers()) {
+    for (const peer of rtpPeers()) {
       const pVid = receiverTrack(peer.pc, "presence", "video");
       const pAud = receiverTrack(peer.pc, "presence", "audio");
       const gVid = receiverTrack(peer.pc, "program", "video");
@@ -626,7 +631,7 @@ export function createRoomMedia(opts: {
 
   function markAll(set: Set<string>): number {
     const before = set.size;
-    for (const peer of opts.peers()) {
+    for (const peer of rtpPeers()) {
       if (peer.peerId) set.add(peer.peerId);
     }
     return set.size - before;
@@ -641,7 +646,7 @@ export function createRoomMedia(opts: {
       program = { audio: mic, video: camera, stop() {} };
       return;
     }
-    const from = opts.peers().find((p) => p.peerId === tvSourcePeerId);
+    const from = rtpPeers().find((p) => p.peerId === tvSourcePeerId);
     if (!from) return;
     program = {
       audio: receiverTrack(from.pc, "presence", "audio"),
@@ -767,7 +772,7 @@ export function createRoomMedia(opts: {
 
   async function thisForwardFrom(fromPeerId: string): Promise<void> {
     if (!opts.forward) return;
-    const peers = opts.peers();
+    const peers = rtpPeers();
     const from = peers.find((p) => p.peerId === fromPeerId);
     if (!from) return;
     for (const dest of peers) {
@@ -840,7 +845,7 @@ export function createRoomMedia(opts: {
       !program &&
       !programFromLive;
     await pushPresenceAudio();
-    for (const peer of opts.peers()) {
+    for (const peer of rtpPeers()) {
       if (!peer.peerId) continue;
       const presenceVideo =
         camera && cameraWatchers.has(peer.peerId) ? camera : null;
@@ -1239,7 +1244,7 @@ export function createRoomMedia(opts: {
           stop() {},
         };
       } else {
-        const from = opts.peers().find((p) => p.peerId === peerId);
+        const from = rtpPeers().find((p) => p.peerId === peerId);
         if (!from) return { ok: false, error: "這個人不在" };
         if (!programFromLive) program?.stop();
         tvSourcePeerId = peerId;
@@ -1621,7 +1626,7 @@ export function createRoomMedia(opts: {
           return;
         }
         programWatchers.add(data.from);
-        const peers = opts.peers().filter((p) => p.peerId);
+        const peers = rtpPeers().filter((p) => p.peerId);
         if (!peers.some((p) => p.peerId === data.from)) {
           for (const p of peers) programWatchers.add(p.peerId);
         }

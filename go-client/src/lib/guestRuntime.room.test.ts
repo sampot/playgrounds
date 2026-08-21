@@ -281,7 +281,7 @@ describe("guestRuntime invite.room", () => {
     expect(fixtures.createOffer).toHaveBeenCalledWith(
       expect.objectContaining({
         transport: "signal",
-        media: "ready",
+        media: "none",
       })
     );
     expect(fixtures.postOffer).toHaveBeenCalledTimes(1);
