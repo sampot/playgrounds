@@ -270,6 +270,7 @@
     peerName={null}
     guestCount={status.guestCount ?? 0}
     occupantPeers={status.occupantPeers ?? []}
+    directPeerIds={status.directPeerIds ?? []}
     onEnd={() => runtime.leaveRoom()}
   />
 {:else if showCanvas}

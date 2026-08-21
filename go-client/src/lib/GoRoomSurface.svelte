@@ -67,6 +67,7 @@
     roomHostMemberMenu,
     roomMemberCard,
     roomMemberCardsSorted,
+    roomMemberShowsDirectLink,
     roomOccupantRows,
     roomShowAdSlot,
     roomShellActiveTab,
@@ -168,6 +169,8 @@
     guestCount?: number;
     occupantNames?: string[];
     occupantPeers?: RoomOccupantPeer[];
+    /** Guest mesh: peerIds with an open direct DataChannel. */
+    directPeerIds?: string[];
     onLogin?: () => void;
     onInvite?: () => void;
     onEnd?: () => void | Promise<void>;
@@ -188,6 +191,7 @@
     guestCount = 0,
     occupantNames = [],
     occupantPeers = [],
+    directPeerIds = [],
     onLogin,
     onInvite,
     onEnd,
@@ -313,6 +317,11 @@
           hostPeerId,
           tvSourcePeerId: goRoomMedia.tvSourcePeerId,
           avatarUrl: person.mine ? goAuth.profile?.avatar_url : null,
+          directLink: roomMemberShowsDirectLink({
+            mine: person.mine,
+            peerId: person.peerId,
+            directPeerIds,
+          }),
         })
       )
     )

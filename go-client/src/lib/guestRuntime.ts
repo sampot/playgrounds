@@ -132,6 +132,8 @@ export type GuestStatus = {
   /** Room surface: guests in the booth including self (Host not counted). */
   guestCount: number;
   occupantPeers: { peerId: string; name: string }[];
+  /** Guest↔Guest mesh peers with an open DataChannel (file direct path). */
+  directPeerIds: string[];
 };
 
 type Listener = (s: GuestStatus) => void;
@@ -175,6 +177,7 @@ export function createGuestRuntime() {
     surface: null,
     guestCount: 0,
     occupantPeers: [],
+    directPeerIds: [],
   };
   const listeners = new Set<Listener>();
   let localAgentId = newAgentId();
@@ -284,6 +287,7 @@ export function createGuestRuntime() {
       canvasGeneration: 0,
       loadProgress: null,
       surface: null,
+      directPeerIds: [],
     });
   }
 
@@ -317,6 +321,7 @@ export function createGuestRuntime() {
       error: GO_ROOM_CONNECT_FAILED,
       message: "",
       surface: "room",
+      directPeerIds: [],
     });
   }
 
@@ -560,17 +565,29 @@ export function createGuestRuntime() {
             },
             onBinary: (_peerId, buf) => goRoomFiles.onBinary(buf),
             onRosterChange: () => {
-              set({ guestCount: 1 + (meshClient?.knownPeerIds().length ?? 0) });
+              publishMeshLinks();
               void goRoomMedia.refresh();
             },
             onDirectOpen: (_peerId, session) => {
               session.pc.addEventListener("track", (ev) => {
                 goRoomMedia.onRemoteTrack(ev, session.pc);
               });
+              publishMeshLinks();
+              void goRoomMedia.refresh();
+            },
+            onDirectClose: () => {
+              publishMeshLinks();
               void goRoomMedia.refresh();
             },
           })
         : null;
+
+      function publishMeshLinks(): void {
+        set({
+          guestCount: 1 + (meshClient?.knownPeerIds().length ?? 0),
+          directPeerIds: meshClient?.directPeerIds() ?? [],
+        });
+      }
 
       const attachRoomChannels = () => {
         const sess = slot.s;
@@ -667,6 +684,7 @@ export function createGuestRuntime() {
           message: "",
           error: null,
           guestCount: 1 + (meshClient?.knownPeerIds().length ?? 0),
+          directPeerIds: meshClient?.directPeerIds() ?? [],
         });
       };
 
@@ -1062,6 +1080,7 @@ export function createGuestRuntime() {
       canvasGeneration: 0,
       loadProgress: null,
       surface: null,
+      directPeerIds: [],
     });
   }
 
@@ -1102,6 +1121,7 @@ export function createGuestRuntime() {
       canvasGeneration: 0,
       loadProgress: null,
       surface: "room",
+      directPeerIds: [],
     });
   }
 

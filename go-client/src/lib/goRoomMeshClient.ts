@@ -23,6 +23,8 @@ export type RoomMeshClient = {
   bufferedAmount: (peerId: string) => number;
   hasDirect: (peerId: string) => boolean;
   knownPeerIds: () => string[];
+  /** peerIds with an open mesh DataChannel. */
+  directPeerIds: () => string[];
   sessionFor: (peerId: string) => RosterPeerSession | null;
   dispose: () => void;
 };
@@ -109,11 +111,9 @@ export function createRoomMeshClient(opts: {
         drop(remoteId, "close");
       },
       onConnectionState: (state: RTCPeerConnectionState) => {
-        if (
-          state === "failed" ||
-          state === "disconnected" ||
-          state === "closed"
-        ) {
+        // ICE often flickers through "disconnected" then recovers — do not
+        // blackhole the peer (plan: one attempt; transient ≠ fail).
+        if (state === "failed" || state === "closed") {
           if (!pending.has(remoteId) && !open.has(remoteId)) return;
           drop(remoteId, state === "failed" ? "fail" : "close");
         }
@@ -273,6 +273,12 @@ export function createRoomMeshClient(opts: {
     },
     knownPeerIds() {
       return [...known];
+    },
+    directPeerIds() {
+      return [...open.keys()].filter((id) => {
+        const ch = open.get(id)?.getChannel();
+        return Boolean(ch && ch.readyState === "open");
+      });
     },
     sessionFor(peerId) {
       return open.get(peerId) ?? null;

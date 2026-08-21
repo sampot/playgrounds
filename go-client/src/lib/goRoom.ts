@@ -733,6 +733,8 @@ export const GO_ROOM_ROLE_HOST = "主持人";
 export const GO_ROOM_ROLE_PRESENTER = "主講人";
 export const GO_ROOM_ON_AIR = "LIVE";
 export const GO_ROOM_HAND_RAISE = "舉手";
+/** Compact roster cue: mesh DC open — file bytes need not relay via Host. */
+export const GO_ROOM_MEMBER_DIRECT = "傳檔直達";
 
 export type RoomMemberCardView = {
   peerId: string;
@@ -747,6 +749,8 @@ export type RoomMemberCardView = {
   speaking: boolean;
   onAir: boolean;
   handRaised: boolean;
+  /** Guest↔Guest mesh DataChannel open with local peer. */
+  directLink: boolean;
 };
 
 /** First visible grapheme for a letter avatar when there is no photo. */
@@ -773,7 +777,19 @@ export function roomMemberOnAir(opts: {
   return Boolean(localId) && src === localId;
 }
 
-/** Member-list card model: roles, mic／camera, LIVE, 舉手. */
+/** Roster cue: other guest has an open mesh link with us (never self). */
+export function roomMemberShowsDirectLink(opts: {
+  mine: boolean;
+  peerId: string;
+  directPeerIds: readonly string[];
+}): boolean {
+  if (opts.mine) return false;
+  const id = opts.peerId.trim();
+  if (!id) return false;
+  return opts.directPeerIds.includes(id);
+}
+
+/** Member-list card model: roles, mic／camera, LIVE, 舉手, mesh cue. */
 export function roomMemberCard(opts: {
   occupant: RoomOccupant;
   hostPeerId?: string | null;
@@ -782,6 +798,7 @@ export function roomMemberCard(opts: {
   speaking?: boolean;
   handRaised?: boolean;
   avatarUrl?: string | null;
+  directLink?: boolean;
 }): RoomMemberCardView {
   const hostId = opts.hostPeerId?.trim() || "";
   const host = Boolean(hostId) && opts.occupant.peerId === hostId;
@@ -805,6 +822,7 @@ export function roomMemberCard(opts: {
     speaking: Boolean(opts.speaking) && micOn,
     onAir,
     handRaised: Boolean(opts.handRaised),
+    directLink: Boolean(opts.directLink) && !opts.occupant.mine,
   };
 }
 

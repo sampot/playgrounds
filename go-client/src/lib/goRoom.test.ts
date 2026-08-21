@@ -45,6 +45,7 @@ import {
   roomMemberCard,
   roomMemberCardsSorted,
   roomMemberOnAir,
+  roomMemberShowsDirectLink,
   roomOccupantRows,
   GO_ROOM_FORCE_CAMERA_OFF,
   GO_ROOM_FORCE_MUTE,
@@ -442,6 +443,33 @@ describe("roomMemberCard", () => {
     ).toBe(true);
   });
 
+  it("marks mesh-direct peers for a compact roster cue (never self)", () => {
+    expect(
+      roomMemberShowsDirectLink({
+        mine: false,
+        peerId: "g-b",
+        directPeerIds: ["g-b"],
+      })
+    ).toBe(true);
+    expect(
+      roomMemberShowsDirectLink({
+        mine: true,
+        peerId: "local",
+        directPeerIds: ["local", "g-b"],
+      })
+    ).toBe(false);
+    expect(
+      roomMemberCard({
+        occupant: guest,
+        hostPeerId: "local",
+        directLink: true,
+      }).directLink
+    ).toBe(true);
+    expect(
+      roomMemberCard({ occupant: guest, hostPeerId: "local" }).directLink
+    ).toBe(false);
+  });
+
   it("animates the mic only when the open mic is speaking", () => {
     expect(
       roomMemberCard({
@@ -482,6 +510,7 @@ function memberStub(
     speaking: false,
     onAir: false,
     handRaised: false,
+    directLink: false,
     ...patch,
   };
 }

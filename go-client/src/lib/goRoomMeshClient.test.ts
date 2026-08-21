@@ -328,6 +328,69 @@ describe("createRoomMeshClient", () => {
     expect(createOffer).toHaveBeenCalledTimes(1);
   });
 
+  it("does not tear down an open mesh on transient disconnected", async () => {
+    let onConn: ((state: RTCPeerConnectionState) => void) | undefined;
+    const createOffer = vi.fn(
+      async (opts: {
+        handlers?: {
+          onChannelOpen?: () => void;
+          onConnectionState?: (state: RTCPeerConnectionState) => void;
+        };
+      }) => {
+        onConn = opts.handlers?.onConnectionState;
+        opts.handlers?.onChannelOpen?.();
+        return { session: mockSession(), wire: "offer-wire" };
+      }
+    );
+    const client = createRoomMeshClient({
+      localAgentId: "g-a",
+      localName: "甲",
+      sendToHost: () => {},
+      createOffer,
+      acceptOffer: vi.fn(),
+      applyAnswer: vi.fn(),
+    });
+    await client.onHostMessage({
+      type: SESSION_MESH_TYPE,
+      v: 1,
+      op: "hello",
+      peerId: "g-b",
+    });
+    expect(client.hasDirect("g-b")).toBe(true);
+    onConn?.("disconnected");
+    expect(client.hasDirect("g-b")).toBe(true);
+    expect(client.directPeerIds()).toEqual(["g-b"]);
+    onConn?.("connected");
+    expect(client.hasDirect("g-b")).toBe(true);
+    onConn?.("failed");
+    expect(client.hasDirect("g-b")).toBe(false);
+  });
+
+  it("lists open mesh peer ids for the roster cue", async () => {
+    const createOffer = vi.fn(
+      async (opts: { handlers?: { onChannelOpen?: () => void } }) => {
+        opts.handlers?.onChannelOpen?.();
+        return { session: mockSession(), wire: "offer-wire" };
+      }
+    );
+    const client = createRoomMeshClient({
+      localAgentId: "g-a",
+      localName: "甲",
+      sendToHost: () => {},
+      createOffer,
+      acceptOffer: vi.fn(),
+      applyAnswer: vi.fn(),
+    });
+    expect(client.directPeerIds()).toEqual([]);
+    await client.onHostMessage({
+      type: SESSION_MESH_TYPE,
+      v: 1,
+      op: "hello",
+      peerId: "g-b",
+    });
+    expect(client.directPeerIds()).toEqual(["g-b"]);
+  });
+
   it("sends binary on an open mesh DataChannel", async () => {
     const bins: ArrayBuffer[] = [];
     const session = mockSession({

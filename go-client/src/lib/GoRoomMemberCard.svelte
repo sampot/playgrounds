@@ -1,6 +1,7 @@
 <script lang="ts">
   import {
     GO_ROOM_HAND_RAISE,
+    GO_ROOM_MEMBER_DIRECT,
     GO_ROOM_MEMBER_MORE,
     GO_ROOM_ON_AIR,
     GO_ROOM_ROLE_HOST,
@@ -38,6 +39,7 @@
     if (card.speaking) bits.push("發言中");
     if (card.onAir) bits.push("播送中");
     if (card.handRaised) bits.push(GO_ROOM_HAND_RAISE);
+    if (card.directLink) bits.push(GO_ROOM_MEMBER_DIRECT);
     return bits.join(" · ");
   });
 </script>
@@ -48,6 +50,7 @@
   class={[
     "member-card",
     card.onAir && "member-card--on-air",
+    card.directLink && "member-card--direct",
     selected && "member-card--selected",
   ]
     .filter(Boolean)
@@ -69,6 +72,25 @@
     {:else}
       <span class="member-avatar member-avatar--letter" aria-hidden="true">
         {card.avatarInitial}
+      </span>
+    {/if}
+    {#if card.directLink}
+      <span class="member-direct" title={GO_ROOM_MEMBER_DIRECT}>
+        <svg
+          class="member-direct-icon"
+          viewBox="0 0 24 24"
+          width="12"
+          height="12"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.4"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M10 13a5 5 0 0 0 7.54.54l1.92-1.92a5 5 0 0 0-7.07-7.07L10.5 6.5" />
+          <path d="M14 11a5 5 0 0 0-7.54-.54L4.54 12.4a5 5 0 0 0 7.07 7.07L13.5 17.5" />
+        </svg>
       </span>
     {/if}
     {#if card.handRaised}
@@ -252,6 +274,9 @@
       0 0 0 2px color-mix(in oklab, rgb(var(--gold)) 55%, transparent),
       var(--pixel-shadow);
   }
+  .member-card--direct:not(.member-card--on-air) {
+    border-color: color-mix(in oklab, rgb(var(--accent)) 45%, rgb(var(--ink)));
+  }
   .member-avatar-wrap {
     position: relative;
     flex: 0 0 auto;
@@ -271,6 +296,23 @@
     font-family: var(--pixel);
     font-weight: 700;
     font-size: 1rem;
+  }
+  .member-direct {
+    position: absolute;
+    right: -0.3rem;
+    bottom: -0.3rem;
+    display: grid;
+    place-items: center;
+    width: 1.1rem;
+    height: 1.1rem;
+    border: 2px solid rgb(var(--ink));
+    border-radius: 999px;
+    background: color-mix(in oklab, rgb(var(--accent)) 55%, rgb(var(--card)));
+    color: rgb(var(--ink));
+    pointer-events: none;
+  }
+  .member-direct-icon {
+    display: block;
   }
   .member-hand {
     position: absolute;
