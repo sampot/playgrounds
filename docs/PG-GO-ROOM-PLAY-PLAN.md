@@ -3,7 +3,7 @@
 > **狀態：** Draft（2026-08-21）— **契約從屬** [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md) §5.9／凍結 #30／Phase **3**；**Phase 1–3 進行中**（wire／席次／fanout／Host attach peer＋SAM 掛槽／主持「玩五子棋」CTA）  
 > **權威決策：** 從屬 [DECISIONS.md](./DECISIONS.md) **DEC-050**（純玩版）、**DEC-045**（已有可用 PeerConnection → **重用**，禁止 Platform renegotiation）、**DEC-047**（Platform Invite）；**不另開 DEC**  
 > **相關：** [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)（包廂產品契約／媒體／傳檔——**本文件只寫開局落地**）、[PG-GO-HOST-INVITE-PLAN.md](./PG-GO-HOST-INVITE-PLAN.md)（GO-INVITE＝`invite.compose`；**勿混**）、[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)（五子棋 `gomoku.v1`）、[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)、[PG-GO-ROOM-DEV-HARNESS-PLAN.md](./PG-GO-ROOM-DEV-HARNESS-PLAN.md)（localhost／Agent 多 tab；開局 E2E 可建其上）、[PG-GO-SESSION-CHAT-PLAN.md](./PG-GO-SESSION-CHAT-PLAN.md)（局內 overlay——**勿混**）、`.cursor/rules/no-native-dialogs.mdc`、`.cursor/rules/mobile-first-ux.mdc`、[GLOSSARY.md](./GLOSSARY.md)  
-> **載體 SAM（第一刀）：** 型錄 [`pg-gomoku`](../catalog/entries/pg-gomoku.yaml)（`gomoku.v1`；roles＝`host`＋`player`）
+> **載體 SAM：** 型錄 [`pg-gomoku`](../catalog/entries/pg-gomoku.yaml)（`gomoku.v1`；roles＝`host`＋`player`）；[`pg-redpick`](../catalog/entries/pg-redpick.yaml)（`redpick.v1`；roles＝`host`＋`p2`＋`p3`＋`p4`）
 
 一句話：包廂進門已連（Guest↔Host PC）→ 主持用 **`session_play`** 在**同一條連線**上開 SAM 局；大螢幕槽掛畫布；入座席走既有 `avatar_relay`；**不鑄** `invite.compose`、**不改** Guest `/i/`、**零** Platform 第二輪 O／A。終局可「結束這一局」而包廂還在。
 
@@ -67,7 +67,7 @@
 5. 第一刀不做局中換席／開局後補位。
 6. 遊戲 SAM 忽略閒置 2+2 A／V；不因開局自動開相機。
 7. 開局時節目可 `unoffer`；結束局＝卸載畫布、節目 `<video>` **綁定不拆**（勿 `display:none` 解碼停）。
-8. 現況主面可露第一刀「玩五子棋」（自動入座）；完整選局 sheet＝Phase 4 收斂。
+8. 主持主面 CTA＝「玩遊戲」→ **頁內 Modal**（型錄 `listRoomPlayableGames`）；自動入座開局；完整手動指定席＝後續。
 
 ---
 
@@ -183,9 +183,9 @@ session_play.end    { from: host }
 | Session core | 自 `hostRuntime` **抽出**「已有 `RosterPeerSession[]` → openSession → invite／act 隧道」；compose 路徑繼續自管 Platform answer loop；包廂路徑**注入** room peer 表 | 禁止包廂呼叫 `mintPlatformInvite({ kind: "invite.compose" })` |
 | Guest | `guestRuntime` room 分支：收 offer → `resolveGoSamFiles` → 掛槽；在 seats → accept；否則觀戰 | 今日 room **跳過** `loading_sam` |
 | 殼面 | `GoRoomTvSlot`／`GoRoomSurface`：`play.active` 掛 canvas；藏節目視覺、不拆綁定；點槽＝操作／觀看，勿誤開影片 HUD | ROOM §10.5 |
-| UX | 成員區「玩遊戲」→ sheet（`kind: game`）→ 指定／自動入座；狀態句「正在玩〈遊戲〉」；成員標在玩／在看 | 實作前主面不露 CTA |
+| UX | 成員區「玩遊戲」→ Modal（型錄驅動）→ 自動入座；狀態句「正在玩遊戲」；Guest 無 CTA | 勿硬編碼單一遊戲按鈕 |
 | 媒體 | 開局前 unoffer 節目（切台）；麥／文字／檔不因開局停；mesh 不承載 session | ROOM §5.7／#19 |
-| Catalog | 第一刀硬鎖可開局集合含 `pg-gomoku` | `roles: [host, player]` |
+| Catalog | 可開局＝`kind: game`＋宣告 `protocols`（roles≥2）；含 `pg-gomoku`、`pg-redpick` | `hostableProtocolFor` |
 
 ### 9.1 觀戰
 
@@ -223,7 +223,7 @@ session_play.end    { from: host }
 | **1. Wire＋席次** | `rosterSessionPlay`；`assignRoomPlaySeats`；單測 | parse／guard；auto／manual 滿席／缺額案例綠 | **完成** |
 | **2. Peer 上掛 session** | 抽出 session core；room 注入既有 peer；假 DC：offer→載 stub→invite／act 一回合 | **零** Platform mint／join；end 後 peer 仍可 chat | **進行中**（`attachExistingPeer`／`inviteRoomPlayPeers`／`closeSessionKeepPeers`；Guest load＋auto-accept；手測／完整 act 隧道待） |
 | **3. 大螢幕槽** | TV slot 掛／卸 canvas；節目綁定保留 | active 見畫布；end 回沒訊號；video 元素仍在 DOM | **進行中**（`GoRoomTvSlot` iframe；video `opacity:0` 不拆綁） |
-| **4. 主持 sheet UX** | 型錄 game → 指定／自動；狀態／成員標；Guest 無 CTA | 窄屏可開局；席不滿頁內說明；無原生 dialog | **初刀**（成員區「玩五子棋」／「結束這一局」；完整 sheet 待） |
+| **4. 主持 sheet UX** | 型錄 game → Modal 選局；自動入座；狀態／結束局；Guest 無 CTA | 窄屏可開局；席不滿頁內說明；無原生 dialog | **完成**（「玩遊戲」Modal；手動指定席待） |
 | **5. 五子棋 e2e** | Host＋Guest 包廂內對弈至終局；第三人觀戰；結束局後包廂仍在 | Guest URL 始終包廂 `/i/`；可再播片／文字 | **延後** |
 
 **前置（非本文件交付，但阻塞排程）：** ROOM Phase **2d** 殼面手測收斂、片子／傳檔快樂路徑穩。ROOM 文件寫明：**現況不要排開局**。
@@ -266,3 +266,4 @@ session_play.end    { from: host }
 | 2026-08-21 | **Phase 1 落地：** `rosterSessionPlay`＋`goRoomPlaySeats`；**Phase 2 初刀：** `goRoomSessionPlay`、Host `offerPlay`／`endPlay` fanout、晚進門 snapshot、Guest apply；主面仍不露 CTA |
 | 2026-08-21 | **Phase 2–4 續：** Host `attachExistingPeer`／合成 invite；`goRoomPlayBootstrap`；TV 槽 iframe；成員區「玩五子棋」；Guest load＋auto-accept |
 | 2026-08-21 | **`pg_surface=solo\|room`：** 殼層掛載語境；`/s/` 單機、包廂連線；gomoku 依 surface 簡化 UI；結束局 keep-peers |
+| 2026-08-21 | **玩遊戲 Modal＋`pg-redpick`：** 型錄驅動選局；`redpick.v1` 四席；取代硬編碼「玩五子棋」 |

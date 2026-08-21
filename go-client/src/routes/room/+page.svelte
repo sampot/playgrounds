@@ -220,7 +220,7 @@
   playCanvasUrl={status?.playCanvasUrl ?? null}
   playCanvasSrcdoc={status?.playCanvasSrcdoc ?? null}
   playCanvasGeneration={status?.playCanvasGeneration ?? 0}
-  onStartPlay={() => void runtime.startAutoPlay("pg-gomoku")}
+  onStartPlay={(catalogId) => void runtime.startAutoPlay(catalogId)}
   onEndPlay={() => void runtime.endPlay()}
 />
 

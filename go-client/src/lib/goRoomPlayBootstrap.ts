@@ -138,3 +138,47 @@ export function listRoomPlayableCatalogIds(): string[] {
     return Boolean(p && p.roles.length >= 2);
   }).map((e) => e.id);
 }
+
+export type RoomPlayableGame = {
+  catalogId: string;
+  title: string;
+  blurb: string;
+  /** Seats required (roles × limits; default 1 per role). */
+  seatCount: number;
+  cover?: string;
+};
+
+/** Seat slots for a hostable protocol (default 1 per role). */
+export function roomPlaySeatCount(protocol: HostableProtocol): number {
+  let n = 0;
+  const seen = new Set<string>();
+  for (const role of protocol.roles) {
+    const r = role.trim();
+    if (!r || seen.has(r)) continue;
+    seen.add(r);
+    const lim = protocol.roleLimits?.[r];
+    n +=
+      typeof lim === "number" && Number.isFinite(lim) && lim > 0
+        ? Math.floor(lim)
+        : 1;
+  }
+  return n;
+}
+
+/** Catalog-driven booth play picker rows. */
+export function listRoomPlayableGames(): RoomPlayableGame[] {
+  const out: RoomPlayableGame[] = [];
+  for (const id of listRoomPlayableCatalogIds()) {
+    const entry = getGoCatalogEntry(id);
+    const protocol = hostableProtocolFor(entry ?? null);
+    if (!entry || !protocol) continue;
+    out.push({
+      catalogId: id,
+      title: entry.title,
+      blurb: entry.blurb,
+      seatCount: roomPlaySeatCount(protocol),
+      ...(entry.cover ? { cover: entry.cover } : {}),
+    });
+  }
+  return out;
+}

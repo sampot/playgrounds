@@ -131,6 +131,30 @@ describe("assignRoomPlaySeats", () => {
     ).toBe(false);
   });
 
+  it("auto-fills four distinct redpick seats by join order", () => {
+    const out = assignRoomPlaySeats({
+      protocolRoles: ["host", "p2", "p3", "p4"],
+      hostPeerId: "host-1",
+      occupantsOrdered: [
+        occ("host-1", "H", 0),
+        occ("g-a", "A", 1),
+        occ("g-b", "B", 2),
+        occ("g-c", "C", 3),
+        occ("g-d", "D", 4),
+      ],
+      mode: "auto",
+    });
+    expect(out.ok).toBe(true);
+    if (!out.ok) throw new Error("expected ok");
+    expect(out.seats).toEqual([
+      { role: "host", peerId: "host-1" },
+      { role: "p2", peerId: "g-a" },
+      { role: "p3", peerId: "g-b" },
+      { role: "p4", peerId: "g-c" },
+    ]);
+    expect(out.spectators).toEqual(["g-d"]);
+  });
+
   it("respects roleLimits when provided (default 1 each)", () => {
     const out = assignRoomPlaySeats({
       protocolRoles: ["player"],

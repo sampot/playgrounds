@@ -20,6 +20,8 @@
   import GoRoomTvSlot from "$lib/GoRoomTvSlot.svelte";
   import GoRoomMemberCard from "$lib/GoRoomMemberCard.svelte";
   import GoRoomFileCard from "$lib/GoRoomFileCard.svelte";
+  import GoRoomPlayPicker from "$lib/GoRoomPlayPicker.svelte";
+  import { listRoomPlayableGames } from "$lib/goRoomPlayBootstrap";
   import { goAuth } from "$lib/goAuth.svelte";
   import { roomAdClickAction } from "$lib/goAds";
   import { chromeSession } from "$lib/chromeSession.svelte";
@@ -183,7 +185,7 @@
     playCanvasUrl?: string | null;
     playCanvasSrcdoc?: string | null;
     playCanvasGeneration?: number;
-    onStartPlay?: () => void | Promise<void>;
+    onStartPlay?: (catalogId: string) => void | Promise<void>;
     onEndPlay?: () => void | Promise<void>;
   };
 
@@ -213,6 +215,9 @@
     onStartPlay,
     onEndPlay,
   }: Props = $props();
+
+  let playPickerOpen = $state(false);
+  const playableGames = $derived(listRoomPlayableGames());
 
   let draft = $state("");
   let clientReady = $state(false);
@@ -552,6 +557,7 @@
       shareOpen,
       confirmOpen:
         confirmEnd ||
+        playPickerOpen ||
         Boolean(kickTarget) ||
         Boolean(deleteFileId) ||
         Boolean(privatePendingDelete),
@@ -1728,9 +1734,9 @@
                 <button
                   type="button"
                   class="pixel-btn pixel-btn--primary door-row-action"
-                  onclick={() => void onStartPlay?.()}
+                  onclick={() => (playPickerOpen = true)}
                 >
-                  玩五子棋
+                  玩遊戲
                 </button>
               </div>
             {/if}
@@ -2495,6 +2501,12 @@
       onFlash={(msg) => chromeSession.setFlash(msg)}
     />
   {/if}
+
+  <GoRoomPlayPicker
+    bind:open={playPickerOpen}
+    games={playableGames}
+    onPick={(catalogId) => void onStartPlay?.(catalogId)}
+  />
 </div>
 
 <style>

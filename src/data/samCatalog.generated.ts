@@ -1649,10 +1649,11 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     title: "撿紅點",
     kind: "game",
     series: "桌遊",
-    blurb: "對點數撿牌，連撿／清桌加成；四人人機、手機適配與自製音效。",
+    blurb: "對點數撿牌，連撿／清桌加成；四人人機或包廂四人連線（redpick.v1）。",
     source: "sampot/pg-redpick",
     status: "listed",
     license: "MIT",
+    protocols: [{"protocolId":"redpick.v1","apiVersion":"1","roles":["host","p2","p3","p4"]}],
     cover: "/covers/pg-redpick.png",
   },
   {
