@@ -449,8 +449,8 @@ export function goRoomCastCaptureError(opts?: {
   return native ? GO_ROOM_CAST_UNSUPPORTED : GO_ROOM_CAST_SOURCE_UNSUPPORTED;
 }
 
-/** Guest↔Guest mesh is postponed; Hub star carries files and media. */
-export const GO_ROOM_MESH_ENABLED = false;
+/** Guest↔Guest mesh: roster-change dial; file bytes prefer direct DC (§7.4／1c). */
+export const GO_ROOM_MESH_ENABLED = true;
 
 /** Host plus guests currently in the booth. */
 export function roomOccupantCount(guestCount: number): number {

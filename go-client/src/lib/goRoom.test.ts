@@ -601,8 +601,8 @@ describe("roomHostMemberMenu", () => {
 });
 
 describe("GO_ROOM_MESH_ENABLED", () => {
-  it("keeps Guest↔Guest mesh off so Hub star is the only path", () => {
-    expect(GO_ROOM_MESH_ENABLED).toBe(false);
+  it("enables Guest↔Guest mesh so file bytes can skip the Host star", () => {
+    expect(GO_ROOM_MESH_ENABLED).toBe(true);
   });
 });
 

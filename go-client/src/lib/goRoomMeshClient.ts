@@ -1,6 +1,7 @@
 /**
- * Guest-side session_mesh: build a 2+2＋DC peer to another guest.
- * Fail → caller keeps using Host star for files／media.
+ * Guest-side session_mesh: build a 2+2＋DC peer to another guest on roster change.
+ * One attempt per peerId per presence; fail／close → star only (no redial).
+ * File transfer only reads hasDirect — never dials here.
  */
 
 import {
@@ -31,6 +32,8 @@ type Pending = {
   remoteId: string;
 };
 
+type DropReason = "fail" | "close" | "left";
+
 export function createRoomMeshClient(opts: {
   localAgentId: string;
   localName: string;
@@ -49,6 +52,8 @@ export function createRoomMeshClient(opts: {
   const pending = new Map<string, Pending>();
   const open = new Map<string, RosterPeerSession>();
   const known = new Set<string>();
+  /** Same peerId: no second dial until bye clears (plan §7.4 一次機會). */
+  const dead = new Set<string>();
 
   function sendHost(msg: SessionMeshMessage): void {
     try {
@@ -58,19 +63,17 @@ export function createRoomMeshClient(opts: {
     }
   }
 
-  function drop(peerId: string, failed: boolean): void {
+  function drop(peerId: string, reason: DropReason): void {
     const sess = pending.get(peerId)?.session ?? open.get(peerId);
     pending.delete(peerId);
     open.delete(peerId);
-    if (sess) {
-      try {
-        sess.close();
-      } catch {
-        /* ignore */
-      }
+    if (reason === "left") {
+      dead.delete(peerId);
+    } else {
+      dead.add(peerId);
     }
     opts.onDirectClose?.(peerId);
-    if (failed) {
+    if (reason === "fail") {
       sendHost(
         buildSessionMeshMessage({
           op: "fail",
@@ -78,6 +81,13 @@ export function createRoomMeshClient(opts: {
           to: peerId,
         })
       );
+    }
+    if (sess) {
+      try {
+        sess.close();
+      } catch {
+        /* ignore */
+      }
     }
   }
 
@@ -95,7 +105,8 @@ export function createRoomMeshClient(opts: {
         if (sess) markOpen(remoteId, sess);
       },
       onChannelClose: () => {
-        drop(remoteId, false);
+        if (!pending.has(remoteId) && !open.has(remoteId)) return;
+        drop(remoteId, "close");
       },
       onConnectionState: (state: RTCPeerConnectionState) => {
         if (
@@ -103,20 +114,24 @@ export function createRoomMeshClient(opts: {
           state === "disconnected" ||
           state === "closed"
         ) {
-          drop(remoteId, state === "failed");
+          if (!pending.has(remoteId) && !open.has(remoteId)) return;
+          drop(remoteId, state === "failed" ? "fail" : "close");
         }
       },
       onBinary: (buf: ArrayBuffer) => {
         opts.onBinary?.(remoteId, buf);
       },
       onError: () => {
-        if (!open.has(remoteId)) drop(remoteId, true);
+        if (!pending.has(remoteId) && !open.has(remoteId)) return;
+        if (!open.has(remoteId)) drop(remoteId, "fail");
       },
     };
   }
 
   async function startOffer(remoteId: string): Promise<void> {
-    if (pending.has(remoteId) || open.has(remoteId)) return;
+    if (dead.has(remoteId) || pending.has(remoteId) || open.has(remoteId)) {
+      return;
+    }
     try {
       const result = await createOffer({
         transport: "signal",
@@ -127,6 +142,14 @@ export function createRoomMeshClient(opts: {
         },
         handlers: handlers(remoteId),
       });
+      if (dead.has(remoteId)) {
+        try {
+          result.session.close();
+        } catch {
+          /* ignore */
+        }
+        return;
+      }
       pending.set(remoteId, { session: result.session, remoteId });
       if (result.session.getChannel()?.readyState === "open") {
         markOpen(remoteId, result.session);
@@ -140,12 +163,12 @@ export function createRoomMeshClient(opts: {
         })
       );
     } catch {
-      drop(remoteId, true);
+      drop(remoteId, "fail");
     }
   }
 
   async function takeOffer(from: string, sdp: string): Promise<void> {
-    if (open.has(from) || pending.has(from)) return;
+    if (dead.has(from) || open.has(from) || pending.has(from)) return;
     try {
       const result = await acceptOffer({
         offerWire: sdp,
@@ -157,6 +180,14 @@ export function createRoomMeshClient(opts: {
         },
         handlers: handlers(from),
       });
+      if (dead.has(from)) {
+        try {
+          result.session.close();
+        } catch {
+          /* ignore */
+        }
+        return;
+      }
       pending.set(from, { session: result.session, remoteId: from });
       if (result.session.getChannel()?.readyState === "open") {
         markOpen(from, result.session);
@@ -170,7 +201,7 @@ export function createRoomMeshClient(opts: {
         })
       );
     } catch {
-      drop(from, true);
+      drop(from, "fail");
     }
   }
 
@@ -182,6 +213,7 @@ export function createRoomMeshClient(opts: {
         if (!remoteId || remoteId === opts.localAgentId) return;
         known.add(remoteId);
         opts.onRosterChange?.();
+        if (dead.has(remoteId)) return;
         if (!shouldOfferMesh(opts.localAgentId, remoteId)) return;
         await startOffer(remoteId);
         return;
@@ -190,7 +222,7 @@ export function createRoomMeshClient(opts: {
         const remoteId = data.peerId;
         if (!remoteId) return;
         known.delete(remoteId);
-        drop(remoteId, false);
+        drop(remoteId, "left");
         opts.onRosterChange?.();
         return;
       }
@@ -200,6 +232,7 @@ export function createRoomMeshClient(opts: {
         return;
       }
       if (data.op === "answer" && data.from && data.sdp) {
+        if (dead.has(data.from)) return;
         const sess =
           pending.get(data.from)?.session ?? open.get(data.from);
         if (!sess) return;
@@ -209,12 +242,16 @@ export function createRoomMeshClient(opts: {
             markOpen(data.from, sess);
           }
         } catch {
-          drop(data.from, true);
+          drop(data.from, "fail");
         }
         return;
       }
       if (data.op === "fail" && data.from) {
-        drop(data.from, false);
+        if (pending.has(data.from) || open.has(data.from)) {
+          drop(data.from, "close");
+        } else {
+          dead.add(data.from);
+        }
       }
     },
     sendBinary(peerId, buf) {
@@ -242,8 +279,10 @@ export function createRoomMeshClient(opts: {
     },
     dispose() {
       for (const id of [...pending.keys(), ...open.keys()]) {
-        drop(id, false);
+        drop(id, "close");
       }
+      known.clear();
+      dead.clear();
     },
   };
 }

@@ -243,7 +243,7 @@ describe("roomRuntime", () => {
     expect(rt.getStatus().guestCount).toBe(1);
   });
 
-  it("does not introduce guests over session_mesh; Hub star carries data and media", async () => {
+  it("introduces guests over session_mesh when a second guest joins", async () => {
     let loopOpts: {
       prepareHandlers: () => {
         handlers: { onMessage: (data: unknown) => void };
@@ -274,14 +274,18 @@ describe("roomRuntime", () => {
       agentId: "g-b",
       name: "乙",
     });
-    expect(b.send).not.toHaveBeenCalledWith(
+    expect(b.send).toHaveBeenCalledWith(
       expect.objectContaining({
         type: "session_mesh",
+        op: "hello",
+        peerId: "g-a",
       })
     );
-    expect(a.send).not.toHaveBeenCalledWith(
+    expect(a.send).toHaveBeenCalledWith(
       expect.objectContaining({
         type: "session_mesh",
+        op: "hello",
+        peerId: "g-b",
       })
     );
 
@@ -293,9 +297,13 @@ describe("roomRuntime", () => {
       to: "g-b",
       sdp: "wire",
     });
-    expect(b.send).not.toHaveBeenCalledWith(
+    expect(b.send).toHaveBeenCalledWith(
       expect.objectContaining({
         type: "session_mesh",
+        op: "offer",
+        from: "g-a",
+        to: "g-b",
+        sdp: "wire",
       })
     );
   });

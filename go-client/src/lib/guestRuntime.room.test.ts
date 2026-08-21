@@ -260,7 +260,7 @@ describe("guestRuntime invite.room", () => {
     );
   });
 
-  it("ignores session_mesh hello so Guest↔Guest stays on the Host hub", async () => {
+  it("dials a mesh peer on session_mesh hello (roster change, not file transfer)", async () => {
     const { createGuestRuntime } = await import("./guestRuntime");
     const rt = createGuestRuntime();
     await rt.bootFromShortId("room1");
@@ -269,6 +269,7 @@ describe("guestRuntime invite.room", () => {
       handlers?: { onMessage?: (data: unknown) => void };
     };
     fixtures.createOffer.mockClear();
+    // localAgentId is go-…; "zz-peer" is lexicographically larger → we offer.
     offerOpts.handlers?.onMessage?.({
       type: "session_mesh",
       v: 1,
@@ -276,7 +277,13 @@ describe("guestRuntime invite.room", () => {
       peerId: "zz-peer",
     });
     await new Promise((r) => setTimeout(r, 20));
-    expect(fixtures.createOffer).not.toHaveBeenCalled();
+    expect(fixtures.createOffer).toHaveBeenCalledTimes(1);
+    expect(fixtures.createOffer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        transport: "signal",
+        media: "ready",
+      })
+    );
     expect(fixtures.postOffer).toHaveBeenCalledTimes(1);
   });
 

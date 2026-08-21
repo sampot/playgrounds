@@ -154,6 +154,180 @@ describe("createRoomMeshClient", () => {
     expect(client.hasDirect("g-b")).toBe(false);
   });
 
+  it("does not re-offer the same peer after a failed attempt", async () => {
+    const createOffer = vi.fn(async () => {
+      throw new Error("ICE gathering timeout");
+    });
+    const client = createRoomMeshClient({
+      localAgentId: "g-a",
+      localName: "甲",
+      sendToHost: () => {},
+      createOffer,
+      acceptOffer: vi.fn(),
+      applyAnswer: vi.fn(),
+    });
+    await client.onHostMessage({
+      type: SESSION_MESH_TYPE,
+      v: 1,
+      op: "hello",
+      peerId: "g-b",
+    });
+    expect(createOffer).toHaveBeenCalledTimes(1);
+    await client.onHostMessage({
+      type: SESSION_MESH_TYPE,
+      v: 1,
+      op: "hello",
+      peerId: "g-b",
+    });
+    expect(createOffer).toHaveBeenCalledTimes(1);
+    expect(client.knownPeerIds()).toEqual(["g-b"]);
+    expect(client.hasDirect("g-b")).toBe(false);
+  });
+
+  it("ignores a late offer from a peer already marked failed", async () => {
+    const createOffer = vi.fn(async () => {
+      throw new Error("ICE gathering timeout");
+    });
+    const acceptOffer = vi.fn();
+    const client = createRoomMeshClient({
+      localAgentId: "g-a",
+      localName: "甲",
+      sendToHost: () => {},
+      createOffer,
+      acceptOffer,
+      applyAnswer: vi.fn(),
+    });
+    await client.onHostMessage({
+      type: SESSION_MESH_TYPE,
+      v: 1,
+      op: "hello",
+      peerId: "g-b",
+    });
+    await client.onHostMessage({
+      type: SESSION_MESH_TYPE,
+      v: 1,
+      op: "offer",
+      from: "g-b",
+      to: "g-a",
+      sdp: "late-wire",
+    });
+    expect(acceptOffer).not.toHaveBeenCalled();
+  });
+
+  it("does not redial after the remote reports fail", async () => {
+    const createOffer = vi.fn();
+    const acceptOffer = vi.fn();
+    const client = createRoomMeshClient({
+      localAgentId: "g-b",
+      localName: "乙",
+      sendToHost: () => {},
+      createOffer,
+      acceptOffer,
+      applyAnswer: vi.fn(),
+    });
+    await client.onHostMessage({
+      type: SESSION_MESH_TYPE,
+      v: 1,
+      op: "hello",
+      peerId: "g-a",
+    });
+    await client.onHostMessage({
+      type: SESSION_MESH_TYPE,
+      v: 1,
+      op: "fail",
+      from: "g-a",
+      to: "g-b",
+    });
+    await client.onHostMessage({
+      type: SESSION_MESH_TYPE,
+      v: 1,
+      op: "offer",
+      from: "g-a",
+      to: "g-b",
+      sdp: "retry-wire",
+    });
+    expect(acceptOffer).not.toHaveBeenCalled();
+  });
+
+  it("allows a fresh attempt after bye then hello (new presence)", async () => {
+    const createOffer = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("fail once"))
+      .mockImplementationOnce(
+        async (opts: { handlers?: { onChannelOpen?: () => void } }) => {
+          const session = mockSession();
+          opts.handlers?.onChannelOpen?.();
+          return { session, wire: "offer-2" };
+        }
+      );
+    const client = createRoomMeshClient({
+      localAgentId: "g-a",
+      localName: "甲",
+      sendToHost: () => {},
+      createOffer,
+      acceptOffer: vi.fn(),
+      applyAnswer: vi.fn(),
+    });
+    await client.onHostMessage({
+      type: SESSION_MESH_TYPE,
+      v: 1,
+      op: "hello",
+      peerId: "g-b",
+    });
+    expect(createOffer).toHaveBeenCalledTimes(1);
+    await client.onHostMessage({
+      type: SESSION_MESH_TYPE,
+      v: 1,
+      op: "bye",
+      peerId: "g-b",
+    });
+    await client.onHostMessage({
+      type: SESSION_MESH_TYPE,
+      v: 1,
+      op: "hello",
+      peerId: "g-b",
+    });
+    expect(createOffer).toHaveBeenCalledTimes(2);
+    expect(client.hasDirect("g-b")).toBe(true);
+  });
+
+  it("does not redial after an open mesh channel closes", async () => {
+    let onClose: (() => void) | undefined;
+    const createOffer = vi.fn(
+      async (opts: {
+        handlers?: { onChannelOpen?: () => void; onChannelClose?: () => void };
+      }) => {
+        onClose = opts.handlers?.onChannelClose;
+        opts.handlers?.onChannelOpen?.();
+        return { session: mockSession(), wire: "offer-wire" };
+      }
+    );
+    const client = createRoomMeshClient({
+      localAgentId: "g-a",
+      localName: "甲",
+      sendToHost: () => {},
+      createOffer,
+      acceptOffer: vi.fn(),
+      applyAnswer: vi.fn(),
+    });
+    await client.onHostMessage({
+      type: SESSION_MESH_TYPE,
+      v: 1,
+      op: "hello",
+      peerId: "g-b",
+    });
+    expect(client.hasDirect("g-b")).toBe(true);
+    onClose?.();
+    expect(client.hasDirect("g-b")).toBe(false);
+    await client.onHostMessage({
+      type: SESSION_MESH_TYPE,
+      v: 1,
+      op: "hello",
+      peerId: "g-b",
+    });
+    expect(createOffer).toHaveBeenCalledTimes(1);
+  });
+
   it("sends binary on an open mesh DataChannel", async () => {
     const bins: ArrayBuffer[] = [];
     const session = mockSession({
