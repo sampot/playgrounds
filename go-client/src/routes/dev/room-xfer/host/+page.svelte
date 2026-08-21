@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
+  import { browser } from "$app/environment";
   import { page } from "$app/state";
   import {
     ROOM_XFER_IO_DELAY_MS,
@@ -8,7 +9,10 @@
     type RoomXferHarness,
   } from "$lib/goRoomXferHarness";
 
-  const room = $derived(page.url.searchParams.get("room")?.trim() || "default");
+  // Prerender forbids `url.searchParams` — only read query after hydrate.
+  const room = $derived(
+    (browser ? page.url.searchParams.get("room")?.trim() : null) || "default"
+  );
 
   let harness: RoomXferHarness | null = null;
   let phase = $state("idle");

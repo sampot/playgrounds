@@ -25,7 +25,9 @@ const config = {
       "@utils": "../src/utils",
     },
     prerender: {
-      handleHttpError: "warn",
+      // Fail the build if a prerendered route returns 4xx/5xx (e.g. accidental
+      // `url.searchParams` during SSR) instead of shipping empty／error HTML.
+      handleHttpError: "fail",
     },
   },
 };

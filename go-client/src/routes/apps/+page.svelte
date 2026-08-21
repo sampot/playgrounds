@@ -1,5 +1,6 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
+  import { browser } from "$app/environment";
   import { page } from "$app/state";
   import { chromeSession } from "$lib/chromeSession.svelte";
   import { getGoCatalogEntry } from "$lib/goCatalog";
@@ -46,7 +47,10 @@
   const pageCount = $derived(appsPageCount(apps.length));
   const currentPage = $derived(
     clampAppsPage(
-      parseAppsPageParam(page.url.searchParams.get("page")),
+      // Prerender forbids `url.searchParams`; query only matters after hydrate.
+      parseAppsPageParam(
+        browser ? page.url.searchParams.get("page") : null
+      ),
       pageCount
     )
   );
