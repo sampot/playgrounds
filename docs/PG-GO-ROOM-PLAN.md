@@ -2,7 +2,7 @@
 
 > **狀態：** Draft（2026-08-21）— 主面＝**主視訊區**（沒訊號／片子／live 同一塊；槽內無字；**劇院態可滿窗**，三區／底列 overlay；**開局契約仍凍、實作延後**）；chrome **可收**；廳態＝大螢幕＋**成員／檔案／文字**（RWD）；文字＝開口備援（非主欄）；兩層螢幕（大螢幕 ≠ 我這台）；**大螢幕＝同時一路主畫面**（主持指定；再指定＝切台）；**否決**瀏覽器多路視訊合成進節目；**在場聲＝星狀下 Host `AudioContext` 混音再送**（開麥彼此聽得到；靜音＝不進混）；**放到大螢幕上＝主持指定 `file { owner, id }`，一律由持檔端本機渲染 → 節目 RTP**（可別人掛的檔、**可主持私有檔**；呈現型別影→音→圖遞增）；**分享目錄**前端一律 `/room-file/<id>`（SW＝HTTP server；本機掛檔 SW 直出、不經 DC；遠端每 roundtrip ↔ transfer）；**Guest↔Guest mesh（Phase 1c）：** 索檔／持檔有直連 DC 時檔 bytes **不**經 Host relay；失敗回 star；**節目／在場 RTP 仍走 Hub**；**主持私有檔＝OPFS、不進分享、上大螢幕≠分享**（契約凍；實作見 Phase **2g**）；其餘：進門即主面、不鎖 1:1、兩個時鐘、SDP **2+2**
 > **權威決策：** 從屬 [DECISIONS.md](./DECISIONS.md) **DEC-050**（純玩版）、**DEC-045**（Roster／薄 signaling；**非** Avatars 產品面）、**DEC-047**（Platform Invite）；**不另開 DEC**  
-> **相關：** [PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)、[PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md)（登入＋記憶體 field API key）、[PG-GO-HOST-INVITE-PLAN.md](./PG-GO-HOST-INVITE-PLAN.md)（GO-INVITE＝遊戲 compose；**勿混**）、[PG-GO-SESSION-CHAT-PLAN.md](./PG-GO-SESSION-CHAT-PLAN.md)（局內 overlay 對話——**勿混**）、[PG-GO-SHOP-LOBBY-PLAN.md](./PG-GO-SHOP-LOBBY-PLAN.md)（大廳熱點入口）、[PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)、[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（官方 TURN；包廂 ICE **與**遊戲邀請分開）、`.cursor/rules/no-native-dialogs.mdc`、`.cursor/rules/mobile-first-ux.mdc`、[GLOSSARY.md](./GLOSSARY.md)
+> **相關：** [PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)、[PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md)（登入＋記憶體 field API key）、[PG-GO-HOST-INVITE-PLAN.md](./PG-GO-HOST-INVITE-PLAN.md)（GO-INVITE＝遊戲 compose；**勿混**）、[PG-GO-ROOM-PLAY-PLAN.md](./PG-GO-ROOM-PLAY-PLAN.md)（包廂內重用 peer 開局＝`session_play`；Phase 3；**實作延後**）、[PG-GO-SESSION-CHAT-PLAN.md](./PG-GO-SESSION-CHAT-PLAN.md)（局內 overlay 對話——**勿混**）、[PG-GO-SHOP-LOBBY-PLAN.md](./PG-GO-SHOP-LOBBY-PLAN.md)（大廳熱點入口）、[PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)、[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（官方 TURN；包廂 ICE **與**遊戲邀請分開）、`.cursor/rules/no-native-dialogs.mdc`、`.cursor/rules/mobile-first-ux.mdc`、[GLOSSARY.md](./GLOSSARY.md)
 
 一句話：已登入會員進 **`/room` 就是這一間包廂**（主面立刻出現；**不必先請人**）。**包廂活著＝主持這個畫面還開著；過期的是邀請碼，不是這一間。** 快樂路徑＝**請人進來一起看大螢幕**（片子／圖／某人 live；可把別人掛的檔、或主持**私有檔**切上大螢幕）。**主面是大螢幕槽**，不是時間線——舞台＝畫面（影片、視訊），文字＝三區之一、不是進門第一眼，產品不是會議格子牆。每人自帶手機／筆電可掛檔、下載、**私下播放**，**不跟大螢幕互斥**。片子／圖／音／live 由主持指定**一路**、走 **WebRTC 節目 RTP**（持檔端本機渲染；再指定＝切台；**不做**多路視訊合成）。開口用麥（星狀下 Host **混音**讓開麥者彼此聽得到）；文字是不方便開口時的輔助。**分享目錄**與**主持私有檔**分開：分享裡每一檔前端一律同源 `/room-file/<id>`（本機 SW 直出；遠端 DC transfer）；私有＝Host 本機 OPFS 片庫，**不** fanout、**不可**被別人「要」——上大螢幕只送節目 RTP，要分享仍須顯式**掛到分享區**。同一張有效門牌可請人進來，也可給自己的另一台掃。人數不鎖 1:1。資料只走 WebRTC（**不**經 Platform 中繼、**不**雲存、**不錄製**）。進門仍 Guest↔Host；Guest 另可試建 Guest↔Guest DC（`session_mesh`）——**下載／私下播**有直連則跳過 Host 轉幀；無直連或失敗＝Host star。節目／在場 RTP 仍 Hub。殼＝大螢幕槽＋成員／檔案／文字（**不**用可行走大廳當 `/room`）。**在大螢幕上開一局**（重用進門 PC、不鑄 compose）＝契約已凍、**實作延後**。
 
@@ -314,6 +314,8 @@ Guest `/i/` 不經大廳；進主面須讀成「你在一間包廂」。可選�
 
 **現況不實作、主面不露「玩遊戲」。** 契約仍凍（重用進門 PC、不鑄 `invite.compose`、Guest 留 `/i/`）；等殼面、片子／live、傳檔、開口穩了再排。Mesh 檔直連見 §7.4／**1c**（與開局無關）。
 
+**實作計劃（索引）：** [PG-GO-ROOM-PLAY-PLAN.md](./PG-GO-ROOM-PLAY-PLAN.md)（`session_play`、席次、重用 peer、大螢幕掛 SAM、與 GO-INVITE 切界；Phase 0–5）。本節只凍產品契約；落地步驟與模組邊界以該文件為準。
+
 包廂已連則**重用進門 PC** 開 SAM session（Phase 3；DEC-045 重用）。**不必**再掃遊戲 QR、**禁止**另鑄 `invite.compose`、**禁止** `replaceState` 成 `/s/<id>`。GO-INVITE 仍服務「還沒進包廂、為某一款遊戲拉人」。
 
 ```text
@@ -485,7 +487,7 @@ pc.createDataChannel("roster", { ordered: true });
 | `session_occupancy` | **用** | 主持把在場名單 snapshot fanout（Hub 星狀；人數不以 mesh `hello` 為權威——mesh 可能建不起） |
 | `session_mesh` | **用（1c）** | 主持轉送任兩 Guest 的 O／A／candidate；**不**經 Platform；**不**載檔 bytes／RTP。**在線 Guest 變動時** Host `hello`（既有人＋新人）；Guest **立刻**試建第二條 PC。失敗標該 peer 不再 dial。旗標：`GO_ROOM_MESH_ENABLED` |
 | `session_cast` | 媒體階段 | **大螢幕控制面**（指定 `file { owner,id,scope? }`／peer live／沒訊號；可選 kind／name／paused／t 當標籤）；**不**承載檔 bytes；節目 RTP 走 Hub；owner≠主持時由持檔端產軌；`scope: "private"`＝Host OPFS |
-| `session_play` | **延後** | **開局控制面**（catalogId、席次 peerId、offer／end）；**不**經 Platform；不載 SAM bytes。現況不介紹、主面不露玩遊戲 |
+| `session_play` | **延後** | **開局控制面**（catalogId、席次 peerId、offer／end）；**不**經 Platform；不載 SAM bytes。現況不介紹、主面不露玩遊戲。實作見 [PG-GO-ROOM-PLAY-PLAN.md](./PG-GO-ROOM-PLAY-PLAN.md) |
 | `session_camera` | Phase 2 | 鏡頭項：offer＝掛上；`request` 才送 RTP |
 | `session_ping` | 可選 | RTT 探測；對人可顯示「約 N ms」，不揭露路徑 |
 | `avatar_relay` | 開局才用 | 進門不用。大螢幕上開局後才掛 session／SAM 需要的 relay |
@@ -952,7 +954,7 @@ session_camera.release  { from }
 | **圖檔上大螢幕** | owner canvas 靜態／低幀 video 軌；無 seek HUD | 同上 |
 | **可預覽 doc 上大螢幕** | 僅來源端可 capture 的表面；不承諾任意 MIME | 不阻塞影／音／圖 |
 | **在場聲混音（2f）** | Host `AudioContext` 混多麥 → 各 peer 一條 presence audio | §9.8.1；**已落地** |
-| **在包廂開一局** | 已有 PC → 重用；大螢幕槽掛 SAM；主持選遊戲＋指定／自動入座；觀戰＝未入座仍看畫布 | DEC-045 重用；§5.9。**不要**散場再鑄遊戲邀請當快樂路徑 |
+| **在包廂開一局** | 已有 PC → 重用；大螢幕槽掛 SAM；主持選遊戲＋指定／自動入座；觀戰＝未入座仍看畫布 | DEC-045 重用；§5.9；實作 [PG-GO-ROOM-PLAY-PLAN.md](./PG-GO-ROOM-PLAY-PLAN.md)。**不要**散場再鑄遊戲邀請當快樂路徑 |
 | **螢幕分享** | 同一條在場 live；與鏡頭互斥；可被指定上大螢幕 | 不阻塞大螢幕 |
 
 **不列為預留：** 多路視訊合成進節目／訪客端監視牆／會議格子（§3 否決）。
@@ -1097,7 +1099,7 @@ Esc 回大廳（現況 `goEscapeHome` 含 `/chat` → 改 `/room`）。**劇院�
 | Peer | 進門 booth 2+2 helper（勿把遊戲 DC-only／現況 1+1 默默改掉）。**mesh 邊＝DC-only**（勿再給 mesh 留 2+2 再當媒體 peers） |
 | 媒體 | **節目槽＝片子／live**（進門綁 program `<video>`；房級送**單一路**來源；電影 `captureStream`）。開局＝大螢幕槽掛 SAM，節目可 unoffer。在場＝開口／可指定上大螢幕。**在場聲＝Host 混音**（§9.8.1／2f）。目錄「要」＝同源 HTTP。人數不關鏡頭。**不做**多路視訊合成 |
 | 殼面 | 主視訊區 16:9（槽內無字）＋廳態三區／劇院態 overlay（§5.8）。內景降級為外框／沒訊號雪花。**不要**重用 `GoShopLobby`。chrome hideable 對齊對弈 overlay。**不要**用系統全螢幕冒充劇院態 |
-| 開局 | **延後。** 契約：`session_play`；重用進門 PC；席次從協議 roles；自動＝主持＋進門序。現況不介紹、主面不露玩遊戲 |
+| 開局 | **延後。** 契約：`session_play`；重用進門 PC；席次從協議 roles；自動＝主持＋進門序。現況不介紹、主面不露玩遊戲。實作計劃：[PG-GO-ROOM-PLAY-PLAN.md](./PG-GO-ROOM-PLAY-PLAN.md) |
 | 分享 | `GoShareSheet` 邀請模式；title「邀請你進包廂」；**必備**「另一台請掃碼、不要再開一間」 |
 | 路由 | `go-client/src/routes/room/`；`/chat` 導向 `/room` |
 | 大廳 | hotspot `room` → `/room`；label「包廂」 |
@@ -1122,7 +1124,7 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 | **2e. 別人掛的檔上大螢幕** | 主持 `session_cast` → **owner** 本機渲染 → Hub 轉節目；先 video／audio；image 同模型；doc 延後 | 主持可把 Guest 掛的片子／歌放到大螢幕；不能 capture → reject＋頁內說明；**不**為上大螢幕拉檔到主持 | **video／audio 已落地**（`fromPeer`；image／doc 仍延後） |
 | **2f. 在場聲混音** | 星狀下 Host `AudioContext` 混多路上行麥 → 各 peer 一條 presence audio；單開麥可轉發；排除自迴音；節目音不混入 | ≥2 開麥者彼此聽得到；關麥即離混；**不做**多路視訊合成 | **已落地**（`goRoomPresenceAudioMix`；Hub `pushPresenceAudio`） |
 | **2g. 主持私有檔** | Host OPFS 片庫；與分享分離；可上大螢幕（`scope: private`）；掛到分享才可「要」；Guest 無私有區 | 私有不 fanout、不上 `/room-file`；cast 僅 RTP；散場不清 OPFS | **進行中**（OPFS 庫＋cast scope＋主持檔案區分段已接；手測／Safari 片源仍同既有限制） |
-| **3. 重用 peer 開局** | 包廂已連 → `session_play`；大螢幕槽掛 SAM；主持選遊戲＋指定／自動入座；觀戰看同一畫布 | 不必再掃 compose；Guest 留 `/i/`；終局可結束這一局而包廂還在。第一刀：五子棋 2 席 | **延後**（契約已凍；主面不露玩遊戲。先把 2d／2e／片子／live／傳檔做穩） |
+| **3. 重用 peer 開局** | 包廂已連 → `session_play`；大螢幕槽掛 SAM；主持選遊戲＋指定／自動入座；觀戰看同一畫布 | 不必再掃 compose；Guest 留 `/i/`；終局可結束這一局而包廂還在。第一刀：五子棋 2 席 | **進行中**（契約凍；wire／席次／fanout 見 [PG-GO-ROOM-PLAY-PLAN.md](./PG-GO-ROOM-PLAY-PLAN.md) Phase 1–2；主面暫不露玩遊戲；掛 SAM／UX 待續） |
 
 建議實作順序 **0 → 1（含同源 HTTP 門面＋HTTP↔transfer 隧道對齊）→ 1b**（已落地）→ **2c**（已落地）→ **2d（殼面，進行中）** → **2e（別人掛的檔）** → **2f（在場聲混音）** → **2g（主持私有）** → **1c（Guest↔Guest 檔 mesh）**；**3 開局延後**。2b 私下播保留在檔案區，不要當主面播放器；下載／圖檢視應收斂到與 2b 同一 `/room-file/` 門面。現況**不要**排開局。**不要**排多路視訊合成。1c 打開後節目 RTP／在場聲仍走 Hub，直到另刀評估直連媒體。
 
@@ -1161,7 +1163,7 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 | 27 | 主持導播 | 僅主持指定大螢幕來源（**含別人掛的檔**／**主持私有**／peer／開局）。被指定者不是新主持。再指定＝切台 |
 | 28 | 殼面 | **主視訊區**＝主內容（16:9；沒訊號也佔；**槽內無字**）。廳態：不到 768px 上半大螢幕下半 tab；≥768px 右欄控制面板（頂麥列、上檔案、下成員／文字 tab）。**禁止**三欄並排。**劇院態：** 使用者隱藏控制面板才應用內滿窗（**禁止**一播放就進）；畫面只有主視訊；下拉／peek／Esc 叫出控制＝**回廳態**（**禁止**劇院 overlay 面板／頁底扁條）。廣告浮在主視訊區，**串流時藏**。**禁止**以系統 Fullscreen 當劇院態預設。**不**用可行走大廳。家具熱點非主導航 |
 | 29 | 頂列 | 包廂主面 **可 overlay 收起**（約 3s；對齊對弈）。請人／結束不只活在頂列。consent／錯誤面不收 |
-| 30 | 開局 | 契約凍：重用進門 PC；`session_play`；主持選遊戲＋指定或自動入座；未入座觀戰；不鑄 compose、不改 Guest 網址。第一刀不做局中換席。**實作延後** |
+| 30 | 開局 | 契約凍：重用進門 PC；`session_play`；主持選遊戲＋指定或自動入座；未入座觀戰；不鑄 compose、不改 Guest 網址。第一刀不做局中換席。**實作延後**（落地見 [PG-GO-ROOM-PLAY-PLAN.md](./PG-GO-ROOM-PLAY-PLAN.md)） |
 | 31 | 檔上大螢幕 | **`file { owner, id, scope? }`＝持檔端渲染 → 節目 RTP**。`scope: "private"`＝Host OPFS。呈現型別影→音→圖遞增；doc／任意 MIME 不承諾。傳輸模型不變 |
 | 32 | 在場聲混音 | 星狀下 Host **混音**再送 presence audio（`AudioContext` 或等價）；單開麥可轉發；≥2 開麥禁止只轉一軌。節目音不混開口。否決多路視訊合成當在場解。**2f** |
 | 33 | 主持私有檔 | **僅 Host**；**OPFS** 片庫與分享目錄分離；不 fanout、不上 `/room-file`；可上大螢幕（僅 RTP）；要分享＝顯式掛到分享；散場不清 OPFS；Guest 無私有區。**2g 延後** |
@@ -1193,7 +1195,7 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 - [ ] **2d：** 殼面進行中（廳態＋劇院態已接 UI；手測／RWD 收斂中）
 - [x] **2f：** 星狀在場聲混音（≥2 開麥彼此聽得到；節目音不混）
 - [ ] **2g：** 主持私有檔進行中（OPFS＋`scope:private` cast＋主持私有／分享分段已接；手測待）
-- [ ] **3：** 包廂開局 **延後**（契約已凍；不排 `session_play`）
+- [ ] **3：** 包廂開局 **延後**（契約已凍；不排 `session_play`；實作計劃 [PG-GO-ROOM-PLAY-PLAN.md](./PG-GO-ROOM-PLAY-PLAN.md)）
 
 **Phase 1（實作後）**
 
@@ -1297,5 +1299,7 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 | 2026-08-21 | **Mesh 檔直連（1c 契約）：** Guest 除進門 Host 外可試建 Guest↔Guest DC（`session_mesh`）；**下載／私下播**在索檔↔持檔有直連時不經 Host relay；失敗回 star。節目／在場 RTP 仍 Hub。撤「mesh 全面延後」；凍結 #20／§7.4／Phase 1c 修訂 |
 | 2026-08-21 | **Mesh 建邊＝名單變動、非傳檔：** 在線 Guest 變動（進門見既有／後續新人）Host `hello` 後**立刻** dial；同一 peerId **失敗不重試**；「要」檔只查 `hasDirect`、禁止此時建邊。§7.4／凍結 #20 修訂 |
 | 2026-08-21 | **1c 實作：** `GO_ROOM_MESH_ENABLED = true`；`goRoomMeshClient` 一次機會（fail／close 進 dead、bye 清）；Host introduce／forward；傳檔 `sendBinary(dest)` 直連優先 |
+| 2026-08-21 | **開局實作計劃索引：** Phase 3／§5.9 指向 [PG-GO-ROOM-PLAY-PLAN.md](./PG-GO-ROOM-PLAY-PLAN.md)（重用 peer、`session_play`；實作仍延後） |
+| 2026-08-21 | **開局 Phase 1–2 初刀：** `session_play` wire／席次／Host fanout＋晚進門重送；見 PLAY 計劃（主面仍不露 CTA） |
 | 2026-08-21 | **2g 實作（初刀）：** `goRoomPrivateOpfs`＋`goRoomPrivateFiles`；`session_cast.scope`；`startPrivateProgram`（blob 片源、不 register `/room-file`）；主持檔案區私有／分享分段；掛到分享→既有 `shareLocalFile`；散場 detach 不清 OPFS |
 | 2026-08-21 | **Mesh＝DC-only（修雙 Guest 大螢幕黑屏）：** `session_mesh` 改 `media: "none"`；`goRoomMedia` 忽略 `via: "mesh"`；Guest 媒體 peers 只含進門 Host。兩 Guest 時 mesh 空節目軌曾蓋掉 Host RTP → 雙黑、一人離則恢復 |

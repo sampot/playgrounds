@@ -123,6 +123,19 @@ describe("createGoHostBinding — session lifecycle", () => {
     expect(opened.roles).toEqual(["host", "player"]);
   });
 
+  it("openSession is idempotent when a session is already open (booth play)", async () => {
+    const rt = makeRuntime({
+      phase: "waiting",
+      sessionId: "sess-existing",
+      channelName: "playgrounds-session:sess-existing",
+    });
+    const binding = createGoHostBinding({ getHostRuntime: () => rt });
+    const opened = await binding.openSession();
+    expect(rt.open).not.toHaveBeenCalled();
+    expect(opened.sessionId).toBe("sess-existing");
+    expect(opened.channelName).toBe("playgrounds-session:sess-existing");
+  });
+
   it("closeSession delegates to runtime.close", async () => {
     const rt = makeRuntime();
     const binding = createGoHostBinding({ getHostRuntime: () => rt });

@@ -18,6 +18,11 @@ import { handleGoBuiltInKv } from "./goBuiltInKv";
 import { handleGoFunctionsApi } from "./goFunctionsRuntime";
 import { handleGoShellPlatformApi } from "./goShellPlatform";
 import { handleGoShellSessionApi } from "./goShellSession";
+import {
+  injectGoPgSurfaceMeta,
+  normalizeGoPgSurface,
+  type GoPgSurface,
+} from "./goPgSurface";
 
 export const GO_MEMORY_SESSION_TYPE = "playgrounds-go-memory-session" as const;
 export const GO_MEMORY_SESSION_RESULT = "playgrounds-go-memory-session-result" as const;
@@ -161,7 +166,8 @@ export type MemoryCanvasBuild = {
 export function buildGoMemoryCanvas(
   files: FileMap,
   generation: number,
-  storageScope?: string
+  storageScope?: string,
+  surface: GoPgSurface = "solo"
 ): MemoryCanvasBuild {
   const { srcdoc: base, blobUrls } = composePreview(files, "index.html");
   let srcdoc = injectCanvasBridge(base, storageScope);
@@ -170,6 +176,7 @@ export function buildGoMemoryCanvas(
   } else {
     srcdoc = `${API_BRIDGE}${srcdoc}`;
   }
+  srcdoc = injectGoPgSurfaceMeta(srcdoc, normalizeGoPgSurface(surface));
   // Bust iframe remounts when generation changes.
   srcdoc = srcdoc.replace(
     /<html([^>]*)>/iu,

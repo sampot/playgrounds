@@ -176,6 +176,12 @@
     onEnd?: () => void | Promise<void>;
     onReissue?: () => void;
     onKick?: (peerId: string) => void;
+    playCatalogId?: string | null;
+    playCanvasUrl?: string | null;
+    playCanvasSrcdoc?: string | null;
+    playCanvasGeneration?: number;
+    onStartPlay?: () => void | Promise<void>;
+    onEndPlay?: () => void | Promise<void>;
   };
 
   let {
@@ -197,6 +203,12 @@
     onEnd,
     onReissue,
     onKick,
+    playCatalogId = null,
+    playCanvasUrl = null,
+    playCanvasSrcdoc = null,
+    playCanvasGeneration = 0,
+    onStartPlay,
+    onEndPlay,
   }: Props = $props();
 
   let draft = $state("");
@@ -433,6 +445,7 @@
     roomShowAdSlot({
       inBooth,
       tvOn,
+      playActive: Boolean(playCatalogId || playCanvasUrl || playCanvasSrcdoc),
     })
   );
   const panesConcurrent = $derived(
@@ -1427,6 +1440,9 @@
         paused={goRoomMedia.programPaused}
         currentTime={goRoomMedia.programTime}
         duration={goRoomMedia.programDuration}
+        {playCanvasUrl}
+        {playCanvasSrcdoc}
+        {playCanvasGeneration}
         bind:videoEl={tvVideoEl}
         bind:slotEl={tvSlotEl}
         onToggle={onTvHit}
@@ -1684,6 +1700,29 @@
                 {doorRow.action}
               </button>
             </div>
+            {#if playCatalogId}
+              <div class="door-row">
+                <p class="muted door-row-label">正在玩遊戲</p>
+                <button
+                  type="button"
+                  class="pixel-btn door-row-action"
+                  onclick={() => void onEndPlay?.()}
+                >
+                  結束這一局
+                </button>
+              </div>
+            {:else if phase === "open"}
+              <div class="door-row">
+                <p class="muted door-row-label">大螢幕上開一局</p>
+                <button
+                  type="button"
+                  class="pixel-btn pixel-btn--primary door-row-action"
+                  onclick={() => void onStartPlay?.()}
+                >
+                  玩五子棋
+                </button>
+              </div>
+            {/if}
           {/if}
           <ul class="member-list">
             {#each memberCards as card (card.peerId)}

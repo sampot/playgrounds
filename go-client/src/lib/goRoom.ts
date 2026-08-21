@@ -200,12 +200,15 @@ export function roomCinemaExitOnChromeReveal(opts: {
   return opts.cinema && !opts.chromeHidden;
 }
 
-/** House ad floats on the idle TV; hide once a program is streaming. */
+/** House ad floats on the idle TV; hide once a program is streaming or play is on. */
 export function roomShowAdSlot(opts: {
   inBooth?: boolean;
   tvOn?: boolean;
+  /** Booth play (SAM on TV slot) — same as program stream for ad chrome. */
+  playActive?: boolean;
 }): boolean {
   if (opts.inBooth === false) return false;
+  if (opts.playActive) return false;
   return !opts.tvOn;
 }
 

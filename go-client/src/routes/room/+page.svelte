@@ -97,4 +97,10 @@
   onEnd={() => runtime.close()}
   onKick={(peerId) => runtime.kickPeer(peerId)}
   onReissue={() => void runtime.openBooth({ afterEnd: true })}
+  playCatalogId={status?.playCatalogId ?? null}
+  playCanvasUrl={status?.playCanvasUrl ?? null}
+  playCanvasSrcdoc={status?.playCanvasSrcdoc ?? null}
+  playCanvasGeneration={status?.playCanvasGeneration ?? 0}
+  onStartPlay={() => void runtime.startAutoPlay("pg-gomoku")}
+  onEndPlay={() => void runtime.endPlay()}
 />

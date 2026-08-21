@@ -170,6 +170,9 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
   /** peerAgentId → session (one DataChannel per connected Guest). */
   const peerSessions = new Map<string, RosterPeerSession>();
   let seq = 0;
+  /** Booth play: closeSession must not tear WebRTC peers. */
+  let keepPeersOnClose = false;
+  let onKeepPeersClosed: (() => void | Promise<void>) | null = null;
 
   /** Per-answer slot; peerId is resolved from the first presence message. */
   type RelaySlot = {
@@ -862,10 +865,60 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
     return result;
   }
 
+  async function closeSessionKeepPeersImpl(opts?: {
+    message?: string;
+  }): Promise<void> {
+    clearInviteExpiryTimer();
+    loop?.stop();
+    loop = null;
+    if (status.sessionId && peerSessions.size > 0) {
+      sendRelay({
+        kind: SESSION_INVITE_CANCEL_KIND,
+        inviteId: status.inviteId || "",
+        sessionId: status.sessionId,
+      });
+    }
+    if (status.sessionId) {
+      try {
+        await deps.invokeHostSession("/api/session/close", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ sessionId: status.sessionId }),
+        });
+      } catch {
+        /* best-effort */
+      }
+    }
+    seatBoundSent.clear();
+    sessionInviteSent.clear();
+    set({
+      phase: "idle",
+      message: opts?.message ?? "已結束這一局",
+      error: null,
+      sessionId: null,
+      channelName: null,
+      inviteId: null,
+      shortUrl: null,
+      inviteExpiresAt: null,
+      seats: [],
+    });
+  }
+
   async function close(opts?: {
     message?: string;
     reason?: string;
   }): Promise<void> {
+    if (keepPeersOnClose) {
+      await closeSessionKeepPeersImpl({
+        message: opts?.message ?? "已結束這一局",
+      });
+      try {
+        await onKeepPeersClosed?.();
+      } catch {
+        /* ignore */
+      }
+      return;
+    }
     clearInviteExpiryTimer();
     loop?.stop();
     loop = null;
@@ -950,6 +1003,131 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
     act: hostAct,
     hostSessionFetch,
     close,
+    /**
+     * Booth play: register an already-open PeerConnection (no Platform).
+     * Does not own channel close — roomRuntime keeps the booth peer alive.
+     */
+    attachExistingPeer(opts: {
+      peerId: string;
+      session: RosterPeerSession;
+      displayName?: string | null;
+    }): void {
+      const peerId = opts.peerId.trim();
+      if (!peerId) return;
+      peerSessions.set(peerId, opts.session);
+      let slot = slots.find((s) => s.peerId === peerId);
+      if (!slot) {
+        slot = {
+          peerId,
+          session: opts.session,
+          displayName: opts.displayName?.trim() || null,
+        };
+        slots.push(slot);
+      } else {
+        slot.session = opts.session;
+        slot.lost = false;
+        if (opts.displayName?.trim()) slot.displayName = opts.displayName.trim();
+      }
+    },
+    /** Drop peer from play session maps without closing the WebRTC PC. */
+    detachExistingPeer(peerId: string): void {
+      const id = peerId.trim();
+      if (!id) return;
+      peerSessions.delete(id);
+      sessionInviteSent.delete(id);
+      const slot = slots.find((s) => s.peerId === id);
+      if (slot) {
+        slot.lost = true;
+        slot.session = null;
+      }
+      const removed = status.seats.filter((s) => s.peerId === id);
+      for (const s of removed) seatBoundSent.delete(s.inviteId);
+      if (removed.length) {
+        set({ seats: status.seats.filter((s) => s.peerId !== id) });
+      }
+    },
+    /**
+     * Booth play: set a synthetic invite id and send session_invite to each
+     * seated guest peer (roles from seats；host role is local — not invited).
+     */
+    inviteRoomPlayPeers(opts: {
+      seats: readonly { role: string; peerId: string }[];
+    }): { inviteId: string; sent: number } {
+      const inviteId = `room-play-${crypto.randomUUID().slice(0, 10)}`;
+      if (!status.sessionId) {
+        throw new Error("尚未開場，無法邀請入座");
+      }
+      set({ inviteId, shortUrl: null, inviteExpiresAt: null });
+      sessionInviteSent.clear();
+      let sent = 0;
+      for (const seat of opts.seats) {
+        if (seat.role === hostRole) continue;
+        if (!peerSessions.has(seat.peerId)) continue;
+        if (sessionInviteSent.has(seat.peerId)) continue;
+        sessionInviteSent.add(seat.peerId);
+        sendRelay(
+          buildSessionInvitePayload({
+            sessionId: status.sessionId,
+            inviteId,
+            role: seat.role || guestRoles[0] || "player",
+            protocol: {
+              protocolId: deps.protocol.protocolId,
+              apiVersion: deps.protocol.apiVersion || "1",
+              roles: [...deps.protocol.roles],
+              roleLimits: deps.protocol.roleLimits
+                ? { ...deps.protocol.roleLimits }
+                : undefined,
+              joinPolicy: "invite_only",
+            },
+          }),
+          seat.peerId
+        );
+        sent += 1;
+      }
+      set({
+        phase: "waiting",
+        message: sent > 0 ? "已送出入座邀請" : "等待對手入座…",
+        error: null,
+      });
+      return { inviteId, sent };
+    },
+    /** Room DC → avatar_relay （peerId known from booth slot）. */
+    handleAvatarRelay(raw: unknown, peerId: string): void {
+      const id = peerId.trim();
+      if (!id) return;
+      let slot = slots.find((s) => s.peerId === id);
+      if (!slot) {
+        slot = {
+          peerId: id,
+          session: peerSessions.get(id) ?? null,
+          displayName: null,
+        };
+        slots.push(slot);
+      }
+      onRelay(raw, slot);
+    },
+    /**
+     * Booth play: closeSession／HOST.close keep PeerConnections.
+     * `onClosed` runs after keep-peers teardown（roomRuntime.endPlay）.
+     */
+    enableKeepPeersOnClose(hooks?: {
+      onClosed?: () => void | Promise<void>;
+    }): void {
+      keepPeersOnClose = true;
+      onKeepPeersClosed = hooks?.onClosed ?? null;
+    },
+    keepsPeersOnClose(): boolean {
+      return keepPeersOnClose;
+    },
+    /**
+     * End the SAM session but keep PeerConnections（包廂還在）.
+     * Does not revoke Platform invites or close WebRTC.
+     * Does not fan out session.closed（Guest would treat that as 散場 on GO-INVITE;
+     * booth Guests clear play via session_invite_cancel + session_play.end）.
+     */
+    async closeSessionKeepPeers(opts?: { message?: string }): Promise<void> {
+      await closeSessionKeepPeersImpl(opts);
+    },
     dispose() {
       clearInviteExpiryTimer();
       loop?.stop();

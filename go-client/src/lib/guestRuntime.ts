@@ -62,7 +62,16 @@ import {
   isSessionCameraMessage,
   isSessionMicMessage,
 } from "@pg/roster/rosterSessionCamera";
+import { isSessionPlayMessage } from "@pg/roster/rosterSessionPlay";
 import { createRoomMeshClient } from "./goRoomMeshClient";
+import {
+  createRoomSessionPlay,
+  type RoomSessionPlayController,
+  type RoomSessionPlayState,
+} from "./goRoomSessionPlay";
+import { loadRoomPlaySam } from "./goRoomPlayBootstrap";
+import { mountGoCanvas, type MountedGoCanvas } from "./mountGoCanvas";
+import { hostableProtocolFor, getGoCatalogEntry } from "./goCatalog";
 import {
   SESSION_INVITE_ACCEPT_KIND,
   SESSION_INVITE_REJECT_KIND,
@@ -86,6 +95,7 @@ import {
   installGoCanvasApiListener,
   syncGoCanvasSnapshot,
 } from "./goCanvas";
+import { withGoPgSurfaceQuery } from "./goPgSurface";
 import { isGoCanvasSwUsable } from "./goCanvasSupport";
 import {
   buildGoMemoryCanvas,
@@ -127,13 +137,19 @@ export type GuestStatus = {
   displayName: string;
   /** File download progress while `phase === "loading_sam"`. */
   loadProgress: GoLoadProgress | null;
-  /** `room` skips SAM／canvas; `sam` is the game invite path. */
+  /** `room` skips SAM／canvas until play; `sam` is the game invite path. */
   surface: "sam" | "room" | null;
   /** Room surface: guests in the booth including self (Host not counted). */
   guestCount: number;
   occupantPeers: { peerId: string; name: string }[];
   /** Guest↔Guest mesh peers with an open DataChannel (file direct path). */
   directPeerIds: string[];
+  /** Booth play canvas in TV slot. */
+  playCatalogId: string | null;
+  playCanvasUrl: string | null;
+  playCanvasSrcdoc: string | null;
+  playCanvasMode: GuestCanvasMode | null;
+  playCanvasGeneration: number;
 };
 
 type Listener = (s: GuestStatus) => void;
@@ -178,6 +194,11 @@ export function createGuestRuntime() {
     guestCount: 0,
     occupantPeers: [],
     directPeerIds: [],
+    playCatalogId: null,
+    playCanvasUrl: null,
+    playCanvasSrcdoc: null,
+    playCanvasMode: null,
+    playCanvasGeneration: 0,
   };
   const listeners = new Set<Listener>();
   let localAgentId = newAgentId();
@@ -189,12 +210,17 @@ export function createGuestRuntime() {
   let peerSession: RosterPeerSession | null = null;
   let meshClient: ReturnType<typeof createRoomMeshClient> | null = null;
   let peerAgentId: string | null = null;
+  let sessionPlay: RoomSessionPlayController | null = null;
+  let playCanvas: MountedGoCanvas | null = null;
+  let playBootstrapSeq = 0;
   let composeProtocolId: string | null = null;
   let pendingInvite: SessionInvitePayload | null = null;
   let accepted = false;
   let unlistenApi: (() => void) | null = null;
   let homeSandboxByInvite = new Map<string, string>();
   let tunnelChannelBySession = new Map<string, string>();
+  /** Seat id for the active booth play tunnel (cleared on end play). */
+  let activePlaySeatId: string | null = null;
   let leavingSelf = false;
 
   function clearMemoryBlobs() {
@@ -206,7 +232,8 @@ export function createGuestRuntime() {
   function buildMemorySrcdoc(): string {
     if (!samFiles) throw new Error("小品尚未載入");
     clearMemoryBlobs();
-    const built = buildGoMemoryCanvas(samFiles, generation);
+    const surface = status.surface === "room" ? "room" : "solo";
+    const built = buildGoMemoryCanvas(samFiles, generation, undefined, surface);
     memoryBlobUrls = Array.isArray(built.blobUrls) ? built.blobUrls : [];
     return built.srcdoc;
   }
@@ -214,28 +241,48 @@ export function createGuestRuntime() {
   /**
    * Remount canvas after seat_bound so SAM re-probes `/api/session/seat`
    * (gomoku tryBootAsPlayer is one-shot at boot).
+   * Booth TV binds `playCanvas*` — keep those in sync with `canvas*`.
    */
   async function remountCanvasAfterSeat(): Promise<
     Partial<GuestStatus> | null
   > {
     if (!sandboxId || !samFiles || !canvasMode) return null;
     generation += 1;
+    const roomSurface = status.surface === "room";
     if (canvasMode === "memory") {
       const srcdoc = buildMemorySrcdoc();
-      return {
+      const partial: Partial<GuestStatus> = {
         canvasMode: "memory",
         canvasSrcdoc: srcdoc,
         canvasUrl: null,
         canvasGeneration: generation,
       };
+      if (roomSurface) {
+        partial.playCanvasMode = "memory";
+        partial.playCanvasSrcdoc = srcdoc;
+        partial.playCanvasUrl = null;
+        partial.playCanvasGeneration = generation;
+      }
+      return partial;
     }
     await syncGoCanvasSnapshot(sandboxId, generation, samFiles);
-    return {
+    const url = withGoPgSurfaceQuery(
+      canvasEntryUrl(sandboxId, generation),
+      roomSurface ? "room" : "solo"
+    );
+    const partial: Partial<GuestStatus> = {
       canvasMode: "sw",
-      canvasUrl: canvasEntryUrl(sandboxId, generation),
+      canvasUrl: url,
       canvasSrcdoc: null,
       canvasGeneration: generation,
     };
+    if (roomSurface) {
+      partial.playCanvasMode = "sw";
+      partial.playCanvasUrl = url;
+      partial.playCanvasSrcdoc = null;
+      partial.playCanvasGeneration = generation;
+    }
+    return partial;
   }
 
   function emit() {
@@ -259,6 +306,8 @@ export function createGuestRuntime() {
     pendingInvite = null;
     composeProtocolId = null;
     accepted = false;
+    clearGuestPlayCanvas();
+    sessionPlay?.reset();
     goSessionChat.detach();
     goRoomFiles.detach();
     goRoomMedia.detach();
@@ -284,6 +333,11 @@ export function createGuestRuntime() {
       canvasUrl: null,
       canvasSrcdoc: null,
       canvasMode: null,
+      playCatalogId: null,
+      playCanvasUrl: null,
+      playCanvasSrcdoc: null,
+      playCanvasMode: null,
+      playCanvasGeneration: 0,
       canvasGeneration: 0,
       loadProgress: null,
       surface: null,
@@ -348,9 +402,107 @@ export function createGuestRuntime() {
     if (pendingInvite.protocol.protocolId !== composeProtocolId) return;
     const peer = fromPeerId || peerAgentId;
     if (!peer || !sandboxId) return;
+    if (status.surface === "room" && sessionPlay) {
+      const role = sessionPlay.seatRoleFor(localAgentId);
+      if (!role) return; // spectator
+    }
     accepted = true;
     composeProtocolId = null;
     void acceptInvite(peer);
+  }
+
+  function clearGuestPlayCanvas(): void {
+    playCanvas?.dispose();
+    playCanvas = null;
+    playBootstrapSeq += 1;
+    if (status.surface === "room") {
+      sandboxId = null;
+      samFiles = null;
+      canvasMode = null;
+      set({
+        playCatalogId: null,
+        playCanvasUrl: null,
+        playCanvasSrcdoc: null,
+        playCanvasMode: null,
+        playCanvasGeneration: 0,
+        canvasUrl: null,
+        canvasSrcdoc: null,
+        canvasMode: null,
+      });
+    }
+  }
+
+  /**
+   * End booth play only — keep PeerConnection／chat／files.
+   * Used when host ends the SAM session (cancel／session.closed／session_play.end).
+   */
+  function endRoomPlayOnly(): void {
+    if (status.surface !== "room") return;
+    pendingInvite = null;
+    composeProtocolId = null;
+    accepted = false;
+    if (activePlaySeatId) {
+      registerSessionBridge(activePlaySeatId, "", null);
+      activePlaySeatId = null;
+    }
+    homeSandboxByInvite.clear();
+    tunnelChannelBySession.clear();
+    clearGuestPlayCanvas();
+    sessionPlay?.reset();
+    set({
+      phase: "ready",
+      message: "這一局已結束",
+      error: null,
+    });
+  }
+
+  async function bootstrapGuestPlay(catalogId: string): Promise<void> {
+    const seq = ++playBootstrapSeq;
+    const seatedRole = sessionPlay?.seatRoleFor(localAgentId) ?? null;
+    try {
+      const bundle = await loadRoomPlaySam({ catalogId });
+      if (seq !== playBootstrapSeq) return;
+      const entry = getGoCatalogEntry(catalogId);
+      const protocol = hostableProtocolFor(entry ?? null);
+      if (protocol) composeProtocolId = protocol.protocolId;
+      samFiles = bundle.files;
+      generation += 1;
+      playCanvas?.dispose();
+      playCanvas = await mountGoCanvas(bundle.files, generation, {
+        catalogId,
+        surface: "room",
+      });
+      if (seq !== playBootstrapSeq) {
+        clearGuestPlayCanvas();
+        return;
+      }
+      sandboxId = playCanvas.sandboxId;
+      canvasMode = playCanvas.canvasMode;
+      accepted = false;
+      set({
+        playCatalogId: catalogId,
+        playCanvasUrl: playCanvas.canvasUrl,
+        playCanvasSrcdoc: playCanvas.canvasSrcdoc,
+        playCanvasMode: playCanvas.canvasMode,
+        playCanvasGeneration: playCanvas.canvasGeneration,
+        canvasUrl: playCanvas.canvasUrl,
+        canvasSrcdoc: playCanvas.canvasSrcdoc,
+        canvasMode: playCanvas.canvasMode,
+        canvasGeneration: playCanvas.canvasGeneration,
+        message: seatedRole
+          ? "遊戲載入中，等待入座…"
+          : "觀戰載入中…",
+      });
+      sessionPlay?.markActive();
+      if (seatedRole && pendingInvite) tryAutoAccept();
+    } catch (e) {
+      if (seq !== playBootstrapSeq) return;
+      clearGuestPlayCanvas();
+      set({
+        error: friendlySamDownloadError(e),
+        message: "",
+      });
+    }
   }
 
   async function acceptInvite(peerId: string): Promise<void> {
@@ -397,6 +549,10 @@ export function createGuestRuntime() {
     if (msg.from === localAgentId) return;
     const payload = msg.payload;
     if (isSessionInviteCancelPayload(payload)) {
+      if (status.surface === "room") {
+        endRoomPlayOnly();
+        return;
+      }
       markHostEnded("主持已結束這一場");
       return;
     }
@@ -421,6 +577,10 @@ export function createGuestRuntime() {
         send: (act: SessionActPayload, to?: string) =>
           sendAvatarRelay(act as unknown as Record<string, unknown>, to),
       });
+      if (activePlaySeatId && activePlaySeatId !== binding.seatId) {
+        registerSessionBridge(activePlaySeatId, "", null);
+      }
+      activePlaySeatId = binding.seatId;
       registerSessionBridge(binding.seatId, homeId, bridge);
       tunnelChannelBySession.set(binding.sessionId, binding.channelName);
       set({
@@ -472,6 +632,10 @@ export function createGuestRuntime() {
         event &&
         (event.type === "session.closed" || event.type === "match.closed")
       ) {
+        if (status.surface === "room") {
+          endRoomPlayOnly();
+          return;
+        }
         markHostEnded(
           event.reason === "host_closed"
             ? "主持已結束這一場"
@@ -546,6 +710,12 @@ export function createGuestRuntime() {
     });
     try {
       localAgentId = newAgentId();
+      peerAgentId = null;
+      sessionPlay = createRoomSessionPlay({
+        localPeerId: () => localAgentId,
+        hostPeerId: () => peerAgentId || "",
+        isBoothHost: () => false,
+      });
       const join = await createJoin(meta.secret, platformApiOrigin());
       const slot: { s: RosterPeerSession | null; attached: boolean } = {
         s: null,
@@ -733,6 +903,16 @@ export function createGuestRuntime() {
               isSessionMicMessage(data)
             ) {
               void goRoomMedia.onCastControl(data);
+            } else if (isSessionPlayMessage(data)) {
+              const applied = sessionPlay?.applyRemote(data);
+              if (applied?.ok && data.op === "offer") {
+                set({ playCatalogId: data.catalogId });
+                void bootstrapGuestPlay(data.catalogId);
+              } else if (data.op === "end") {
+                endRoomPlayOnly();
+              }
+            } else if (isAvatarRelayMessage(data)) {
+              onRelay(data);
             }
           },
           onBinary: (buf) => goRoomFiles.onBinary(buf),
@@ -1088,6 +1268,9 @@ export function createGuestRuntime() {
       return;
     }
     leavingSelf = true;
+    sessionPlay?.reset();
+    sessionPlay = null;
+    clearGuestPlayCanvas();
     goSessionChat.detach();
     goRoomFiles.detach();
     goRoomMedia.detach();
@@ -1103,6 +1286,7 @@ export function createGuestRuntime() {
       /* ignore */
     }
     peerSession = null;
+    peerAgentId = null;
     unlistenApi?.();
     unlistenApi = null;
     set({
@@ -1116,6 +1300,11 @@ export function createGuestRuntime() {
       loadProgress: null,
       surface: "room",
       directPeerIds: [],
+      playCatalogId: null,
+      playCanvasUrl: null,
+      playCanvasSrcdoc: null,
+      playCanvasMode: null,
+      playCanvasGeneration: 0,
     });
   }
 
@@ -1132,6 +1321,17 @@ export function createGuestRuntime() {
   return {
     subscribe,
     getStatus,
+    getPlayState(): RoomSessionPlayState {
+      return (
+        sessionPlay?.getState() ?? {
+          phase: "idle",
+          catalogId: null,
+          rev: null,
+          seats: [],
+          fromHost: null,
+        }
+      );
+    },
     bootFromShortId,
     consentAndPlay,
     decline,
@@ -1152,8 +1352,48 @@ export function createGuestRuntime() {
       });
       tunnelChannelBySession.set("sess-1", "playgrounds-session:sess-1");
     },
+    /** @internal Vitest — booth guest ready with play chrome on. */
+    __testMarkRoomReady() {
+      const noop = () => {};
+      peerSession = {
+        send: noop,
+        close: noop,
+        getChannel: () => null,
+        pc: { addEventListener: noop },
+      } as never;
+      set({
+        phase: "ready",
+        surface: "room",
+        message: "在包廂裡",
+        error: null,
+        playCatalogId: "pg-gomoku",
+        playCanvasUrl: "https://example.test/play",
+        playCanvasSrcdoc: null,
+        playCanvasMode: "sw",
+        playCanvasGeneration: 1,
+      });
+      sessionPlay = createRoomSessionPlay({
+        localPeerId: () => localAgentId,
+        hostPeerId: () => peerAgentId || "host-1",
+        isBoothHost: () => false,
+      });
+    },
     __testOnChannelClose() {
       markHostEnded("主持已結束連線");
+    },
+    /** @internal Vitest — apply room session_play without WebRTC. */
+    __testApplySessionPlay(raw: unknown) {
+      return sessionPlay?.applyRemote(raw) ?? { ok: false, reason: "bad_message" as const };
+    },
+    __testSetRoomHostPeer(id: string) {
+      peerAgentId = id;
+      sessionPlay =
+        sessionPlay ??
+        createRoomSessionPlay({
+          localPeerId: () => localAgentId,
+          hostPeerId: () => peerAgentId || "",
+          isBoothHost: () => false,
+        });
     },
   };
 }

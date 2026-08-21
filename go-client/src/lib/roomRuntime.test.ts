@@ -62,7 +62,15 @@ vi.mock("./goRoomMedia.svelte", () => ({
     onCastControl: vi.fn(),
     onRemoteTrack: vi.fn(),
     forwardFrom: vi.fn(),
+    stopProgram: vi.fn(async () => {}),
   },
+}));
+
+vi.mock("./goRoomPlayBootstrap", () => ({
+  loadRoomPlaySam: vi.fn(() => new Promise(() => {})),
+  createRoomPlayHostRuntime: vi.fn(),
+  mountRoomPlayHostCanvas: vi.fn(),
+  listRoomPlayableCatalogIds: () => ["pg-gomoku"],
 }));
 
 function mockSession() {
@@ -533,5 +541,118 @@ describe("roomRuntime", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("offerPlay fans out session_play on existing peers without minting compose", async () => {
+    let loopOpts: {
+      prepareHandlers: () => {
+        handlers: {
+          onChannelOpen: () => void;
+          onMessage: (data: unknown) => void;
+        };
+        attachSession: (s: ReturnType<typeof mockSession>) => void;
+      };
+    } | null = null;
+    fixtures.startLoop.mockImplementation((opts: typeof loopOpts) => {
+      loopOpts = opts;
+      return { stop: vi.fn(), inviteId: "inv-room" };
+    });
+    const { createRoomRuntime } = await import("./roomRuntime");
+    const { goRoomMedia } = await import("./goRoomMedia.svelte");
+    const rt = createRoomRuntime();
+    await rt.openBooth();
+    await rt.mintInviteAndAnswer();
+    const a = mockSession();
+    const b = mockSession();
+    const first = loopOpts!.prepareHandlers();
+    first.attachSession(a);
+    first.handlers.onChannelOpen();
+    const second = loopOpts!.prepareHandlers();
+    second.attachSession(b);
+    second.handlers.onChannelOpen();
+
+    a.send.mockClear();
+    b.send.mockClear();
+    const out = await rt.offerPlay({
+      catalogId: "pg-gomoku",
+      seats: [
+        { role: "host", peerId: "local" },
+        { role: "player", peerId: "g-a" },
+      ],
+    });
+    expect(out.ok).toBe(true);
+    expect(goRoomMedia.stopProgram).toHaveBeenCalled();
+    expect(fixtures.mint).toHaveBeenCalledTimes(1);
+    expect(a.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "session_play",
+        op: "offer",
+        catalogId: "pg-gomoku",
+      })
+    );
+    expect(b.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "session_play",
+        op: "offer",
+        catalogId: "pg-gomoku",
+      })
+    );
+    expect(rt.getPlayState().phase).toBe("loading");
+
+    const late = mockSession();
+    const third = loopOpts!.prepareHandlers();
+    third.attachSession(late);
+    late.send.mockClear();
+    third.handlers.onChannelOpen();
+    expect(late.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "session_play",
+        op: "offer",
+        catalogId: "pg-gomoku",
+      })
+    );
+
+    a.send.mockClear();
+    b.send.mockClear();
+    expect((await rt.endPlay()).ok).toBe(true);
+    expect(rt.getPlayState().phase).toBe("idle");
+    expect(a.send).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "session_play", op: "end" })
+    );
+  });
+
+  it("ignores session_play forged by a guest", async () => {
+    let loopOpts: {
+      prepareHandlers: () => {
+        handlers: { onMessage: (data: unknown) => void };
+        attachSession: (s: ReturnType<typeof mockSession>) => void;
+      };
+    } | null = null;
+    fixtures.startLoop.mockImplementation((opts: typeof loopOpts) => {
+      loopOpts = opts;
+      return { stop: vi.fn(), inviteId: "inv-room" };
+    });
+    const { createRoomRuntime } = await import("./roomRuntime");
+    const rt = createRoomRuntime();
+    await rt.openBooth();
+    await rt.mintInviteAndAnswer();
+    const a = mockSession();
+    const b = mockSession();
+    const first = loopOpts!.prepareHandlers();
+    first.attachSession(a);
+    const second = loopOpts!.prepareHandlers();
+    second.attachSession(b);
+    a.send.mockClear();
+    b.send.mockClear();
+    first.handlers.onMessage({
+      type: "session_play",
+      v: 1,
+      op: "offer",
+      from: "g-a",
+      catalogId: "pg-gomoku",
+      seats: [{ role: "host", peerId: "g-a" }],
+    });
+    expect(rt.getPlayState().phase).toBe("idle");
+    expect(b.send).not.toHaveBeenCalled();
   });
 });

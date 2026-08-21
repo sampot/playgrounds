@@ -519,3 +519,122 @@ describe("hostRuntime invite TTL / answer loop expiry", () => {
     rt.dispose();
   });
 });
+
+describe("hostRuntime room-play peer reuse", () => {
+  it("attachExistingPeer + inviteRoomPlayPeers sends session_invite without Platform mint", async () => {
+    const invokeHostSession = vi.fn(async (path: string) => {
+      if (path.includes("/open")) return { ok: true };
+      return { ok: true };
+    });
+    const send = vi.fn();
+    const rt = createHostRuntime({
+      getFiles: () => ({ "index.html": "<html></html>" }) as FileMap,
+      getSandboxId: () => "go-sb-room",
+      protocol,
+      invokeHostSession,
+    });
+    await rt.open();
+    const peer = {
+      send,
+      close: vi.fn(),
+      getChannel: () => ({ readyState: "open" as const, send: vi.fn() }),
+      pc: { addEventListener: vi.fn() },
+    };
+    rt.attachExistingPeer({
+      peerId: "g-a",
+      session: peer as never,
+      displayName: "甲",
+    });
+    const out = rt.inviteRoomPlayPeers({
+      seats: [
+        { role: "host", peerId: "host-local" },
+        { role: "player", peerId: "g-a" },
+      ],
+    });
+    expect(out.sent).toBe(1);
+    expect(out.inviteId.startsWith("room-play-")).toBe(true);
+    expect(rt.getStatus().inviteId).toBe(out.inviteId);
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "avatar_relay",
+        to: "g-a",
+        payload: expect.objectContaining({
+          kind: "session_invite",
+          role: "player",
+          inviteId: out.inviteId,
+        }),
+      })
+    );
+    expect(invokeHostSession).not.toHaveBeenCalledWith(
+      expect.stringContaining("invite"),
+      expect.anything()
+    );
+
+    send.mockClear();
+    rt.handleAvatarRelay(
+      {
+        type: "avatar_relay",
+        from: "g-a",
+        payload: {
+          kind: "session_invite_accept",
+          inviteId: out.inviteId,
+          sessionId: rt.getStatus().sessionId,
+          role: "player",
+          homeSandboxId: "guest-sb",
+        },
+      },
+      "g-a"
+    );
+    await vi.waitFor(() => {
+      expect(rt.getStatus().seats.some((s) => s.peerId === "g-a")).toBe(true);
+    });
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "avatar_relay",
+        to: "g-a",
+        payload: expect.objectContaining({ kind: "session_seat_bound" }),
+      })
+    );
+
+    const closeSpy = peer.close;
+    await rt.closeSessionKeepPeers({ message: "局結束" });
+    expect(rt.getStatus().phase).toBe("idle");
+    expect(rt.getStatus().sessionId).toBeNull();
+    expect(closeSpy).not.toHaveBeenCalled();
+    rt.detachExistingPeer("g-a");
+    rt.dispose();
+  });
+
+  it("enableKeepPeersOnClose makes close() keep PeerConnections", async () => {
+    const invokeHostSession = vi.fn(async (path: string) => {
+      if (path.includes("/open")) return { ok: true };
+      return { ok: true };
+    });
+    const send = vi.fn();
+    const onClosed = vi.fn();
+    const rt = createHostRuntime({
+      getFiles: () => ({ "index.html": "<html></html>" }) as FileMap,
+      getSandboxId: () => "go-sb-room",
+      protocol,
+      invokeHostSession,
+    });
+    await rt.open();
+    const peer = {
+      send,
+      close: vi.fn(),
+      getChannel: () => ({ readyState: "open" as const, send: vi.fn() }),
+      pc: { addEventListener: vi.fn() },
+    };
+    rt.attachExistingPeer({
+      peerId: "g-a",
+      session: peer as never,
+      displayName: "甲",
+    });
+    rt.enableKeepPeersOnClose({ onClosed });
+    await rt.close({ message: "局結束" });
+    expect(rt.getStatus().phase).toBe("idle");
+    expect(peer.close).not.toHaveBeenCalled();
+    expect(onClosed).toHaveBeenCalledTimes(1);
+    rt.dispose();
+  });
+});

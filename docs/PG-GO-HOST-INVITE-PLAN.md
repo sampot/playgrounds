@@ -2,10 +2,12 @@
 
 > **狀態：** Draft（2026-08-16）— GO-INVITE 實作落地（DEC-053 `env.HOST`）；Phase 5 手測進行中  
 > **權威決策：** 建議 [DECISIONS.md](./DECISIONS.md) **DEC-052**（§5.3 玩家主場互邀＝GO-INVITE；本文件實作之）  
-> **相關：** [PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md)（登入＋記憶體 field API key）、[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)（純玩版；玩家主場）、[PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)（包廂＝`invite.room`，**不是**本刀 compose）、[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)（五子棋 `gomoku.v1`；**作者面** Host 鑄邀請）、[PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)、[GLOSSARY.md](./GLOSSARY.md)  
+> **相關：** [PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md)（登入＋記憶體 field API key）、[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)（純玩版；玩家主場）、[PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)（包廂＝`invite.room`，**不是**本刀 compose）、[PG-GO-ROOM-PLAY-PLAN.md](./PG-GO-ROOM-PLAY-PLAN.md)（包廂內開局＝重用 peer；**勿混**）、[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)（五子棋 `gomoku.v1`；**作者面** Host 鑄邀請）、[PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)、[GLOSSARY.md](./GLOSSARY.md)  
 > **載體 SAM：** 型錄 [`pg-gomoku`](../catalog/entries/pg-gomoku.yaml)（source [`sampot/pg-gomoku`](https://github.com/sampot/pg-gomoku)；`gomoku.v1`）
 
 一句話：**登入 go 的玩家（玩家主場，DEC-050）在遊戲中開一局、對另一位玩家發出邀請；對手開 `https://go.samkuo.me/i/<short_id>` 入座對弈。** play 與 go **都可**鑄邀請；go 以玩家記憶體 field API key 走 `invite.compose`，並以 `env.HOST`（`createGoHostBinding`）主持 session。
+
+> **產品路徑（2026-08）：** 連線對弈快樂路徑改為**包廂內** [`session_play`](./PG-GO-ROOM-PLAY-PLAN.md)（`pg_surface=room`）。go **`/s/<id>`**＝單機（`pg_surface=solo`）；`pg-gomoku` UI **不再**露出「邀請對弈」。本文件仍描述 `invite.compose`／`env.HOST` 能力（場殼／相容），**不是**五子棋玩家主場快樂路徑。
 
 > **與作者面（場殼）的關係（不變）：** 場殼 play 仍是**作者 Host**；本刀把「Host 能力」**複製到 go 的玩家主場**——同一套 `invite.compose`＋`gomoku.v1`，但 Host＝已登入玩家、座落在 **go origin**。go **不**新增我的場／密鑰庫／後台／TURN 管理（見 §4 非目標）。
 
@@ -43,7 +45,7 @@
 - **不**做多 peer／觀戰／完美斷線重連／雲存棋譜（對齊 E2E 鎖 1 Guest；go `/i/` 臨時生命週期）。
 - **不**承諾 `/i/` 離線可玩（go 既有硬規則）。
 - 本刀**不**改 `sampot/pg-gomoku` 的 `app.js` 流程（§7 只**補** go 畫布橋）；gomoku 的「邀請對手」CTA 已存在——它在 go 只需 `/api/shell/platform/invite` 能成功回應即可照走。
-- **不**把包廂裡的開局做成 `invite.compose`（見 [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md) §5.9；本刀仍是「從遊戲中鑄門牌拉還沒在包廂的人」）。
+- **不**把包廂裡的開局做成 `invite.compose`（見 [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md) §5.9；落地 [PG-GO-ROOM-PLAY-PLAN.md](./PG-GO-ROOM-PLAY-PLAN.md)；本刀仍是「從遊戲中鑄門牌拉還沒在包廂的人」）。
 
 ---
 
@@ -228,3 +230,4 @@ go 目前只有 Guest runtime（`guestRuntime.ts`）。玩家 A 開局須在 go 
 | --- | --- |
 | 2026-08-11 | 初版 Draft：GO-INVITE 化實（DEC-052 §5.3）；go 玩家以記憶體 field API key 走 `invite.compose`；go 側主持 `gomoku.v1` Host session；完成依據＝go A↔B 入座對弈至終局 |
 | 2026-08-19 | 劃清：包廂內開局不走本刀 compose（見 [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md) §5.9） |
+| 2026-08-21 | 交叉索引：包廂開局實作計劃 [PG-GO-ROOM-PLAY-PLAN.md](./PG-GO-ROOM-PLAY-PLAN.md) |

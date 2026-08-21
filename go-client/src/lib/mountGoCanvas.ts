@@ -12,6 +12,11 @@ import {
   revokeGoMemoryBlobs,
 } from "./goMemoryCanvas";
 import type { HostRuntime } from "./hostRuntime";
+import {
+  normalizeGoPgSurface,
+  withGoPgSurfaceQuery,
+  type GoPgSurface,
+} from "./goPgSurface";
 
 export type GoCanvasMode = "sw" | "memory";
 
@@ -25,6 +30,11 @@ export type MountGoCanvasOptions = {
    * Lives in the page, not in the canvas — pass a getter.
    */
   getHostRuntime?: () => HostRuntime | null;
+  /**
+   * Shell surface for the SAM UI (`pg_surface` query／meta).
+   * Default `solo`（`/s/`）；booth TV uses `room`.
+   */
+  surface?: GoPgSurface;
 };
 
 export type MountedGoCanvas = {
@@ -64,6 +74,7 @@ export async function mountGoCanvas(
   options: MountGoCanvasOptions = {}
 ): Promise<MountedGoCanvas> {
   const sandboxId = `go-${crypto.randomUUID().slice(0, 8)}`;
+  const surface = normalizeGoPgSurface(options.surface);
   const storageScope = options.catalogId?.trim()
     ? `catalog:${options.catalogId.trim()}`
     : `ephemeral:${sandboxId}`;
@@ -92,7 +103,10 @@ export async function mountGoCanvas(
       return {
         sandboxId,
         canvasMode: "sw",
-        canvasUrl: canvasEntryUrl(sandboxId, generation),
+        canvasUrl: withGoPgSurfaceQuery(
+          canvasEntryUrl(sandboxId, generation),
+          surface
+        ),
         canvasSrcdoc: null,
         canvasGeneration: generation,
         dispose,
@@ -106,7 +120,12 @@ export async function mountGoCanvas(
   unlisten = installGoMemoryApiListener(
     apiCtx(sandboxId, prepared, options.catalogId, options.getHostRuntime)
   );
-  const built = buildGoMemoryCanvas(prepared, generation, storageScope);
+  const built = buildGoMemoryCanvas(
+    prepared,
+    generation,
+    storageScope,
+    surface
+  );
   memoryBlobUrls = built.blobUrls;
   return {
     sandboxId,

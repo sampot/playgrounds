@@ -26,6 +26,9 @@
     paused = true,
     currentTime = 0,
     duration = 0,
+    playCanvasUrl = null,
+    playCanvasSrcdoc = null,
+    playCanvasGeneration = 0,
     onToggle,
     onPlayPause,
     onSeek,
@@ -46,6 +49,9 @@
     paused?: boolean;
     currentTime?: number;
     duration?: number;
+    playCanvasUrl?: string | null;
+    playCanvasSrcdoc?: string | null;
+    playCanvasGeneration?: number;
     onToggle: () => void;
     onPlayPause: () => void;
     onSeek: (seconds: number) => void;
@@ -57,6 +63,9 @@
     caption?: string | null;
   } = $props();
 
+  const playActive = $derived(
+    Boolean(playCanvasUrl || playCanvasSrcdoc)
+  );
   const showTransport = $derived(roomTvHudHasTransport(hudKind));
   const clockMax = $derived(Math.max(duration, currentTime, 0));
   const expanded = $derived(restore || slotFullscreen);
@@ -101,17 +110,41 @@
 <div class="tv-slot" bind:this={slotEl} class:tv-slot--fs={slotFullscreen}>
   <video
     bind:this={videoEl}
-    class={["tv-video", !tvOn && "tv-video--off"].filter(Boolean).join(" ")}
+    class={[
+      "tv-video",
+      !tvOn && "tv-video--off",
+      playActive && "tv-video--play-hidden",
+    ]
+      .filter(Boolean)
+      .join(" ")}
     autoplay
     muted
     playsinline
     controls={false}
     aria-label="包廂大螢幕"
   ></video>
-  {#if !tvOn}
+  {#if playActive}
+    {#if playCanvasSrcdoc}
+      {#key playCanvasGeneration}
+        <iframe
+          class="tv-play-canvas"
+          title="包廂遊戲"
+          srcdoc={playCanvasSrcdoc}
+        ></iframe>
+      {/key}
+    {:else if playCanvasUrl}
+      {#key playCanvasGeneration}
+        <iframe
+          class="tv-play-canvas"
+          title="包廂遊戲"
+          src={playCanvasUrl}
+        ></iframe>
+      {/key}
+    {/if}
+  {:else if !tvOn}
     <span class="tv-snow" aria-hidden="true"></span>
   {/if}
-  {#if tvOn}
+  {#if tvOn && !playActive}
     <button
       type="button"
       class="tv-hit"
@@ -120,7 +153,7 @@
       onclick={onToggle}
     ></button>
   {/if}
-  {#if tvOn && hudOpen && hudKind !== "none"}
+  {#if tvOn && !playActive && hudOpen && hudKind !== "none"}
     <div class="tv-hud" role="toolbar" aria-label="播放器">
       {#if showTransport}
         <button
@@ -284,6 +317,19 @@
   }
   .tv-video--off {
     opacity: 0;
+  }
+  .tv-video--play-hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .tv-play-canvas {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    background: #000;
   }
   .tv-snow {
     position: absolute;

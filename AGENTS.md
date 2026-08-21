@@ -62,6 +62,7 @@ Reader-facing narrative stays personal／non-product (blog DEC-004).
 - `docs/PG-CATALOG-UX-PLAN.md` — 型錄人機 UX（Phase 2–5 landed）
 - `docs/PG-GO-CLIENT-PLAN.md` — 純玩版 Guest（DEC-050）
 - `docs/PG-GO-ROOM-PLAN.md` — 純玩版包廂 `/room`（Invite 一般用途隔間；Phase 1＝文字／傳檔；主持私有 OPFS＝2g 契約凍）
+- `docs/PG-GO-ROOM-PLAY-PLAN.md` — 包廂內重用 peer 開局（`session_play`；ROOM Phase 3；實作延後）
 - `wrangler.jsonc` — single-site self-host (README Deploy to Cloudflare)
 - `wrangler.official.jsonc` — author field-net
 - `vercel.json` / `netlify.toml` — README one-click Vercel / Netlify

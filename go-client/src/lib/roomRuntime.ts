@@ -5,6 +5,7 @@
 
 import {
   isPresenceMessage,
+  isAvatarRelayMessage,
   type RosterPeerHandlers,
   type RosterPeerSession,
 } from "@pg/roster/rosterPeer";
@@ -28,6 +29,8 @@ import {
   isSessionCameraMessage,
   isSessionMicMessage,
 } from "@pg/roster/rosterSessionCamera";
+import { isSessionPlayMessage } from "@pg/roster/rosterSessionPlay";
+import type { SessionPlaySeat } from "@pg/roster/rosterSessionPlay";
 import { createRoomMeshBroker } from "./goRoomMeshBroker";
 import { startPlatformHostAnswerLoop } from "@pg/platform/platformHostLoop";
 import {
@@ -42,6 +45,26 @@ import { goRoomPrivateFiles } from "./goRoomPrivateFiles.svelte";
 import { goRoomMedia } from "./goRoomMedia.svelte";
 import { isRoomPrivateFileId } from "./goRoomPrivateOpfs";
 import { createRoomFileStarHub, type RoomFileStarHub } from "./goRoomFileStar";
+import {
+  createRoomSessionPlay,
+  type RoomSessionPlayState,
+} from "./goRoomSessionPlay";
+import { assignRoomPlaySeats } from "./goRoomPlaySeats";
+import {
+  createRoomPlayHostRuntime,
+  loadRoomPlaySam,
+  mountRoomPlayHostCanvas,
+} from "./goRoomPlayBootstrap";
+import {
+  getGoCatalogEntry,
+  hostableProtocolFor,
+} from "./goCatalog";
+import type { HostRuntime } from "./hostRuntime";
+import type { MountedGoCanvas } from "./mountGoCanvas";
+import type { FileMap } from "@pg/projectTypes";
+import { canvasEntryUrl, syncGoCanvasSnapshot } from "./goCanvas";
+import { buildGoMemoryCanvas } from "./goMemoryCanvas";
+import { withGoPgSurfaceQuery } from "./goPgSurface";
 import {
   GO_ROOM_QUICK_REPLIES,
   GO_ROOM_MESH_ENABLED,
@@ -74,6 +97,12 @@ export type RoomStatus = {
   guestCount: number;
   occupantNames: string[];
   occupantPeers: { peerId: string; name: string }[];
+  /** Booth play canvas (TV slot); null when idle. */
+  playCatalogId: string | null;
+  playCanvasUrl: string | null;
+  playCanvasSrcdoc: string | null;
+  playCanvasMode: "sw" | "memory" | null;
+  playCanvasGeneration: number;
 };
 
 type Listener = (s: RoomStatus) => void;
@@ -114,6 +143,11 @@ export function createRoomRuntime(opts?: {
     guestCount: 0,
     occupantNames: [],
     occupantPeers: [],
+    playCatalogId: null,
+    playCanvasUrl: null,
+    playCanvasSrcdoc: null,
+    playCanvasMode: null,
+    playCanvasGeneration: 0,
   };
   const listeners = new Set<Listener>();
   let loop: ReturnType<typeof startPlatformHostAnswerLoop> | null = null;
@@ -128,6 +162,12 @@ export function createRoomRuntime(opts?: {
     shortUrl: string;
   } | null> | null = null;
   let fileHub: RoomFileStarHub | null = null;
+  let playHost: HostRuntime | null = null;
+  let playCanvas: MountedGoCanvas | null = null;
+  let playFiles: FileMap | null = null;
+  let playGeneration = 0;
+  let playBootstrapSeq = 0;
+  let endingPlay = false;
   const meshBroker = createRoomMeshBroker({
     sendTo(peerId, msg) {
       const slot = slots.find(
@@ -140,6 +180,35 @@ export function createRoomRuntime(opts?: {
       }
     },
   });
+  const sessionPlay = createRoomSessionPlay({
+    localPeerId: () => localAgentId,
+    hostPeerId: () => localAgentId,
+    isBoothHost: () => true,
+  });
+
+  function clearPlayCanvas(): void {
+    playCanvas?.dispose();
+    playCanvas = null;
+    playFiles = null;
+    playHost = null;
+    set({
+      playCatalogId: null,
+      playCanvasUrl: null,
+      playCanvasSrcdoc: null,
+      playCanvasMode: null,
+      playCanvasGeneration: 0,
+    });
+  }
+
+  function fanoutPlay(msg: unknown): void {
+    for (const sess of liveSessions()) {
+      try {
+        sess.send(msg);
+      } catch {
+        /* ignore */
+      }
+    }
+  }
 
   function emit() {
     for (const l of listeners) l({ ...status });
@@ -301,6 +370,7 @@ export function createRoomRuntime(opts?: {
     slot.lost = true;
     if (slot.peerId && fileHub) fileHub.removePeer(slot.peerId);
     if (GO_ROOM_MESH_ENABLED && slot.peerId) meshBroker.removePeer(slot.peerId);
+    if (slot.peerId && playHost) playHost.detachExistingPeer(slot.peerId);
     const sess = slot.session;
     slot.session = null;
     if (sess) {
@@ -383,6 +453,16 @@ export function createRoomRuntime(opts?: {
               /* ignore */
             }
           }
+        } else if (isSessionPlayMessage(data)) {
+          /* Only booth host may offer／end — ignore guest forgeries. */
+        } else if (isAvatarRelayMessage(data) && playHost) {
+          const peerId =
+            slot.peerId ||
+            (typeof data.from === "string" ? data.from.trim() : "");
+          if (peerId) {
+            if (!slot.peerId) slot.peerId = peerId;
+            playHost.handleAvatarRelay(data, peerId);
+          }
         }
       },
       onBinary: (buf) => {
@@ -393,6 +473,21 @@ export function createRoomRuntime(opts?: {
           fanoutOccupancy();
           const sess = slot.session;
           if (sess) {
+            const playSnap = sessionPlay.snapshotOffer();
+            if (playSnap) {
+              try {
+                sess.send(playSnap);
+              } catch {
+                /* ignore */
+              }
+            }
+            if (playHost && slot.peerId) {
+              playHost.attachExistingPeer({
+                peerId: slot.peerId,
+                session: sess,
+                displayName: slot.displayName,
+              });
+            }
             if (goSessionChat.textLocked) {
               try {
                 sess.send(
@@ -684,6 +779,211 @@ export function createRoomRuntime(opts?: {
     }
   }
 
+  async function remountPlayCanvasAfterSessionOpen(
+    catalogId: string
+  ): Promise<void> {
+    if (!playCanvas || !playFiles) return;
+    playGeneration += 1;
+    const storageScope = `catalog:${catalogId}`;
+    if (playCanvas.canvasMode === "sw") {
+      await syncGoCanvasSnapshot(
+        playCanvas.sandboxId,
+        playGeneration,
+        playFiles,
+        storageScope
+      );
+      const url = withGoPgSurfaceQuery(
+        canvasEntryUrl(playCanvas.sandboxId, playGeneration),
+        "room"
+      );
+      playCanvas = {
+        ...playCanvas,
+        canvasUrl: url,
+        canvasSrcdoc: null,
+        canvasGeneration: playGeneration,
+      };
+      set({
+        playCanvasUrl: url,
+        playCanvasSrcdoc: null,
+        playCanvasMode: "sw",
+        playCanvasGeneration: playGeneration,
+      });
+      return;
+    }
+    const built = buildGoMemoryCanvas(
+      playFiles,
+      playGeneration,
+      storageScope,
+      "room"
+    );
+    const prevDispose = playCanvas.dispose;
+    playCanvas = {
+      ...playCanvas,
+      canvasUrl: null,
+      canvasSrcdoc: built.srcdoc,
+      canvasGeneration: playGeneration,
+      dispose: () => {
+        prevDispose();
+      },
+    };
+    set({
+      playCanvasUrl: null,
+      playCanvasSrcdoc: built.srcdoc,
+      playCanvasMode: "memory",
+      playCanvasGeneration: playGeneration,
+    });
+  }
+
+  async function bootstrapPlayHost(
+    catalogId: string,
+    seats: readonly SessionPlaySeat[]
+  ): Promise<void> {
+    const seq = ++playBootstrapSeq;
+    try {
+      const bundle = await loadRoomPlaySam({ catalogId });
+      if (seq !== playBootstrapSeq) return;
+      playFiles = bundle.files;
+      playGeneration += 1;
+      playHost = createRoomPlayHostRuntime({
+        bundle,
+        getFiles: () => playFiles,
+        getSandboxId: () => playCanvas?.sandboxId ?? null,
+        getHostRuntime: () => playHost,
+      });
+      playHost.enableKeepPeersOnClose({
+        onClosed: () => {
+          void endPlay();
+        },
+      });
+      // Mount once so sandbox exists for /api/session/open, then open＋invite,
+      // then remount so Host UI boots with pg_surface=room + getSession().
+      playCanvas = await mountRoomPlayHostCanvas({
+        bundle,
+        generation: playGeneration,
+        getHostRuntime: () => playHost,
+      });
+      if (seq !== playBootstrapSeq) {
+        clearPlayCanvas();
+        return;
+      }
+      set({
+        playCatalogId: catalogId,
+        playCanvasUrl: playCanvas.canvasUrl,
+        playCanvasSrcdoc: playCanvas.canvasSrcdoc,
+        playCanvasMode: playCanvas.canvasMode,
+        playCanvasGeneration: playCanvas.canvasGeneration,
+      });
+      await playHost.open();
+      for (const slot of slots) {
+        if (slot.lost || !slot.peerId || !slot.session) continue;
+        playHost.attachExistingPeer({
+          peerId: slot.peerId,
+          session: slot.session,
+          displayName: slot.displayName,
+        });
+      }
+      playHost.inviteRoomPlayPeers({ seats });
+      if (seq !== playBootstrapSeq) return;
+      await remountPlayCanvasAfterSessionOpen(catalogId);
+      if (seq !== playBootstrapSeq) return;
+      sessionPlay.markActive();
+    } catch (e) {
+      if (seq !== playBootstrapSeq) return;
+      const message = e instanceof Error ? e.message : String(e);
+      chromeSession.setFlash(message.slice(0, 80), 3200);
+      clearPlayCanvas();
+      const ended = sessionPlay.hostEnd();
+      if (ended.ok) fanoutPlay(ended.message);
+      set({ error: message });
+    }
+  }
+
+  async function offerPlay(input: {
+    catalogId: string;
+    rev?: string;
+    seats: readonly SessionPlaySeat[];
+  }): Promise<
+    | { ok: true; state: RoomSessionPlayState }
+    | { ok: false; reason: string }
+  > {
+    const out = sessionPlay.hostOffer(input);
+    if (!out.ok) return out;
+    void goRoomMedia.stopProgram();
+    fanoutPlay(out.message);
+    // Hide house ad immediately（不等 SAM 載完）.
+    set({ playCatalogId: input.catalogId });
+    void bootstrapPlayHost(input.catalogId, input.seats);
+    return { ok: true, state: out.state };
+  }
+
+  /**
+   * Host shortcut: auto-seat + offerPlay for a catalog game (first knife UX).
+   */
+  async function startAutoPlay(catalogId: string): Promise<
+    | { ok: true; state: RoomSessionPlayState }
+    | { ok: false; reason: string }
+  > {
+    const entry = getGoCatalogEntry(catalogId);
+    const protocol = hostableProtocolFor(entry ?? null);
+    if (!protocol) return { ok: false, reason: "not_playable" };
+    const occupants = [
+      {
+        peerId: localAgentId,
+        displayName: roomHostDisplayName(goAuth.profile) || "主持",
+        joinedAt: 0,
+      },
+      ...slots
+        .filter((s) => !s.lost && s.peerId && s.session)
+        .map((s, i) => ({
+          peerId: s.peerId!,
+          displayName: s.displayName?.trim() || "訪客",
+          joinedAt: i + 1,
+        })),
+    ];
+    const seatsOut = assignRoomPlaySeats({
+      protocolRoles: protocol.roles,
+      roleLimits: protocol.roleLimits,
+      hostPeerId: localAgentId,
+      occupantsOrdered: occupants,
+      mode: "auto",
+    });
+    if (!seatsOut.ok) {
+      chromeSession.setFlash("人數不夠開局，請先請人進來", 2800);
+      return { ok: false, reason: seatsOut.reason };
+    }
+    return offerPlay({ catalogId, seats: seatsOut.seats });
+  }
+
+  async function endPlay(): Promise<
+    | { ok: true; state: RoomSessionPlayState }
+    | { ok: false; reason: string }
+  > {
+    if (endingPlay) {
+      return { ok: true, state: sessionPlay.getState() };
+    }
+    endingPlay = true;
+    try {
+      playBootstrapSeq += 1;
+      if (playHost) {
+        try {
+          await playHost.closeSessionKeepPeers({ message: "已結束這一局" });
+        } catch {
+          /* ignore */
+        }
+      }
+      clearPlayCanvas();
+      const out = sessionPlay.hostEnd();
+      if (!out.ok) {
+        // Already idle（e.g. close→onClosed→endPlay after keep-peers）
+        return { ok: true, state: sessionPlay.getState() };
+      }
+      fanoutPlay(out.message);
+      return { ok: true, state: out.state };
+    } finally {
+      endingPlay = false;
+    }
+  }
+
   async function close(opts?: { message?: string }): Promise<void> {
     if (closing || status.phase === "ended") return;
     closing = true;
@@ -691,6 +991,16 @@ export function createRoomRuntime(opts?: {
     clearRoomInviteSession(inviteSession);
     loop?.stop();
     loop = null;
+    playBootstrapSeq += 1;
+    if (playHost) {
+      try {
+        await playHost.closeSessionKeepPeers();
+      } catch {
+        /* ignore */
+      }
+    }
+    clearPlayCanvas();
+    sessionPlay.reset();
     goSessionChat.detach();
     goRoomFiles.detach();
     goRoomPrivateFiles.detach();
@@ -727,6 +1037,11 @@ export function createRoomRuntime(opts?: {
       guestCount: 0,
       occupantNames: [],
       occupantPeers: [],
+      playCatalogId: null,
+      playCanvasUrl: null,
+      playCanvasSrcdoc: null,
+      playCanvasMode: null,
+      playCanvasGeneration: 0,
     });
     closing = false;
   }
@@ -740,6 +1055,13 @@ export function createRoomRuntime(opts?: {
     getStatus(): RoomStatus {
       return { ...status };
     },
+    getPlayState(): RoomSessionPlayState {
+      return sessionPlay.getState();
+    },
+    /** Booth host: fanout session_play.offer on existing peers (no compose). */
+    offerPlay,
+    startAutoPlay,
+    endPlay,
     openBooth,
     mintInviteAndAnswer,
     kickPeer,

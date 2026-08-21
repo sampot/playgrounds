@@ -1,0 +1,130 @@
+/**
+ * Load a hostable catalog SAM for booth play (PG-GO-ROOM-PLAY-PLAN).
+ */
+
+import type { FileMap } from "@pg/projectTypes";
+import {
+  getGoCatalogEntry,
+  hostableProtocolFor,
+  GO_LISTED_CATALOG,
+  type GoCatalogEntry,
+  type HostableProtocol,
+} from "./goCatalog";
+import { resolveGoSamFiles } from "./goSamResolve";
+import { goLoadProgressFromFiles } from "./goLoadProgress";
+import { mountGoCanvas, type MountedGoCanvas } from "./mountGoCanvas";
+import type { HostRuntime } from "./hostRuntime";
+import { createHostRuntime } from "./hostRuntime";
+import { handleGoFunctionsApi } from "./goFunctionsRuntime";
+
+export type RoomPlaySamBundle = {
+  catalogId: string;
+  entry: GoCatalogEntry;
+  protocol: HostableProtocol;
+  files: FileMap;
+};
+
+export async function loadRoomPlaySam(opts: {
+  catalogId: string;
+  onProgress?: (p: { ratio: number | null; detail: string }) => void;
+}): Promise<RoomPlaySamBundle> {
+  const catalogId = opts.catalogId.trim();
+  const entry = getGoCatalogEntry(catalogId);
+  if (!entry) throw new Error(`找不到小品 ${catalogId}`);
+  const protocol = hostableProtocolFor(entry);
+  if (!protocol || protocol.roles.length === 0) {
+    throw new Error("此小品尚不支援包廂開局");
+  }
+  const source = entry.source?.trim();
+  if (!source) throw new Error("小品缺少來源");
+  const resolved = await resolveGoSamFiles({
+    source,
+    updatePolicy: "local-first",
+    onProgress: (p) => {
+      opts.onProgress?.(goLoadProgressFromFiles(p));
+    },
+  });
+  return {
+    catalogId,
+    entry,
+    protocol,
+    files: resolved.files,
+  };
+}
+
+export async function mountRoomPlayHostCanvas(opts: {
+  bundle: RoomPlaySamBundle;
+  generation: number;
+  getHostRuntime: () => HostRuntime | null;
+}): Promise<MountedGoCanvas> {
+  return mountGoCanvas(opts.bundle.files, opts.generation, {
+    catalogId: opts.bundle.catalogId,
+    getHostRuntime: opts.getHostRuntime,
+    surface: "room",
+  });
+}
+
+export function createRoomPlayHostRuntime(opts: {
+  bundle: RoomPlaySamBundle;
+  getFiles: () => FileMap | null;
+  getSandboxId: () => string | null;
+  getHostRuntime: () => HostRuntime | null;
+}): HostRuntime {
+  const { bundle, getFiles, getSandboxId, getHostRuntime } = opts;
+  return createHostRuntime({
+    getFiles,
+    getSandboxId,
+    protocol: bundle.protocol,
+    async invokeHostSession(
+      path: string,
+      init?: {
+        method?: string;
+        headers?: Record<string, string>;
+        body?: string;
+      }
+    ) {
+      const sandboxId = getSandboxId();
+      const files = getFiles();
+      if (!sandboxId || !files) throw new Error("Host 沙盒尚未就緒");
+      const same = await handleGoFunctionsApi(
+        {
+          getFiles,
+          getSandboxId,
+          getCatalogId: () => bundle.catalogId,
+          getHostRuntime,
+        },
+        {
+          method: init?.method || "GET",
+          url: path,
+          headers: Object.entries(init?.headers || {}),
+          body:
+            init?.body != null
+              ? new TextEncoder().encode(init.body).buffer
+              : null,
+        }
+      );
+      const text = new TextDecoder().decode(same.body ?? new ArrayBuffer(0));
+      const data = text ? (JSON.parse(text) as unknown) : null;
+      if (same.status >= 400) {
+        let message = `Host session API ${same.status}`;
+        let code = "act_rejected";
+        if (data && typeof data === "object") {
+          const o = data as { error?: string; code?: string };
+          if (typeof o.error === "string") message = o.error;
+          if (typeof o.code === "string") code = o.code;
+        }
+        throw Object.assign(new Error(message), { code });
+      }
+      return data;
+    },
+  });
+}
+
+/** First-knife playable set: hostable `kind: game` with explicit roles. */
+export function listRoomPlayableCatalogIds(): string[] {
+  return GO_LISTED_CATALOG.filter((e) => {
+    if (e.kind !== "game") return false;
+    const p = hostableProtocolFor(e);
+    return Boolean(p && p.roles.length >= 2);
+  }).map((e) => e.id);
+}

@@ -46,4 +46,43 @@ describe("guestRuntime host-ended notification", () => {
     expect(status.phase).toBe("ended");
     expect(status.error).toBe("主持已結束這一場");
   });
+
+  it("in booth, invite cancel only ends play — keeps room open", () => {
+    const runtime = createGuestRuntime();
+    runtime.__testMarkRoomReady();
+    runtime.__testOnRelay({
+      type: "avatar_relay",
+      from: "go-host-1",
+      payload: {
+        kind: "session_invite_cancel",
+        inviteId: "room-play-abc",
+        sessionId: "sess-play-1",
+      },
+    });
+    const status = runtime.getStatus();
+    expect(status.phase).toBe("ready");
+    expect(status.surface).toBe("room");
+    expect(status.error).toBeNull();
+    expect(status.playCatalogId).toBeNull();
+  });
+
+  it("in booth, session.closed only ends play — keeps room open", () => {
+    const runtime = createGuestRuntime();
+    runtime.__testMarkRoomReady();
+    runtime.__testOnRelay({
+      type: "avatar_relay",
+      from: "go-host-1",
+      payload: {
+        kind: "session_event",
+        sessionId: "sess-play-1",
+        seq: 1,
+        event: { type: "session.closed", reason: "host_closed" },
+      },
+    });
+    const status = runtime.getStatus();
+    expect(status.phase).toBe("ready");
+    expect(status.surface).toBe("room");
+    expect(status.error).toBeNull();
+    expect(status.playCatalogId).toBeNull();
+  });
 });

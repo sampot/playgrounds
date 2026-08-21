@@ -177,6 +177,22 @@ export function createGoHostBinding(deps: GoHostBindingDeps): GoHostBinding {
     },
     async openSession(_options) {
       const rt = requireRuntime(deps.getHostRuntime());
+      const existing = rt.getStatus();
+      if (
+        existing.sessionId &&
+        existing.channelName &&
+        existing.phase !== "idle" &&
+        existing.phase !== "error"
+      ) {
+        const meta = buildProtocolMeta(rt);
+        return {
+          sessionId: existing.sessionId,
+          channelName: existing.channelName,
+          protocolId: meta.protocolId,
+          apiVersion: meta.apiVersion,
+          roles: meta.roles,
+        };
+      }
       await rt.open();
       const status = rt.getStatus();
       if (!status.sessionId || !status.channelName) {

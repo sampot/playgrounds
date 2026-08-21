@@ -1417,6 +1417,15 @@ describe("room cinema shell", () => {
     expect(roomShowAdSlot({ shortLandscape: true })).toBe(true);
   });
 
+  it("hides the house ad while booth play is active (開局)", () => {
+    expect(roomShowAdSlot({ inBooth: true, tvOn: false, playActive: true })).toBe(
+      false
+    );
+    expect(
+      roomShowAdSlot({ inBooth: true, tvOn: false, playActive: false })
+    ).toBe(true);
+  });
+
   it("keeps hall pane geometry independent of cinema", () => {
     expect(roomShellPanesConcurrent("desktop", true)).toBe(false);
     expect(roomShellFilesPinned("desktop", true)).toBe(true);
