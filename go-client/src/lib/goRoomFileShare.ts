@@ -16,6 +16,8 @@ export const GO_ROOM_FILE_SAVE_READY_HINT =
 export const GO_ROOM_FILE_DROP = "拖進來或點這裡掛上檔案";
 export const GO_ROOM_FILE_DELETE_CONFIRM =
   "撤回後在場的人看不到這個檔。已存到硬碟的不受影響。";
+/** Overflow next to a file card — same pattern as member「更多」. */
+export const GO_ROOM_FILE_MORE = "更多";
 
 export const GO_ROOM_FILE_ZONE = ["share", "private"] as const;
 export type RoomFileZone = (typeof GO_ROOM_FILE_ZONE)[number];
@@ -139,6 +141,95 @@ export function roomFilePrivateActions(opts: {
     remove: true,
     preview: av || image,
   };
+}
+
+export type RoomFileMenuAction =
+  | "preview"
+  | "download"
+  | "cast"
+  | "remove"
+  | "mount";
+
+export type RoomFileMenuItem = {
+  action: RoomFileMenuAction;
+  label: string;
+  enabled: boolean;
+  danger?: boolean;
+};
+
+/** Overflow menu for a share-catalog row (member-card「更多」pattern). */
+export function roomFileShareMenu(opts: {
+  role: "host" | "guest";
+  mine: boolean;
+  kind: FileShareKind;
+  previewLabel?: string;
+  previewEnabled?: boolean;
+  downloadLabel?: string;
+  downloadEnabled?: boolean;
+}): RoomFileMenuItem[] {
+  const acts = roomFileShareActions(opts);
+  const items: RoomFileMenuItem[] = [];
+  if (acts.preview) {
+    items.push({
+      action: "preview",
+      label: opts.previewLabel ?? roomFileShareOpenLabel(opts.kind),
+      enabled: opts.previewEnabled !== false,
+    });
+  }
+  if (acts.download) {
+    items.push({
+      action: "download",
+      label: opts.downloadLabel ?? GO_ROOM_FILE_DOWNLOAD,
+      enabled: opts.downloadEnabled !== false,
+    });
+  }
+  if (acts.cast) {
+    items.push({
+      action: "cast",
+      label: GO_ROOM_FILE_CAST,
+      enabled: true,
+    });
+  }
+  if (acts.remove) {
+    items.push({
+      action: "remove",
+      label: GO_ROOM_FILE_DELETE,
+      enabled: true,
+      danger: true,
+    });
+  }
+  return items;
+}
+
+/** Overflow menu for a host private-library row. */
+export function roomFilePrivateMenu(opts: {
+  kind: FileShareKind;
+}): RoomFileMenuItem[] {
+  const acts = roomFilePrivateActions(opts);
+  const items: RoomFileMenuItem[] = [];
+  if (acts.cast) {
+    items.push({
+      action: "cast",
+      label: GO_ROOM_FILE_CAST,
+      enabled: true,
+    });
+  }
+  if (acts.mount) {
+    items.push({
+      action: "mount",
+      label: GO_ROOM_PRIVATE_MOUNT,
+      enabled: true,
+    });
+  }
+  if (acts.remove) {
+    items.push({
+      action: "remove",
+      label: GO_ROOM_PRIVATE_DELETE,
+      enabled: true,
+      danger: true,
+    });
+  }
+  return items;
 }
 
 export function roomFileOnAir(opts: {

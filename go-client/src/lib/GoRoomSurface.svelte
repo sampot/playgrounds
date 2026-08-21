@@ -19,6 +19,7 @@
   import GoAdSlot from "$lib/GoAdSlot.svelte";
   import GoRoomTvSlot from "$lib/GoRoomTvSlot.svelte";
   import GoRoomMemberCard from "$lib/GoRoomMemberCard.svelte";
+  import GoRoomFileCard from "$lib/GoRoomFileCard.svelte";
   import { goAuth } from "$lib/goAuth.svelte";
   import { roomAdClickAction } from "$lib/goAds";
   import { chromeSession } from "$lib/chromeSession.svelte";
@@ -62,6 +63,7 @@
     roomInviteDoorRow,
     roomInviteRemainLabel,
     roomHostLoginGate,
+    roomTvStatusGate,
     roomHostMemberMenu,
     roomMemberCard,
     roomMemberCardsSorted,
@@ -97,7 +99,6 @@
   } from "$lib/goRoomCatalog";
   import {
     GO_ROOM_FILE_CANCEL,
-    GO_ROOM_FILE_CAST,
     GO_ROOM_FILE_DELETE,
     GO_ROOM_FILE_DELETE_CONFIRM,
     GO_ROOM_FILE_DOWNLOAD,
@@ -106,16 +107,13 @@
     GO_ROOM_FILE_DROP,
     GO_ROOM_FILE_FILTERS,
     GO_ROOM_FILE_FILTER_LABEL,
-    GO_ROOM_FILE_ON_AIR,
     GO_ROOM_FILE_ZONE,
     GO_ROOM_FILE_ZONE_LABEL,
     GO_ROOM_PRIVATE_DELETE,
     GO_ROOM_PRIVATE_DELETE_CONFIRM,
     GO_ROOM_PRIVATE_DROP,
-    GO_ROOM_PRIVATE_MOUNT,
     GO_ROOM_PRIVATE_UNSUPPORTED_HINT,
     ROOM_FILE_PREVIEW_VIDEO_PRELOAD,
-    fileShareIcon,
     fileShareKind,
     formatFileShareSize,
     roomFileDownloadDisabled,
@@ -123,11 +121,12 @@
     roomFileOnAir,
     roomFilePreviewMountsMedia,
     roomFilePreviewShouldAttachUrl,
-    roomFilePrivateActions,
-    roomFileShareActions,
+    roomFilePrivateMenu,
+    roomFileShareMenu,
     roomFileShareMatches,
     roomFileShareOpenLabel,
     roomFileShareProgress,
+    type RoomFileMenuAction,
     type RoomFileShareFilter,
     type RoomFileZone,
   } from "$lib/goRoomFileShare";
@@ -224,7 +223,6 @@
   let shareHang = $state({ done: 0, total: 0 });
   let previewOpen = $state(false);
   let previewId = $state<string | null>(null);
-  let overlayDialog = $state<HTMLDialogElement | null>(null);
   let deleteFileId = $state<string | null>(null);
   let now = $state(Date.now());
   let pane = $state<RoomShellPane>(roomShellDefaultPane());
@@ -237,6 +235,7 @@
   let tvSlotFullscreen = $state(false);
   let selectedPeerId = $state<string | null>(null);
   let hostMenuPeerId = $state<string | null>(null);
+  let fileMenuId = $state<string | null>(null);
   let kickTarget = $state<{ peerId: string; name: string } | null>(null);
   let pendingShare = $state(false);
   let tvVideoEl = $state<HTMLVideoElement | null>(null);
@@ -341,9 +340,7 @@
   const loginGate = $derived(
     roomHostLoginGate({ role, loggedIn, phase, clientReady })
   );
-  const overlayOpen = $derived(
-    phase === "connecting" || phase === "error" || phase === "ended"
-  );
+  const tvStatusGate = $derived(roomTvStatusGate(phase));
 
   onMount(() => {
     clientReady = true;
@@ -524,8 +521,12 @@
   $effect(() => {
     chromeSession.holdAutoHide = roomChromeShouldHold({
       shareOpen,
-      confirmOpen: confirmEnd || Boolean(kickTarget),
-      overlayOpen: overlayOpen || Boolean(hostMenuPeerId),
+      confirmOpen:
+        confirmEnd ||
+        Boolean(kickTarget) ||
+        Boolean(deleteFileId) ||
+        Boolean(privatePendingDelete),
+      // Member／file card「更多」must not reveal or pin the playground header.
     });
     return () => {
       chromeSession.holdAutoHide = false;
@@ -754,24 +755,27 @@
   });
 
   $effect(() => {
-    const el = overlayDialog;
-    if (!el) return;
-    if (overlayOpen && !el.open) el.showModal();
-    if (!overlayOpen && el.open) el.close();
-  });
-
-  $effect(() => {
-    const openId = hostMenuPeerId;
-    if (!openId) return;
+    const openPeer = hostMenuPeerId;
+    const openFile = fileMenuId;
+    if (!openPeer && !openFile) return;
     const onPtr = (e: PointerEvent) => {
       const t = e.target;
-      if (
-        t instanceof Element &&
-        t.closest(`[data-member-peer="${CSS.escape(openId)}"]`)
-      ) {
-        return;
+      if (t instanceof Element) {
+        if (
+          openPeer &&
+          t.closest(`[data-member-peer="${CSS.escape(openPeer)}"]`)
+        ) {
+          return;
+        }
+        if (
+          openFile &&
+          t.closest(`[data-file-id="${CSS.escape(openFile)}"]`)
+        ) {
+          return;
+        }
       }
       hostMenuPeerId = null;
+      fileMenuId = null;
     };
     document.addEventListener("pointerdown", onPtr);
     return () => document.removeEventListener("pointerdown", onPtr);
@@ -1328,6 +1332,60 @@
       liveOnTv: Boolean(goRoomMedia.tvSourcePeerId),
     });
   }
+
+  function toggleFileMenu(id: string) {
+    hostMenuPeerId = null;
+    fileMenuId = fileMenuId === id ? null : id;
+  }
+
+  function shareFileMeta(f: (typeof files)[number]): string {
+    const transferHint = catalogTransferHint({
+      status: f.status,
+      playing: goRoomFiles.playback?.id === f.id,
+    });
+    const bits = [formatSize(f.size)];
+    if (transferHint) bits.push(`${transferHint} ${formatSize(f.received)}`);
+    else if (f.status === "error") bits.push(f.error || "失敗");
+    return bits.join(" · ");
+  }
+
+  function onShareFileAction(id: string, action: RoomFileMenuAction) {
+    fileMenuId = null;
+    if (action === "preview") {
+      void onPlayFile(id);
+      return;
+    }
+    if (action === "download") {
+      if (downloadSlotMode(files.find((f) => f.id === id)?.status, id) === "cancel") {
+        onCancelDownload(id);
+        return;
+      }
+      void onDownload(id);
+      return;
+    }
+    if (action === "cast") {
+      void onPutOnTv(id);
+      return;
+    }
+    if (action === "remove") {
+      void onUnshare(id);
+    }
+  }
+
+  function onPrivateFileAction(id: string, action: RoomFileMenuAction) {
+    fileMenuId = null;
+    if (action === "cast") {
+      void onPutPrivateOnTv(id);
+      return;
+    }
+    if (action === "mount") {
+      void onMountPrivateToShare(id);
+      return;
+    }
+    if (action === "remove") {
+      privatePendingDelete = id;
+    }
+  }
 </script>
 
 <div
@@ -1389,6 +1447,43 @@
           <p class="muted room-tv-gate-hint">
             {GO_ROOM_LOGIN_HINT} 單機小品不受影響。
           </p>
+        </div>
+      {:else if tvStatusGate}
+        <div class="room-tv-gate" role="region" aria-labelledby="room-status-gate-title">
+          {#if phase === "connecting"}
+            <p id="room-status-gate-title" class="room-tv-gate-title pixel-text">
+              {message || "正在進包廂…"}
+            </p>
+          {:else if phase === "error"}
+            <p id="room-status-gate-title" class="room-tv-gate-title pixel-text err">
+              {error || "無法開始"}
+            </p>
+            {#if role === "host"}
+              <button
+                type="button"
+                class="pixel-btn pixel-btn--primary room-tv-gate-btn"
+                onclick={() => onInvite?.()}
+              >
+                再試一次
+              </button>
+            {/if}
+          {:else}
+            <p id="room-status-gate-title" class="room-tv-gate-title pixel-text">
+              {message || "這一間已結束"}
+            </p>
+            <div class="room-tv-gate-actions">
+              {#if role === "host" && loggedIn}
+                <button
+                  type="button"
+                  class="pixel-btn pixel-btn--primary room-tv-gate-btn"
+                  onclick={() => onReissue?.()}
+                >
+                  再開一間
+                </button>
+              {/if}
+              <a class="pixel-btn room-tv-gate-btn" href="/">回遊樂場大廳</a>
+            </div>
+          {/if}
         </div>
       {:else if showAd}
         <div class="room-ad">
@@ -1599,9 +1694,11 @@
                   onclick={() =>
                     (selectedPeerId =
                       selectedPeerId === card.peerId ? null : card.peerId)}
-                  onHostMenuToggle={() =>
-                    (hostMenuPeerId =
-                      hostMenuPeerId === card.peerId ? null : card.peerId)}
+                  onHostMenuToggle={() => {
+                    fileMenuId = null;
+                    hostMenuPeerId =
+                      hostMenuPeerId === card.peerId ? null : card.peerId;
+                  }}
                   onHostAction={(action) => void onHostMemberAction(card, action)}
                 />
               </li>
@@ -1747,7 +1844,6 @@
             <ul class="file-list">
               {#each privateShown as f (f.id)}
                 {@const kind = fileShareKind({ mime: f.mime, name: f.name })}
-                {@const acts = roomFilePrivateActions({ kind })}
                 {@const onAir = roomFileOnAir({
                   fileId: f.id,
                   fileName: f.name,
@@ -1755,51 +1851,18 @@
                   programName: goRoomMedia.programName,
                   liveOnTv: Boolean(goRoomMedia.tvSourcePeerId),
                 })}
-                <li
-                  class={["file-card", onAir && "file-card--on-air"].filter(Boolean).join(" ")}
-                >
-                  <div class="file-card-head">
-                    <span class="file-type" aria-hidden="true">{fileShareIcon(kind)}</span>
-                    <div class="file-card-meta">
-                      <p class="file-name">{f.name}</p>
-                      <p class="muted">{formatSize(f.size)} · 僅這台</p>
-                    </div>
-                  </div>
-                  {#if onAir}
-                    <p class="file-on-air">
-                      <span class="file-on-air-wave" aria-hidden="true"></span>
-                      {GO_ROOM_FILE_ON_AIR}
-                    </p>
-                  {/if}
-                  <div class="file-actions">
-                    {#if acts.cast}
-                      <button
-                        type="button"
-                        class="pixel-btn pixel-btn--primary"
-                        onclick={() => void onPutPrivateOnTv(f.id)}
-                      >
-                        {GO_ROOM_FILE_CAST}
-                      </button>
-                    {/if}
-                    {#if acts.mount}
-                      <button
-                        type="button"
-                        class="pixel-btn"
-                        onclick={() => void onMountPrivateToShare(f.id)}
-                      >
-                        {GO_ROOM_PRIVATE_MOUNT}
-                      </button>
-                    {/if}
-                    {#if acts.remove}
-                      <button
-                        type="button"
-                        class="pixel-btn"
-                        onclick={() => (privatePendingDelete = f.id)}
-                      >
-                        {GO_ROOM_PRIVATE_DELETE}
-                      </button>
-                    {/if}
-                  </div>
+                <li>
+                  <GoRoomFileCard
+                    fileId={f.id}
+                    name={f.name}
+                    {kind}
+                    meta={`${formatSize(f.size)} · 僅這台`}
+                    {onAir}
+                    menu={roomFilePrivateMenu({ kind })}
+                    menuOpen={fileMenuId === f.id}
+                    onMenuToggle={() => toggleFileMenu(f.id)}
+                    onAction={(action) => onPrivateFileAction(f.id, action)}
+                  />
                 </li>
               {/each}
             </ul>
@@ -1810,97 +1873,38 @@
             <ul class="file-list">
               {#each filesShown as f (f.id)}
                 {@const kind = fileShareKind({ mime: f.mime, name: f.name })}
-                {@const acts = roomFileShareActions({ role, mine: f.mine, kind })}
                 {@const owner = fileOwnerCard(f)}
                 {@const onAir = fileOnAir(f)}
-                {@const transferHint = catalogTransferHint({
-                  status: f.status,
-                  playing: goRoomFiles.playback?.id === f.id,
-                })}
-                <li
-                  class={["file-card", onAir && "file-card--on-air"].filter(Boolean).join(" ")}
-                >
-                  <div class="file-card-head">
-                    <span class="file-type" aria-hidden="true">{fileShareIcon(kind)}</span>
-                    <div class="file-card-meta">
-                      <p class="file-name">{f.path || f.name}</p>
-                      <p class="muted">
-                        {formatSize(f.size)}
-                        {#if transferHint} · {transferHint} {formatSize(f.received)}
-                        {:else if f.status === "error"} · {f.error || "失敗"}
-                        {/if}
-                      </p>
-                    </div>
-                    <span class="file-owner">
-                      <span class="bubble-avatar" aria-hidden="true">
-                        {#if owner?.avatarUrl}
-                          <img
-                            class="bubble-avatar-img"
-                            src={owner.avatarUrl}
-                            alt=""
-                            width="32"
-                            height="32"
-                            referrerpolicy="no-referrer"
-                          />
-                        {:else}
-                          <span class="bubble-avatar-letter">
-                            {owner?.avatarInitial ?? (f.mine ? "我" : f.ownerName.slice(0, 1) || "?")}
-                          </span>
-                        {/if}
-                      </span>
-                      <span class="file-owner-name">{f.mine ? "我" : f.ownerName}</span>
-                    </span>
-                  </div>
-                  {#if onAir}
-                    <p class="file-on-air">
-                      <span class="file-on-air-wave" aria-hidden="true"></span>
-                      {GO_ROOM_FILE_ON_AIR}
-                    </p>
-                  {/if}
-                  <div class="file-actions">
-                    {#if acts.preview}
-                      <button
-                        type="button"
-                        class="pixel-btn"
-                        disabled={f.status === "transferring" && goRoomFiles.playback?.id !== f.id}
-                        onclick={() => void onPlayFile(f.id)}
-                      >
-                        {roomFileShareOpenLabel(
-                          fileShareKind({ mime: f.mime, name: f.name })
-                        )}
-                      </button>
-                    {/if}
-                    {#if acts.download}
-                      <button
-                        type="button"
-                        class="pixel-btn pixel-btn--primary"
-                        disabled={downloadButtonDisabled(f.status, f.id)}
-                        onclick={() => {
-                          if (downloadSlotMode(f.status, f.id) === "cancel") {
-                            onCancelDownload(f.id);
-                            return;
-                          }
-                          void onDownload(f.id);
-                        }}
-                      >
-                        {downloadButtonLabel(f.id, f.status)}
-                      </button>
-                    {/if}
-                    {#if acts.cast}
-                      <button
-                        type="button"
-                        class="pixel-btn pixel-btn--primary"
-                        onclick={() => void onPutOnTv(f.id)}
-                      >
-                        {GO_ROOM_FILE_CAST}
-                      </button>
-                    {/if}
-                    {#if acts.remove}
-                      <button type="button" class="pixel-btn" onclick={() => void onUnshare(f.id)}>
-                        {GO_ROOM_FILE_DELETE}
-                      </button>
-                    {/if}
-                  </div>
+                <li>
+                  <GoRoomFileCard
+                    fileId={f.id}
+                    name={f.path || f.name}
+                    {kind}
+                    meta={shareFileMeta(f)}
+                    {onAir}
+                    owner={{
+                      name: f.mine ? "我" : f.ownerName,
+                      avatarUrl: owner?.avatarUrl,
+                      avatarInitial:
+                        owner?.avatarInitial ??
+                        (f.mine ? "我" : f.ownerName.slice(0, 1) || "?"),
+                    }}
+                    menu={roomFileShareMenu({
+                      role,
+                      mine: f.mine,
+                      kind,
+                      previewLabel: roomFileShareOpenLabel(kind),
+                      previewEnabled: !(
+                        f.status === "transferring" &&
+                        goRoomFiles.playback?.id !== f.id
+                      ),
+                      downloadLabel: downloadButtonLabel(f.id, f.status),
+                      downloadEnabled: !downloadButtonDisabled(f.status, f.id),
+                    })}
+                    menuOpen={fileMenuId === f.id}
+                    onMenuToggle={() => toggleFileMenu(f.id)}
+                    onAction={(action) => onShareFileAction(f.id, action)}
+                  />
                 </li>
               {/each}
             </ul>
@@ -2284,43 +2288,6 @@
     ></video>
   {/if}
 
-  <dialog
-    bind:this={overlayDialog}
-    class="room-sheet"
-    aria-labelledby="room-overlay-title"
-    oncancel={(e) => {
-      /* Connecting／error／ended stay until the phase changes. */
-      e.preventDefault();
-    }}
-  >
-    {#if phase === "connecting"}
-      <div class="booth-sheet pixel-box">
-        <p id="room-overlay-title">{message || "正在進包廂…"}</p>
-      </div>
-    {:else if phase === "error"}
-      <div class="booth-sheet pixel-box">
-        <p id="room-overlay-title" class="err">{error || "無法開始"}</p>
-        {#if role === "host"}
-          <button type="button" class="pixel-btn pixel-btn--primary" onclick={() => onInvite?.()}>
-            再試一次
-          </button>
-        {/if}
-      </div>
-    {:else if phase === "ended"}
-      <div class="booth-sheet pixel-box">
-        <p id="room-overlay-title">{message || "這一間已結束"}</p>
-        <div class="room-actions">
-          {#if role === "host" && loggedIn}
-            <button type="button" class="pixel-btn pixel-btn--primary" onclick={() => onReissue?.()}>
-              再開一間
-            </button>
-          {/if}
-          <a class="pixel-btn" href="/">回遊樂場大廳</a>
-        </div>
-      </div>
-    {/if}
-  </dialog>
-
   {#if previewOpen}
     <div
       class="file-preview-overlay"
@@ -2602,6 +2569,20 @@
   .room-tv-gate-btn {
     min-height: 44px;
     align-self: stretch;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    box-sizing: border-box;
+  }
+  .room-tv-gate-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    align-self: stretch;
+  }
+  .room-tv-gate .err {
+    color: #ffb4b8;
   }
   .room-tv-gate-hint {
     margin: 0;
@@ -2620,6 +2601,10 @@
     .room-tv-gate-btn {
       align-self: center;
       min-width: min(100%, 16rem);
+    }
+    .room-tv-gate-actions {
+      align-items: center;
+      max-width: 28rem;
     }
   }
   .room-ad {
@@ -2751,49 +2736,6 @@
     stroke-linecap: round;
     stroke-linejoin: round;
   }
-  .room-sheet {
-    width: 100%;
-    max-width: none;
-    height: 100%;
-    max-height: none;
-    margin: 0;
-    padding: 0;
-    border: none;
-    background: transparent;
-  }
-  .room-sheet[open] {
-    display: flex;
-    align-items: flex-end;
-  }
-  .room-sheet::backdrop {
-    background: color-mix(in oklab, rgb(var(--ink)) 28%, transparent);
-  }
-  .booth-sheet {
-    position: relative;
-    z-index: 1;
-    width: 100%;
-    max-height: min(80%, 32rem);
-    overflow: auto;
-    padding: 0.75rem 0.85rem 0.9rem;
-    background: rgb(var(--card));
-    border-radius: var(--radius) var(--radius) 0 0;
-    border-top: var(--pixel-edge) solid rgb(var(--ink));
-    pointer-events: auto;
-  }
-  .booth-sheet-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    margin-bottom: 0.5rem;
-  }
-  .booth-sheet-title {
-    margin: 0;
-    font-size: 0.9rem;
-  }
-  .booth-sheet-bar .pixel-btn {
-    min-height: 44px;
-  }
   .muted {
     color: color-mix(in oklab, rgb(var(--ink)) 72%, transparent);
     font-size: 0.88rem;
@@ -2801,18 +2743,6 @@
   .err {
     color: rgb(180 35 45);
     margin: 0 0 0.5rem;
-  }
-  .room-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-  .room-actions .pixel-btn {
-    min-height: 44px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    text-decoration: none;
   }
   .room-timeline {
     flex: 1 1 auto;
@@ -2995,11 +2925,11 @@
   }
   .file-list {
     list-style: none;
-    margin: 0.5rem 0 0;
+    margin: 0.35rem 0 0;
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 0.55rem;
+    gap: 0;
   }
   .file-filters {
     display: flex;
@@ -3088,78 +3018,6 @@
     width: 100%;
     height: 0.55rem;
     accent-color: rgb(var(--accent));
-  }
-  .file-card {
-    padding: 0.55rem 0.5rem 0.5rem;
-    border: 2px solid color-mix(in oklab, rgb(var(--ink)) 22%, transparent);
-    border-radius: var(--radius);
-    background: rgb(var(--card));
-  }
-  .file-card--on-air {
-    border-color: #3dff8a;
-    box-shadow: 0 0 0 2px color-mix(in oklab, #3dff8a 55%, transparent);
-  }
-  .file-card-head {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.45rem;
-    min-width: 0;
-  }
-  .file-type {
-    flex: 0 0 auto;
-    font-size: 1.35rem;
-    line-height: 1.2;
-  }
-  .file-card-meta {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
-  .file-owner {
-    display: flex;
-    flex: 0 0 auto;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.15rem;
-    max-width: 4.5rem;
-  }
-  .file-owner-name {
-    overflow: hidden;
-    max-width: 100%;
-    font-size: 0.7rem;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .file-on-air {
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
-    margin: 0.4rem 0 0;
-    font-weight: 700;
-    color: #146b3a;
-  }
-  .file-on-air-wave {
-    display: inline-block;
-    width: 0.85rem;
-    height: 0.85rem;
-    border-radius: 50%;
-    background: #3dff8a;
-    animation: file-on-air-pulse 1.1s ease-in-out infinite;
-  }
-  @keyframes file-on-air-pulse {
-    0%,
-    100% {
-      transform: scale(0.75);
-      opacity: 0.55;
-    }
-    50% {
-      transform: scale(1.15);
-      opacity: 1;
-    }
-  }
-  .file-name {
-    margin: 0;
-    font-weight: 700;
-    overflow-wrap: anywhere;
   }
   .file-actions {
     display: flex;
@@ -3442,7 +3300,13 @@
     .room--desktop .room-pane--files {
       border-bottom: none;
       border-right: 1px solid color-mix(in oklab, rgb(var(--ink)) 18%, transparent);
+      /* Match .room-tabs top inset so 私有／分享 line up with 成員／聊天. */
+      padding-top: 0.25rem;
       padding-right: 0.45rem;
+    }
+    .room--desktop .room-pane--files > .file-filters:first-child,
+    .room--desktop .room-pane--files > .file-filters--kind:first-child {
+      margin-top: 0;
     }
     .room--desktop .room-tabs {
       padding-left: 0.45rem;
@@ -3512,8 +3376,7 @@
     }
   }
   @media (min-width: 40rem) {
-    .confirm-actions,
-    .room-actions {
+    .confirm-actions {
       flex-direction: row;
     }
   }

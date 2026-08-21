@@ -4,27 +4,33 @@ import {
   GO_ROOM_FILE_CANCEL,
   GO_ROOM_FILE_DELETE,
   GO_ROOM_FILE_DROP,
+  GO_ROOM_FILE_DOWNLOAD,
   GO_ROOM_FILE_FILTERS,
   GO_ROOM_FILE_FILTER_LABEL,
+  GO_ROOM_FILE_MORE,
   GO_ROOM_FILE_ON_AIR,
-    GO_ROOM_FILE_PREVIEW,
-    GO_ROOM_FILE_PLAY,
-    GO_ROOM_FILE_VIEW,
-    GO_ROOM_FILE_LISTEN,
-    ROOM_FILE_PREVIEW_VIDEO_PRELOAD,
-    fileShareIcon,
-    fileShareKind,
-    formatFileShareSize,
-    roomFileDownloadDisabled,
-    roomFileDownloadMode,
-    roomFileOnAir,
-    roomFilePreviewMountsMedia,
-    roomFilePreviewShouldAttachUrl,
-    roomFileShareActions,
-    roomFilePrivateActions,
-    roomFileShareMatches,
-    roomFileShareOpenLabel,
-    roomFileShareProgress,
+  GO_ROOM_FILE_PREVIEW,
+  GO_ROOM_FILE_PLAY,
+  GO_ROOM_FILE_VIEW,
+  GO_ROOM_FILE_LISTEN,
+  GO_ROOM_PRIVATE_DELETE,
+  GO_ROOM_PRIVATE_MOUNT,
+  ROOM_FILE_PREVIEW_VIDEO_PRELOAD,
+  fileShareIcon,
+  fileShareKind,
+  formatFileShareSize,
+  roomFileDownloadDisabled,
+  roomFileDownloadMode,
+  roomFileOnAir,
+  roomFilePreviewMountsMedia,
+  roomFilePreviewShouldAttachUrl,
+  roomFileShareActions,
+  roomFilePrivateActions,
+  roomFileShareMenu,
+  roomFilePrivateMenu,
+  roomFileShareMatches,
+  roomFileShareOpenLabel,
+  roomFileShareProgress,
 } from "./goRoomFileShare";
 
 describe("fileShareKind", () => {
@@ -62,6 +68,73 @@ describe("roomFileShareMatches", () => {
     expect(roomFileShareMatches("doc", "doc")).toBe(true);
     expect(roomFileShareMatches("doc", "image")).toBe(true);
     expect(roomFileShareMatches("doc", "video")).toBe(false);
+  });
+});
+
+describe("roomFileShareMenu", () => {
+  it("builds an overflow menu like member cards — only available actions", () => {
+    expect(GO_ROOM_FILE_MORE).toBe("更多");
+    expect(
+      roomFileShareMenu({
+        role: "guest",
+        mine: false,
+        kind: "video",
+        previewLabel: "播放",
+      })
+    ).toEqual([
+      { action: "preview", label: "播放", enabled: true },
+      { action: "download", label: GO_ROOM_FILE_DOWNLOAD, enabled: true },
+    ]);
+    expect(
+      roomFileShareMenu({
+        role: "host",
+        mine: true,
+        kind: "video",
+      })
+    ).toEqual([
+      { action: "cast", label: GO_ROOM_FILE_CAST, enabled: true },
+      { action: "remove", label: GO_ROOM_FILE_DELETE, enabled: true, danger: true },
+    ]);
+    expect(
+      roomFileShareMenu({
+        role: "host",
+        mine: false,
+        kind: "audio",
+        previewLabel: "收聽",
+        downloadLabel: GO_ROOM_FILE_CANCEL,
+        downloadEnabled: true,
+        previewEnabled: false,
+      })
+    ).toEqual([
+      { action: "preview", label: "收聽", enabled: false },
+      { action: "download", label: GO_ROOM_FILE_CANCEL, enabled: true },
+      { action: "cast", label: GO_ROOM_FILE_CAST, enabled: true },
+      { action: "remove", label: GO_ROOM_FILE_DELETE, enabled: true, danger: true },
+    ]);
+  });
+});
+
+describe("roomFilePrivateMenu", () => {
+  it("lists cast／mount／remove for the host private library", () => {
+    expect(roomFilePrivateMenu({ kind: "video" })).toEqual([
+      { action: "cast", label: GO_ROOM_FILE_CAST, enabled: true },
+      { action: "mount", label: GO_ROOM_PRIVATE_MOUNT, enabled: true },
+      {
+        action: "remove",
+        label: GO_ROOM_PRIVATE_DELETE,
+        enabled: true,
+        danger: true,
+      },
+    ]);
+    expect(roomFilePrivateMenu({ kind: "doc" })).toEqual([
+      { action: "mount", label: GO_ROOM_PRIVATE_MOUNT, enabled: true },
+      {
+        action: "remove",
+        label: GO_ROOM_PRIVATE_DELETE,
+        enabled: true,
+        danger: true,
+      },
+    ]);
   });
 });
 

@@ -76,6 +76,7 @@ import {
   roomInviteDoorRow,
   roomHostLoginGate,
   roomShowAdSlot,
+  roomTvStatusGate,
   roomShellActiveTab,
   roomShellDefaultPane,
   roomShellFilesPinned,
@@ -774,6 +775,15 @@ describe("booth copy", () => {
     ).toBe(false);
   });
 
+  it("puts connecting／error／ended copy on the TV, not a bottom sheet", () => {
+    expect(roomTvStatusGate("connecting")).toBe(true);
+    expect(roomTvStatusGate("error")).toBe(true);
+    expect(roomTvStatusGate("ended")).toBe(true);
+    expect(roomTvStatusGate("ready")).toBe(false);
+    expect(roomTvStatusGate("open")).toBe(false);
+    expect(roomTvStatusGate("idle")).toBe(false);
+  });
+
   it("warns that hung items and live pulls stop when the Host ends the booth", () => {
     expect(GO_ROOM_END_CONFIRM_HOST).toBe(
       "關掉後在場的人會斷線，目錄會沒了，大螢幕與鏡頭會停，進行中的遊戲會停。已存到硬碟的檔不受影響。"
@@ -1320,6 +1330,11 @@ describe("roomChromeShouldHold", () => {
     expect(
       roomChromeShouldHold({ composerFocused: true, shareOpen: true })
     ).toBe(true);
+  });
+
+  it("does not treat in-card member／file menus as chrome overlays", () => {
+    // Card「更多」lives in the control rail — must not reveal／pin the header.
+    expect(roomChromeShouldHold({ overlayOpen: false })).toBe(false);
   });
 });
 

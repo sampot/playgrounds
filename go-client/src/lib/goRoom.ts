@@ -144,12 +144,14 @@ export function roomChromeHideable(opts: {
   return true;
 }
 
-/** Pause chrome 3s hide while a sheet／overlay is in the way. Chat composer does not. */
+/** Pause chrome 3s hide while a sheet／overlay is in the way. Chat composer
+ * and in-card member／file「更多」menus do not — those must not reveal the header. */
 export function roomChromeShouldHold(opts: {
   shareOpen?: boolean;
   confirmOpen?: boolean;
   /** Ignored: typing in 文字 must not reveal or pin the playground header. */
   composerFocused?: boolean;
+  /** Full-page／blocking overlays only — not card overflow menus. */
   overlayOpen?: boolean;
   drawerOpen?: boolean;
 }): boolean {
@@ -220,6 +222,14 @@ export function roomHostLoginGate(opts: {
 }): boolean {
   if (!opts.clientReady) return false;
   return opts.role === "host" && !opts.loggedIn && opts.phase === "idle";
+}
+
+/**
+ * Connecting／error／ended copy lives on the TV (same surface as the login
+ * gate). Invitees see「正在進包廂…」there — not a bottom sheet.
+ */
+export function roomTvStatusGate(phase: RoomUiPhase): boolean {
+  return phase === "connecting" || phase === "error" || phase === "ended";
 }
 
 export type RoomEscStep =
