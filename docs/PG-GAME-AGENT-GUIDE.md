@@ -1,9 +1,9 @@
 # Playgrounds 遊戲開發指南（Coding Agent）
 
-> **狀態：** Draft（2026-08-17；修訂：§2.5 `sam-manifest.json`；既有 §3.8／§3.6／§3.7／§1.1／§3.5／§2.4）  
+> **狀態：** Draft（2026-08-17；修訂：2026-08-21 §8 包廂連線；既有 §2.5／§3.8／§3.6／§3.7／§1.1／§3.5／§2.4）  
 > **讀者：** Coding agent（次要：人類作者）  
-> **範圍：** 獨立 `pg-*` 遊戲 repo；產物須能在 **go 純玩**（`https://go.samkuo.me/s/<id>`）與 **play 畫布**同契約執行。  
-> **自足：** 開發遊戲時**只讀本檔**即可；不必讀宿主其它 SPEC／PLAN／源碼。上架型錄、改殼、加新 lib id **不在**本檔範圍。宿主下載協定細節見 [PG-GO-SAM-MANIFEST-PLAN.md](./PG-GO-SAM-MANIFEST-PLAN.md)（維護者；agent 以本檔 §2.5 為準即可）。  
+> **範圍：** 獨立 `pg-*` 遊戲 repo；產物須能在 **go 純玩**（`https://go.samkuo.me/s/<id>`）與 **play 畫布**同契約執行；**多人連線**僅走包廂（§8）。  
+> **自足：** 開發遊戲時**只讀本檔**即可；不必讀宿主其它 SPEC／PLAN／源碼。上架型錄、改殼、加新 lib id **不在**本檔範圍。宿主下載協定細節見 [PG-GO-SAM-MANIFEST-PLAN.md](./PG-GO-SAM-MANIFEST-PLAN.md)（維護者；agent 以本檔 §2.5 為準即可）。包廂開局宿主落地見 [PG-GO-ROOM-PLAY-PLAN.md](./PG-GO-ROOM-PLAY-PLAN.md)（維護者；agent 以本檔 §8 為準即可）。  
 > **Starter：** 新遊戲請用 template repo [`sampot/pg-game-scaffold`](https://github.com/sampot/pg-game-scaffold)（`gh repo create … --template sampot/pg-game-scaffold`）。遊戲 repo 只保留短 `AGENTS.md` **指針**指向本檔；**禁止**把本指南全文拷進每個 `pg-*`。  
 > **借鑑：** go／play 殼契約對齊主機 SDK 的責任切分（平台供應釘版能力＋薄系統服務；遊戲寫玩法）——見 §1.1；細節與非目標見 [PG-UI-SDK-SPEC](./PG-UI-SDK-SPEC.md) §1.4、[PG-LIBS-SPEC](./PG-LIBS-SPEC.md) §1.5。
 
@@ -21,6 +21,7 @@
 | **下載清單** | 根目錄 **`sam-manifest.json`**（修訂號＋執行期檔列表）必備——見 §2.5；go 依此下載，不掃整棵 repo |
 | **執行期** | 宿主注入 `window.PG`；你**不要**自己載入 `/playgrounds/sdk.js` |
 | **相容** | 同一套檔在 go 與 play **同形**；**禁止**依 `location.host` 特判 go／play |
+| **單機 vs 連線** | go **`/s/<id>`**＝**只單機**；**多人連線**＝只在包廂大螢幕（`pg_surface=room`）——見 §8 |
 | **工具** | 需要測試／暫用工具時用 `npx <pkg>`，**不**寫進依賴清單當運行時需求 |
 
 **硬禁令（違者視為未完成）：**
@@ -30,7 +31,7 @@
 3. 禁止用裸 `localStorage`（或同類）當分數／進度的**權威**；持久化走 `PG.kv`（或自訂 `/api`）。  
 4. 禁止交付時缺少根目錄 `sam-manifest.json`，或 `files` 漏列執行期會載入的相對路徑資源。
 
-做完後依 **§11 Definition of Done** 逐項自檢再停。
+做完後依 **§12 Definition of Done** 逐項自檢再停。
 
 ### 0.1 從 scaffold 開新遊戲（建議）
 
@@ -71,18 +72,19 @@ cd pg-<name>
 
 | 層 | 誰負責 | 例子 |
 | --- | --- | --- |
-| **殼（play／go）** | 注入 `window.PG`、預設 `/api`、釘版 `PG.libs`、場／純玩 chrome | 頂列、邊緣抽屜把手、SDK、libs 靜態檔 |
-| **遊戲（你的 repo）** | 玩法、HUD、虛擬搖桿／觸控層、頁內確認／toast、素材 | `#game`、結束面板、Credits |
-| **線上（另約）** | Invite／session／signaling | **不是** `PG.libs`；單機預設不碰 `PG.SESSION` |
+| **殼（play／go）** | 注入 `window.PG`、預設 `/api`、釘版 `PG.libs`、場／純玩 chrome；包廂選局／入座／掛大螢幕 | 頂列、邊緣抽屜把手、SDK、libs 靜態檔、`session_play` |
+| **遊戲（你的 repo）** | 玩法、HUD、虛擬搖桿／觸控層、頁內確認／toast、素材；依 `pg_surface`／角色簡化 UI | `#game`、結束面板、Credits、局內「發牌／開始／落子」 |
+| **線上（包廂）** | 連線拓樸／Peer／入座席＝**殼**；對弈規則／誰可按設定＝**遊戲**（§8） | **不是** `PG.libs`；**禁止**把 `/s/` 做成多人連線快樂路徑 |
 
 **殼不做、你也不要發明成「平台 API」的：**
 
 - `PG.controls`／`PG.input`／殼注入虛擬手把  
 - 殼級成就／獎盃／內購／商店  
 - 用 `alert`／`confirm`／`prompt` 充當系統對話框  
-- 把 matchmaking／WebRTC 塞進 `PG.libs.load`
+- 把 matchmaking／WebRTC 塞進 `PG.libs.load`  
+- 在 `pg_surface=room` 再鑄「邀請對弈」／compose 掃碼當開局主路徑（人已在包廂）
 
-**平台義務（遊戲必須履行；多數是文件級硬規則，不是新 `PG.*`）：** 存檔走 `PG.kv`、錯誤頁內提示、生命週期暫停（§3.5）、輸入歸零（§3.2）、mobile-first、玩中 chrome 收合（§3.6）、直橫／桌面視口可玩（§3.7）、採納適用的業界共識並避開否決項（§3.8）。
+**平台義務（遊戲必須履行；多數是文件級硬規則，不是新 `PG.*`）：** 存檔走 `PG.kv`、錯誤頁內提示、生命週期暫停（§3.5）、輸入歸零（§3.2）、mobile-first、玩中 chrome 收合（§3.6）、直橫／桌面視口可玩（§3.7）、採納適用的業界共識並避開否決項（§3.8）；連線局另守 §8。
 
 ---
 
@@ -128,7 +130,7 @@ functions.js           # 若有：亦須列入 sam-manifest.json 的 files
 
 ### 2.4 卡面封面 `thumbnail.png`
 
-遊戲 repo **根目錄**須有一張 **`thumbnail.png`**，供 go 首頁推薦卡、`/apps`、換片「試試這些」等**產品內卡面**替換預設系列圖示。舊遊戲尚未補圖時宿主會 fallback 系列 icon；**新做／重寫遊戲的 agent 交付前應產出此檔**（見下方「如何產生」與 §11）。
+遊戲 repo **根目錄**須有一張 **`thumbnail.png`**，供 go 首頁推薦卡、`/apps`、換片「試試這些」等**產品內卡面**替換預設系列圖示。舊遊戲尚未補圖時宿主會 fallback 系列 icon；**新做／重寫遊戲的 agent 交付前應產出此檔**（見下方「如何產生」與 §12）。
 
 | 項 | 規格 |
 | --- | --- |
@@ -136,9 +138,9 @@ functions.js           # 若有：亦須列入 sam-manifest.json 的 files
 | **內容** | **真實遊玩畫面**（一幀可辨識玩法）；勿只放 logo／純字 title card／抽象裝飾圖 |
 | **比例** | **4:3**（**640×480** 優先；或 800×600）。正方形僅過渡可接受——宿主會 `object-fit: cover` 裁切，非首選 |
 | **格式／體積** | PNG；建議 **≤ ~50KB**（可損壓）；勿丟未壓縮大圖 |
-| **署名** | 畫面含第三方素材時，仍依 §8 在 `ATTRIBUTION.md`（及必要時 credits）署名；封面本身不另開授權例外 |
+| **署名** | 畫面含第三方素材時，仍依 §9 在 `ATTRIBUTION.md`（及必要時 credits）署名；封面本身不另開授權例外 |
 | **語意（硬）** | 有 thumbnail **≠**「這台裝置可離線玩」。離線＝造訪後 cache（go `/apps`／「更多」已下載）；封面只負責「長什麼樣」 |
-| **如何進卡面** | 作者／agent 只負責把檔放進遊戲 repo。**宿主**建置／維護腳本把檔同步到 go（等）靜態 **`/covers/<catalog_id>.png`**，型錄產物可選帶 `cover` 路徑——見 [PG-GO-CLIENT-PLAN §5.8](./PG-GO-CLIENT-PLAN.md)、[PG-CATALOG-QUERY-PLAN](./PG-CATALOG-QUERY-PLAN.md)。**禁止**指望 go 首頁 runtime 去打 GitHub raw；**禁止**在遊戲任務裡自行改宿主 `/covers/` 或型錄 YAML（§12） |
+| **如何進卡面** | 作者／agent 只負責把檔放進遊戲 repo。**宿主**建置／維護腳本把檔同步到 go（等）靜態 **`/covers/<catalog_id>.png`**，型錄產物可選帶 `cover` 路徑——見 [PG-GO-CLIENT-PLAN §5.8](./PG-GO-CLIENT-PLAN.md)、[PG-CATALOG-QUERY-PLAN](./PG-CATALOG-QUERY-PLAN.md)。**禁止**指望 go 首頁 runtime 去打 GitHub raw；**禁止**在遊戲任務裡自行改宿主 `/covers/` 或型錄 YAML（§13） |
 
 #### 如何產生（agent 義務）
 
@@ -298,7 +300,7 @@ manager.on("end", () => {
 3. **有挑戰**——AI 或關卡會因玩家選擇改變。  
 4. **輸贏清楚**——可勝可敗，且來自玩家操作。  
 5. **測試測規則**——不是只斷言「某個欄位有變」。  
-6. **美術／音效有實際用上**，且署名齊（§8）。  
+6. **美術／音效有實際用上**，且署名齊（§9）。  
 7. **生命週期（§3.5）**——背景／隱藏時不繼續吃輸入、不無意義燒 CPU／音訊。  
 8. **chrome 收合（§3.6）**——`playing` 時隱藏開局設定／大標題／常駐說明；相位切換改變可見 DOM，非只改文案。  
 9. **視口（§3.7）**——手機與桌面、直式與橫式皆可玩；短高橫式有重組，非僅加寬。
@@ -525,7 +527,7 @@ libs：`unknown_lib`、`load_failed`（見 §5）。
 - 不要假設存在 `PG.secrets`（UI 不暴露密鑰值）。  
 - 不要在 UI 直連「後端 env」。  
 - 不要發明 `PG.controls`／`PG.input`／`PG.lifecycle`／`PG.achievements`（殼不注入操控；生命週期見 §3.5；無獎盃 API）。  
-- `PG.SESSION`／`COMPUTE`／`HOST`／`DELEGATE` 為 **capability**：未準入時**屬性不存在**（`"SESSION" in PG === false`）。**單機小品預設不要依賴它們。** 多人／Invite 協定超出本指南（§12）。
+- `PG.SESSION`／`COMPUTE`／`HOST`／`DELEGATE` 為 **capability**：未準入時**屬性不存在**（`"SESSION" in PG === false`）。**單機小品（`/s/`、`pg_surface=solo`）預設不要依賴它們。** 包廂連線局依 §8（入座席由殼完成；遊戲讀席次／角色後走既有 session 隧道）。
 
 ### 4.5 自訂 API 逃生艙
 
@@ -709,7 +711,105 @@ Phaser 場景、物理、輸入細節以 **Phaser 4** 官方文件／examples �
 
 ---
 
-## 8. 美術／音效／署名
+## 8. 包廂連線遊戲（硬）
+
+遊樂場的**多人連線對弈**快樂路徑＝**包廂**（go `/room` 主持＋Guest `/i/<short>`），不是 `/s/<id>`。任務要求「可連線／包廂局」時遵守本節；**預設仍先做出可在 `/s/` 單機玩的同一套檔**。
+
+### 8.1 拓樸（硬）
+
+| 入口 | 殼注入 | 遊戲必須 |
+| --- | --- | --- |
+| go **`/s/<id>`**（及 play 畫布單機開） | `pg_surface=solo`（或缺省＝solo） | **只單機**（人機／本地多席／AI 等）；**禁止**露「邀請對弈／開場／鑄 compose／等人入座」當主路徑 |
+| 包廂大螢幕槽 | `pg_surface=room` | **只連線對弈**；入座席由殼 `session_play`＋`avatar_relay`；遊戲做局內規則與**依角色**的 UI |
+
+**禁止：**
+
+- 把 `/s/...` 做成多人連線主路徑（掃碼拉人、等人滿、線上大廳）  
+- 在 `room` 面再要求 Guest 掃第二張 compose／把網址 `replaceState` 成 `/s/<id>` 或 `/room`  
+- 假設「開了 `/s/` 就能跟包廂裡的人同一局」
+
+參考實作：`pg-gomoku`、`pg-redpick`（皆有 `shellSurface.js`＋依 surface 分支）。
+
+### 8.2 讀取 `pg_surface`
+
+殼會傳語境（擇一；**預設 solo**）：
+
+1. URL：`…/index.html?…&pg_surface=room|solo`  
+2. Memory／srcdoc：`<meta name="pg:surface" content="room|solo">`  
+3. 皆無 → **`solo`**
+
+建議抽小模組（勿依 `location.host`）：
+
+```js
+export function readPgSurface(doc = document, loc = location) {
+  try {
+    const q = new URLSearchParams(loc.search || "").get("pg_surface");
+    if (q === "room" || q === "solo") return q;
+  } catch { /* ignore */ }
+  try {
+    const c = doc.querySelector?.('meta[name="pg:surface"]')
+      ?.getAttribute?.("content")?.trim();
+    if (c === "room" || c === "solo") return c;
+  } catch { /* ignore */ }
+  return "solo";
+}
+```
+
+開局：`const shellSurface = readPgSurface();` → `solo` 只掛單機 UI；`room` 只掛連線 UI（等候／入座狀態／依角色操作）。
+
+### 8.3 誰設定遊戲（硬）
+
+| 動作 | 誰可以 | 說明 |
+| --- | --- | --- |
+| 選哪一款、開／結束這一局 | **包廂主持**（殼） | 遊戲不負責「玩遊戲」選單 |
+| 局內設定：發牌、選先手、開始、再來一局、重設規則選項等 | **僅主持角色**（通常 protocol `host`） | Guest **不可**改設定；UI 不顯示或 disabled |
+| 輪到自己的出牌／落子／操作 | **該席角色** | 非己回合不可送權威 `act` |
+| 觀戰 | 未入座席 | 同畫布；**不**佔 role、**不**送 `act` |
+
+**權威在 Host 本機 SAM `functions.js`：** 非主持的設定類 `act` 必須 `role_forbidden`（例：僅主持可 `deal`／`start`／`reset`）。前端隱藏不夠——後端要拒。
+
+### 8.4 UI 依角色調整（硬）
+
+連線局 UI **必須**隨本機角色改變可見 DOM（對齊 §3.6：相位／角色切換＝改結構，非只改一行字）：
+
+| 角色 | UI 取向 |
+| --- | --- |
+| **主持（host）** | 可見局內設定與「發牌／開始／再來」；可看滿席／等候文案；輪到自己時可操作 |
+| **入座訪客（p2／player…）** | **隱藏**主持專用設定；顯示「已入座／等候主持…」；僅己回合操作；結束後等主持再開 |
+| **觀戰** | 只看；無出牌控件；可標「在看」 |
+
+**玩家名稱：** 包廂會把顯示名帶進 session presence／`listSeats`（`name`／`displayName`）。連線局應用這些名稱標席次／回合（勿只顯示「席二」「對手」）；本機視角可把「自己」顯示成「你」，其餘用真名。
+
+**禁止**對玩家露出協議 id 字串（如 `redpick.v1`）當主文案；型錄／除錯另論。
+
+### 8.5 協定與席次（遊戲側）
+
+- 型錄／`protocol` 宣告 `roles`（含主持席）與必要時 `roleLimits`；包廂滿席才開局——**人數閘在殼**，遊戲在 `waiting`／`ready`／`active` 狀態機上對齊。  
+- **入座席＝殼的事**：`room` 面不要自己 mint Platform invite、不要自己做 QR 進門。  
+- Guest 自動入座後，遊戲只：`getSeat`／同步 state、依 role 渲染、收發合法 `act`。  
+- 結束這一局（遊戲內或殼「結束這一局」）→ 卸局；**不要**假設會拆包廂 PeerConnection。
+
+### 8.6 與 GO-INVITE 的界線
+
+| 路徑 | 用途 |
+| --- | --- |
+| **包廂 `session_play`** | 人已在包廂 → 大螢幕開局（本節快樂路徑） |
+| **GO-INVITE（`invite.compose`）** | **尚未**進包廂、為某一款掃碼拉人 |
+
+任務寫「包廂連線」時：**不要**做 compose 邀請流當主 UX。`pg_surface=solo` 亦**不要**露 compose。
+
+### 8.7 連線局交付自檢（任務要求多人時另勾）
+
+- [ ] `/s/<id>` 與 `pg_surface=solo`：**無**連線邀請／開場／等人主路徑  
+- [ ] `pg_surface=room`：**無**單機開局模式切換當主路徑；入座不自鑄 compose  
+- [ ] 僅主持可見／可送設定類操作；`functions.js` 拒絕非主持設定 `act`  
+- [ ] 訪客／觀戰 UI 與主持明顯不同（隱藏設定、等候文案、無越權控件）  
+- [ ] 席位／回合顯示使用包廂顯示名（有則優先）  
+- [ ] `sam-manifest.json` 含 `shellSurface.js`（若有）等連線相關檔，並 bump `rev`
+
+---
+
+## 9. 美術／音效／署名
 
 | 規則 | |
 | --- | --- |
@@ -728,7 +828,7 @@ Phaser 場景、物理、輸入細節以 **Phaser 4** 官方文件／examples �
 
 ---
 
-## 9. 測試
+## 10. 測試
 
 - 單元測試測**玩法規則**（合法步、得分、勝敗、碰撞結果等），用 `npx vitest run`（**不要**為 vitest 把依賴寫死進「遊戲運行時」；以 npx 臨時執行）。  
 - **不要**在測試裡假設能載到真實 `/playgrounds/libs/*`（那是殼環境）。引擎相關邏輯：抽純函式測，或 mock。  
@@ -758,7 +858,7 @@ npx vitest run
 
 ---
 
-## 10. 常見錯誤（禁止重蹈）
+## 11. 常見錯誤（禁止重蹈）
 
 1. CDN 或自帶 Phaser／Pixi／Three min.js  
 2. 當 Phaser 3 寫（殼是 **4**）  
@@ -784,11 +884,14 @@ npx vitest run
 22. 只做直式長頁＋`min-width` 略加寬，短高橫式無法玩或需「請旋轉」（違反 §3.7）  
 23. 旋轉螢幕重置整局，或固定 px 畫布在矮視口溢出／擋操作  
 24. 照抄「請旋轉」／orientation lock／依賴 Fullscreen 當唯一可玩條件（違反 §3.8）  
-25. 無 `sam-manifest.json`，或 `files` 漏列執行期資源／改檔不 bump `rev`（違反 §2.5）
+25. 無 `sam-manifest.json`，或 `files` 漏列執行期資源／改檔不 bump `rev`（違反 §2.5）  
+26. 把 `/s/<id>` 做成多人連線快樂路徑，或在包廂 `room` 面再鑄 compose／掃第二張邀請（違反 §8）  
+27. 連線局讓訪客改發牌／先手／再來一局等設定，或 `functions.js` 不拒非主持設定 `act`（違反 §8.3）  
+28. 連線局主持／訪客／觀戰同一套設定控件，或角色切換只改文案不改 DOM（違反 §8.4）
 
 ---
 
-## 11. Definition of Done（交付前自檢）
+## 12. Definition of Done（交付前自檢）
 
 複製並在工作記錄勾選：
 
@@ -809,25 +912,29 @@ npx vitest run
 - [ ] `ATTRIBUTION.md`（及必要時遊戲內 credits）齊  
 - [ ] `npx vitest run` 綠（有規則可測時）  
 - [ ] 無 go／play 特判；相對路徑資源正確  
-- [ ] 未發明殼級操控／獎盃 API；單機未依賴 Invite／`SESSION`  
+- [ ] 未發明殼級操控／獎盃 API；單機（`/s/`）未依賴 Invite／把連線當預設  
 - [ ] 根目錄 `thumbnail.png` 已依 §2.4 產生（真實遊玩幀、4:3、約 640×480、PNG ≤~50KB）並入庫  
 - [ ] 根目錄 `sam-manifest.json` 已依 §2.5（`version` 1、`rev` 已 bump、`files` 含 `index.html` 與所有執行期相對路徑資源）  
+- [ ] （若任務要求包廂連線）§8.7 連線局自檢全勾  
+
 ---
 
-## 12. 本指南不涵蓋（不要擅自擴 scope）
+## 13. 本指南不涵蓋（不要擅自擴 scope）
 
 除非任務單**明文**要求，否則不要做：
 
 - 修改 Playgrounds 宿主、Service Worker、`pin.json`、新增 `PG.libs` id  
 - 撰寫／提交場型錄 YAML、上架／unlist 流程、宿主 `/covers/<id>.png` 同步  
-- Invite／WebRTC／多人对弈協定、`PG.SESSION` 座席邏輯  
+- 實作包廂殼本身（`session_play` wire、進門 WebRTC、門牌 mint）——那是宿主；遊戲只守 §8  
+- 把 GO-INVITE compose 當包廂開局快樂路徑（違反 §8.6）  
 - Platform 登入、dash、點數、TURN  
 - 文件站、場殼 IDE、OPFS 編輯管線  
 
-預設產物＝**可在 go `/s/<id>` 單機純玩**的靜態 SAM。多人局需另份任務說明。
+**預設產物**＝可在 go **`/s/<id>` 單機**純玩的靜態 SAM。  
+**任務要求多人連線時**＝同一套檔另支援 `pg_surface=room`（§8）；仍須保持 `/s/` 為單機。
 
 ---
 
-## 13. 給維護者的註腳（agent 可略）
+## 14. 給維護者的註腳（agent 可略）
 
-本檔內容摘自宿主契約（UI SDK、`PG.libs`、遊戲交付約束、UX／生命週期／畫面相位／視口硬規則、適用的業界 Web 遊戲共識、主機 SDK 責任借鑑）。若與殼上實際 `sdk.js`／`pin.json` 衝突，以殼運行為準，並應回修本檔附表版本。Agent 開發遊戲時仍以本檔為唯一必讀。
+本檔內容摘自宿主契約（UI SDK、`PG.libs`、遊戲交付約束、UX／生命週期／畫面相位／視口硬規則、適用的業界 Web 遊戲共識、主機 SDK 責任借鑑、包廂 `session_play`／`pg_surface`）。若與殼上實際 `sdk.js`／`pin.json`／包廂行為衝突，以殼運行為準，並應回修本檔附表版本。Agent 開發遊戲時仍以本檔為唯一必讀。
