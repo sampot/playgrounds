@@ -32,6 +32,8 @@ class DashStore {
   users = $state<AdminUser[]>([]);
   confirm = $state<ConfirmState>(null);
   busy = $state(false);
+  /** True while auto-provisioning back to a field (e.g. go login success). */
+  redirectingToField = $state(false);
   creditSessions = $state<CreditSessionRow[]>([]);
   returnFieldHint = $state("");
 
@@ -174,7 +176,10 @@ class DashStore {
       );
       if (res.ok && data.access_token) {
         setAccessToken(data.access_token);
-        this.flash("已進入後台", "ok");
+        // /go/login will show an in-panel “returning” state instead of dash flash.
+        if (!location.pathname.startsWith("/go/login")) {
+          this.flash("已進入後台", "ok");
+        }
       } else {
         this.flash("無法完成進入，請再試一次", "err");
       }
@@ -185,7 +190,10 @@ class DashStore {
     params.delete("claimed");
     params.delete("auth_error");
     const qs = params.toString();
-    const next = qs ? `/?${qs}` : "/";
+    // Keep /go/login path so the bare shell stays put while we auto-provision
+    // back to go (do not flash the dash homepage chrome).
+    const path = location.pathname.startsWith("/go/login") ? "/go/login" : "/";
+    const next = qs ? `${path}?${qs}` : path;
     if (location.search || fieldParam) history.replaceState({}, "", next);
 
     this.returnFieldHint = this.peekReturnField();
@@ -198,7 +206,13 @@ class DashStore {
         if (this.me?.role === "admin") await this.loadUsers();
         const ret = this.peekReturnField();
         if (ret) {
-          this.flash("正在回到你的遊樂場…", "ok");
+          this.redirectingToField = true;
+          // On /go/login the page panel shows this status; elsewhere use flash.
+          if (!location.pathname.startsWith("/go/login")) {
+            this.flash("正在回到你的遊樂場…", "ok");
+          } else {
+            this.clearFlash();
+          }
           await this.provisionAndOpenField(ret, {
             skipConfirm: true,
           });
@@ -223,6 +237,7 @@ class DashStore {
           { method: "POST", body: JSON.stringify(body) }
         );
         if (!res.ok || !data.field_url) {
+          this.redirectingToField = false;
           this.flash(
             data.error === "invalid_target_field"
               ? "遊樂場網址無效"
@@ -233,7 +248,9 @@ class DashStore {
         }
         this.takeReturnField();
         await this.refreshMe();
-        this.flash("正在開啟遊樂場…", "ok");
+        if (!location.pathname.startsWith("/go/login")) {
+          this.flash("正在開啟遊樂場…", "ok");
+        }
         window.location.assign(data.field_url);
       } finally {
         this.busy = false;

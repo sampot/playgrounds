@@ -21,20 +21,31 @@
 <div class="go-login-panel">
   <div class="hero">
     <h1>登入遊樂場</h1>
-    <p>登入成功後自動回到純玩版，繼續遊玩。</p>
+    {#if dash.redirectingToField}
+      <p>登入成功，即將返回純玩版。</p>
+    {:else}
+      <p>登入成功後自動回到純玩版，繼續遊玩。</p>
+    {/if}
   </div>
-  <div class="panel">
-    <h2>選擇一種方式登入</h2>
-    <p class="lede">
-      純玩版以 LINE 登入為主要方式，也可使用 Google。註冊帳戶為邀請制：若你還沒有帳戶，請先到
-      <a href="https://dash.samkuo.me/" rel="noopener noreferrer">後台</a>
-      以既有方式建立。
-    </p>
-    <div class="row go-login-actions">
-      <a class="btn" href={lineHref}>使用 LINE 進入</a>
-      <a class="btn secondary" href={googleHref}>使用 Google 進入</a>
+  {#if dash.redirectingToField}
+    <div class="panel" role="status" aria-live="polite">
+      <h2>即將返回</h2>
+      <p class="lede">正在回到你的遊樂場…</p>
     </div>
-  </div>
+  {:else}
+    <div class="panel">
+      <h2>選擇一種方式登入</h2>
+      <p class="lede">
+        純玩版以 LINE 登入為主要方式，也可使用 Google。註冊帳戶為邀請制：若你還沒有帳戶，請先到
+        <a href="https://dash.samkuo.me/" rel="noopener noreferrer">後台</a>
+        以既有方式建立。
+      </p>
+      <div class="row go-login-actions">
+        <a class="btn" href={lineHref}>使用 LINE 進入</a>
+        <a class="btn secondary" href={googleHref}>使用 Google 進入</a>
+      </div>
+    </div>
+  {/if}
 </div>
 
 <style>

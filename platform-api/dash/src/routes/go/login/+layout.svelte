@@ -11,5 +11,7 @@
   <meta name="robots" content="noindex" />
 </svelte:head>
 
-<Flash message={dash.flashMsg} kind={dash.flashKind} />
+{#if !dash.redirectingToField}
+  <Flash message={dash.flashMsg} kind={dash.flashKind} />
+{/if}
 {@render children()}
