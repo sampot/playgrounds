@@ -332,6 +332,39 @@ class GoAuth {
     }
   }
 
+  /**
+   * Apply a field API key for this tab (validate via `/v1/field/me` first).
+   * Used by localhost harness paste／remember — not a product login path.
+   */
+  async applyFieldApiKey(key: string): Promise<GoProfile> {
+    const trimmed = key.trim();
+    if (!trimmed) {
+      const err = new Error("請貼上 field API key") as Error & { code?: string };
+      err.code = "empty_key";
+      throw err;
+    }
+    this.busy = true;
+    try {
+      const me = await fetchFieldMe(trimmed);
+      this.#apiKey = trimmed;
+      writeSessionApiKey(trimmed);
+      this.loggedIn = true;
+      const profile = this.#applyFieldMe(me);
+      chromeSession.setFlash(BOSS_FLASH.loggedIn);
+      return profile;
+    } catch (err) {
+      if (isFieldCredentialRejected(err)) {
+        this.#clearApiKey();
+        const e = new Error("通行證無效或已失效") as Error & { code?: string };
+        e.code = "rejected";
+        throw e;
+      }
+      throw err instanceof Error ? err : new Error(String(err));
+    } finally {
+      this.busy = false;
+    }
+  }
+
   /** Test seam: inject an in-memory field API key (never touches storage). */
   __setApiKeyForTests(key: string | null): void {
     this.#apiKey = key;

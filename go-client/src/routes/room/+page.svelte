@@ -1,12 +1,23 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { browser } from "$app/environment";
+  import { page } from "$app/state";
   import { goAuth } from "$lib/goAuth.svelte";
   import GoRoomSurface from "$lib/GoRoomSurface.svelte";
+  import GoRoomDevProbe from "$lib/GoRoomDevProbe.svelte";
   import {
     createRoomRuntime,
     type RoomStatus,
   } from "$lib/roomRuntime";
+  import {
+    attachGoRoomDev,
+    goRoomDevPageEnabled,
+    goRoomDevPeerCount,
+    parseGoRoomDevQuery,
+    writeGoRoomDevRememberedKey,
+    type GoRoomDevHandle,
+  } from "$lib/goRoomDev";
+  import GoRoomDevKeyPanel from "$lib/GoRoomDevKeyPanel.svelte";
   import {
     GO_ROOM_DESCRIPTION,
     GO_ROOM_DOCUMENT_TITLE,
@@ -30,14 +41,62 @@
 
   let status = $state<RoomStatus | null>(null);
   const runtime = createRoomRuntime();
+  const devEnabled = $derived(browser && goRoomDevPageEnabled());
+  const devQuery = $derived(
+    browser
+      ? parseGoRoomDevQuery(page.url.searchParams)
+      : { mint: false, join: false, login: false, name: null }
+  );
+  const peerCount = $derived(goRoomDevPeerCount(status?.guestCount ?? 0));
+
+  let devHandle: GoRoomDevHandle | null = null;
+  let autoMintStarted = false;
 
   onMount(() => {
     const unsub = runtime.subscribe((s) => {
       status = s;
+      devHandle?.sync();
     });
     if (goAuth.loggedIn) void runtime.openBooth();
+
+    if (devEnabled) {
+      devHandle = attachGoRoomDev({
+        enabled: true,
+        role: "host",
+        getSnapshot: () => {
+          const s = runtime.getStatus();
+          return {
+            phase: s.phase,
+            doorUrl: s.shortUrl,
+            guestCount: s.guestCount,
+            loggedIn: goAuth.loggedIn,
+            inviteDoor: s.inviteDoor,
+          };
+        },
+        mint: async () => {
+          const r = await runtime.mintInviteAndAnswer();
+          if (!r?.shortUrl) {
+            throw new Error("mint failed");
+          }
+          return { shortUrl: r.shortUrl };
+        },
+        join: async () => {
+          /* host does not join */
+        },
+        setApiKey: async (key, setOpts) => {
+          await goAuth.applyFieldApiKey(key);
+          if (setOpts?.remember !== false) {
+            writeGoRoomDevRememberedKey(key, { enabled: true });
+          }
+          await runtime.openBooth();
+        },
+      });
+    }
+
     return () => {
       unsub();
+      devHandle?.dispose();
+      devHandle = null;
       void runtime.close();
     };
   });
@@ -47,9 +106,43 @@
     if (goAuth.loggedIn) void runtime.openBooth();
   });
 
+  $effect(() => {
+    if (!browser || !devEnabled || !devQuery.mint) return;
+    if (!goAuth.loggedIn) return;
+    if (autoMintStarted) return;
+    const phase = status?.phase;
+    if (phase !== "open" && phase !== "idle") return;
+    autoMintStarted = true;
+    void (async () => {
+      try {
+        await runtime.mintInviteAndAnswer();
+        devHandle?.sync();
+      } catch {
+        /* status.error already set */
+      }
+    })();
+  });
+
+  function onDevKeyApplied() {
+    void runtime.openBooth();
+    devHandle?.sync();
+    if (devQuery.mint && !autoMintStarted) {
+      autoMintStarted = true;
+      void (async () => {
+        try {
+          await runtime.mintInviteAndAnswer();
+          devHandle?.sync();
+        } catch {
+          /* status.error already set */
+        }
+      })();
+    }
+  }
+
   async function mint() {
     try {
       await runtime.mintInviteAndAnswer();
+      devHandle?.sync();
     } catch {
       /* status.error already set */
     }
@@ -79,6 +172,15 @@
   {@html `<script type="application/ld+json">${pageLdJson}</script>`}
 </svelte:head>
 
+{#if devEnabled}
+  <GoRoomDevProbe
+    phase={status?.phase ?? "idle"}
+    {peerCount}
+    inviteDoor={status?.inviteDoor ?? "none"}
+    doorUrl={status?.shortUrl ?? null}
+  />
+{/if}
+
 <GoRoomSurface
   role="host"
   phase={status?.phase ?? "idle"}
@@ -104,3 +206,7 @@
   onStartPlay={() => void runtime.startAutoPlay("pg-gomoku")}
   onEndPlay={() => void runtime.endPlay()}
 />
+
+{#if devEnabled}
+  <GoRoomDevKeyPanel onApplied={onDevKeyApplied} />
+{/if}

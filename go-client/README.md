@@ -5,23 +5,48 @@ Guest-only client at **`https://go.samkuo.me`** (DEC-050). No editor, no OPFS sa
 ## Dev
 
 ```bash
-# terminal 1 — Platform API (short resolve / join / signal)
-npm run platform:dev
-
-# terminal 2 — go client (talks directly to https://api.samkuo.me — no Vite /v1 proxy)
+# default — go client only (talks directly to https://api.samkuo.me — no Vite /v1 proxy)
 npm run go:dev
 # → http://localhost:5174/i/<shortId>
 # → http://localhost:5174/s/pg-breakout
+# → http://localhost:5174/room
 ```
 
 The client always targets `https://api.samkuo.me` (and `https://dash.samkuo.me` for
 login). Local dev works because the Platform CORS allowlist includes `localhost`.
-Only override via `VITE_PLATFORM_API_ORIGIN`／`VITE_PLATFORM_DASH_ORIGIN` for tests／self-hosting.
+**You do not need `platform:dev` for ordinary go／包廂 work.** Only override via
+`VITE_PLATFORM_API_ORIGIN`／`VITE_PLATFORM_DASH_ORIGIN` when developing Platform
+itself or self-hosting.
 
-Optional in `platform-api/.dev.vars`:
+包廂多 tab／Agent 自動化（免 SSO、自動鑄門牌／進門）見
+[`docs/PG-GO-ROOM-DEV-HARNESS-PLAN.md`](../docs/PG-GO-ROOM-DEV-HARNESS-PLAN.md)
+（僅 `go:dev`＋loopback；正式 API）。
+
+**開發通行證（最簡單）：**
+
+1. 在 localhost `/room` **先用「登入」SSO 一次**
+2. 頁頂「開發通行證」→ **記住到本機**（之後開新 tab 會自動登入）
+3. 或 **複製 key** → 貼到另一個瀏覽器／跟 Agent 說「已記住」
+
+Agent／腳本仍可用：`window.__goRoomDev.setApiKey('pg_sk_…', { remember: true })`
+
+**多 tab 劇本：**
+
+1. Host：`/room?dev_mint=1`（已記住 key 則自動登入＋鑄門牌）
+2. 讀 `window.__goRoomDev.doorUrl` 或 `[data-testid=room-door-url]`
+3. Guest：`{doorUrl}?dev_join=1&name=G1`
+4. Host：`__goRoomDev.waitReady({ peerCount: 2 })`
+
+Optional in `platform-api/.dev.vars` when running a **local** Platform:
 
 ```
 GO_PUBLIC_ORIGIN=http://localhost:5174
+```
+
+```bash
+# only when changing Invite／signaling／DO — not required for go／包廂
+npm run platform:dev
+# then point go at it: VITE_PLATFORM_API_ORIGIN=http://127.0.0.1:8787 npm run go:dev
 ```
 
 ## Deploy

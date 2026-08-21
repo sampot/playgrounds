@@ -1,5 +1,6 @@
 <script lang="ts">
   import { page } from "$app/state";
+  import { browser } from "$app/environment";
   import { onMount } from "svelte";
   import { chromeSession } from "$lib/chromeSession.svelte";
   import { findGoCatalogBySource } from "$lib/goCatalog";
@@ -16,11 +17,20 @@
   } from "$lib/goShareMeta";
   import { composeSamSource, isRoomInvite } from "@pg/platform/platformCompose";
   import GoRoomSurface from "$lib/GoRoomSurface.svelte";
+  import GoRoomDevProbe from "$lib/GoRoomDevProbe.svelte";
   import {
     likelyInAppBrowser,
   } from "$lib/goCanvasSupport";
   import { setGoMemoryCanvasWindow } from "$lib/goMemoryCanvas";
   import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
+  import {
+    attachGoRoomDev,
+    goRoomDevJoinName,
+    goRoomDevPageEnabled,
+    goRoomDevPeerCount,
+    parseGoRoomDevQuery,
+    type GoRoomDevHandle,
+  } from "$lib/goRoomDev";
 
   const shortId = $derived(page.params.shortId?.trim() || "");
   const og = $derived(
@@ -36,6 +46,21 @@
   let copyFlash = $state("");
   const runtime = createGuestRuntime();
   const inAppHint = $derived(likelyInAppBrowser());
+  const devEnabled = $derived(browser && goRoomDevPageEnabled());
+  const devQuery = $derived(
+    browser
+      ? parseGoRoomDevQuery(page.url.searchParams)
+      : { mint: false, join: false, login: false, name: null }
+  );
+  const peerCount = $derived(goRoomDevPeerCount(status?.guestCount ?? 0));
+  const guestDoorUrl = $derived(
+    browser && shortId
+      ? `${location.origin}/i/${encodeURIComponent(shortId)}`
+      : null
+  );
+
+  let devHandle: GoRoomDevHandle | null = null;
+  let autoJoined = false;
 
   const samSource = $derived(
     status?.meta ? composeSamSource(status.meta.intent) : null
@@ -85,21 +110,77 @@
   });
 
   onMount(() => {
-    const unsub = runtime.subscribe(s => {
+    const unsub = runtime.subscribe((s) => {
       status = s;
       if (s.displayName) nameInput = s.displayName;
+      devHandle?.sync();
     });
     if (shortId) void runtime.bootFromShortId(shortId);
+
+    if (devEnabled) {
+      devHandle = attachGoRoomDev({
+        enabled: true,
+        role: "guest",
+        getSnapshot: () => {
+          const s = runtime.getStatus();
+          return {
+            phase: s.phase,
+            doorUrl:
+              typeof location !== "undefined" && shortId
+                ? `${location.origin}/i/${encodeURIComponent(shortId)}`
+                : null,
+            guestCount: s.guestCount,
+            loggedIn: false,
+            inviteDoor: "none",
+          };
+        },
+        mint: async () => {
+          throw new Error("guest cannot mint");
+        },
+        join: async (displayName?: string) => {
+          const name =
+            displayName?.trim() ||
+            goRoomDevJoinName(parseGoRoomDevQuery(page.url.searchParams));
+          nameInput = name;
+          await runtime.consentAndPlay(name);
+        },
+      });
+    }
+
     return () => {
       unsub();
+      devHandle?.dispose();
+      devHandle = null;
       chromeSession.clear();
     };
+  });
+
+  $effect(() => {
+    if (!browser || !devEnabled || !devQuery.join) return;
+    if (!isRoom) return;
+    if (!status || status.phase !== "consent") return;
+    if (autoJoined || busy) return;
+    autoJoined = true;
+    const name = goRoomDevJoinName(devQuery);
+    nameInput = name;
+    void (async () => {
+      busy = true;
+      try {
+        await runtime.consentAndPlay(name);
+        devHandle?.sync();
+      } catch {
+        /* status.error already set */
+      } finally {
+        busy = false;
+      }
+    })();
   });
 
   async function onAccept() {
     busy = true;
     try {
       await runtime.consentAndPlay(nameInput);
+      devHandle?.sync();
     } finally {
       busy = false;
     }
@@ -149,6 +230,14 @@
   <meta name="twitter:image" content={og.image} />
   <meta name="twitter:image:alt" content={og.imageAlt} />
 </svelte:head>
+
+{#if devEnabled}
+  <GoRoomDevProbe
+    phase={status?.phase ?? "idle"}
+    {peerCount}
+    doorUrl={guestDoorUrl}
+  />
+{/if}
 
 {#if !shortId}
   <h1 class="pixel-text">無法開始</h1>
