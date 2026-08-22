@@ -1,6 +1,6 @@
 # Playgrounds 純玩版：包廂內重用 peer 開局（`session_play`）
 
-> **狀態：** Draft（2026-08-21）— **契約從屬** [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md) §5.9／凍結 #30／Phase **3**；**Phase 1–3 進行中**（wire／席次／fanout／Host attach peer＋SAM 掛槽／主持「玩五子棋」CTA）  
+> **狀態：** Draft（2026-08-22）— **契約從屬** [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md) §5.9／凍結 #30／Phase **3**；**Phase 0–5 第一刀手測完成**（`pg-gomoku` Host＋Guest 連線對弈至終局、結束局後可再開；觀戰：殼 channel＋`pg-gomoku` `tryBootAsSpectator`；**harness 第三人觀戰已確認**）  
 > **權威決策：** 從屬 [DECISIONS.md](./DECISIONS.md) **DEC-050**（純玩版）、**DEC-045**（已有可用 PeerConnection → **重用**，禁止 Platform renegotiation）、**DEC-047**（Platform Invite）；**不另開 DEC**  
 > **相關：** [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)（包廂產品契約／媒體／傳檔——**本文件只寫開局落地**）、[PG-GO-HOST-INVITE-PLAN.md](./PG-GO-HOST-INVITE-PLAN.md)（GO-INVITE＝`invite.compose`；**勿混**）、[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)（五子棋 `gomoku.v1`）、[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)、[PG-GO-ROOM-DEV-HARNESS-PLAN.md](./PG-GO-ROOM-DEV-HARNESS-PLAN.md)（localhost／Agent 多 tab；開局 E2E 可建其上）、[PG-GO-SESSION-CHAT-PLAN.md](./PG-GO-SESSION-CHAT-PLAN.md)（局內 overlay——**勿混**）、`.cursor/rules/no-native-dialogs.mdc`、`.cursor/rules/mobile-first-ux.mdc`、[GLOSSARY.md](./GLOSSARY.md)  
 > **載體 SAM：** 型錄 [`pg-gomoku`](../catalog/entries/pg-gomoku.yaml)（`gomoku.v1`；roles＝`host`＋`player`）；[`pg-redpick`](../catalog/entries/pg-redpick.yaml)（`redpick.v1`；roles＝`host`＋`p2`＋`p3`＋`p4`）
@@ -190,8 +190,9 @@ session_play.end    { from: host }
 ### 9.1 觀戰
 
 - 所有在場端 materialize **同一** `catalogId`。
-- 未在 `seats[]`：**不**佔 protocol role、**不**送 `act`；UI「在看」。
+- 未在 `seats[]`：**不**佔 protocol role、**不**送 `act`；UI「觀戰中」。
 - 畫面同步走既有 Host event fanout；無觀戰模式時殼層 disable 輸入即可。
+- **實作：** Host `open` 後重送 `session_play.offer` 附 `sessionId`／`channelName`；Guest 觀戰端綁 `createRosterSessionWatchBridge`（`act`→forbidden）；包廂 TV **一律 memory canvas**＋`publishGoMemoryBroadcast`（含 onload 前 queue；避免 SW／Edge BC 漏事件）；`pg-gomoku` `tryBootAsSpectator`（`onlinePanel`，勿用未定義 `onlineSection`）。**harness 已確認**第三人「觀戰中」＋落子同步。
 
 ### 9.2 失敗
 
@@ -221,30 +222,30 @@ session_play.end    { from: host }
 | --- | --- | --- | --- |
 | **0. 契約索引** | 本文件；ROOM §5.9／Phase 3 指向此處 | 開局實作範圍與 GO-INVITE 切界清楚 | **完成** |
 | **1. Wire＋席次** | `rosterSessionPlay`；`assignRoomPlaySeats`；單測 | parse／guard；auto／manual 滿席／缺額案例綠 | **完成** |
-| **2. Peer 上掛 session** | 抽出 session core；room 注入既有 peer；假 DC：offer→載 stub→invite／act 一回合 | **零** Platform mint／join；end 後 peer 仍可 chat | **進行中**（`attachExistingPeer`／`inviteRoomPlayPeers`／`closeSessionKeepPeers`；Guest load＋auto-accept；手測／完整 act 隧道待） |
-| **3. 大螢幕槽** | TV slot 掛／卸 canvas；節目綁定保留 | active 見畫布；end 回沒訊號；video 元素仍在 DOM | **進行中**（`GoRoomTvSlot` iframe；video `opacity:0` 不拆綁） |
+| **2. Peer 上掛 session** | 抽出 session core；room 注入既有 peer；假 DC：offer→載 stub→invite／act 一回合 | **零** Platform mint／join；end 後 peer 仍可 chat | **完成**（`attachExistingPeer`／`inviteRoomPlayPeers`／`closeSessionKeepPeers`；Guest load＋auto-accept；**act 隧道單元**） |
+| **3. 大螢幕槽** | TV slot 掛／卸 canvas；節目綁定保留 | active 見畫布；end 回沒訊號；video 元素仍在 DOM | **完成**（`GoRoomTvSlot`；memory BC 綁定；手測） |
 | **4. 主持 sheet UX** | 型錄 game → Modal 選局；自動入座；狀態／結束局；Guest 無 CTA | 窄屏可開局；席不滿頁內說明；無原生 dialog | **完成**（「玩遊戲」Modal；手動指定席待） |
-| **5. 五子棋 e2e** | Host＋Guest 包廂內對弈至終局；第三人觀戰；結束局後包廂仍在 | Guest URL 始終包廂 `/i/`；可再播片／文字 | **延後** |
+| **5. 五子棋 e2e** | Host＋Guest 包廂內對弈至終局；第三人觀戰；結束局後包廂仍在 | Guest URL 始終包廂 `/i/`；可再播片／文字 | **第一刀手測完成**（連線對弈＋重開新局；觀戰 event channel **單元綠**；**harness 第三人觀戰已確認**） |
 
-**前置（非本文件交付，但阻塞排程）：** ROOM Phase **2d** 殼面手測收斂、片子／傳檔快樂路徑穩。ROOM 文件寫明：**現況不要排開局**。
+**前置（非本文件交付）：** ROOM Phase **2d** 殼面 RWD 手測已完成。剩餘：手動指定席 UI、多人傳檔 e2e。
 
-建議刀序：**0 → 1 → 2 → 3 → 4 → 5**。TDD：可執行邏輯先寫失敗測試（席次、wire、peer 掛 session）。
+建議刀序：**0 → 1 → 2 → 3 → 4 → 5**（第一刀已過）。TDD：可執行邏輯先寫失敗測試（席次、wire、peer 掛 session）。
 
 ---
 
 ## 12. 驗收清單（實作後）
 
-- [ ] `session_play.offer`／`end` 經既有包廂 DC fanout；不經 Platform
-- [ ] 開局**不** mint `invite.compose`；Guest **不**改網址
-- [ ] 進門 PC 重用（無第二輪 Platform O／A）
-- [ ] 自動／手動入座；席不滿不開；同一 peer 不佔兩席
-- [ ] 大螢幕槽掛 SAM；結束局卸載；節目綁定不拆
-- [ ] 入座席可對弈；觀戰同畫布、無 act
-- [ ] 晚進門重送 play snapshot；只能觀戰
-- [ ] 結束這一局後包廂仍 open（文字／檔／可再 cast）
+- [x] `session_play.offer`／`end` 經既有包廂 DC fanout；不經 Platform
+- [x] 開局**不** mint `invite.compose`；Guest **不**改網址
+- [x] 進門 PC 重用（無第二輪 Platform O／A）
+- [x] 自動入座；席不滿不開；同一 peer 不佔兩席（**手動指定席 UI 待**）
+- [x] 大螢幕槽掛 SAM；結束局卸載；節目綁定不拆（手測）
+- [x] 入座席可對弈（Host＋Guest 手測；觀戰 event channel **單元綠**；harness 第三人觀戰已確認）
+- [x] 晚進門重送 play snapshot（含 `sessionId`／`channelName`）；只能觀戰
+- [x] 結束這一局後包廂仍 open（文字／檔／可再 cast；**可再開新局**手測）
 - [ ] 結束這一間確認文案含遊戲會停
-- [ ] 無 `alert`／`confirm`／`prompt`；窄屏可完成選局／入座／終局
-- [ ] 第一刀：`pg-gomoku`／`gomoku.v1` Host＋1 player 至終局
+- [x] 無 `alert`／`confirm`／`prompt`；窄屏可完成選局／自動入座／終局
+- [x] 第一刀：`pg-gomoku`／`gomoku.v1` Host＋1 player 至終局（手測；可重開）
 
 ---
 
@@ -267,3 +268,8 @@ session_play.end    { from: host }
 | 2026-08-21 | **Phase 2–4 續：** Host `attachExistingPeer`／合成 invite；`goRoomPlayBootstrap`；TV 槽 iframe；成員區「玩五子棋」；Guest load＋auto-accept |
 | 2026-08-21 | **`pg_surface=solo\|room`：** 殼層掛載語境；`/s/` 單機、包廂連線；gomoku 依 surface 簡化 UI；結束局 keep-peers |
 | 2026-08-21 | **玩遊戲 Modal＋`pg-redpick`：** 型錄驅動選局；`redpick.v1` 四席；取代硬編碼「玩五子棋」 |
+| 2026-08-22 | ROOM **2d** RWD 手測完成；開局前置改為傳檔快樂路徑／e2e |
+| 2026-08-22 | ROOM **2e image** 落地（不阻塞開局） |
+| 2026-08-22 | Phase **2** act 隧道單元（`attachExistingPeer`＋`session_act`→`/api/session/act`＋`session_act_result`） |
+| 2026-08-22 | **fix：** 包廂 TV 槽 `onload` 綁 `setGoMemoryCanvasWindow`——srcdoc memory canvas 否則收不到 Guest `session_event`（主持端看不到對方落子） |
+| 2026-08-22 | **手測：** `pg-gomoku` Host＋Guest 連線對弈至終局、結束局後可再開；Phase 3／5 第一刀完成 |

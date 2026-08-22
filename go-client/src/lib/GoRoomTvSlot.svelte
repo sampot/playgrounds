@@ -14,6 +14,7 @@
     roomTvVolumeIconClick,
     type RoomTvHudKind,
   } from "$lib/goRoom";
+  import { setGoMemoryCanvasWindow } from "$lib/goMemoryCanvas";
 
   let {
     tvOn = false,
@@ -79,6 +80,21 @@
     if (!hudOpen) volPanel = false;
   });
 
+  /**
+   * srcdoc memory canvas cannot share BroadcastChannel with the shell —
+   * session_event fanout uses publishGoMemoryBroadcast → this window.
+   * Do **not** clear on effect cleanup while play stays active (remount／
+   * {#key} would drop the bind and lose queued posts).
+   */
+  $effect(() => {
+    if (!playActive) setGoMemoryCanvasWindow(null);
+  });
+
+  function onPlayFrameLoad(ev: Event) {
+    const el = ev.currentTarget as HTMLIFrameElement;
+    setGoMemoryCanvasWindow(el.contentWindow);
+  }
+
   $effect(() => {
     attachMediaStream(videoEl, tvStream, {
       volume,
@@ -130,6 +146,7 @@
           class="tv-play-canvas"
           title="包廂遊戲"
           srcdoc={playCanvasSrcdoc}
+          onload={onPlayFrameLoad}
         ></iframe>
       {/key}
     {:else if playCanvasUrl}
@@ -138,6 +155,7 @@
           class="tv-play-canvas"
           title="包廂遊戲"
           src={playCanvasUrl}
+          onload={onPlayFrameLoad}
         ></iframe>
       {/key}
     {/if}

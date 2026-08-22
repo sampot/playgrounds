@@ -21,6 +21,9 @@ export type SessionPlayOfferMessage = {
   catalogId: string;
   rev?: string;
   seats: SessionPlaySeat[];
+  /** Present after Host SAM open — spectators／late join bind event channel. */
+  sessionId?: string;
+  channelName?: string;
 };
 
 export type SessionPlayEndMessage = {
@@ -88,6 +91,8 @@ export function isSessionPlayMessage(data: unknown): data is SessionPlayMessage 
       return false;
     }
   }
+  if (m.sessionId !== undefined && !isId(m.sessionId)) return false;
+  if (m.channelName !== undefined && !isId(m.channelName)) return false;
   return parseSeats(m.seats) !== null;
 }
 
@@ -96,6 +101,8 @@ export function buildSessionPlayOffer(opts: {
   catalogId: string;
   rev?: string;
   seats: readonly SessionPlaySeat[];
+  sessionId?: string;
+  channelName?: string;
 }): SessionPlayOfferMessage {
   const msg: SessionPlayOfferMessage = {
     type: SESSION_PLAY_TYPE,
@@ -106,6 +113,8 @@ export function buildSessionPlayOffer(opts: {
     seats: opts.seats.map((s) => ({ role: s.role, peerId: s.peerId })),
   };
   if (opts.rev) msg.rev = opts.rev;
+  if (opts.sessionId) msg.sessionId = opts.sessionId;
+  if (opts.channelName) msg.channelName = opts.channelName;
   return msg;
 }
 

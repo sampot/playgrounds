@@ -134,6 +134,38 @@ describe("createRoomSessionPlay", () => {
     });
   });
 
+  it("attachSessionChannel enriches snapshot for spectators／late join", () => {
+    const host = hostCtl();
+    host.hostOffer({
+      catalogId: "pg-gomoku",
+      seats: [
+        { role: "host", peerId: "host-1" },
+        { role: "player", peerId: "g-a" },
+      ],
+    });
+    host.attachSessionChannel({
+      sessionId: "sess-play-1",
+      channelName: "playgrounds-session:sess-play-1",
+    });
+    expect(host.snapshotOffer()).toMatchObject({
+      sessionId: "sess-play-1",
+      channelName: "playgrounds-session:sess-play-1",
+    });
+
+    const spectator = createRoomSessionPlay({
+      localPeerId: () => "g-b",
+      hostPeerId: () => "host-1",
+      isBoothHost: () => false,
+    });
+    const applied = spectator.applyRemote(host.snapshotOffer()!);
+    expect(applied.ok).toBe(true);
+    expect(spectator.isSpectator("g-b")).toBe(true);
+    expect(spectator.snapshotOffer()).toMatchObject({
+      sessionId: "sess-play-1",
+      channelName: "playgrounds-session:sess-play-1",
+    });
+  });
+
   it("does not mint compose — offer wire has no invite fields", () => {
     const host = hostCtl();
     const offered = host.hostOffer({

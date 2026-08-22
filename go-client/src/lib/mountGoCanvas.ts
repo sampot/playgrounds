@@ -67,6 +67,11 @@ function apiCtx(
 /**
  * Materialize SAM files into SW canvas or memory srcdoc (no OPFS).
  * Runs functions.js for non-session `/api` with IndexedDB／localStorage KV／DB.
+ *
+ * Booth `surface: "room"` **always** uses memory／srcdoc：opaque-origin iframes
+ * cannot share BroadcastChannel with the shell; session_event must go through
+ * `publishGoMemoryBroadcast`（GoRoomTvSlot binds the play iframe）. SW mode
+ * breaks third-person spectator sync on some engines (e.g. Edge).
  */
 export async function mountGoCanvas(
   files: FileMap,
@@ -93,7 +98,7 @@ export async function mountGoCanvas(
     }
   };
 
-  const preferSw = isGoCanvasSwUsable();
+  const preferSw = surface !== "room" && isGoCanvasSwUsable();
   if (preferSw) {
     try {
       unlisten = installGoCanvasApiListener(

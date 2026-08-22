@@ -38,6 +38,53 @@ export type RosterHomeSeatBinding = {
   status: "open" | "paused";
 };
 
+/**
+ * Read-only env.SESSION for booth spectators (same canvas, no act).
+ */
+export function createRosterSessionWatchBridge(opts: {
+  sessionId: string;
+  channelName: string;
+  homeSandboxId: string;
+}): SessionBridge {
+  const { sessionId, channelName, homeSandboxId } = opts;
+  return {
+    async apiVersion() {
+      return SESSION_API_VERSION;
+    },
+    async capabilities() {
+      return [...SESSION_CAPABILITIES];
+    },
+    async getSeat(): Promise<SessionSeatInfo> {
+      return {
+        sessionId,
+        seatId: "spectator",
+        role: "spectator",
+        participantId: homeSandboxId,
+        hostSandboxId: "remote-host",
+        status: "open",
+        ready: false,
+      } as SessionSeatInfo;
+    },
+    async getState() {
+      return {
+        ready: true,
+        status: "waiting",
+        channelName,
+        note: "觀戰中 — 畫面隨對局更新",
+      };
+    },
+    async getEventChannel() {
+      return { name: channelName };
+    },
+    async act() {
+      throw new SessionBridgeError("forbidden", "觀戰席不可落子");
+    },
+    async leave() {
+      /* no-op — booth host ends the play */
+    },
+  };
+}
+
 export function createRosterSessionTunnelBridge(opts: {
   binding: RosterHomeSeatBinding;
   send: RosterTunnelSend;
@@ -104,11 +151,14 @@ export function publishRosterRelayedSessionEvent(
     event: relay.event,
   };
   publishSessionEvent(channel, envelope);
-  try {
-    channel.close();
-  } catch {
-    /* ignore */
-  }
+  // Defer close — some engines (Edge) drop in-flight posts if closed sync.
+  setTimeout(() => {
+    try {
+      channel.close();
+    } catch {
+      /* ignore */
+    }
+  }, 0);
 }
 
 export function applySessionActResultFromRelay(

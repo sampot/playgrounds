@@ -40,6 +40,44 @@ describe("session_play", () => {
     expect(offer.rev).toBe("abc123");
   });
 
+  it("accepts offer with optional sessionId／channelName (spectator sync)", () => {
+    const offer = buildSessionPlayOffer({
+      from: "host-1",
+      catalogId: "pg-gomoku",
+      seats,
+      sessionId: "sess-play-1",
+      channelName: "playgrounds-session:sess-play-1",
+    });
+    expect(isSessionPlayMessage(offer)).toBe(true);
+    expect(offer.sessionId).toBe("sess-play-1");
+    expect(offer.channelName).toBe("playgrounds-session:sess-play-1");
+  });
+
+  it("rejects offer with empty sessionId or channelName when present", () => {
+    expect(
+      isSessionPlayMessage({
+        type: SESSION_PLAY_TYPE,
+        v: 1,
+        op: "offer",
+        from: "host-1",
+        catalogId: "pg-gomoku",
+        seats,
+        sessionId: "",
+      })
+    ).toBe(false);
+    expect(
+      isSessionPlayMessage({
+        type: SESSION_PLAY_TYPE,
+        v: 1,
+        op: "offer",
+        from: "host-1",
+        catalogId: "pg-gomoku",
+        seats,
+        channelName: "",
+      })
+    ).toBe(false);
+  });
+
   it("accepts end from host", () => {
     const end = buildSessionPlayEnd({ from: "host-1" });
     expect(isSessionPlayMessage(end)).toBe(true);

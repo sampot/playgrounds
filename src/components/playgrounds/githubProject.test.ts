@@ -114,6 +114,15 @@ describe("fetchGithubProjectFromManifest", () => {
     expect(
       fetchMock.mock.calls.every(c => !String(c[0]).includes("api.github.com"))
     ).toBe(true);
+    const fileCalls = fetchMock.mock.calls.filter(
+      c =>
+        String(c[0]).includes("/app.js") || String(c[0]).includes("/index.html")
+    );
+    expect(fileCalls.length).toBeGreaterThan(0);
+    expect(
+      fileCalls.every(c => (c[1] as RequestInit | undefined)?.cache === "no-store")
+    ).toBe(true);
+    expect(fileCalls.every(c => String(c[0]).includes("?v=rev-9"))).toBe(true);
     vi.unstubAllGlobals();
   });
 

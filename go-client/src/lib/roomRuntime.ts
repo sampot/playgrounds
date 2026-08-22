@@ -900,6 +900,15 @@ export function createRoomRuntime(opts?: {
         });
       }
       playHost.inviteRoomPlayPeers({ seats });
+      const playStatus = playHost.getStatus();
+      if (playStatus.sessionId && playStatus.channelName) {
+        sessionPlay.attachSessionChannel({
+          sessionId: playStatus.sessionId,
+          channelName: playStatus.channelName,
+        });
+        const enriched = sessionPlay.snapshotOffer();
+        if (enriched) fanoutPlay(enriched);
+      }
       if (seq !== playBootstrapSeq) return;
       await remountPlayCanvasAfterSessionOpen(catalogId);
       if (seq !== playBootstrapSeq) return;

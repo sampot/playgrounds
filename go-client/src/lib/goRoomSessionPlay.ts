@@ -21,6 +21,9 @@ export type RoomSessionPlayState = {
   seats: SessionPlaySeat[];
   /** peerId that issued the current offer (booth host). */
   fromHost: string | null;
+  /** Host SAM session — set after open；spectators bind event channel. */
+  sessionId: string | null;
+  channelName: string | null;
 };
 
 export type RoomSessionPlayApplyResult =
@@ -33,6 +36,8 @@ const IDLE: RoomSessionPlayState = {
   rev: null,
   seats: [],
   fromHost: null,
+  sessionId: null,
+  channelName: null,
 };
 
 function cloneState(s: RoomSessionPlayState): RoomSessionPlayState {
@@ -42,6 +47,8 @@ function cloneState(s: RoomSessionPlayState): RoomSessionPlayState {
     rev: s.rev,
     seats: s.seats.map((x) => ({ role: x.role, peerId: x.peerId })),
     fromHost: s.fromHost,
+    sessionId: s.sessionId,
+    channelName: s.channelName,
   };
 }
 
@@ -70,6 +77,11 @@ export function createRoomSessionPlay(opts: {
   applyRemote: (data: unknown) => RoomSessionPlayApplyResult;
   /** Mark local SAM ready → active (after loading). */
   markActive: () => RoomSessionPlayState;
+  /** After Host `/api/session/open` — enrich offer for spectators／late join. */
+  attachSessionChannel: (input: {
+    sessionId: string;
+    channelName: string;
+  }) => RoomSessionPlayState;
   /** Snapshot offer for late join (null if idle). */
   snapshotOffer: () => SessionPlayOfferMessage | null;
   seatRoleFor: (peerId: string) => string | null;
@@ -79,12 +91,24 @@ export function createRoomSessionPlay(opts: {
   let state = cloneState(IDLE);
 
   function setOffer(msg: SessionPlayOfferMessage): RoomSessionPlayState {
+    const sameCatalog =
+      state.phase !== "idle" &&
+      state.catalogId === msg.catalogId &&
+      state.fromHost === msg.from;
+    const sessionId =
+      msg.sessionId ?? (sameCatalog ? state.sessionId : null);
+    const channelName =
+      msg.channelName ??
+      (sessionId ? `playgrounds-session:${sessionId}` : null) ??
+      (sameCatalog ? state.channelName : null);
     state = {
-      phase: "loading",
+      phase: sameCatalog && state.phase === "active" ? "active" : "loading",
       catalogId: msg.catalogId,
       rev: msg.rev ?? null,
       seats: msg.seats.map((s) => ({ role: s.role, peerId: s.peerId })),
       fromHost: msg.from,
+      sessionId,
+      channelName,
     };
     return cloneState(state);
   }
@@ -145,6 +169,15 @@ export function createRoomSessionPlay(opts: {
       return cloneState(state);
     },
 
+    attachSessionChannel(input) {
+      if (state.phase === "idle") return cloneState(state);
+      const sessionId = input.sessionId.trim();
+      const channelName = input.channelName.trim();
+      if (!sessionId || !channelName) return cloneState(state);
+      state = { ...state, sessionId, channelName };
+      return cloneState(state);
+    },
+
     snapshotOffer() {
       if (state.phase === "idle" || !state.catalogId || !state.fromHost) {
         return null;
@@ -154,6 +187,8 @@ export function createRoomSessionPlay(opts: {
         catalogId: state.catalogId,
         rev: state.rev ?? undefined,
         seats: state.seats,
+        sessionId: state.sessionId ?? undefined,
+        channelName: state.channelName ?? undefined,
       });
     },
 

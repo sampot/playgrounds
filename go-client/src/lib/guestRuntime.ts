@@ -64,7 +64,9 @@ import {
   isSessionCameraMessage,
   isSessionMicMessage,
 } from "@pg/roster/rosterSessionCamera";
-import { isSessionPlayMessage } from "@pg/roster/rosterSessionPlay";
+import {
+  isSessionPlayMessage,
+} from "@pg/roster/rosterSessionPlay";
 import { createRoomMeshClient } from "./goRoomMeshClient";
 import {
   createRoomSessionPlay,
@@ -84,12 +86,14 @@ import {
   isSessionInvitePayload,
   isSessionSeatBoundPayload,
   type SessionActPayload,
+  type SessionEventRelayPayload,
   type SessionInvitePayload,
 } from "@pg/roster/rosterSessionBridge";
 import {
   applySessionActResultFromRelay,
   bindingFromSeatBound,
   createRosterSessionTunnelBridge,
+  createRosterSessionWatchBridge,
   publishRosterRelayedSessionEvent,
 } from "@pg/roster/rosterHomeSessionTunnel";
 import { registerSessionBridge } from "@pg/sessionBridge";
@@ -225,6 +229,9 @@ export function createGuestRuntime() {
   let unlistenApi: (() => void) | null = null;
   let homeSandboxByInvite = new Map<string, string>();
   let tunnelChannelBySession = new Map<string, string>();
+  /** Spectator remount in flight — queue events until the new iframe boots. */
+  let spectatorRemountPending = false;
+  let spectatorEventQueue: SessionEventRelayPayload[] = [];
   /** Seat id for the active booth play tunnel (cleared on end play). */
   let activePlaySeatId: string | null = null;
   let leavingSelf = false;
@@ -455,6 +462,8 @@ export function createGuestRuntime() {
     }
     homeSandboxByInvite.clear();
     tunnelChannelBySession.clear();
+    spectatorRemountPending = false;
+    spectatorEventQueue = [];
     clearGuestPlayCanvas();
     sessionPlay?.reset();
     set({
@@ -519,6 +528,7 @@ export function createGuestRuntime() {
       });
       sessionPlay?.markActive();
       if (seatedRole && pendingInvite) tryAutoAccept();
+      else if (!seatedRole) tryBindSpectatorWatchFromPlayState();
     } catch (e) {
       if (seq !== playBootstrapSeq) return;
       clearGuestPlayCanvas();
@@ -527,6 +537,101 @@ export function createGuestRuntime() {
         message: "",
         playLoadProgress: null,
       });
+    }
+  }
+
+  function flushSpectatorEventQueue(): void {
+    if (spectatorEventQueue.length === 0) return;
+    const pending = spectatorEventQueue.splice(0);
+    for (const relay of pending) {
+      deliverSessionEventToPlayCanvas(relay);
+    }
+  }
+
+  function deliverSessionEventToPlayCanvas(
+    payload: SessionEventRelayPayload
+  ): void {
+    const channel =
+      tunnelChannelBySession.get(payload.sessionId) ??
+      (status.surface === "room" && status.playCatalogId
+        ? `playgrounds-session:${payload.sessionId}`
+        : undefined);
+    if (!channel) return;
+    if (spectatorRemountPending) {
+      spectatorEventQueue.push(payload);
+      return;
+    }
+    publishRosterRelayedSessionEvent(channel, payload);
+    publishGoMemoryBroadcast(channel, {
+      type: "session-event",
+      sessionId: payload.sessionId,
+      seq: payload.seq,
+      event: payload.event,
+    });
+  }
+
+  /**
+   * Spectators never get seat_bound — bind a read-only bridge + event channel
+   * once Host re-fans offer with sessionId／channelName (or late-join snapshot).
+   * Also called from the first session_event if the enriched offer was missed.
+   */
+  function tryBindSpectatorWatchFromPlayState(): void {
+    if (status.surface !== "room" || !sessionPlay) return;
+    if (!sessionPlay.isSpectator(localAgentId)) return;
+    const st = sessionPlay.getState();
+    if (!st.sessionId || !st.channelName || !sandboxId) return;
+    if (tunnelChannelBySession.get(st.sessionId) === st.channelName) return;
+    const seatId = `watch:${st.sessionId}`;
+    const bridge = createRosterSessionWatchBridge({
+      sessionId: st.sessionId,
+      channelName: st.channelName,
+      homeSandboxId: sandboxId,
+    });
+    if (activePlaySeatId && activePlaySeatId !== seatId) {
+      registerSessionBridge(activePlaySeatId, "", null);
+    }
+    activePlaySeatId = seatId;
+    registerSessionBridge(seatId, sandboxId, bridge);
+    tunnelChannelBySession.set(st.sessionId, st.channelName);
+    set({ message: "觀戰中", error: null });
+    spectatorRemountPending = true;
+    void remountCanvasAfterSeat()
+      .then((partial) => {
+        set({
+          phase: "ready",
+          message: "觀戰中",
+          error: null,
+          ...(partial || {}),
+        });
+        // Let the new iframe run tryBootAsSpectator before flushing.
+        setTimeout(() => {
+          spectatorRemountPending = false;
+          flushSpectatorEventQueue();
+        }, 400);
+      })
+      .catch(() => {
+        spectatorRemountPending = false;
+        flushSpectatorEventQueue();
+      });
+  }
+
+  function handleSessionPlayMessage(data: unknown): void {
+    if (!isSessionPlayMessage(data)) return;
+    const applied = sessionPlay?.applyRemote(data);
+    if (applied?.ok && data.op === "offer") {
+      const alreadyMounted =
+        status.playCatalogId === data.catalogId && sandboxId != null;
+      if (!alreadyMounted) {
+        set({
+          playCatalogId: data.catalogId,
+          playLoadProgress: roomPlaySamCheckProgress(),
+        });
+        void bootstrapGuestPlay(data.catalogId);
+      } else {
+        tryBindSpectatorWatchFromPlayState();
+      }
+    } else if (data.op === "end") {
+      endRoomPlayOnly();
     }
   }
 
@@ -653,16 +758,18 @@ export function createGuestRuntime() {
       return;
     }
     if (isSessionEventRelayPayload(payload)) {
-      const channel = tunnelChannelBySession.get(payload.sessionId);
-      if (channel) {
-        publishRosterRelayedSessionEvent(channel, payload);
-        publishGoMemoryBroadcast(channel, {
-          type: "session-event",
+      if (
+        status.surface === "room" &&
+        sessionPlay?.isSpectator(localAgentId) &&
+        !tunnelChannelBySession.has(payload.sessionId)
+      ) {
+        sessionPlay.attachSessionChannel({
           sessionId: payload.sessionId,
-          seq: payload.seq,
-          event: payload.event,
+          channelName: `playgrounds-session:${payload.sessionId}`,
         });
+        tryBindSpectatorWatchFromPlayState();
       }
+      deliverSessionEventToPlayCanvas(payload);
       const phaseFromEv = sessionChatPhaseFromEvent(payload.event);
       if (phaseFromEv) goSessionChat.setUiPhase(phaseFromEv);
       if (status.surface === "room") {
@@ -952,16 +1059,7 @@ export function createGuestRuntime() {
             ) {
               void goRoomMedia.onCastControl(data);
             } else if (isSessionPlayMessage(data)) {
-              const applied = sessionPlay?.applyRemote(data);
-              if (applied?.ok && data.op === "offer") {
-                set({
-                  playCatalogId: data.catalogId,
-                  playLoadProgress: roomPlaySamCheckProgress(),
-                });
-                void bootstrapGuestPlay(data.catalogId);
-              } else if (data.op === "end") {
-                endRoomPlayOnly();
-              }
+              handleSessionPlayMessage(data);
             } else if (isAvatarRelayMessage(data)) {
               onRelay(data);
             }
@@ -1383,6 +1481,8 @@ export function createGuestRuntime() {
           rev: null,
           seats: [],
           fromHost: null,
+          sessionId: null,
+          channelName: null,
         }
       );
     },
@@ -1444,6 +1544,13 @@ export function createGuestRuntime() {
     /** @internal Vitest — apply room session_play without WebRTC. */
     __testApplySessionPlay(raw: unknown) {
       return sessionPlay?.applyRemote(raw) ?? { ok: false, reason: "bad_message" as const };
+    },
+    /** @internal Vitest — full offer／end side effects (spectator bind). */
+    __testHandleSessionPlay(raw: unknown) {
+      handleSessionPlayMessage(raw);
+    },
+    __testHasTunnelChannel(sessionId: string): boolean {
+      return tunnelChannelBySession.has(sessionId);
     },
     __testSetRoomHostPeer(id: string) {
       peerAgentId = id;

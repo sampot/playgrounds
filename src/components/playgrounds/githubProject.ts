@@ -181,10 +181,11 @@ export async function fetchGithubSamManifest(
     throw new Error("sam-manifest 僅支援儲存庫根目錄來源（勿指定子目錄）");
   }
   const rawRef = ref.ref || "main";
-  const url = `${githubRawBase(ref, rawRef)}/${SAM_MANIFEST_FILENAME}`;
+  // Bust CDN／browser HTTP cache so booth check-tip sees the latest rev.
+  const url = `${githubRawBase(ref, rawRef)}/${SAM_MANIFEST_FILENAME}?t=${Date.now()}`;
   let res: Response;
   try {
-    res = await fetch(url, { signal: options?.signal });
+    res = await fetch(url, { signal: options?.signal, cache: "no-store" });
   } catch (e) {
     if (options?.signal?.aborted) throw new Error("已取消下載");
     const msg = e instanceof Error ? e.message : String(e);
@@ -244,8 +245,13 @@ export async function fetchGithubProjectFromManifest(
       .split("/")
       .map(encodeURIComponent)
       .join("/");
-    const rawUrl = `${base}/${pathEnc}${bust}`;
-    const fileRes = await fetch(rawUrl, { signal: options?.signal });
+    // no-store: branch tip + rev query still hit Fastly; avoid caching a
+    // stale blob under a freshly published manifest.rev (poisoned offline pack).
+    const rawUrl = `${base}/${pathEnc}${bust}&t=${Date.now()}`;
+    const fileRes = await fetch(rawUrl, {
+      signal: options?.signal,
+      cache: "no-store",
+    });
     if (!fileRes.ok) {
       throw new Error(`下載失敗：${repoPath}（HTTP ${fileRes.status}）`);
     }

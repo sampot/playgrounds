@@ -133,18 +133,51 @@ const API_BRIDGE = `<script data-go-memory-session>
 </script>`;
 
 let memoryCanvasWindow: Window | null = null;
+/** Posts that arrived before the play iframe onload (remount／first paint). */
+let pendingMemoryBc: { name: string; payload: unknown }[] = [];
 
 export function setGoMemoryCanvasWindow(win: Window | null): void {
   memoryCanvasWindow = win;
+  if (!win) {
+    pendingMemoryBc = [];
+    return;
+  }
+  const queued = pendingMemoryBc.splice(0);
+  for (const item of queued) {
+    try {
+      win.postMessage(
+        {
+          type: GO_MEMORY_BC_TYPE,
+          name: item.name,
+          payload: item.payload,
+        },
+        "*"
+      );
+    } catch {
+      /* ignore */
+    }
+  }
 }
 
-/** Fan out Host session events into the memory iframe (BroadcastChannel shim). */
+/** Fan out Host session events into the memory iframe (BroadcastChannel shim).
+ * Caller must `setGoMemoryCanvasWindow` to the play iframe (e.g. GoRoomTvSlot onload).
+ * Without a bound window, Guest 落子 never paints on the Host TV canvas.
+ * Events before onload are queued and flushed when the window binds.
+ */
 export function publishGoMemoryBroadcast(
   channelName: string,
   payload: unknown
 ): void {
+  const enqueue = () => {
+    pendingMemoryBc.push({ name: channelName, payload });
+    if (pendingMemoryBc.length > 64) pendingMemoryBc.shift();
+  };
   try {
-    memoryCanvasWindow?.postMessage(
+    if (!memoryCanvasWindow) {
+      enqueue();
+      return;
+    }
+    memoryCanvasWindow.postMessage(
       {
         type: GO_MEMORY_BC_TYPE,
         name: channelName,
@@ -153,7 +186,7 @@ export function publishGoMemoryBroadcast(
       "*"
     );
   } catch {
-    /* ignore */
+    enqueue();
   }
 }
 
