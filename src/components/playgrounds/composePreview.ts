@@ -31,21 +31,22 @@ export function playgroundModuleSpecifier(path: string): string {
 
 function resolveRelative(fromFile: string, href: string): string | null {
   const raw = href.trim();
+  const pathPart = raw.split(/[?#]/u)[0]?.trim() ?? "";
   if (
-    !raw ||
-    raw.startsWith("data:") ||
-    raw.startsWith("blob:") ||
-    raw.startsWith("http://") ||
-    raw.startsWith("https://") ||
-    raw.startsWith("//") ||
-    raw.startsWith("#") ||
-    raw.startsWith("mailto:")
+    !pathPart ||
+    pathPart.startsWith("data:") ||
+    pathPart.startsWith("blob:") ||
+    pathPart.startsWith("http://") ||
+    pathPart.startsWith("https://") ||
+    pathPart.startsWith("//") ||
+    pathPart.startsWith("#") ||
+    pathPart.startsWith("mailto:")
   ) {
     return null;
   }
   try {
     const baseDir = parentDir(fromFile);
-    const joined = baseDir ? `${baseDir}/${raw}` : raw;
+    const joined = baseDir ? `${baseDir}/${pathPart}` : pathPart;
     return normalizeProjectPath(joined);
   } catch {
     return null;

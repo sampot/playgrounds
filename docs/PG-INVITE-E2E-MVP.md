@@ -56,7 +56,7 @@
 
 | 角色 | Platform 帳號 | 場憑證 | 可做 | 不可做 |
 | --- | --- | --- | --- | --- |
-| **Host** | **要**（邀請制註冊＋SSO） | 殼頁**記憶體** API key（經 provision） | 開五子棋 Host 席、鑄／撤 Invite、作答循環、session 權威 | 把 key 寫入 SecretStore／URL／SAM 可序列化狀態 |
+| **Host** | **要**（Social SSO；首次可自助建帳） | 殼頁**記憶體** API key（經 provision） | 開五子棋 Host 席、鑄／撤 Invite、作答循環、session 權威 | 把 key 寫入 SecretStore／URL／SAM 可序列化狀態 |
 | **Guest** | **不要** | 無；僅 Invite secret＋短命 `join_cap` | 開短連結、同意入座、連線、落子 | 鑄 Invite、provision、「登入我的遊樂場」 |
 
 **勿混：** `#pg_provision=`（Host 通行證交接）≠ `#pg=`（場 Invite）≠ `/join/<token>`（註冊邀請）≠ `#roster=`（OOB wire）。

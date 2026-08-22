@@ -21,7 +21,7 @@
 
 ## 2. 目標
 
-- **dash 第三個 SSO：** LINE Login（authorization code + PKCE S256）可進入後台、可於帳號頁連結／解除、可作註冊邀請 `/join/<token>` 綁定、可 bootstrap 第一個 admin。
+- **dash 第三個 SSO：** LINE Login（authorization code + PKCE S256）可進入後台、可於帳號頁連結／解除、可作**公開自助註冊**（首次 login 建帳）或選用註冊邀請 `/join/<token>` 綁定、可 bootstrap 第一個 admin。
 - **身分模型對齊：** `PlatformUser` 增 `line?: { id, displayName, linkedAt, avatarUrl? }`；`sso:line:<userId>` 索引；`ssoCount` 計入 line。
 - **`/v1/me` 與 `/v1/field/me`** 回傳 line（`display_name`、`avatar_url`）；go Header profile 可顯示 LINE 使用者 avatar／名稱。
 - **不改變** go 協定、不另造 LINE 專屬登入面、不改場內 SSO 邊界。

@@ -42,6 +42,7 @@ import {
   roomChatShouldCloseOnOutsidePress,
   roomChatWhoLabel,
   roomHostDisplayName,
+  playerDisplayName,
   roomInviteDoor,
   roomInviteRemainLabel,
   roomMediaSummary,
@@ -751,6 +752,21 @@ describe("roomHostDisplayName", () => {
   it("falls back to 主持 when login has no label", () => {
     expect(roomHostDisplayName(null)).toBe("主持");
     expect(roomHostDisplayName({ label: "   " })).toBe("主持");
+  });
+
+  it("rejects email addresses as player names", () => {
+    expect(roomHostDisplayName({ label: "sam@example.com" })).toBe("主持");
+  });
+});
+
+describe("playerDisplayName", () => {
+  it("rejects email-like strings", () => {
+    expect(playerDisplayName("a@b.co", "訪客")).toBe("訪客");
+    expect(playerDisplayName("  sam.kuo@pentium.network ", "主持")).toBe("主持");
+  });
+
+  it("keeps normal nicknames", () => {
+    expect(playerDisplayName(" P2 ", "訪客")).toBe("P2");
   });
 });
 

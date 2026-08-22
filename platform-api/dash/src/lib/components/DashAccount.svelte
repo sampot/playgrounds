@@ -34,7 +34,7 @@
     dash.askConfirm({
       title: "刪除我的帳戶",
       message:
-        "刪除後無法再以此帳號進入後台；通行證也會失效。若要回來，需重新取得註冊邀請。",
+        "刪除後無法再以此帳號進入後台；通行證也會失效。若要回來，請再以 Social 登入建立新帳戶。",
       requireCheck: true,
       checkLabel: "我了解，確定刪除帳戶",
       confirmLabel: "刪除帳戶",

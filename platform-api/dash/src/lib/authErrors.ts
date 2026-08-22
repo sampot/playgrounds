@@ -5,7 +5,7 @@
  */
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
   need_invite_or_link:
-    "這個登入方式尚未關聯到任何帳戶。若你之前已註冊，請先以另一種方式登入並在「帳號」頁連結；否則請使用管理員提供的註冊邀請。",
+    "這個登入方式尚未關聯到任何帳戶。請再試一次，或改用其他登入方式。",
   forbidden: "你的帳戶目前無法進入後台。",
   user_not_found: "找不到對應的使用者帳戶。",
   invite_not_found: "找不到這份註冊邀請。",

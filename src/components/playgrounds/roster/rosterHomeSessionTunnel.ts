@@ -45,8 +45,13 @@ export function createRosterSessionWatchBridge(opts: {
   sessionId: string;
   channelName: string;
   homeSandboxId: string;
+  /** When set, `act({ type: "sync" })` tunnels to Host for fogged state. */
+  hostPeerId?: string;
+  inviteId?: string;
+  send?: RosterTunnelSend;
 }): SessionBridge {
-  const { sessionId, channelName, homeSandboxId } = opts;
+  const { sessionId, channelName, homeSandboxId, hostPeerId, inviteId, send } =
+    opts;
   return {
     async apiVersion() {
       return SESSION_API_VERSION;
@@ -76,8 +81,25 @@ export function createRosterSessionWatchBridge(opts: {
     async getEventChannel() {
       return { name: channelName };
     },
-    async act() {
-      throw new SessionBridgeError("forbidden", "觀戰席不可落子");
+    async act(payload: unknown) {
+      const type =
+        payload && typeof payload === "object"
+          ? String((payload as { type?: unknown }).type || "").trim()
+          : "";
+      if (type !== "sync") {
+        throw new SessionBridgeError("forbidden", "觀戰席不可落子");
+      }
+      if (!send || !hostPeerId) {
+        throw new SessionBridgeError("not_ready", "觀戰通道尚未就緒");
+      }
+      return requestSessionActOverRelay({
+        inviteId: inviteId || "spectator-watch",
+        sessionId,
+        seatId: "spectator",
+        payload,
+        send,
+        toPeerId: hostPeerId,
+      });
     },
     async leave() {
       /* no-op — booth host ends the play */

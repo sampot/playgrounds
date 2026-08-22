@@ -79,7 +79,7 @@ Admin opens **連線備援** + **加點** for a Host; field shell auto-mints ICE
 
 (OAuth apps often allow only one／few callbacks — use a separate Dev client for local if needed.)
 
-Flows: `GET /auth/{github|google}?intent=login|join|link|bootstrap` → provider → `/auth/{provider}/callback` → session cookie + access token.
+Flows: `GET /auth/{github|google|line}?intent=login|join|link|bootstrap` → provider → `/auth/{provider}/callback` → session cookie + access token. **`login` with an unbound SSO subject creates a Platform user**（open signup; no registration invite required）. `join` remains an optional admin invite path.
 
 Admin bootstrap UI: **`https://dash.samkuo.me/bootstrap/`** (not on the login page).
 

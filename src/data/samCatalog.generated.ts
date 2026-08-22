@@ -1206,10 +1206,11 @@ export const GENERATED_SAM_CATALOG: GeneratedSamEntry[] = [
     title: "台灣麻將",
     kind: "game",
     series: "桌遊",
-    blurb: "十六張常見可配家規：補花吃碰槓胡、正花拉莊搶槓、可託管人機。",
+    blurb: "十六張常見可配家規：補花吃碰槓胡、正花拉莊搶槓；人機或包廂四人連線。",
     source: "sampot/pg-mahjong",
-    status: "unlisted",
+    status: "listed",
     license: "MIT",
+    protocols: [{"protocolId":"mahjong.v1","apiVersion":"1","roles":["host","p2","p3","p4"]}],
     cover: "/covers/pg-mahjong.png",
   },
   {

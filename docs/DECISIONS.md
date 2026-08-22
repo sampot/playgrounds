@@ -952,11 +952,11 @@
   3. **Ticket 路徑 signaling（僅 Platform）：** 鑄 Invite 時**不**帶 offer。**加入者**提交 offer，**同一邏輯回合** long-poll 等 answer；**邀請者（session host）**排隊串行作答。同時僅一筆 WebRTC handshake；忙線＝**排隊**。Host 離線 → 需新連線者超時（預期）。**若雙方已有可用 PeerConnection → 重用該連線，不跑 signaling**（signaling **僅**尚未連線或既有 peer 不可用時）。OOB `#roster=`／QR／文字 **不變**（仍發起者 offer）。Wire／非 trickle／每輪 1× O／A 不變；禁止對已連線 peer 經 Platform renegotiation。
   4. **與 Roster：** Platform **串行發握手**（僅未連線）；連上後 Roster **並行持多 peer**（見 DEC-045）。
   5. **深鏈與短連結：** `#pg=<invite>`（hash；場殼／相容）；**`/i/<short_id>`** canonical 在 **`go.samkuo.me`**（見 DEC-050）；`api` 上 `/i/` 可 302→go；**QR 預設短連結＠go**。
-  6. **身分：** 註冊邀請制；Social SSO（**GitHub 必做、Google 次做**；見 [PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md)）；不存密碼；可 MFA。SSO → **access token**（後台 session）。Bootstrap：一次性 **`ADMIN_BOOTSTRAP_TOKEN`**。**不做場內 SSO** 發放場憑證。
+  6. **身分：** Social SSO 公開自助註冊（**GitHub／Google／LINE**；見 [PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md)）——首次成功 SSO 即建立 Platform 帳號（`user`）；不存密碼；可 MFA。SSO → **access token**（後台 session）。Bootstrap：一次性 **`ADMIN_BOOTSTRAP_TOKEN`**（第一個 admin）。admin 可選核發 `/join/<token>` 註冊邀請（非必須）。**不做場內 SSO** 發放場憑證。
   7. **API key／Host 入場：** 每帳號最多 1 把場用 API key；**僅遊樂場殼頁記憶體**（經 dash「登入我的遊樂場」→ 短命 **provision** redeem；**URL 永不帶 `pg_sk_`**）。每次入場 **輪替**（單席，避免共用）。**∉ SecretStore**（DEC-029 專供 BYOK）。**後台 UI 登入後呼叫 API 使用 access token，不用 API key。**
   8. **呈現：** 放大＝**`maximizePreview`（放大畫布）**，非瀏覽器全螢幕。
   9. **後台 UI：** 權威規格 [PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md)（品牌對齊場殼；`dash.samkuo.me`）。**統一進入介面**；登入後依角色顯示；**Host 主要入口**＝「登入我的遊樂場」（可設預設遊樂場網址）。**場邀請短網址由 SAM 經場殼代理呼叫 API 取得；後台不鑄場 Invite。**
-  10. **非目標：** 資料面中繼、trickle、**預設**／免費無限 TURN、**使用者自備 TURN**（對齊 DEC-045）、公開自助註冊、平行多 handshake、通用縮址、場內 SSO、以 SecretStore 存放 Platform API key、deep link 承載 `pg_sk_`。官方 TURN＋點數制另見 [PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（**訂閱制**非目標）。
+  10. **非目標：** 資料面中繼、trickle、**預設**／免費無限 TURN、**使用者自備 TURN**（對齊 DEC-045）、平行多 handshake、通用縮址、場內 SSO、以 SecretStore 存放 Platform API key、deep link 承載 `pg_sk_`。官方 TURN＋點數制另見 [PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（**訂閱制**非目標）。
   - 階段見 [PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)。
 - **Consequences:**
   - 勿把 Platform 做成聊天室或 ICE trickle 匯流排；勿為每個場 name 建租戶。
@@ -986,6 +986,7 @@
 - **Revision（2026-08-07）：** Host 入場＝dash provision → 場殼記憶體 API key；∉ SecretStore；單席輪替；不做場內 SSO。
 - **Revision（2026-08-07）：** 非目標明示**自備 TURN**（與 DEC-045 對齊）；官方 TURN／點數指向 CREDITS 計劃。
 - **Revision（2026-08-07）：** 場 Invite 短連結 canonical 改 **`go.samkuo.me/i/…`**（DEC-050／[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)）；api `/i/` 降為相容 302。
+- **Revision（2026-08-22）：** 身分改 **Social SSO 公開自助註冊**（首次 login 建帳）；註冊邀請改選用；自「公開自助註冊」非目標表移除。
 
 ### DEC-048: Playgrounds 宿主 SvelteKit 靜態 PWA
 

@@ -536,7 +536,7 @@ export async function getRegistrationInvite(
   return JSON.parse(raw) as RegistrationInvite;
 }
 
-/** Invite-only registration: create account + access token; no field API key. */
+/** Optional registration invite: create account + access token; no field API key. */
 export async function claimRegistrationInvite(
   store: EnvStore,
   token: string,

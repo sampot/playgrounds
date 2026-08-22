@@ -33,4 +33,23 @@ describe("createRosterSessionWatchBridge", () => {
       expect(e).toMatchObject({ code: "forbidden" });
     }
   });
+
+  it("tunnels sync act when relay is wired", async () => {
+    const sent: unknown[] = [];
+    const bridge = createRosterSessionWatchBridge({
+      sessionId: "sess-1",
+      channelName: "playgrounds-session:sess-1",
+      homeSandboxId: "go-guest-watch",
+      hostPeerId: "host-peer",
+      send: (act) => {
+        sent.push(act);
+      },
+    });
+    void bridge.act({ type: "sync" });
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({
+      seatId: "spectator",
+      payload: { type: "sync" },
+    });
+  });
 });

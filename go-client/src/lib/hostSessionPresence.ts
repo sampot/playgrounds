@@ -3,6 +3,8 @@
  * Booth play reuses PeerConnection slots; guest `displayName` comes from presence.
  */
 
+import { playerDisplayName } from "./goRoom";
+
 export type HostSessionPresenceSeat = {
   seatId?: string;
   role: string;
@@ -21,12 +23,12 @@ export function buildHostSessionPresenceBody(opts: {
   seats: HostSessionPresenceSeat[];
 } {
   const hostRole = opts.hostRole.trim() || "host";
-  const hostName = opts.hostDisplayName?.trim() || undefined;
+  const hostName = playerDisplayName(opts.hostDisplayName, "");
   const guestSeats = opts.seats
     .filter((s) => s.role.trim() && s.role.trim() !== hostRole)
     .map((s) => {
       const role = s.role.trim();
-      const displayName = s.displayName?.trim() || undefined;
+      const displayName = playerDisplayName(s.displayName, "");
       return {
         ...(s.seatId ? { seatId: s.seatId } : {}),
         role,

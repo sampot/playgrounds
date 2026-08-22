@@ -27,6 +27,37 @@ import { handleGoFunctionsApi } from "./goFunctionsRuntime";
 import { goAuth } from "./goAuth.svelte";
 import { roomHostDisplayName } from "./goRoom";
 
+/** Presence poll must not return null-role fog (clears host hand in older SAMs). */
+async function mergeHostFoggedState(
+  ctx: Parameters<typeof handleGoFunctionsApi>[0],
+  data: unknown
+): Promise<unknown> {
+  if (!data || typeof data !== "object" || !("state" in data)) return data;
+  try {
+    const stateRes = await handleGoFunctionsApi(ctx, {
+      method: "GET",
+      url: "/api/session/state?role=host",
+      headers: [],
+      body: null,
+    });
+    if (stateRes.status >= 400) return data;
+    const stateText = new TextDecoder().decode(
+      stateRes.body ?? new ArrayBuffer(0)
+    );
+    const stateView = stateText ? (JSON.parse(stateText) as unknown) : null;
+    if (!stateView || typeof stateView !== "object") return data;
+    return {
+      ...(data as Record<string, unknown>),
+      state: {
+        ...(data as { state: Record<string, unknown> }).state,
+        ...(stateView as Record<string, unknown>),
+      },
+    };
+  } catch {
+    return data;
+  }
+}
+
 /**
  * Booth play must tip-check via raw `sam-manifest.json` `rev`
  * （`fetchSamTipRev` → `fetchGithubSamTipRev`；**不**走 `api.github.com`／Trees）.
@@ -127,13 +158,14 @@ export function createRoomPlayHostRuntime(opts: {
       const sandboxId = getSandboxId();
       const files = getFiles();
       if (!sandboxId || !files) throw new Error("Host 沙盒尚未就緒");
+      const apiCtx = {
+        getFiles,
+        getSandboxId,
+        getCatalogId: () => bundle.catalogId,
+        getHostRuntime,
+      };
       const same = await handleGoFunctionsApi(
-        {
-          getFiles,
-          getSandboxId,
-          getCatalogId: () => bundle.catalogId,
-          getHostRuntime,
-        },
+        apiCtx,
         {
           method: init?.method || "GET",
           url: path,
@@ -145,7 +177,7 @@ export function createRoomPlayHostRuntime(opts: {
         }
       );
       const text = new TextDecoder().decode(same.body ?? new ArrayBuffer(0));
-      const data = text ? (JSON.parse(text) as unknown) : null;
+      let data = text ? (JSON.parse(text) as unknown) : null;
       if (same.status >= 400) {
         let message = `Host session API ${same.status}`;
         let code = "act_rejected";
@@ -155,6 +187,9 @@ export function createRoomPlayHostRuntime(opts: {
           if (typeof o.code === "string") code = o.code;
         }
         throw Object.assign(new Error(message), { code });
+      }
+      if (path.includes("/api/session/presence")) {
+        data = await mergeHostFoggedState(apiCtx, data);
       }
       return data;
     },

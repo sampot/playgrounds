@@ -6,7 +6,7 @@
 > **實作計劃：** [PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)  
 > **相關：** DEC-004（敘事非產品）、DEC-005（Svelte 5 runes）、DEC-029（SecretStore＝**僅 BYOK**；**不含** Platform API key）、DEC-042（保留名 `api`／`dash`）、DEC-048（場網宿主 Kit；**不**取代本筆後台套件）、[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（點數／官方 TURN Draft）、[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)（場邀請 E2E＝五子棋）、[GLOSSARY.md](./GLOSSARY.md)、場殼 `PlaygroundsLayout`／`global.css`
 
-一句話：**`dash.samkuo.me` 是 Platform 帳號／通行證／註冊營運後台（SvelteKit 5）——Host **主要入口**；統一進入（SSO）後依角色顯示（一般使用者不見營運）；主 CTA「**登入我的遊樂場**」輪替場用 API key 並經短命 **provision** 深鏈開啟預設場（預設 `play.samkuo.me`）；場殼兌換後將 key **僅存記憶體**（**不**進 SecretStore）；註冊使用者可設預設遊樂場網址、**連結／解除 Social SSO**（至少保留一個）、**刪除自己的帳戶**；admin 另可核發註冊邀請並**管理已註冊使用者**；後台持 **access token**；場邀請短網址仍由 SAM 經殼代理取得（非後台鑄）；**不做場內 SSO**。**
+一句話：**`dash.samkuo.me` 是 Platform 帳號／通行證／註冊營運後台（SvelteKit 5）——Host **主要入口**；統一進入（**Social SSO 公開自助註冊**：首次成功即建帳）後依角色顯示（一般使用者不見營運）；主 CTA「**登入我的遊樂場**」輪替場用 API key 並經短命 **provision** 深鏈開啟預設場（預設 `play.samkuo.me`）；場殼兌換後將 key **僅存記憶體**（**不**進 SecretStore）；註冊使用者可設預設遊樂場網址、**連結／解除 Social SSO**（至少保留一個）、**刪除自己的帳戶**；admin 可選核發註冊邀請並**管理已註冊使用者**；後台持 **access token**；場邀請短網址仍由 SAM 經殼代理取得（非後台鑄）；**不做場內 SSO**。**
 
 ---
 
@@ -112,7 +112,7 @@
 
 ### 3.4 註冊頁 `/join/<token>`
 
-獨立 landing（同一視覺系統；Kit 路由）：驗證邀請狀態 → **領取／SSO 綁定** → 後台 session（**不**在註冊時自動鑄場用 API key；Host 入場改走「登入我的遊樂場」）。
+獨立 landing（同一視覺系統；Kit 路由）：驗證邀請狀態 → **領取／SSO 綁定** → 後台 session（**不**在註冊時自動鑄場用 API key；Host 入場改走「登入我的遊樂場」）。**主註冊路徑已改為 dash／go 直接 SSO**；本 landing 為 admin 選用邀請之相容面。
 
 ---
 
@@ -161,7 +161,7 @@
 | **API key**（`pg_sk_…`） | **僅遊樂場殼頁** | 殼代理鑄 Invite、host signal pending／answer、撤銷 Invite 等**場用** API | 伺服器只存 hash。明文經 **provision redeem** 交給場殼後 **僅存殼頁記憶體**；關頁／重整清空。**不**進 SecretStore、**不**進 URL、**不**當後台登入憑證。硬頂 1；「登入我的遊樂場」＝**輪替**（舊場立刻失效） |
 | **Provision token** | 後台→場殼交接 | 單次、短命；兌換 API key 明文 | Deep link（例 `#pg_provision=<token>`）**只**帶此 token，**永不**帶 `pg_sk_`。兌換後作廢；TTL 建議 60–120s |
 | **Join capability** | 持 Invite 連結者 | 單次加入／offer | 短命；≠ API key、≠ access token、≠ provision |
-| **註冊邀請** | 新使用者 | 取得帳號資格 | `/join/<token>`；**≠** 場 `#pg=`、**≠** provision |
+| **註冊邀請** | 新使用者（選用） | 取得帳號資格（相容路徑） | `/join/<token>`；**主路徑＝dash／go 直接 SSO 建帳**；**≠** 場 `#pg=`、**≠** provision |
 
 **硬規則：**
 
@@ -184,7 +184,7 @@
 
 **規則：**
 
-1. **邀請制：** 新使用者必須持有效 `/join/<token>`（或 admin 預綁）才能完成首次 SSO 綁定；禁止公開自助註冊。
+1. **公開自助註冊：** 未登入者於 dash（或 go 登入面）以支援的 Social SSO（GitHub／Google／LINE）完成首次登入時，**自動建立** Platform 帳號（role=`user`）並綁定該 SSO；**不**需 `/join/<token>`。admin 可選核發註冊邀請（相容路徑仍保留）。密碼註冊仍禁止。
 2. **不存密碼。**
 3. Bootstrap：`ADMIN_BOOTSTRAP_TOKEN` 一次性 → 綁**第一個** admin 的 SSO subject → 作廢；之後不得再用 bootstrap 鑄 key。
 4. 同一 Platform `user_id` 可連結多個 SSO provider（GitHub＋Google）；登入任一連結即可。
@@ -197,7 +197,7 @@
 
 進入後台：**僅 Social SSO**（GitHub／Google）→ access token／session cookie。
 
-註冊：`/join/<token>` → **GitHub 或 Google 綁定** → 後台 session（**不**自動鑄場用 API key）。
+註冊：Social SSO 首次成功 → 後台 session（**不**自動鑄場用 API key）。可選 `/join/<token>` 邀請路徑仍可用。
 
 進入遊樂場當 Host：「**登入我的遊樂場**」（§6.2）→ 輪替 key＋provision → 開預設場 → 場殼 redeem → 記憶體持 key。
 
@@ -331,7 +331,7 @@
 | 元素 | 規格 |
 | --- | --- |
 | 入口 | 帳號 tab 底部危險區：「刪除我的帳戶」 |
-| 確認 | **頁內確認面**（非原生 dialog）：說明後果（無法再以此帳號進入後台；場用通行證失效；須新註冊邀請才能再來）；需明確確認動作（例：勾選「我了解」或輸入固定提示語——**勿**用 `prompt`） |
+| 確認 | **頁內確認面**（非原生 dialog）：說明後果（無法再以此帳號進入後台；場用通行證失效；之後須再以 Social SSO 建立新帳戶）；需明確確認動作（例：勾選「我了解」或輸入固定提示語——**勿**用 `prompt`） |
 | 成功 | 清 session／access token；導回未登入進入頁；flash 可選「帳戶已刪除」 |
 | 效果 | 刪除（或等效不可恢復之標記）`user` 記錄、SSO 索引、場用 API key、該使用者 access token；**不**回溯撤銷已鑄場 Invite |
 | 最後 admin | **不可**自刪「目前唯一未停用的 admin」（與停用對稱）；→ 可讀錯誤＋`last_admin`；須先有其他 admin 或完成交接 |
@@ -371,7 +371,7 @@
 
 #### 6.5.1 管理註冊使用者
 
-**職：** admin 檢視已註冊 Platform 帳號並停用／復用（邀請制帳號面的營運把手）。
+**職：** admin 檢視已註冊 Platform 帳號並停用／復用（公開自助註冊帳號面的營運把手）。
 
 | 元素 | 規格 |
 | --- | --- |
@@ -539,7 +539,7 @@ SAM（現行 Agent／會議小品等）
 
 ### 9.2 Phase 5＋後台 Kit／使用者管理
 
-- [x] GitHub OAuth 登入／綁定（邀請制）→ 核發 access token（程式落地；正式域 secrets／callback 需驗證）
+- [x] GitHub OAuth 登入／綁定（公開自助＋邀請相容）→ 核發 access token（程式落地；正式域 secrets／callback 需驗證）
 - [x] Google OAuth
 - [x] Access token／session cookie 為後台進入；API key 僅場殼
 - [x] 汰除「貼 API key 登入」過渡（改純 SSO）
@@ -617,3 +617,4 @@ SAM（現行 Agent／會議小品等）
 | 2026-08-07 | **§6.2.4** 使用者可自設**使用連線備援**（`turn_prefer`；需已開通資格） |
 | 2026-08-16 | §6.2.4：`turn_prefer` 開啟＝session 邀請 **relay-only**（不嘗試直連）；對齊點數計劃 |
 | 2026-08-18 | §6.5 營運能力表預留 **布告（go）**（後段；見 [PG-GO-BULLETIN-PLAN.md](./PG-GO-BULLETIN-PLAN.md)） |
+| 2026-08-22 | **公開自助註冊：** SSO 首次 login 建帳；`/join` 邀請改選用；DEC-047 對齊 |

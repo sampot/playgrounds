@@ -107,7 +107,7 @@
 | 畫布語境 `pg_surface`（go） | `pg_surface`／solo｜room | 殼層掛 SAM 畫布時告訴遊戲的語境：查詢參數 **`pg_surface=solo\|room`**（缺省＝solo）；memory／srcdoc 用 `<meta name="pg:surface">`。`solo`＝`/s/` 單機；`room`＝包廂大螢幕連線對弈（入座席由 `session_play`）。見 [PG-GO-ROOM-PLAY-PLAN.md](./PG-GO-ROOM-PLAY-PLAN.md) §6.0。 |
 | 場邀請 E2E MVP（五子棋） | 邀請 E2E／`gomoku.v1` | 以型錄 **`pg-gomoku`** 跑通「註冊 Host 鑄 Invite → 未註冊 Guest 短連結（**go**）入座 → 對弈」；示範協議 `gomoku.v1`（非 brainstorm 狗糧當產品敘事）。見 [PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)、[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)、DEC-047／045／023／050。 |
 | 放大畫布（遊樂場） | 放大畫布／`maximizePreview` | 場殼把 SAM 畫布放到主工作面（`previewMaximized`）；`?open=`／型錄開啟成功後常用。**不是**瀏覽器全螢幕。見 DEC-025／047。 |
-| Platform access token | access token／後台 session | 後台 UI（`dash`）登入後呼叫帳號／通行證／admin API 的憑證（SSO 換發）。**≠** API key；**不**給場殼。見 DEC-047、[PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md) §5。 |
+| Platform access token | access token／後台 session | 後台 UI（`dash`）登入後呼叫帳號／通行證／admin API 的憑證（**Social SSO** 換發；首次未綁定則**公開自助建帳**）。**≠** API key；**不**給場殼。見 DEC-047、[PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md) §5。 |
 | Platform field API key | 場用 API key／通行證（`pg_sk_…`） | 每帳號至多 1 把；**僅遊樂場殼頁記憶體**；經後台「登入我的遊樂場」→ 短命 **provision** redeem 取得。每次入場輪替（單席）。用於殼代理鑄 Invite／signal。**∉ SecretStore**、**不**掛 `env.secrets.*`、**不**進 URL／`.sam`。**不是**後台登入憑證。對讀者可稱「通行證」。見 DEC-047、DASH-SPEC §5／§6.2。 |
 | Platform provision | provision／`#pg_provision=` | 短命、單次 token：後台→場殼交接場用 API key。Deep link **只**帶 provision，**永不**帶 `pg_sk_`。Redeem 後作廢。**≠** `#pg=` 場 Invite。見 DEC-047、DASH-SPEC §7.0。 |
 | Platform 點數 | 點數／credits | 註冊帳號餘額；有營運成本的備援（首項＝官方 TURN）按實際消耗扣點。**非**訂閱制。扣點掛 **Host**；Guest 無帳號不持點。見 [PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)。 |

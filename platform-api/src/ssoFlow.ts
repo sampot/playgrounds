@@ -1,5 +1,6 @@
 /**
- * Shared SSO intent completion (GitHub / Google) for Platform dash (DEC-047).
+ * Shared SSO intent completion (GitHub / Google / LINE) for Platform dash (DEC-047).
+ * Login intent: existing link → session; unknown subject → open signup (create user).
  */
 
 import {
@@ -20,7 +21,7 @@ import {
   putUser,
   type EnvStore,
 } from "./auth.js";
-import { apiKeyPlaintext } from "./ids.js";
+import { apiKeyPlaintext, randomId } from "./ids.js";
 import type { OAuthIntent } from "./githubOAuth.js";
 
 export type SsoProvider = "github" | "google" | "line";
@@ -161,8 +162,24 @@ export async function completeSsoIntent(opts: {
   const store = env.STORE;
 
   if (state.intent === "login") {
-    const userId = await getUserIdBySso(store, subject);
-    if (!userId) return fail("need_invite_or_link");
+    let userId = await getUserIdBySso(store, subject);
+    if (!userId) {
+      // Open SSO signup: first successful Social login creates a Platform user
+      // (role=user). No registration invite required. Admin still via bootstrap.
+      const newUserId = `user_${randomId(12)}`;
+      await ensureUser(store, newUserId, "user");
+      const linked = await linkSso(store, newUserId, subject);
+      if (!linked.ok) {
+        // Rare race: another request linked this subject first — fall through
+        // to that account if present.
+        const raced = await getUserIdBySso(store, subject);
+        if (!raced) return fail(linked.error);
+        userId = raced;
+      } else {
+        const at = await issueAccessToken(store, newUserId, "user");
+        return success(at.plaintext, at.record.expiresAt, "registered=1");
+      }
+    }
     const user = await getUser(store, userId);
     if (!user || user.disabled) return fail("forbidden");
     await syncSsoAvatar(store, user.userId, subject);

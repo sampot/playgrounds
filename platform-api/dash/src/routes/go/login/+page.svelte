@@ -36,9 +36,7 @@
     <div class="panel">
       <h2>選擇一種方式登入</h2>
       <p class="lede">
-        純玩版以 LINE 登入為主要方式，也可使用 Google。註冊帳戶為邀請制：若你還沒有帳戶，請先到
-        <a href="https://dash.samkuo.me/" rel="noopener noreferrer">後台</a>
-        以既有方式建立。
+        純玩版以 LINE 登入為主要方式，也可使用 Google。第一次以此身分進入會自動建立遊樂場帳戶。
       </p>
       <div class="row go-login-actions">
         <a class="btn" href={lineHref}>使用 LINE 進入</a>

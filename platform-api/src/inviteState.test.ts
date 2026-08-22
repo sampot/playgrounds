@@ -196,8 +196,10 @@ describe("google oauth link + sso flow", () => {
     expect(clash.ok).toBe(false);
   });
 
-  it("completeSsoIntent login requires prior link", async () => {
+  it("completeSsoIntent login creates account when SSO is new", async () => {
     const store = memoryStore();
+    let token = "";
+    let extra = "";
     const fails: string[] = [];
     const res = await completeSsoIntent({
       env: { STORE: store },
@@ -206,15 +208,32 @@ describe("google oauth link + sso flow", () => {
         n: "x",
         exp: Date.now() + 60_000,
       },
-      subject: { provider: "google", id: "g1", label: "a@b.c" },
+      subject: {
+        provider: "google",
+        id: "g1",
+        label: "a@b.c",
+        avatarUrl: "https://example.com/a.png",
+      },
       fail: (c) => {
         fails.push(c);
         return new Response(c, { status: 400 });
       },
-      success: async () => new Response("ok"),
+      success: async (accessToken, _exp, extraQuery) => {
+        token = accessToken;
+        extra = extraQuery || "";
+        return new Response("ok");
+      },
     });
-    expect(fails).toEqual(["need_invite_or_link"]);
-    expect(await res.text()).toBe("need_invite_or_link");
+    expect(fails).toEqual([]);
+    expect(await res.text()).toBe("ok");
+    expect(token.startsWith("pg_at_")).toBe(true);
+    expect(extra).toBe("registered=1");
+    const userId = await getUserIdByGoogle(store, "g1");
+    expect(userId).toBeTruthy();
+    const user = await getUser(store, userId!);
+    expect(user?.role).toBe("user");
+    expect(user?.google?.email).toBe("a@b.c");
+    expect(user?.google?.avatarUrl).toBe("https://example.com/a.png");
   });
 
   it("completeSsoIntent login after google link", async () => {

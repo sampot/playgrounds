@@ -71,6 +71,7 @@ import {
   GO_ROOM_QUICK_REPLIES,
   GO_ROOM_MESH_ENABLED,
   roomHostDisplayName,
+  playerDisplayName,
   roomOccupantSummary,
   type RoomInviteDoor,
 } from "./goRoom";
@@ -252,7 +253,7 @@ export function createRoomRuntime(opts?: {
       .filter((s) => Boolean(s.peerId))
       .map((s) => ({
         peerId: s.peerId,
-        name: s.displayName?.trim() || "訪客",
+        name: playerDisplayName(s.displayName, "訪客"),
       }));
     set({
       guestCount: live.length,
@@ -271,7 +272,7 @@ export function createRoomRuntime(opts?: {
       .filter((s) => !s.lost && s.session && s.peerId)
       .map((s) => ({
         peerId: s.peerId as string,
-        name: (s.displayName?.trim() || "訪客").slice(0, 64),
+        name: playerDisplayName(s.displayName, "訪客").slice(0, 64),
       }));
     return [{ peerId: localAgentId, name: host }, ...guests];
   }
@@ -412,6 +413,15 @@ export function createRoomRuntime(opts?: {
     return true;
   }
 
+  function syncPlayHostPeer(slot: PeerSlot): void {
+    if (!playHost || !slot.peerId || !slot.session) return;
+    playHost.attachExistingPeer({
+      peerId: slot.peerId,
+      session: slot.session,
+      displayName: slot.displayName,
+    });
+  }
+
   function handlers(slot: PeerSlot): RosterPeerHandlers {
     return {
       onMessage: (data: unknown) => {
@@ -423,6 +433,7 @@ export function createRoomRuntime(opts?: {
             meshBroker.addPeer(data.agentId);
             meshBroker.introduce(data.agentId);
           }
+          syncPlayHostPeer(slot);
           refreshGuestSummary();
             } else if (isSessionChatMessage(data)) {
           const toast = goSessionChat.onIncoming(data);
@@ -491,11 +502,7 @@ export function createRoomRuntime(opts?: {
               }
             }
             if (playHost && slot.peerId) {
-              playHost.attachExistingPeer({
-                peerId: slot.peerId,
-                session: sess,
-                displayName: slot.displayName,
-              });
+              syncPlayHostPeer(slot);
             }
             if (goSessionChat.textLocked) {
               try {
@@ -959,7 +966,7 @@ export function createRoomRuntime(opts?: {
         .filter((s) => !s.lost && s.peerId && s.session)
         .map((s, i) => ({
           peerId: s.peerId!,
-          displayName: s.displayName?.trim() || "訪客",
+          displayName: playerDisplayName(s.displayName, "訪客"),
           joinedAt: i + 1,
         })),
     ];

@@ -42,6 +42,8 @@ export type SessionInviteAcceptPayload = {
   inviteId: string;
   sessionId: string;
   role: string;
+  /** Booth consent nickname — preferred over roster presence for in-game names. */
+  displayName?: string;
   /** homePeer local participant sandbox (prepared; authority stays there). */
   homeSandboxId?: string;
 };

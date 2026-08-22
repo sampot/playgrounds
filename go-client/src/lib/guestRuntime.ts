@@ -50,6 +50,7 @@ import {
   GO_ROOM_KICKED,
   GO_ROOM_MESH_ENABLED,
   GO_ROOM_QUICK_REPLIES,
+  playerDisplayName,
   roomGuestNameFallback,
   roomOccupancyFromSnapshot,
   roomOccupantCount,
@@ -242,11 +243,24 @@ export function createGuestRuntime() {
     memoryBlobUrls = [];
   }
 
+  /** Align with mountGoCanvas / host remountPlayCanvasAfterSessionOpen. */
+  function playStorageScope(): string {
+    const catalogId = status.playCatalogId?.trim();
+    if (catalogId) return `catalog:${catalogId}`;
+    if (sandboxId) return `ephemeral:${sandboxId}`;
+    return "default";
+  }
+
   function buildMemorySrcdoc(): string {
     if (!samFiles) throw new Error("小品尚未載入");
     clearMemoryBlobs();
     const surface = status.surface === "room" ? "room" : "solo";
-    const built = buildGoMemoryCanvas(samFiles, generation, undefined, surface);
+    const built = buildGoMemoryCanvas(
+      samFiles,
+      generation,
+      playStorageScope(),
+      surface
+    );
     memoryBlobUrls = Array.isArray(built.blobUrls) ? built.blobUrls : [];
     return built.srcdoc;
   }
@@ -263,16 +277,34 @@ export function createGuestRuntime() {
     generation += 1;
     const roomSurface = status.surface === "room";
     if (canvasMode === "memory") {
-      const srcdoc = buildMemorySrcdoc();
+      const surface = roomSurface ? "room" : "solo";
+      const built = buildGoMemoryCanvas(
+        samFiles,
+        generation,
+        playStorageScope(),
+        surface
+      );
+      if (playCanvas) {
+        const prevDispose = playCanvas.dispose;
+        playCanvas = {
+          ...playCanvas,
+          canvasSrcdoc: built.srcdoc,
+          canvasGeneration: generation,
+          dispose: () => {
+            revokeGoMemoryBlobs(built.blobUrls);
+            prevDispose();
+          },
+        };
+      }
       const partial: Partial<GuestStatus> = {
         canvasMode: "memory",
-        canvasSrcdoc: srcdoc,
+        canvasSrcdoc: built.srcdoc,
         canvasUrl: null,
         canvasGeneration: generation,
       };
       if (roomSurface) {
         partial.playCanvasMode = "memory";
-        partial.playCanvasSrcdoc = srcdoc;
+        partial.playCanvasSrcdoc = built.srcdoc;
         partial.playCanvasUrl = null;
         partial.playCanvasGeneration = generation;
       }
@@ -582,10 +614,15 @@ export function createGuestRuntime() {
     if (!st.sessionId || !st.channelName || !sandboxId) return;
     if (tunnelChannelBySession.get(st.sessionId) === st.channelName) return;
     const seatId = `watch:${st.sessionId}`;
+    const hostPeerId =
+      st.seats.find((s) => s.role === "host")?.peerId || peerAgentId || "";
     const bridge = createRosterSessionWatchBridge({
       sessionId: st.sessionId,
       channelName: st.channelName,
       homeSandboxId: sandboxId,
+      hostPeerId,
+      send: (act, to) =>
+        sendAvatarRelay(act as unknown as Record<string, unknown>, to),
     });
     if (activePlaySeatId && activePlaySeatId !== seatId) {
       registerSessionBridge(activePlaySeatId, "", null);
@@ -647,12 +684,14 @@ export function createGuestRuntime() {
       set({ error: null });
     }
     try {
+      const guestName = playerDisplayName(status.displayName, "");
       sendAvatarRelay(
         {
           kind: SESSION_INVITE_ACCEPT_KIND,
           inviteId: invite.inviteId,
           sessionId: invite.sessionId,
           role: invite.role || "player",
+          ...(guestName ? { displayName: guestName } : {}),
           homeSandboxId: sandboxId,
         },
         peerId

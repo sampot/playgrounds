@@ -18,6 +18,11 @@ describe("listRoomPlayableCatalogIds", () => {
     const ids = listRoomPlayableCatalogIds();
     expect(ids).toContain("pg-redpick");
   });
+
+  it("includes pg-mahjong (mahjong.v1 four seats)", () => {
+    const ids = listRoomPlayableCatalogIds();
+    expect(ids).toContain("pg-mahjong");
+  });
 });
 
 describe("listRoomPlayableGames", () => {
@@ -25,12 +30,16 @@ describe("listRoomPlayableGames", () => {
     const games = listRoomPlayableGames();
     const gomoku = games.find((g) => g.catalogId === "pg-gomoku");
     const redpick = games.find((g) => g.catalogId === "pg-redpick");
+    const mahjong = games.find((g) => g.catalogId === "pg-mahjong");
     expect(gomoku?.title).toBeTruthy();
     expect(gomoku?.seatCount).toBe(2);
     expect(gomoku?.roles).toEqual(["host", "player"]);
     expect(redpick?.title).toMatch(/撿紅點/);
     expect(redpick?.seatCount).toBe(4);
     expect(redpick?.roles).toEqual(["host", "p2", "p3", "p4"]);
+    expect(mahjong?.title).toMatch(/麻將/);
+    expect(mahjong?.seatCount).toBe(4);
+    expect(mahjong?.roles).toEqual(["host", "p2", "p3", "p4"]);
   });
 
   it("does not surface wire protocol ids in picker blurbs", () => {

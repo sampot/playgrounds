@@ -34,16 +34,30 @@ export function fileMapToSamFiles(files: FileMap): SamFileMap {
   return out;
 }
 
-const RELATIVE_IMPORT_RE =
-  /\b(?:import|export)\s*[\s\S]*?\s+from\s+["'](\.[^"']+)["']|\bimport\s*\(\s*["'](\.[^"']+)["']\s*\)/gu;
+/** Static `import` / `export … from` only — not runtime `import()`. */
+const STATIC_RELATIVE_IMPORT_RE =
+  /\b(?:import|export)\s*[\s\S]*?\s+from\s+["'](\.[^"']+)["']/gu;
+
+/** Drop comments so JSDoc `import('./x.js')` type refs are not dependency edges. */
+function stripJsComments(code: string): string {
+  return code
+    .replace(/\/\*[\s\S]*?\*\//gu, "")
+    .replace(/^\s*\/\/.*$/gmu, "");
+}
 
 function relativeImportSpecs(code: string): string[] {
   const specs: string[] = [];
-  for (const m of code.matchAll(RELATIVE_IMPORT_RE)) {
-    const spec = m[1] ?? m[2];
+  const stripped = stripJsComments(code);
+  for (const m of stripped.matchAll(STATIC_RELATIVE_IMPORT_RE)) {
+    const spec = m[1];
     if (spec) specs.push(spec);
   }
   return specs;
+}
+
+/** @internal Vitest — static relative import specs after comment strip. */
+export function listStaticRelativeImportsForTest(code: string): string[] {
+  return relativeImportSpecs(code);
 }
 
 function resolveRelative(fromFile: string, href: string): string | null {

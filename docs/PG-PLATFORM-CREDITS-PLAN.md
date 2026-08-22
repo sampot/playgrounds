@@ -35,7 +35,6 @@
 
 - **使用者自備 TURN**（殼設定貼 `turn:` URI／credential、SecretStore 存 TURN、教自架 coturn 當產品路徑）——**DEC-045／047 硬否決**。
 - **訂閱制**、多檔 subscription plan 表、自動續扣月費。
-- 公開自助註冊（仍邀請制；DEC-047）。
 - 經 Platform **中繼** session／DataChannel／presence／mailbox／檔案真相（TURN 只解傳輸路徑，權威仍在 peer／本機 session）。
 - Trickle ICE、renegotiation 經 Platform、把 TURN 做成「預設一定連得上」的對外無限承諾。
 - 對 Host／Guest **揭露**直連 vs relay，或要求其選擇傳輸模式（除錯除外；`turn_prefer` 開關只說「連線備援」，不教 ICE）。

@@ -49,6 +49,7 @@ import { goAuth } from "./goAuth.svelte";
 import { chromeSession } from "./chromeSession.svelte";
 import { goSessionChat } from "./goSessionChat.svelte";
 import { buildHostSessionPresenceBody } from "./hostSessionPresence";
+import { playerDisplayName } from "./goRoom";
 import { publishGoMemoryBroadcast } from "./goMemoryCanvas";
 import type { FileMap } from "@pg/projectTypes";
 import type { HostableProtocol } from "./goCatalog";
@@ -325,6 +326,25 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
     error?: { code: string; message: string };
   }> {
     try {
+      const syncType =
+        act.payload &&
+        typeof act.payload === "object" &&
+        String((act.payload as { type?: unknown }).type || "") === "sync";
+      if (
+        act.seatId === "spectator" &&
+        syncType &&
+        act.sessionId === status.sessionId
+      ) {
+        const result = (await hostSessionFetch("/api/session/act", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            role: "spectator",
+            payload: { type: "sync" },
+          }),
+        })) as { ok?: boolean; events?: unknown[]; state?: unknown };
+        return { ok: true, result };
+      }
       const seat = status.seats.find(
         candidate =>
           candidate.seatId === act.seatId &&
@@ -397,6 +417,7 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
       inviteId: string;
       sessionId: string;
       role?: string;
+      displayName?: string;
     },
     fromPeerId: string
   ): Promise<void> {
@@ -417,7 +438,12 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
     const role = payload.role?.trim() || guestRoles[0] || "player";
     const seatId = `seat-${crypto.randomUUID().slice(0, 8)}`;
     const displayName =
-      slots.find(s => s.peerId === fromPeerId)?.displayName || undefined;
+      playerDisplayName(payload.displayName, "") ||
+      playerDisplayName(
+        slots.find(s => s.peerId === fromPeerId)?.displayName,
+        ""
+      ) ||
+      undefined;
     const seat: HostGuestSeat = {
       seatId,
       role,
@@ -591,6 +617,15 @@ export function createHostRuntime(deps: HostRuntimeDeps) {
           if (slot.peerId && slot.session) {
             peerSessions.set(slot.peerId, slot.session);
             refreshSessionChatPeers();
+          }
+          const guestName = playerDisplayName(slot.displayName, "");
+          if (guestName && slot.peerId) {
+            const seats = status.seats.map(s =>
+              s.peerId === slot.peerId ? { ...s, displayName: guestName } : s
+            );
+            if (seats.some((s, i) => s !== status.seats[i])) {
+              set({ seats });
+            }
           }
           if (slot.peerId && !status.seats.some(s => s.peerId === slot.peerId)) {
             set({

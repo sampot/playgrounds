@@ -99,7 +99,7 @@ go 頁：
 - 保留 `<Flash>` 顯示「正在回到你的遊樂場」等狀態。
 
 **`src/routes/go/login/+page.svelte`：**
-- 標題「登入遊樂場」＋ledger「登入成功後自動回到純玩版，繼續遊玩」；註明「註冊帳戶為邀請制」。
+- 標題「登入遊樂場」＋ledger「登入成功後自動回到純玩版，繼續遊玩」；註明第一次以此身分進入會自動建立帳戶。
 - 兩個進入 CTA，**以 LINE 為主要**（go 的 provider 主順序）：
   - `<a class="btn" href="/auth/line?intent=login&return=%2Fgo%2Flogin…">使用 LINE 進入</a>`
   - `<a class="btn secondary" href="/auth/google?intent=login&return=%2Fgo%2Flogin…">使用 Google 進入</a>`

@@ -118,7 +118,9 @@
 
 <div class="panel">
   <h2>註冊邀請</h2>
-  <p class="lede">發出邀請連結，讓新人完成註冊並進入後台。</p>
+  <p class="lede">
+    一般人以 Social 登入即可自助建立帳戶。此處可另發邀請連結（選用）。
+  </p>
   <div class="row">
     <button type="button" disabled={dash.busy} onclick={issueRegInvite}
       >發出註冊邀請</button

@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
 import {
   composePreview,
   extractHtmlTitle,
@@ -7,6 +9,26 @@ import {
   rewriteJsImports,
 } from "./composePreview";
 import { createStarterFiles } from "./projectTypes";
+
+function loadSamDir(root: string): Record<string, string | Uint8Array> {
+  const out: Record<string, string | Uint8Array> = {};
+  function walk(dir: string, base = "") {
+    for (const name of readdirSync(dir)) {
+      const abs = join(dir, name);
+      const rel = base ? `${base}/${name}` : name;
+      if (statSync(abs).isDirectory()) {
+        walk(abs, rel);
+        continue;
+      }
+      if (!/\.(?:html?|css|js|json|png)$/iu.test(name)) continue;
+      out[rel] = name.endsWith(".png")
+        ? new Uint8Array(readFileSync(abs))
+        : readFileSync(abs, "utf8");
+    }
+  }
+  walk(root);
+  return out;
+}
 
 describe("extractHtmlTitle", () => {
   it("reads the first title tag", () => {
@@ -73,6 +95,39 @@ describe("composePreview", () => {
     expect(srcdoc).toContain('type = "importmap"');
     expect(srcdoc).toContain("playgrounds-preview-error");
     expect(srcdoc).not.toContain("/@ide/");
+    revokePreviewBlobs(blobUrls);
+  });
+
+  it("inlines cache-busted stylesheet hrefs (?v=…)", () => {
+    const files = {
+      "index.html": `<!doctype html><html><head>
+<link rel="stylesheet" href="./styles.css?v=14" />
+<link rel="stylesheet" href="./tiles.css" />
+</head><body>
+<script type="module" src="./app.js?v=7"></script>
+</body></html>`,
+      "styles.css": "body{color:red}",
+      "tiles.css": ".tile{color:blue}",
+      "app.js": "export default {}",
+    };
+    const { srcdoc, blobUrls } = composePreview(files, "index.html");
+    expect(srcdoc).toContain('data-playground-css="styles.css"');
+    expect(srcdoc).toContain("body{color:red}");
+    expect(srcdoc).toContain('data-playground-css="tiles.css"');
+    expect(srcdoc).toContain(".tile{color:blue}");
+    expect(srcdoc).not.toMatch(/href\s*=\s*["']\.\/styles\.css\?v=/iu);
+    revokePreviewBlobs(blobUrls);
+  });
+
+  it("inlines pg-mahjong styles for memory-canvas booth play", () => {
+    const root = join(process.cwd(), "..", "pg-mahjong");
+    if (!existsSync(join(root, "index.html"))) return;
+    const files = loadSamDir(root);
+    const { srcdoc, blobUrls } = composePreview(files, "index.html");
+    expect(srcdoc).toContain('data-playground-css="styles.css"');
+    expect(srcdoc).toContain('data-playground-css="tiles.css"');
+    expect(srcdoc).toContain(".table-felt");
+    expect(srcdoc).not.toMatch(/<link[^>]+href=["']\.\/styles\.css\?v=/iu);
     revokePreviewBlobs(blobUrls);
   });
 

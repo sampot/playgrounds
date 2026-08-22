@@ -605,6 +605,58 @@ describe("hostRuntime room-play peer reuse", () => {
     rt.dispose();
   });
 
+  it("prefers booth nickname from session_invite_accept over missing presence", async () => {
+    const invokeHostSession = vi.fn(async () => ({ ok: true }));
+    const send = vi.fn();
+    const rt = createHostRuntime({
+      getFiles: () => ({ "index.html": "<html></html>" }) as FileMap,
+      getSandboxId: () => "go-sb-nick",
+      protocol,
+      invokeHostSession,
+    });
+    await rt.open();
+    const peer = {
+      send,
+      close: vi.fn(),
+      getChannel: () => ({ readyState: "open" as const, send: vi.fn() }),
+      pc: { addEventListener: vi.fn() },
+    };
+    rt.attachExistingPeer({
+      peerId: "g-nick",
+      session: peer as never,
+    });
+    const out = rt.inviteRoomPlayPeers({
+      seats: [
+        { role: "host", peerId: "host-local" },
+        { role: "p2", peerId: "g-nick" },
+      ],
+    });
+    rt.handleAvatarRelay(
+      {
+        type: "avatar_relay",
+        from: "g-nick",
+        payload: {
+          kind: "session_invite_accept",
+          inviteId: out.inviteId,
+          sessionId: rt.getStatus().sessionId,
+          role: "p2",
+          displayName: "小明",
+          homeSandboxId: "guest-sb",
+        },
+      },
+      "g-nick"
+    );
+    await vi.waitFor(() => {
+      expect(rt.getStatus().seats.some((s) => s.peerId === "g-nick")).toBe(
+        true
+      );
+    });
+    expect(rt.getStatus().seats.find((s) => s.peerId === "g-nick")).toEqual(
+      expect.objectContaining({ displayName: "小明", role: "p2" })
+    );
+    rt.dispose();
+  });
+
   it("forwards Guest session_act over attachExistingPeer (room act tunnel)", async () => {
     const placedEvent = {
       type: "match.placed",
@@ -728,6 +780,80 @@ describe("hostRuntime room-play peer reuse", () => {
 
     await rt.closeSessionKeepPeers({ message: "局結束" });
     rt.detachExistingPeer("g-a");
+    rt.dispose();
+  });
+
+  it("forwards spectator sync act without a seated binding", async () => {
+    const invokeHostSession = vi.fn(async (path: string) => {
+      if (path.includes("/open")) return { ok: true };
+      if (path.includes("/act")) {
+        return {
+          ok: true,
+          state: { status: "active", wallCount: 60 },
+        };
+      }
+      return { ok: true };
+    });
+    const send = vi.fn();
+    const rt = createHostRuntime({
+      getFiles: () => ({ "index.html": "<html></html>" }) as FileMap,
+      getSandboxId: () => "go-sb-room-watch",
+      protocol,
+      invokeHostSession,
+    });
+    await rt.open();
+    const sessionId = rt.getStatus().sessionId!;
+    rt.attachExistingPeer({
+      peerId: "watch-1",
+      session: {
+        send,
+        close: vi.fn(),
+        getChannel: () => ({ readyState: "open" as const, send: vi.fn() }),
+        pc: { addEventListener: vi.fn() },
+      } as never,
+      displayName: "觀戰",
+    });
+    invokeHostSession.mockClear();
+    send.mockClear();
+
+    rt.handleAvatarRelay(
+      {
+        type: "avatar_relay",
+        from: "watch-1",
+        payload: {
+          kind: "session_act",
+          inviteId: "spectator-watch",
+          sessionId,
+          seatId: "spectator",
+          requestId: "watch-sync-1",
+          payload: { type: "sync" },
+        },
+      },
+      "watch-1"
+    );
+
+    await vi.waitFor(() => {
+      expect(invokeHostSession).toHaveBeenCalledWith(
+        "/api/session/act",
+        expect.objectContaining({
+          body: JSON.stringify({
+            role: "spectator",
+            payload: { type: "sync" },
+          }),
+        })
+      );
+      expect(send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          payload: expect.objectContaining({
+            kind: "session_act_result",
+            requestId: "watch-sync-1",
+            ok: true,
+          }),
+        })
+      );
+    });
+
+    rt.detachExistingPeer("watch-1");
     rt.dispose();
   });
 

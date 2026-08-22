@@ -32,7 +32,7 @@
     <main class="main">
       <div class="hero">
         <h1>遊樂場</h1>
-        <p>管理帳號，並從這裡登入你的遊樂場。用 GitHub 或 Google 進入即可。</p>
+        <p>管理帳號，並從這裡登入你的遊樂場。用 GitHub、Google 或 LINE 進入即可；第一次會自動建立帳戶。</p>
       </div>
 
       <Flash message={dash.flashMsg} kind={dash.flashKind} />

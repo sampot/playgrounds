@@ -2,6 +2,26 @@
 
 import { SESSION_CHAT_HOST_DISPLAY_NAME } from "@pg/roster/rosterSessionChat";
 
+const EMAIL_LIKE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
+
+/** True when a string looks like an email address (not valid as a player name). */
+export function isEmailLikeDisplayName(value: string): boolean {
+  return EMAIL_LIKE.test(value.trim());
+}
+
+/**
+ * Player-facing display name. Email addresses are rejected and replaced with
+ * `fallback` (empty string keeps the caller's own default).
+ */
+export function playerDisplayName(
+  raw: string | null | undefined,
+  fallback = ""
+): string {
+  const n = raw?.trim();
+  if (!n || isEmailLikeDisplayName(n)) return fallback;
+  return n;
+}
+
 export const GO_ROOM_SHARE_TITLE = "邀請你進包廂";
 export const GO_ROOM_SHARE_HINT =
   "這張邀請約 5 分鐘內有效；過期後再發一張即可，這一間不會因此關掉。請對方用相機掃碼進來。另一台裝置請掃這張邀請進來，不要再開一間包廂。";
@@ -695,7 +715,7 @@ export function roomOccupancyFromSnapshot(opts: {
     seen.add(peerId);
     occupantPeers.push({
       peerId,
-      name: row.name?.trim() || "訪客",
+      name: playerDisplayName(row.name, "訪客"),
     });
   }
   return {
@@ -929,8 +949,7 @@ export type RoomInviteDoor = "none" | "live" | "expired";
 export function roomHostDisplayName(
   profile: { label?: string | null } | null | undefined
 ): string {
-  const label = profile?.label?.trim();
-  return label || SESSION_CHAT_HOST_DISPLAY_NAME;
+  return playerDisplayName(profile?.label, SESSION_CHAT_HOST_DISPLAY_NAME);
 }
 
 /** Bubble name beside the 主持 tag. Local stays first-person. */

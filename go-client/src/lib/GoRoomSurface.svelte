@@ -70,6 +70,8 @@
     roomInviteDoorRow,
     roomInviteRemainLabel,
     roomHostLoginGate,
+    roomHostDisplayName,
+    playerDisplayName,
     roomTvStatusGate,
     roomHostMemberMenu,
     roomMemberCard,
@@ -244,9 +246,8 @@
     const hostId = playLocalPeerId?.trim();
     if (!hostId) return occupantPeers;
     const hostName =
-      playHostName?.trim() ||
-      goAuth.profile?.label?.trim() ||
-      "主持";
+      playerDisplayName(playHostName, "") ||
+      roomHostDisplayName(goAuth.profile);
     const seen = new Set<string>([hostId]);
     const rows = [{ peerId: hostId, name: hostName }];
     for (const p of occupantPeers) {
@@ -709,7 +710,7 @@
       remoteProgramName: goRoomMedia.remoteProgramName,
       occupants: [
         ...occupantPeers,
-        { peerId: "local", name: goAuth.profile?.label?.trim() || "我" },
+        { peerId: "local", name: roomHostDisplayName(goAuth.profile) },
       ],
     });
     const change = roomTvCueChange(tvPrev, next);
@@ -912,7 +913,7 @@
       peerId: c.peerId,
       name: c.name,
     }));
-    const label = goAuth.profile?.label?.trim();
+    const label = playerDisplayName(goAuth.profile?.label, "");
     if (label) rows.push({ peerId: "local", name: label });
     return rows;
   });

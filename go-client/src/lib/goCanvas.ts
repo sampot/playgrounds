@@ -183,6 +183,19 @@ export async function handleGoSessionApi(
       return jsonResponse(await SESSION.getEventChannel());
     }
     if (path.includes("/api/session/state") && request.method === "GET") {
+      const seatInfo = await SESSION.getSeat();
+      if (String(seatInfo.role || "") === "spectator") {
+        try {
+          const result = (await SESSION.act({ type: "sync" })) as {
+            state?: unknown;
+          };
+          if (result && typeof result === "object" && result.state) {
+            return jsonResponse(result.state);
+          }
+        } catch {
+          /* fall through to stub getState */
+        }
+      }
       return jsonResponse(await SESSION.getState());
     }
     if (path.includes("/api/session/act") && request.method === "POST") {

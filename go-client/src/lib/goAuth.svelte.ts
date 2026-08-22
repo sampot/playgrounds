@@ -50,13 +50,11 @@ function profileFromFieldMe(me: FieldMeProfile): GoProfile {
     me.google?.avatar_url ??
     me.github?.avatar_url ??
     null;
-  const label = me.line?.display_name
-    ? me.line.display_name
-    : me.google?.email
-      ? me.google.email
-      : me.github?.login
-        ? `@${me.github.login}`
-        : me.user_id;
+  const label = me.line?.display_name?.trim()
+    ? me.line.display_name.trim()
+    : me.github?.login
+      ? `@${me.github.login}`
+      : "玩家";
   return {
     user_id: me.user_id,
     role: me.role,

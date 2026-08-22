@@ -104,14 +104,25 @@
     if (!hudOpen) volPanel = false;
   });
 
+  let seenPlayGen = $state<number | null>(null);
+
   /**
    * srcdoc memory canvas cannot share BroadcastChannel with the shell —
    * session_event fanout uses publishGoMemoryBroadcast → this window.
-   * Do **not** clear on effect cleanup while play stays active (remount／
-   * {#key} would drop the bind and lose queued posts).
+   * On remount ({#key playCanvasGeneration}) drop the stale iframe window
+   * until onload rebinds; publishGoMemoryBroadcast queues until then.
    */
   $effect(() => {
-    if (!playActive) setGoMemoryCanvasWindow(null);
+    const gen = playCanvasGeneration;
+    if (!playActive) {
+      seenPlayGen = null;
+      setGoMemoryCanvasWindow(null);
+      return;
+    }
+    if (seenPlayGen != null && seenPlayGen !== gen) {
+      setGoMemoryCanvasWindow(null);
+    }
+    seenPlayGen = gen;
   });
 
   function onPlayFrameLoad(ev: Event) {
