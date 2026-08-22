@@ -137,6 +137,16 @@ describe("roomFilePrivateMenu", () => {
         danger: true,
       },
     ]);
+    expect(roomFilePrivateMenu({ kind: "image" })).toEqual([
+      { action: "cast", label: GO_ROOM_FILE_CAST, enabled: true },
+      { action: "mount", label: GO_ROOM_PRIVATE_MOUNT, enabled: true },
+      {
+        action: "remove",
+        label: GO_ROOM_PRIVATE_DELETE,
+        enabled: true,
+        danger: true,
+      },
+    ]);
   });
 });
 
@@ -185,6 +195,22 @@ describe("roomFileShareActions", () => {
       cast: false,
       remove: true,
     });
+    expect(
+      roomFileShareActions({ role: "host", mine: true, kind: "image" })
+    ).toEqual({
+      download: false,
+      preview: false,
+      cast: true,
+      remove: true,
+    });
+    expect(
+      roomFileShareActions({ role: "host", mine: false, kind: "image" })
+    ).toEqual({
+      download: true,
+      preview: true,
+      cast: true,
+      remove: true,
+    });
   });
 });
 
@@ -203,7 +229,7 @@ describe("roomFilePrivateActions", () => {
       preview: false,
     });
     expect(roomFilePrivateActions({ kind: "image" })).toEqual({
-      cast: false,
+      cast: true,
       mount: true,
       remove: true,
       preview: true,

@@ -938,7 +938,10 @@ export function createRoomMedia(opts: {
           ? captureProgramFromHttp(roomFilePath(fileId, { purpose: "play" }), f)
           : captureProgramFromBlob(f));
     const next = await capture(file);
-    const castErr = goRoomCastCaptureError();
+    const castErr =
+      programCaptureKindOfFile(file) === "image"
+        ? GO_ROOM_CAST_UNSUPPORTED
+        : goRoomCastCaptureError();
     if (!next || (!next.audio && !next.video)) {
       if (!quiet) {
         error = castErr;
@@ -1827,8 +1830,18 @@ function mediaElementCaptureStream(el: HTMLMediaElement): MediaStream | null {
 }
 
 function programKindOfFile(file: File): "audio" | "video" {
+  return programCaptureKindOfFile(file) === "audio" ? "audio" : "video";
+}
+
+/** Decode path for local program capture (image → canvas; A/V → media element). */
+export function programCaptureKindOfFile(
+  file: File
+): "audio" | "video" | "image" {
   const mime = (file.type || "").toLowerCase();
   const name = file.name || "";
+  if (mime.startsWith("image/") || /\.(png|jpe?g|gif|webp|avif|bmp|svg)$/i.test(name)) {
+    return "image";
+  }
   if (
     (mime.startsWith("audio/") && !mime.startsWith("video/")) ||
     /\.(mp3|m4a|aac|wav|ogg|flac)$/i.test(name)
@@ -1975,6 +1988,95 @@ async function captureProgramFromBlob(
   };
 }
 
+/** Static image → canvas.captureStream (plan §5.7). Primary path — not a WebKit media fallback. */
+const IMAGE_PROGRAM_FPS = 5;
+
+async function captureProgramFromImage(
+  src: string
+): Promise<CapturedProgram | null> {
+  if (typeof document === "undefined") return null;
+  if (typeof HTMLCanvasElement === "undefined") return null;
+  const canCapture =
+    typeof document.createElement("canvas").captureStream === "function";
+  if (!canCapture) return null;
+
+  const img = new Image();
+  img.decoding = "async";
+  const loaded = await new Promise<boolean>((resolve) => {
+    img.onload = () => resolve(true);
+    img.onerror = () => resolve(false);
+    img.src = src;
+  });
+  if (!loaded || img.naturalWidth < 1 || img.naturalHeight < 1) {
+    return null;
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(2, img.naturalWidth);
+  canvas.height = Math.max(2, img.naturalHeight);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+
+  const draw = () => {
+    try {
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    } catch {
+      /* ignore */
+    }
+  };
+  draw();
+
+  let stream: MediaStream;
+  try {
+    stream = canvas.captureStream(IMAGE_PROGRAM_FPS);
+  } catch {
+    return null;
+  }
+  const videoTrack = stream.getVideoTracks()[0] ?? null;
+  if (!videoTrack) {
+    for (const t of stream.getTracks()) {
+      try {
+        t.stop();
+      } catch {
+        /* ignore */
+      }
+    }
+    return null;
+  }
+  try {
+    videoTrack.contentHint = "detail";
+  } catch {
+    /* ignore */
+  }
+  videoTrack.enabled = true;
+
+  const drawMs = Math.max(50, Math.round(1000 / IMAGE_PROGRAM_FPS));
+  const drawTimer =
+    typeof window !== "undefined" ? window.setInterval(draw, drawMs) : 0;
+
+  return {
+    audio: null,
+    video: videoTrack,
+    stop() {
+      if (drawTimer && typeof window !== "undefined") {
+        window.clearInterval(drawTimer);
+      }
+      try {
+        img.removeAttribute("src");
+      } catch {
+        /* ignore */
+      }
+      for (const t of stream.getTracks()) {
+        try {
+          t.stop();
+        } catch {
+          /* ignore */
+        }
+      }
+    },
+  };
+}
+
 async function waitForProgramMediaReady(
   el: HTMLMediaElement,
   isAudio: boolean,
@@ -2006,6 +2108,9 @@ async function captureProgramFromHttp(
   file: File
 ): Promise<CapturedProgram | null> {
   if (typeof document === "undefined") return null;
+  if (programCaptureKindOfFile(file) === "image") {
+    return captureProgramFromImage(src);
+  }
   const mime = file.type || "";
   const isAudio = mime.startsWith("audio/") && !mime.startsWith("video/");
   const el = document.createElement(isAudio ? "audio" : "video") as

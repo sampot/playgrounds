@@ -116,11 +116,12 @@ export function roomFileShareActions(opts: {
   cast: boolean;
   remove: boolean;
 } {
-  const av = opts.kind === "video" || opts.kind === "audio";
+  const castable =
+    opts.kind === "video" || opts.kind === "audio" || opts.kind === "image";
   return {
     download: !opts.mine,
     preview: !opts.mine,
-    cast: opts.role === "host" && av,
+    cast: opts.role === "host" && castable,
     remove: opts.mine || opts.role === "host",
   };
 }
@@ -134,10 +135,12 @@ export function roomFilePrivateActions(opts: {
   remove: boolean;
   preview: boolean;
 } {
-  const av = opts.kind === "video" || opts.kind === "audio";
+  const castable =
+    opts.kind === "video" || opts.kind === "audio" || opts.kind === "image";
   const image = opts.kind === "image";
+  const av = opts.kind === "video" || opts.kind === "audio";
   return {
-    cast: av,
+    cast: castable,
     mount: true,
     remove: true,
     preview: av || image,

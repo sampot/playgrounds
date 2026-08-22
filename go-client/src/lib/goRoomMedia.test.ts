@@ -2,7 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 import { BOOTH_TRANSCEIVER_SLOTS } from "@pg/roster/rosterBoothMedia";
 import { SESSION_CAST_TYPE } from "@pg/roster/rosterSessionCast";
 import { SESSION_CAMERA_TYPE, SESSION_MIC_TYPE } from "@pg/roster/rosterSessionCamera";
-import { createRoomMedia, localFileProgramCaptureMode } from "./goRoomMedia";
+import {
+  createRoomMedia,
+  localFileProgramCaptureMode,
+  programCaptureKindOfFile,
+} from "./goRoomMedia";
 import {
   GO_ROOM_CAST_SOURCE_UNSUPPORTED,
   GO_ROOM_CAST_UNSUPPORTED,
@@ -515,6 +519,93 @@ describe("createRoomMedia", () => {
   it("uses /room-file HTTP capture for share-catalog ids (not blob:)", () => {
     expect(localFileProgramCaptureMode("file-1")).toBe("http");
     expect(localFileProgramCaptureMode()).toBe("blob");
+  });
+
+  it("classifies image files for canvas program capture", () => {
+    expect(
+      programCaptureKindOfFile(
+        new File([new Uint8Array(4)], "shot.png", { type: "image/png" })
+      )
+    ).toBe("image");
+    expect(
+      programCaptureKindOfFile(
+        new File([new Uint8Array(4)], "shot.JPEG", { type: "" })
+      )
+    ).toBe("image");
+    expect(
+      programCaptureKindOfFile(
+        new File([new Uint8Array(4)], "clip.mp4", { type: "video/mp4" })
+      )
+    ).toBe("video");
+    expect(
+      programCaptureKindOfFile(
+        new File([new Uint8Array(4)], "song.mp3", { type: "audio/mpeg" })
+      )
+    ).toBe("audio");
+  });
+
+  it("casts a listed image as a static program video track (no seek transport)", async () => {
+    const video = track("video", "prog-img");
+    const file = new File([new Uint8Array(4)], "shot.png", {
+      type: "image/png",
+    });
+    const json: unknown[] = [];
+    const media = createRoomMedia({
+      localAgentId: "host",
+      occupantCount: () => 2,
+      peers: () => [{ peerId: "g-a", pc: mockPc(), via: "entrance" }],
+      sendJson: (m) => json.push(m),
+      resolveLocalFile: (id) => (id === "file-1" ? file : null),
+      captureProgram: async () => ({
+        audio: null,
+        video,
+        stop: vi.fn(),
+      }),
+    });
+    expect((await media.startListedProgram("file-1")).ok).toBe(true);
+    expect(media.getState().streamingFileId).toBe("file-1");
+    expect(media.getState().programTransport).toBe(false);
+    expect(json).toContainEqual({
+      type: SESSION_CAST_TYPE,
+      v: 1,
+      op: "offer",
+      from: "host",
+      kind: "video",
+      name: "shot.png",
+      id: "file-1",
+    });
+  });
+
+  it("casts a private image with scope private", async () => {
+    const video = track("video", "prog-img");
+    const file = new File([new Uint8Array(4)], "secret.png", {
+      type: "image/png",
+    });
+    const json: unknown[] = [];
+    const media = createRoomMedia({
+      localAgentId: "host",
+      occupantCount: () => 2,
+      peers: () => [{ peerId: "g-a", pc: mockPc(), via: "entrance" }],
+      sendJson: (m) => json.push(m),
+      resolvePrivateFile: async (id) => (id === "pvt_img" ? file : null),
+      captureProgram: async () => ({
+        audio: null,
+        video,
+        stop: vi.fn(),
+      }),
+    });
+    expect((await media.startPrivateProgram("pvt_img")).ok).toBe(true);
+    expect(media.getState().programScope).toBe("private");
+    expect(json).toContainEqual({
+      type: SESSION_CAST_TYPE,
+      v: 1,
+      op: "offer",
+      from: "host",
+      kind: "video",
+      name: "secret.png",
+      id: "pvt_img",
+      scope: "private",
+    });
   });
 
   it("casts a private OPFS file with scope private and no share resolve", async () => {

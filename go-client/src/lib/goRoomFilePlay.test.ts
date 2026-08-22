@@ -91,6 +91,18 @@ describe("createRoomPlaySink", () => {
     );
   });
 
+  it("uses /room-file for image playId (same façade as video; no blob: product URL)", () => {
+    const sessions = createRoomPlayRegistry();
+    const sink = createRoomPlaySink({
+      playId: "pic-1",
+      mime: "image/png",
+      size: 12,
+      sessions,
+    });
+    expect(sink.url).toBe("/room-file/pic-1?purpose=play");
+    expect(sink.url.startsWith("blob:")).toBe(false);
+  });
+
   it("uses the same-origin play URL for a file larger than the RAM window", () => {
     const sessions = createRoomPlayRegistry();
     const sink = createRoomPlaySink({
