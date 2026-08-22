@@ -44,6 +44,7 @@ import {
   roomOccupantCount,
   roomOccupancyFromSnapshot,
   roomHostMemberMenu,
+  roomHostMemberPutOnTv,
   roomMemberAvatarInitial,
   roomMemberCard,
   roomMemberCardsSorted,
@@ -62,10 +63,18 @@ import {
   roomChromeShouldHold,
   GO_ROOM_CINEMA_ENTER,
   GO_ROOM_CINEMA_EXIT,
+  GO_ROOM_CINEMA_PEEK_HINT,
+  GO_ROOM_CINEMA_PEEK_HINT_STORAGE,
+  GO_ROOM_HOST_CHECKLIST_LABELS,
+  GO_ROOM_HOST_CHECKLIST_STORAGE,
+  markRoomCinemaPeekHintSeen,
+  markRoomHostChecklistDismissed,
   roomCinemaActive,
   roomCinemaAllowed,
   roomCinemaExitOnChromeReveal,
   roomCinemaHudVisible,
+  roomCinemaPeekHintSeen,
+  roomCinemaPeekHintShow,
   roomCinemaToggleLabel,
   roomEscStep,
   roomTvClockLabel,
@@ -81,8 +90,14 @@ import {
   roomTvSinkMuted,
   roomTvVolumeFromInput,
   roomInviteDoorRow,
+  roomHostChecklistDismissed,
+  roomHostChecklistEligible,
+  roomHostChecklistPendingSteps,
+  roomHostChecklistStepDone,
   roomHostLoginGate,
   roomShowAdSlot,
+  roomGuestHostName,
+  roomGuestStatusLine,
   roomGuestNameFallback,
   roomStatusLineVisible,
   roomTvStatusGate,
@@ -594,22 +609,39 @@ describe("roomMemberCardsSorted", () => {
 });
 
 describe("roomHostMemberMenu", () => {
-  it("lets the Host put a live occupant on the TV, mute, close camera, or kick", () => {
+  it("exposes put-on-TV on the card when someone is live", () => {
+    const putOnTv = roomHostMemberPutOnTv({
+      liveAudio: true,
+      liveVideo: true,
+    });
+    expect(putOnTv).toMatchObject({
+      show: true,
+      enabled: true,
+      label: GO_ROOM_PUT_ON_TV,
+    });
+    expect(
+      roomHostMemberPutOnTv({
+        liveAudio: true,
+        liveVideo: true,
+        onAir: true,
+      }).enabled
+    ).toBe(false);
+    expect(roomHostMemberPutOnTv({ liveAudio: false, liveVideo: false }).show).toBe(
+      false
+    );
+  });
+
+  it("keeps mute, camera off, and kick in the overflow menu", () => {
     const items = roomHostMemberMenu({
       mine: false,
       liveAudio: true,
       liveVideo: true,
     });
     expect(items.map((i) => i.action)).toEqual([
-      "putOnTv",
       "forceMute",
       "forceCameraOff",
       "kick",
     ]);
-    expect(items.find((i) => i.action === "putOnTv")).toMatchObject({
-      label: GO_ROOM_PUT_ON_TV,
-      enabled: true,
-    });
     expect(items.find((i) => i.action === "forceMute")).toMatchObject({
       label: GO_ROOM_FORCE_MUTE,
       enabled: true,
@@ -625,32 +657,17 @@ describe("roomHostMemberMenu", () => {
     });
   });
 
-  it("disables put-on-TV when that member is already on the big screen", () => {
-    const items = roomHostMemberMenu({
-      mine: false,
-      liveAudio: true,
-      liveVideo: true,
-      onAir: true,
-    });
-    expect(items.find((i) => i.action === "putOnTv")?.enabled).toBe(false);
-  });
-
   it("does not let the Host kick themselves, and disables mute when the mic is already off", () => {
     const items = roomHostMemberMenu({
       mine: true,
       liveAudio: false,
       liveVideo: true,
     });
-    expect(items.map((i) => i.action)).toEqual([
-      "putOnTv",
-      "forceMute",
-      "forceCameraOff",
-    ]);
+    expect(items.map((i) => i.action)).toEqual(["forceMute", "forceCameraOff"]);
     expect(items.find((i) => i.action === "forceMute")?.enabled).toBe(false);
     expect(items.find((i) => i.action === "forceCameraOff")?.enabled).toBe(
       true
     );
-    expect(items.find((i) => i.action === "putOnTv")?.enabled).toBe(true);
   });
 });
 
@@ -1500,6 +1517,15 @@ describe("room cinema shell", () => {
     ).toBe(true);
   });
 
+  it("hides the house ad in theater mode", () => {
+    expect(
+      roomShowAdSlot({ inBooth: true, tvOn: false, playActive: false, cinema: true })
+    ).toBe(false);
+    expect(
+      roomShowAdSlot({ inBooth: true, tvOn: false, playActive: false, cinema: false })
+    ).toBe(true);
+  });
+
   it("keeps hall pane geometry independent of cinema", () => {
     expect(roomShellPanesConcurrent("desktop", true)).toBe(false);
     expect(roomShellFilesPinned("desktop", true)).toBe(true);
@@ -1631,6 +1657,34 @@ describe("roomShellViewportBox", () => {
   });
 });
 
+describe("roomGuestStatusLine", () => {
+  it("names the host booth and spectator play", () => {
+    expect(
+      roomGuestHostName([{ peerId: "h1", name: "阿明" }])
+    ).toBe("阿明");
+    expect(
+      roomGuestStatusLine({
+        guestCount: 1,
+        tvLabel: "沒訊號",
+        hostName: "阿明",
+        playActive: false,
+        playGameName: null,
+        playSpectator: false,
+      })
+    ).toBe("在阿明的包廂 · 2 人在 · 沒訊號");
+    expect(
+      roomGuestStatusLine({
+        guestCount: 1,
+        tvLabel: "正在玩五子棋",
+        hostName: "阿明",
+        playActive: true,
+        playGameName: "五子棋",
+        playSpectator: true,
+      })
+    ).toBe("在阿明的包廂 · 觀戰中 · 正在玩五子棋");
+  });
+});
+
 describe("roomTvHint", () => {
   it("shows host vs guest copy once while the TV is idle", () => {
     const storage = {
@@ -1651,6 +1705,105 @@ describe("roomTvHint", () => {
     markRoomTvHintSeen(storage);
     expect(storage.getItem(GO_ROOM_TV_HINT_STORAGE)).toBe("1");
     expect(roomTvHintSeen(storage)).toBe(true);
+  });
+});
+
+describe("roomHostChecklist", () => {
+  const idle = {
+    door: "none" as const,
+    guestCount: 0,
+    fileCastOnTv: false,
+    liveCastOnTv: false,
+  };
+
+  it("is host-only while the booth TV is idle", () => {
+    expect(
+      roomHostChecklistEligible({
+        role: "host",
+        phase: "open",
+        tvOn: false,
+        playActive: false,
+        dismissed: false,
+      })
+    ).toBe(true);
+    expect(
+      roomHostChecklistEligible({
+        role: "guest",
+        phase: "open",
+        tvOn: false,
+        playActive: false,
+        dismissed: false,
+      })
+    ).toBe(false);
+    expect(
+      roomHostChecklistEligible({
+        role: "host",
+        phase: "open",
+        tvOn: true,
+        playActive: false,
+        dismissed: false,
+      })
+    ).toBe(false);
+  });
+
+  it("tracks invite and either cast path", () => {
+    expect(roomHostChecklistPendingSteps(idle)).toEqual([
+      "invite",
+      "hang_cast",
+      "live_cast",
+    ]);
+    expect(
+      roomHostChecklistStepDone("invite", { ...idle, door: "live" })
+    ).toBe(true);
+    expect(
+      roomHostChecklistPendingSteps({ ...idle, door: "live" })
+    ).toEqual(["hang_cast", "live_cast"]);
+    expect(
+      roomHostChecklistPendingSteps({ ...idle, fileCastOnTv: true })
+    ).toEqual(["invite"]);
+    expect(
+      roomHostChecklistPendingSteps({ ...idle, liveCastOnTv: true })
+    ).toEqual(["invite"]);
+    expect(GO_ROOM_HOST_CHECKLIST_LABELS.invite).toContain("掃邀請");
+  });
+
+  it("persists dismiss", () => {
+    const storage = {
+      data: {} as Record<string, string>,
+      getItem(k: string) {
+        return this.data[k] ?? null;
+      },
+      setItem(k: string, v: string) {
+        this.data[k] = v;
+      },
+    };
+    expect(roomHostChecklistDismissed(storage)).toBe(false);
+    markRoomHostChecklistDismissed(storage);
+    expect(storage.getItem(GO_ROOM_HOST_CHECKLIST_STORAGE)).toBe("1");
+    expect(roomHostChecklistDismissed(storage)).toBe(true);
+  });
+});
+
+describe("roomCinemaPeekHint", () => {
+  it("shows once on first cinema entry", () => {
+    const storage = {
+      data: {} as Record<string, string>,
+      getItem(k: string) {
+        return this.data[k] ?? null;
+      },
+      setItem(k: string, v: string) {
+        this.data[k] = v;
+      },
+    };
+    expect(roomCinemaPeekHintShow({ cinema: true, seen: false })).toBe(true);
+    expect(roomCinemaPeekHintShow({ cinema: false, seen: false })).toBe(false);
+    expect(roomCinemaPeekHintSeen(storage)).toBe(false);
+    expect(GO_ROOM_CINEMA_PEEK_HINT).toContain("Esc");
+    markRoomCinemaPeekHintSeen(storage);
+    expect(storage.getItem(GO_ROOM_CINEMA_PEEK_HINT_STORAGE)).toBe("1");
+    expect(
+      roomCinemaPeekHintShow({ cinema: true, seen: roomCinemaPeekHintSeen(storage) })
+    ).toBe(false);
   });
 });
 

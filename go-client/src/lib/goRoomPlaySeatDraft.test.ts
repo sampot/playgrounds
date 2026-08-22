@@ -58,9 +58,12 @@ describe("roomPlaySeatDraftComplete", () => {
 
 describe("formatRoomPlaySeatFail", () => {
   it("explains short seats with missing roles", () => {
-    expect(
-      formatRoomPlaySeatFail("seats_short", ["player"])
-    ).toMatch(/對手|player|缺席|不夠/);
+    expect(formatRoomPlaySeatFail("seats_short", ["player"])).toBe(
+      "還缺 1 位對手。請指定或請人進來。"
+    );
+    expect(formatRoomPlaySeatFail("seats_short", ["player", "p2"])).toBe(
+      "還缺 2 位（對手、二家）。請指定或請人進來。"
+    );
   });
 
   it("explains duplicate and unknown peers", () => {

@@ -160,6 +160,8 @@ export type GuestStatus = {
   playCanvasSrcdoc: string | null;
   playCanvasMode: GuestCanvasMode | null;
   playCanvasGeneration: number;
+  /** Booth play: guest is watching, not seated. */
+  playSpectator: boolean;
 };
 
 type Listener = (s: GuestStatus) => void;
@@ -210,6 +212,7 @@ export function createGuestRuntime() {
     playCanvasSrcdoc: null,
     playCanvasMode: null,
     playCanvasGeneration: 0,
+    playSpectator: false,
   };
   const listeners = new Set<Listener>();
   let localAgentId = newAgentId();
@@ -335,7 +338,15 @@ export function createGuestRuntime() {
   }
 
   function set(partial: Partial<GuestStatus>) {
-    status = { ...status, ...partial };
+    const next = { ...status, ...partial };
+    if (!next.playCatalogId?.trim()) {
+      next.playSpectator = false;
+    } else if (partial.playSpectator === undefined && sessionPlay) {
+      const playPhase = sessionPlay.getState().phase;
+      next.playSpectator =
+        playPhase !== "idle" && sessionPlay.isSpectator(localAgentId);
+    }
+    status = next;
     emit();
   }
 

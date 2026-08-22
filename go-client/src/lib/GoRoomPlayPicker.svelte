@@ -25,7 +25,15 @@
     games: RoomPlayableGame[];
     /** Host + guests with wire peer ids（Host = localPeerId）. */
     occupants?: PlayPickerOccupant[];
-    onAutoStart: (catalogId: string) => void | Promise<void>;
+    onAutoStart: (
+      catalogId: string
+    ) =>
+      | void
+      | Promise<
+          | { ok: true }
+          | { ok: false; reason: string; missingRoles?: string[] }
+          | undefined
+        >;
     onManualStart: (
       catalogId: string,
       picks: RoomPlaySeatPick[]
@@ -40,7 +48,7 @@
 
   let closeBtn = $state<HTMLButtonElement | null>(null);
   let wasOpen = false;
-  let step = $state<"games" | "seats">("games");
+  let step = $state<"games" | "start" | "seats">("games");
   let selected = $state<RoomPlayableGame | null>(null);
   let slots = $state<RoomPlaySeatSlot[]>([]);
   /** peerId per slot index；null = empty. */
@@ -78,6 +86,10 @@
     if (event.key === "Escape") {
       event.preventDefault();
       if (step === "seats") {
+        backToStart();
+        return;
+      }
+      if (step === "start") {
         backToGames();
         return;
       }
@@ -87,9 +99,15 @@
 
   function pickGame(game: RoomPlayableGame) {
     selected = game;
+    seatError = "";
+    step = "start";
+  }
+
+  function openManualSeats() {
+    const game = selected;
+    if (!game) return;
     slots = expandRoomPlaySeatSlots(game.roles);
     draft = slots.map(() => null);
-    // Prefill host seat with local host when present.
     const hostOcc = occupants[0];
     const hostSlot = slots.findIndex((s) => s.role === "host");
     if (hostSlot >= 0 && hostOcc) {
@@ -102,6 +120,13 @@
   function backToGames() {
     step = "games";
     selected = null;
+    slots = [];
+    draft = [];
+    seatError = "";
+  }
+
+  function backToStart() {
+    step = "start";
     slots = [];
     draft = [];
     seatError = "";
@@ -135,8 +160,12 @@
     busy = true;
     seatError = "";
     try {
+      const out = await onAutoStart(id);
+      if (out && out.ok === false) {
+        seatError = formatRoomPlaySeatFail(out.reason, out.missingRoles);
+        return;
+      }
       close();
-      await onAutoStart(id);
     } finally {
       busy = false;
     }
@@ -188,7 +217,13 @@
     <div class="play-picker pixel-frame confirm">
       <header class="play-picker-header">
         <h2 id="play-picker-title" class="confirm-title pixel-text">
-          {step === "games" ? "玩遊戲" : "指定席次"}
+          {#if step === "games"}
+            玩遊戲
+          {:else if step === "start"}
+            開局
+          {:else}
+            指定席次
+          {/if}
         </h2>
         <button
           type="button"
@@ -223,6 +258,42 @@
             {/each}
           </ul>
         {/if}
+      {:else if step === "start" && selected}
+        <p class="confirm-body">
+          <strong>{selected.title}</strong> · 需 {selected.seatCount} 人
+        </p>
+        <p class="confirm-body muted">
+          自動入座：主持佔主持席，其餘依進門順序；同一人的兩台不會佔兩席。未入座的人觀戰。
+        </p>
+        {#if seatError}
+          <p class="play-seat-error" role="status">{seatError}</p>
+        {/if}
+        <div class="play-seat-actions play-seat-actions--start">
+          <button
+            type="button"
+            class="pixel-btn play-seat-btn"
+            onclick={backToGames}
+            disabled={busy}
+          >
+            返回
+          </button>
+          <button
+            type="button"
+            class="pixel-btn pixel-btn--primary play-seat-btn play-seat-btn-primary"
+            onclick={() => void startAuto()}
+            disabled={busy}
+          >
+            自動入座開局
+          </button>
+          <button
+            type="button"
+            class="pixel-btn play-seat-btn play-seat-btn-manual"
+            onclick={openManualSeats}
+            disabled={busy}
+          >
+            手動指定席次
+          </button>
+        </div>
       {:else if selected}
         <p class="confirm-body muted">
           {selected.title} · 點席次選人；未入座的人觀戰。
@@ -263,22 +334,14 @@
           <button
             type="button"
             class="pixel-btn play-seat-btn"
-            onclick={backToGames}
+            onclick={backToStart}
             disabled={busy}
           >
             返回
           </button>
           <button
             type="button"
-            class="pixel-btn play-seat-btn"
-            onclick={() => void startAuto()}
-            disabled={busy}
-          >
-            自動入座
-          </button>
-          <button
-            type="button"
-            class="pixel-btn play-seat-btn play-seat-btn-primary"
+            class="pixel-btn pixel-btn--primary play-seat-btn play-seat-btn-primary"
             onclick={() => void startManual()}
             disabled={busy || !draftReady}
           >
@@ -416,6 +479,9 @@
     gap: 0.45rem;
     margin-top: 0.25rem;
   }
+  .play-seat-actions--start {
+    flex-direction: column;
+  }
   .play-seat-btn {
     min-height: 44px;
     flex: 1 1 auto;
@@ -423,11 +489,19 @@
   .play-seat-btn-primary {
     flex: 1 1 100%;
   }
+  .play-seat-btn-manual {
+    flex: 1 1 100%;
+    font-size: 0.9rem;
+  }
   @media (min-width: 40rem) {
     .play-picker-overlay {
       align-items: center;
     }
-    .play-seat-btn-primary {
+    .play-seat-actions--start {
+      flex-direction: row;
+    }
+    .play-seat-btn-primary,
+    .play-seat-btn-manual {
       flex: 1 1 auto;
     }
   }

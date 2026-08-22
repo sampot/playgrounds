@@ -977,7 +977,7 @@ export function createRoomRuntime(opts?: {
    */
   async function startAutoPlay(catalogId: string): Promise<
     | { ok: true; state: RoomSessionPlayState }
-    | { ok: false; reason: string }
+    | { ok: false; reason: string; missingRoles?: string[] }
   > {
     const entry = getGoCatalogEntry(catalogId);
     const protocol = hostableProtocolFor(entry ?? null);
@@ -990,8 +990,13 @@ export function createRoomRuntime(opts?: {
       mode: "auto",
     });
     if (!seatsOut.ok) {
-      chromeSession.setFlash("人數不夠開局，請先請人進來", 2800);
-      return { ok: false, reason: seatsOut.reason };
+      return {
+        ok: false,
+        reason: seatsOut.reason,
+        ...(seatsOut.missingRoles
+          ? { missingRoles: seatsOut.missingRoles }
+          : {}),
+      };
     }
     return offerPlay({ catalogId, seats: seatsOut.seats });
   }

@@ -28,6 +28,7 @@ import {
   roomFilePreviewShouldAttachUrl,
   roomFileShareActions,
   roomFilePrivateActions,
+  roomFileTvCastSourceHint,
   roomFileShareMenu,
   roomFilePrivateMenu,
   roomFileShareMatches,
@@ -45,6 +46,39 @@ describe("fileShareKind", () => {
     expect(fileShareKind({ mime: "image/jpeg", name: "x" })).toBe("image");
     expect(fileShareKind({ name: "notes.pdf" })).toBe("doc");
     expect(fileShareKind({ name: "readme" })).toBe("doc");
+  });
+});
+
+describe("roomFileTvCastSourceHint", () => {
+  it("warns the file owner on WebKit before cast", () => {
+    expect(
+      roomFileTvCastSourceHint({
+        kind: "video",
+        mine: true,
+        nativeHtmlMediaCaptureStream: false,
+      })
+    ).toMatch(/Safari/);
+    expect(
+      roomFileTvCastSourceHint({
+        kind: "video",
+        mine: false,
+        nativeHtmlMediaCaptureStream: false,
+      })
+    ).toBeNull();
+    expect(
+      roomFileTvCastSourceHint({
+        kind: "image",
+        mine: true,
+        nativeHtmlMediaCaptureStream: false,
+      })
+    ).toBeNull();
+    expect(
+      roomFileTvCastSourceHint({
+        kind: "audio",
+        mine: true,
+        nativeHtmlMediaCaptureStream: true,
+      })
+    ).toBeNull();
   });
 });
 

@@ -222,7 +222,7 @@
   playCanvasSrcdoc={status?.playCanvasSrcdoc ?? null}
   playCanvasGeneration={status?.playCanvasGeneration ?? 0}
   playLocalPeerId={status?.localPeerId ?? null}
-  onStartPlay={(catalogId) => void runtime.startAutoPlay(catalogId)}
+  onStartPlay={(catalogId) => runtime.startAutoPlay(catalogId)}
   onStartManualPlay={(catalogId, picks) =>
     runtime.startManualPlay(catalogId, picks)}
   onEndPlay={() => void runtime.endPlay()}

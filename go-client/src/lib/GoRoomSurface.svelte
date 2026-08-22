@@ -55,6 +55,7 @@
     GO_ROOM_OWNER_DECODE,
     attachMediaStream,
     attachPlaybackUrl,
+    htmlMediaCaptureStreamSupported,
     canShareDisplay,
     isRoomInviteShareable,
     roomChatWhoLabel,
@@ -70,10 +71,13 @@
     roomInviteDoorRow,
     roomInviteRemainLabel,
     roomHostLoginGate,
+    roomGuestHostName,
+    roomGuestStatusLine,
     roomHostDisplayName,
     playerDisplayName,
     roomTvStatusGate,
     roomHostMemberMenu,
+    roomHostMemberPutOnTv,
     roomMemberCard,
     roomMemberCardsSorted,
     roomMemberShowsDirectLink,
@@ -99,6 +103,15 @@
     roomTvHintEligible,
     roomTvHintSeen,
     markRoomTvHintSeen,
+    GO_ROOM_HOST_CHECKLIST_LABELS,
+    GO_ROOM_CINEMA_PEEK_HINT,
+    GO_ROOM_CINEMA_PEEK_HINT_MS,
+    markRoomCinemaPeekHintSeen,
+    markRoomHostChecklistDismissed,
+    roomCinemaPeekHintSeen,
+    roomHostChecklistDismissed,
+    roomHostChecklistEligible,
+    roomHostChecklistPendingSteps,
     syncTvSinkPlayback,
     toggleTvFullscreen,
     tvFullscreenElement,
@@ -140,6 +153,7 @@
     roomFilePreviewShouldAttachUrl,
     roomFilePrivateMenu,
     roomFileShareMenu,
+    roomFileTvCastSourceHint,
     roomFileShareMatches,
     roomFileShareOpenLabel,
     roomFileShareProgress,
@@ -200,7 +214,17 @@
     /** Host wire peer id for manual seats（session_play）. */
     playLocalPeerId?: string | null;
     playHostName?: string | null;
-    onStartPlay?: (catalogId: string) => void | Promise<void>;
+    /** Guest booth play: watching without a seat. */
+    playSpectator?: boolean;
+    onStartPlay?: (
+      catalogId: string
+    ) =>
+      | void
+      | Promise<
+          | { ok: true }
+          | { ok: false; reason: string; missingRoles?: string[] }
+          | undefined
+        >;
     onStartManualPlay?: (
       catalogId: string,
       picks: { role: string; peerId: string }[]
@@ -240,6 +264,7 @@
     playCanvasGeneration = 0,
     playLocalPeerId = null,
     playHostName = null,
+    playSpectator = false,
     onStartPlay,
     onStartManualPlay,
     onEndPlay,
@@ -247,6 +272,7 @@
 
   let playPickerOpen = $state(false);
   const playableGames = $derived(listRoomPlayableGames());
+  const nativeFileCapture = htmlMediaCaptureStreamSupported();
   const playPickerOccupants = $derived.by(() => {
     const hostId = playLocalPeerId?.trim();
     if (!hostId) return occupantPeers;
@@ -310,6 +336,10 @@
   let tvSlotEl = $state<HTMLElement | null>(null);
   let cinemaUserEnter = $state(false);
   let tvHintConsumed = $state(false);
+  let hostChecklistDismissed = $state(false);
+  let cinemaPeekConsumed = $state(false);
+  let cinemaPeekToast = $state(false);
+  let cinemaPeekFading = $state(false);
   let menuMsgId = $state<string | null>(null);
   let holdTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -508,6 +538,7 @@
       inBooth,
       tvOn,
       playActive,
+      cinema,
     })
   );
   const panesConcurrent = $derived(
@@ -541,17 +572,79 @@
   );
 
   const showTvHint = $derived(
-    showMembers &&
+    role === "guest" &&
+      showMembers &&
       roomTvHintEligible({ tvOn, playActive }) &&
       !tvHintConsumed
   );
 
+  const hostChecklistProgress = $derived({
+    door,
+    guestCount,
+    fileCastOnTv:
+      tvOn &&
+      Boolean(goRoomMedia.streamingFileId || goRoomMedia.castingFileId),
+    liveCastOnTv: tvOn && Boolean(goRoomMedia.tvSourcePeerId),
+  });
+
+  const hostChecklistEligible = $derived(
+    roomHostChecklistEligible({
+      role,
+      phase,
+      tvOn,
+      playActive,
+      dismissed: hostChecklistDismissed,
+    })
+  );
+
+  const hostChecklistPending = $derived(
+    hostChecklistEligible
+      ? roomHostChecklistPendingSteps(hostChecklistProgress)
+      : []
+  );
+
+  const showHostChecklist = $derived(
+    showMembers && hostChecklistPending.length > 0
+  );
+
   onMount(() => {
     tvHintConsumed = roomTvHintSeen();
+    hostChecklistDismissed = roomHostChecklistDismissed();
+    cinemaPeekConsumed = roomCinemaPeekHintSeen();
   });
 
   $effect(() => {
     if (showTvHint) markRoomTvHintSeen();
+  });
+
+  $effect(() => {
+    if (hostChecklistEligible && hostChecklistPending.length === 0) {
+      markRoomHostChecklistDismissed();
+      hostChecklistDismissed = true;
+    }
+  });
+
+  $effect(() => {
+    if (!cinema || cinemaPeekConsumed) {
+      cinemaPeekToast = false;
+      cinemaPeekFading = false;
+      return;
+    }
+    markRoomCinemaPeekHintSeen();
+    cinemaPeekConsumed = true;
+    cinemaPeekToast = true;
+    cinemaPeekFading = false;
+    const fade = window.setTimeout(() => {
+      cinemaPeekFading = true;
+    }, GO_ROOM_CINEMA_PEEK_HINT_MS);
+    const hide = window.setTimeout(() => {
+      cinemaPeekToast = false;
+      cinemaPeekFading = false;
+    }, GO_ROOM_CINEMA_PEEK_HINT_MS + 400);
+    return () => {
+      window.clearTimeout(fade);
+      window.clearTimeout(hide);
+    };
   });
 
   const statusLabel = $derived.by(() => {
@@ -559,11 +652,20 @@
     if (phase === "connecting") return message || GO_ROOM_CONNECTING_TITLE;
     if (phase === "ended") return message || "這一間已結束";
     if (inBooth) {
-      // Prefer stage line so cast／play read as signal（not occupancy-only「沒訊號」）.
-      const line = roomStageStatus({ guestCount, tvLabel });
-      if (role === "guest" && peerName) {
-        return line ? `${line} · ${peerName}` : peerName;
+      if (role === "guest") {
+        const hostName =
+          playerDisplayName(playHostName, "") ||
+          roomGuestHostName(occupantPeers);
+        return roomGuestStatusLine({
+          guestCount,
+          tvLabel,
+          hostName: hostName || null,
+          playActive,
+          playGameName: playTvName,
+          playSpectator,
+        });
       }
+      const line = roomStageStatus({ guestCount, tvLabel });
       if (line) return line;
       return message;
     }
@@ -1398,6 +1500,16 @@
     chromeSession.chromeHidden = next;
   }
 
+  function dismissHostChecklist() {
+    markRoomHostChecklistDismissed();
+    hostChecklistDismissed = true;
+  }
+
+  function revealChromeFromCinema() {
+    cinemaUserEnter = false;
+    chromeSession.chromeHidden = false;
+  }
+
   function onPaneTab(id: RoomShellPane) {
     pane = id;
   }
@@ -1555,6 +1667,27 @@
         floats={stageFloats}
         caption={tvCaption && tvCaption.until > Date.now() ? tvCaption.text : null}
       />
+      {#if cinemaPeekToast}
+        <p
+          class={[
+            "room-cinema-peek-toast",
+            cinemaPeekFading && "room-cinema-peek-toast--out",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+          role="status"
+        >
+          {GO_ROOM_CINEMA_PEEK_HINT}
+        </p>
+      {/if}
+      {#if cinema}
+        <button
+          type="button"
+          class="room-cinema-peek-edge"
+          aria-label="顯示控制面板"
+          onclick={() => revealChromeFromCinema()}
+        ></button>
+      {/if}
       {#if loginGate}
         <div class="room-tv-gate" role="region" aria-labelledby="room-gate-title">
           <p id="room-gate-title" class="room-tv-gate-title pixel-text">開包廂</p>
@@ -1839,6 +1972,25 @@
               </div>
             {/if}
           {/if}
+          {#if showHostChecklist}
+            <div class="room-host-checklist" role="note" aria-label="開始使用包廂">
+              <div class="room-host-checklist-head">
+                <p class="room-host-checklist-title">可以這樣開始</p>
+                <button
+                  type="button"
+                  class="pixel-btn room-host-checklist-dismiss"
+                  onclick={() => dismissHostChecklist()}
+                >
+                  知道了
+                </button>
+              </div>
+              <ol class="room-host-checklist-steps">
+                {#each hostChecklistPending as step (step)}
+                  <li>{GO_ROOM_HOST_CHECKLIST_LABELS[step]}</li>
+                {/each}
+              </ol>
+            </div>
+          {/if}
           {#if showTvHint}
             <p class="muted room-tv-hint">{roomTvHintCopy(role)}</p>
           {/if}
@@ -1848,6 +2000,15 @@
                 <GoRoomMemberCard
                   {card}
                   selected={selectedPeerId === card.peerId}
+                  putOnTv={
+                    role === "host"
+                      ? roomHostMemberPutOnTv({
+                          liveAudio: card.micOn,
+                          liveVideo: card.cameraOn,
+                          onAir: card.onAir,
+                        })
+                      : null
+                  }
                   hostMenu={role === "host"
                     ? roomHostMemberMenu({
                         mine: card.mine,
@@ -1883,7 +2044,13 @@
               {/if}
               <div class="file-actions">
                 {#if role === "host"}
-                  <p class="muted">主持操作在卡片旁的更多。</p>
+                  <p class="muted">
+                    {#if selectedPerson.liveVideo || selectedPerson.liveAudio}
+                      放到大螢幕上在成員卡上；其餘在更多。
+                    {:else}
+                      主持操作在卡片旁的更多。
+                    {/if}
+                  </p>
                 {:else if !selectedPerson.mine && (selectedPerson.liveVideo || selectedPerson.liveAudio)}
                   {#if goRoomMedia.watching || goRoomMedia.listening}
                     <button type="button" class="pixel-btn" onclick={() => void onStopWatching()}>
@@ -2035,6 +2202,11 @@
                     name={f.name}
                     {kind}
                     meta={`${formatSize(f.size)} · 僅這台`}
+                    castHint={roomFileTvCastSourceHint({
+                      kind,
+                      mine: true,
+                      nativeHtmlMediaCaptureStream: nativeFileCapture,
+                    })}
                     {onAir}
                     {liveBadge}
                     menu={roomFilePrivateMenu({ kind })}
@@ -2065,6 +2237,11 @@
                     name={f.path || f.name}
                     {kind}
                     meta={shareFileMeta(f)}
+                    castHint={roomFileTvCastSourceHint({
+                      kind,
+                      mine: f.mine,
+                      nativeHtmlMediaCaptureStream: nativeFileCapture,
+                    })}
                     {onAir}
                     {liveBadge}
                     owner={{
@@ -2626,7 +2803,16 @@
     bind:open={playPickerOpen}
     games={playableGames}
     occupants={playPickerOccupants}
-    onAutoStart={(catalogId) => void onStartPlay?.(catalogId)}
+    onAutoStart={async (catalogId) => {
+      const out = await onStartPlay?.(catalogId);
+      if (!out) return { ok: true as const };
+      if (out.ok) return { ok: true as const };
+      return {
+        ok: false as const,
+        reason: out.reason,
+        ...(out.missingRoles ? { missingRoles: out.missingRoles } : {}),
+      };
+    }}
     onManualStart={async (catalogId, picks) => {
       if (!onStartManualPlay) {
         return { ok: false as const, reason: "not_playable" };
@@ -2863,6 +3049,92 @@
     margin: 0 0 0.55rem;
     line-height: 1.45;
     font-size: 0.88rem;
+  }
+  .room-host-checklist {
+    margin: 0 0 0.55rem;
+    padding: 0.55rem 0.65rem;
+    border: 1px solid color-mix(in oklab, rgb(var(--ink)) 22%, transparent);
+    background: color-mix(in oklab, rgb(var(--paper)) 92%, transparent);
+    line-height: 1.45;
+    font-size: 0.88rem;
+  }
+  .room-host-checklist-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.45rem;
+    margin-bottom: 0.35rem;
+  }
+  .room-host-checklist-title {
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+  .room-host-checklist-dismiss {
+    min-height: 44px;
+    flex: 0 0 auto;
+    padding: 0.35rem 0.65rem;
+    font-size: 0.82rem;
+  }
+  .room-host-checklist-steps {
+    margin: 0;
+    padding-left: 1.15rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  .room-host-checklist-steps li {
+    padding-left: 0.1rem;
+  }
+  .room-cinema-peek-toast {
+    position: absolute;
+    left: 50%;
+    top: 0.65rem;
+    z-index: 8;
+    margin: 0;
+    padding: 0.45rem 0.7rem;
+    max-width: calc(100% - 1.2rem);
+    transform: translateX(-50%);
+    border-radius: 0.35rem;
+    background: color-mix(in oklab, #000 72%, transparent);
+    color: #f4efe4;
+    font-size: 0.85rem;
+    line-height: 1.35;
+    text-align: center;
+    pointer-events: none;
+    opacity: 1;
+    transition: opacity 0.35s ease;
+  }
+  .room-cinema-peek-toast--out {
+    opacity: 0;
+  }
+  .room-cinema-peek-edge {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    z-index: 7;
+    width: 3.5rem;
+    height: 44px;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+    transform: translateX(-50%);
+    cursor: pointer;
+  }
+  .room-cinema-peek-edge::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 0.45rem;
+    width: 2.75rem;
+    height: 0.32rem;
+    border-radius: 999px;
+    transform: translateX(-50%);
+    background: color-mix(in oklab, #f4efe4 78%, transparent);
+    box-shadow:
+      0 0 0 1px color-mix(in oklab, #000 55%, transparent),
+      0 1px 6px color-mix(in oklab, #000 40%, transparent);
   }
   .room-tabs {
     display: flex;

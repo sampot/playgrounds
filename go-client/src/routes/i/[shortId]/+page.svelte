@@ -426,6 +426,8 @@
     playCanvasUrl={status.playCanvasUrl ?? null}
     playCanvasSrcdoc={status.playCanvasSrcdoc ?? null}
     playCanvasGeneration={status.playCanvasGeneration ?? 0}
+    playHostName={status.occupantPeers[0]?.name ?? null}
+    playSpectator={status.playSpectator}
   />
 {:else if showCanvas}
   <h1 class="sr-only">邀請</h1>

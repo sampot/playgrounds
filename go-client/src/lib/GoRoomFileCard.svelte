@@ -23,6 +23,7 @@
     owner?: Owner | null;
     menu: RoomFileMenuItem[];
     menuOpen?: boolean;
+    castHint?: string | null;
     onMenuToggle?: () => void;
     onAction?: (action: RoomFileMenuItem["action"]) => void;
   };
@@ -37,6 +38,7 @@
     owner = null,
     menu,
     menuOpen = false,
+    castHint = null,
     onMenuToggle,
     onAction,
   }: Props = $props();
@@ -69,6 +71,9 @@
       </span>
       {#if meta}
         <span class="file-meta muted">{meta}</span>
+      {/if}
+      {#if castHint}
+        <span class="file-cast-hint" role="note">{castHint}</span>
       {/if}
     </span>
     {#if owner}
@@ -197,6 +202,11 @@
     line-height: 1.25;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  .file-cast-hint {
+    font-size: 0.72rem;
+    line-height: 1.35;
+    color: color-mix(in oklab, #b00020 75%, rgb(var(--ink)));
   }
   .muted {
     color: color-mix(in oklab, rgb(var(--ink)) 72%, transparent);

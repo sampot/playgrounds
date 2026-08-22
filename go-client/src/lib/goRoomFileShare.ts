@@ -106,6 +106,21 @@ export function roomFilePreviewShouldAttachUrl(opts: {
  */
 export const ROOM_FILE_PREVIEW_VIDEO_PRELOAD = "auto" as const;
 
+export const GO_ROOM_FILE_TV_CAST_HINT =
+  "這台瀏覽器不能當大螢幕片源（常見於 Safari）。請改用電腦 Chrome／Edge 掛檔。";
+
+export function roomFileTvCastSourceHint(opts: {
+  kind: FileShareKind;
+  /** File owner on this device — only they render for cast. */
+  mine: boolean;
+  nativeHtmlMediaCaptureStream: boolean;
+}): string | null {
+  if (!opts.mine) return null;
+  if (opts.kind !== "video" && opts.kind !== "audio") return null;
+  if (opts.nativeHtmlMediaCaptureStream) return null;
+  return GO_ROOM_FILE_TV_CAST_HINT;
+}
+
 export function roomFileShareActions(opts: {
   role: "host" | "guest";
   mine: boolean;

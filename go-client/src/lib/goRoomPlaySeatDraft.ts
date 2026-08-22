@@ -84,11 +84,14 @@ export function formatRoomPlaySeatFail(
 ): string {
   switch (reason) {
     case "seats_short": {
-      const labels = (missingRoles ?? [])
-        .map((r) => roomPlayRoleLabel(r))
-        .filter(Boolean);
-      if (labels.length) {
-        return `還缺席：${labels.join("、")}。請指定或請人進來。`;
+      const missing = missingRoles ?? [];
+      const labels = missing.map((r) => roomPlayRoleLabel(r)).filter(Boolean);
+      const n = missing.length;
+      if (n === 1 && labels[0]) {
+        return `還缺 1 位${labels[0]}。請指定或請人進來。`;
+      }
+      if (n > 0 && labels.length) {
+        return `還缺 ${n} 位（${labels.join("、")}）。請指定或請人進來。`;
       }
       return "人數不夠開局，請指定席次或請人進來";
     }

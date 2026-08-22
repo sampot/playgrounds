@@ -236,9 +236,12 @@ export function roomShowAdSlot(opts: {
   tvOn?: boolean;
   /** Booth play (SAM on TV slot) — same as program stream for ad chrome. */
   playActive?: boolean;
+  /** Theater mode — full-bleed video only; no floating ad chrome. */
+  cinema?: boolean;
 }): boolean {
   if (opts.inBooth === false) return false;
   if (opts.playActive) return false;
+  if (opts.cinema) return false;
   return !opts.tvOn;
 }
 
@@ -388,6 +391,117 @@ export function markRoomTvHintSeen(
 ): void {
   storage.setItem(GO_ROOM_TV_HINT_STORAGE, "1");
 }
+
+export const GO_ROOM_HOST_CHECKLIST_STORAGE = "go-room-host-checklist-v1";
+
+export type RoomHostChecklistStep = "invite" | "hang_cast" | "live_cast";
+
+export const GO_ROOM_HOST_CHECKLIST_LABELS: Record<RoomHostChecklistStep, string> =
+  {
+    invite: "請人進來（另一台請掃邀請，勿再開一間）",
+    hang_cast: "檔案區掛檔，再放到大螢幕上",
+    live_cast: "或開麥／開鏡頭，在成員卡放到大螢幕上",
+  };
+
+export type RoomHostChecklistProgress = {
+  door: RoomInviteDoor;
+  guestCount: number;
+  fileCastOnTv: boolean;
+  liveCastOnTv: boolean;
+};
+
+/** Host members-pane checklist while the booth TV is still idle. */
+export function roomHostChecklistEligible(opts: {
+  role: "host" | "guest";
+  phase: RoomUiPhase;
+  tvOn: boolean;
+  playActive: boolean;
+  dismissed: boolean;
+}): boolean {
+  if (opts.dismissed) return false;
+  if (opts.role !== "host") return false;
+  if (opts.phase !== "open") return false;
+  if (opts.tvOn || opts.playActive) return false;
+  return true;
+}
+
+export function roomHostChecklistStepDone(
+  step: RoomHostChecklistStep,
+  opts: RoomHostChecklistProgress
+): boolean {
+  switch (step) {
+    case "invite":
+      return opts.door === "live" || opts.guestCount > 0;
+    case "hang_cast":
+      return opts.fileCastOnTv;
+    case "live_cast":
+      return opts.liveCastOnTv;
+    default:
+      return false;
+  }
+}
+
+/** Pending steps only; hang_cast／live_cast hide together once either path lands. */
+export function roomHostChecklistPendingSteps(
+  opts: RoomHostChecklistProgress
+): RoomHostChecklistStep[] {
+  const pending: RoomHostChecklistStep[] = [];
+  if (!roomHostChecklistStepDone("invite", opts)) {
+    pending.push("invite");
+  }
+  const hangDone = roomHostChecklistStepDone("hang_cast", opts);
+  const liveDone = roomHostChecklistStepDone("live_cast", opts);
+  if (!hangDone && !liveDone) {
+    pending.push("hang_cast");
+    pending.push("live_cast");
+  }
+  return pending;
+}
+
+export function roomHostChecklistDismissed(
+  storage: Pick<Storage, "getItem"> = typeof localStorage !== "undefined"
+    ? localStorage
+    : { getItem: () => null }
+): boolean {
+  return storage.getItem(GO_ROOM_HOST_CHECKLIST_STORAGE) === "1";
+}
+
+export function markRoomHostChecklistDismissed(
+  storage: Pick<Storage, "setItem"> = typeof localStorage !== "undefined"
+    ? localStorage
+    : { setItem: () => {} }
+): void {
+  storage.setItem(GO_ROOM_HOST_CHECKLIST_STORAGE, "1");
+}
+
+export const GO_ROOM_CINEMA_PEEK_HINT_STORAGE = "go-room-cinema-peek-hint-v1";
+export const GO_ROOM_CINEMA_PEEK_HINT = "下拉或按 Esc 可叫出控制";
+export const GO_ROOM_CINEMA_PEEK_HINT_MS = 3000;
+
+export function roomCinemaPeekHintSeen(
+  storage: Pick<Storage, "getItem"> = typeof localStorage !== "undefined"
+    ? localStorage
+    : { getItem: () => null }
+): boolean {
+  return storage.getItem(GO_ROOM_CINEMA_PEEK_HINT_STORAGE) === "1";
+}
+
+export function markRoomCinemaPeekHintSeen(
+  storage: Pick<Storage, "setItem"> = typeof localStorage !== "undefined"
+    ? localStorage
+    : { setItem: () => {} }
+): void {
+  storage.setItem(GO_ROOM_CINEMA_PEEK_HINT_STORAGE, "1");
+}
+
+/** First cinema entry: show a short overlay before auto-fade. */
+export function roomCinemaPeekHintShow(opts: {
+  cinema: boolean;
+  seen: boolean;
+}): boolean {
+  return opts.cinema && !opts.seen;
+}
+
 export const GO_ROOM_PUT_ON_TV = "放到大螢幕上";
 export const GO_ROOM_FORCE_MUTE = "強制靜音";
 export const GO_ROOM_FORCE_CAMERA_OFF = "關閉鏡頭";
@@ -865,6 +979,21 @@ export type RoomHostMenuItem = {
 };
 
 /** Host-only overflow next to a member card. Kick is never for the local row. */
+export function roomHostMemberPutOnTv(opts: {
+  liveAudio: boolean;
+  liveVideo: boolean;
+  /** Already the designated big-screen live source. */
+  onAir?: boolean;
+}): { show: boolean; enabled: boolean; label: string } {
+  const live = opts.liveAudio || opts.liveVideo;
+  return {
+    show: live,
+    enabled: live && !opts.onAir,
+    label: GO_ROOM_PUT_ON_TV,
+  };
+}
+
+/** Host-only overflow next to a member card. Kick is never for the local row. */
 export function roomHostMemberMenu(opts: {
   mine: boolean;
   liveAudio: boolean;
@@ -873,11 +1002,6 @@ export function roomHostMemberMenu(opts: {
   onAir?: boolean;
 }): RoomHostMenuItem[] {
   const items: RoomHostMenuItem[] = [
-    {
-      action: "putOnTv",
-      label: GO_ROOM_PUT_ON_TV,
-      enabled: (opts.liveAudio || opts.liveVideo) && !opts.onAir,
-    },
     {
       action: "forceMute",
       label: GO_ROOM_FORCE_MUTE,
@@ -926,6 +1050,41 @@ export function roomOccupantSummary(opts: { guestCount: number }): string {
   const guests = Math.max(0, Math.floor(opts.guestCount));
   if (guests <= 0) return "";
   return `${guests + 1} 人在`;
+}
+
+/** Host display name from Guest occupancy snapshot（Host is first in fanout）. */
+export function roomGuestHostName(
+  occupantPeers: readonly RoomOccupantPeer[]
+): string | null {
+  const name = occupantPeers[0]?.name?.trim();
+  if (!name) return null;
+  return playerDisplayName(name, "");
+}
+
+/** Guest status line: booth identity + stage／spectator play. */
+export function roomGuestStatusLine(opts: {
+  guestCount: number;
+  tvLabel: string;
+  hostName: string | null;
+  playActive: boolean;
+  playGameName: string | null;
+  playSpectator: boolean;
+}): string {
+  const stage = roomStageStatus({
+    guestCount: opts.guestCount,
+    tvLabel: opts.tvLabel,
+  });
+  const booth = opts.hostName ? `在${opts.hostName}的包廂` : "";
+
+  if (opts.playActive && opts.playSpectator) {
+    const game = opts.playGameName?.trim();
+    const watch = game ? `觀戰中 · 正在玩${game}` : "觀戰中";
+    return booth ? `${booth} · ${watch}` : watch;
+  }
+
+  if (booth && stage) return `${booth} · ${stage}`;
+  if (booth) return booth;
+  return stage;
 }
 
 export function roomInviteDoor(opts: {

@@ -8,22 +8,31 @@
     GO_ROOM_ROLE_PRESENTER,
     type RoomHostMenuItem,
     type RoomMemberCardView,
+    roomHostMemberPutOnTv,
   } from "$lib/goRoom";
+
+  type PutOnTvAction = {
+    show: boolean;
+    enabled: boolean;
+    label: string;
+  };
 
   type Props = {
     card: RoomMemberCardView;
     selected?: boolean;
     onclick?: () => void;
+    putOnTv?: PutOnTvAction | null;
     hostMenu?: RoomHostMenuItem[];
     hostMenuOpen?: boolean;
     onHostMenuToggle?: () => void;
-    onHostAction?: (action: RoomHostMenuItem["action"]) => void;
+    onHostAction?: (action: RoomHostMenuItem["action"] | "putOnTv") => void;
   };
 
   let {
     card,
     selected = false,
     onclick,
+    putOnTv = null,
     hostMenu,
     hostMenuOpen = false,
     onHostMenuToggle,
@@ -199,6 +208,20 @@
     </span>
   </span>
 </button>
+  {#if putOnTv?.show}
+    <button
+      type="button"
+      class="pixel-btn pixel-btn--primary member-cast"
+      disabled={!putOnTv.enabled}
+      aria-label={`${putOnTv.label} · ${card.name}`}
+      onclick={(e) => {
+        e.stopPropagation();
+        onHostAction?.("putOnTv");
+      }}
+    >
+      {putOnTv.label}
+    </button>
+  {/if}
   {#if hostMenu && hostMenu.length > 0}
     <button
       type="button"
@@ -456,6 +479,11 @@
     padding: 0;
     font-weight: 800;
     letter-spacing: 0.05em;
+  }
+  .member-cast {
+    flex: 1 1 100%;
+    min-height: 44px;
+    width: 100%;
   }
   .member-menu {
     flex: 1 1 100%;
