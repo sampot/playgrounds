@@ -33,7 +33,9 @@ itself or self-hosting.
 1. Host：`/room?dev_mint=1`（已記住 key 則自動登入＋鑄門牌）
 2. 讀 `window.__goRoomDev.doorUrl` 或 `[data-testid=room-door-url]`
 3. Guest：`{doorUrl}?dev_join=1&name=G1`
-4. Host：`__goRoomDev.waitReady({ peerCount: 2 })`
+5. Host：`__goRoomDev.waitReady({ peerCount: 3 })`（兩位 Guest）
+6. 檔案區：Host 掛小文字檔 → 兩位 Guest 皆見列；任一位下載／預覽經 `/room-file/<id>`
+7. （可選）Guest 掛檔 → 另一 Guest 下載（star／mesh）
 
 Optional in `platform-api/.dev.vars` when running a **local** Platform:
 

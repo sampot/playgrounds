@@ -27,7 +27,7 @@ export type RoomFileStarHub = {
   onPeerBinary: (fromPeerId: string, buf: ArrayBuffer) => void;
   outboundControl: (msg: SessionFileControl) => void;
   outboundBinary: (buf: ArrayBuffer) => void;
-  requesterBufferedAmount: () => number;
+  requesterBufferedAmount: (destPeerId?: string) => number;
 };
 
 export function createRoomFileStarHub(opts: {
@@ -209,13 +209,19 @@ export function createRoomFileStarHub(opts: {
         t.ownerId === opts.localAgentId ? t.requesterId : t.ownerId;
       if (dest !== opts.localAgentId) sendBin(dest, buf);
     },
-    requesterBufferedAmount() {
-      for (const t of transfers.values()) {
-        if (t.ownerId === opts.localAgentId) {
-          return peers.get(t.requesterId)?.bufferedAmount() ?? 0;
-        }
+    requesterBufferedAmount(destPeerId?: string) {
+      if (destPeerId) {
+        return peers.get(destPeerId)?.bufferedAmount() ?? 0;
       }
-      return 0;
+      let max = 0;
+      let any = false;
+      for (const t of transfers.values()) {
+        if (t.ownerId !== opts.localAgentId) continue;
+        any = true;
+        const n = peers.get(t.requesterId)?.bufferedAmount() ?? 0;
+        if (n > max) max = n;
+      }
+      return any ? max : 0;
     },
   };
 }

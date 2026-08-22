@@ -312,7 +312,7 @@ Guest `/i/` 不經大廳；進主面須讀成「你在一間包廂」。可選�
 
 ### 5.9 大螢幕上開局（硬；契約凍；**第一刀已手測**）
 
-契約凍（重用進門 PC、不鑄 `invite.compose`、Guest 留 `/i/`）。**第一刀：** `pg-gomoku` Host＋Guest 連線對弈至終局、結束這一局後可再開——手測通過。**redpick：** 四席入座／觀戰／`deal→end` domain 已綠。剩餘：多人傳檔 e2e。Mesh 檔直連見 §7.4／**1c**（與開局無關）。
+契約凍（重用進門 PC、不鑄 `invite.compose`、Guest 留 `/i/`）。**第一刀：** `pg-gomoku` Host＋Guest 連線對弈至終局、結束這一局後可再開——手測通過。**redpick：** 四席入座／觀戰／`deal→end` domain 已綠。**多人傳檔：** Host＋≥2 Guest domain e2e 綠。Mesh 檔直連見 §7.4／**1c**（與開局無關）。
 
 **實作計劃（索引）：** [PG-GO-ROOM-PLAY-PLAN.md](./PG-GO-ROOM-PLAY-PLAN.md)（`session_play`、席次、重用 peer、大螢幕掛 SAM、與 GO-INVITE 切界；Phase 0–5）。本節凍產品契約；落地步驟與模組邊界以該文件為準。
 
@@ -1114,7 +1114,7 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 | Phase | 內容 | 完成定義 | 狀態 |
 | --- | --- | --- | --- |
 | **0. 契約** | 本文件；GLOSSARY／交叉引用 | 包廂≠overlay≠compose；進門即主面；入座不鎖 1:1；**主面＝主視訊區**；廳態／劇院態；頂列可收；**兩層螢幕**；片子／圖／音／live＝節目 RTP（**owner 渲染**；**單主畫面**）；否決多路視訊合成；**在場聲混音**（§9.8.1）；開局＝重用 PC（延後）；**目錄＝一律 `/room-file/<id>`（本機 SW 直出；遠端 roundtrip ↔ transfer）**；主持導播（含別人掛的檔、**含私有**）；目錄只掛檔；**主持私有 OPFS（2g）**；現況 Hub；兩個時鐘；按需鑄；Guest 留 `/i/`；SDP 2+2 | **本刀** |
-| **1. 文字＋傳檔** | 進 `/room` 即主面；按需 mint `invite.room`、`/i/` consent、DC、`session_chat` fanout、`session_file` **分享目錄＋`/room-file/<id>`**（本機直出；遠端每 HTTP ↔ transfer；SW 開 id＋交付完成權威）；answer loop 持續作答 | 會員不必先邀請就見包廂 UI（無 TTL）；同一短鏈 ≥2 Guest 與 Host 互傳文字；分享區可掛檔；對 `/room-file/<id>` 發 HTTP 才有 bytes；落盤優先 Save picker＋串流；Platform 無正文／無檔 bytes；未登入不能開這一間；`/chat`→`/room`；門牌過期包廂仍在 | **按需鑄／兩個時鐘已落地；HTTP↔transfer 隧道（開＋完成權威）已對齊；多人傳檔 e2e 手測仍待；Guest↔Guest 檔 bytes 見 1c；不掛資料夾** |
+| **1. 文字＋傳檔** | 進 `/room` 即主面；按需 mint `invite.room`、`/i/` consent、DC、`session_chat` fanout、`session_file` **分享目錄＋`/room-file/<id>`**（本機直出；遠端每 HTTP ↔ transfer；SW 開 id＋交付完成權威）；answer loop 持續作答 | 會員不必先邀請就見包廂 UI（無 TTL）；同一短鏈 ≥2 Guest 與 Host 互傳文字；分享區可掛檔；對 `/room-file/<id>` 發 HTTP 才有 bytes；落盤優先 Save picker＋串流；Platform 無正文／無檔 bytes；未登入不能開這一間；`/chat`→`/room`；門牌過期包廂仍在 | **按需鑄／兩個時鐘已落地；HTTP↔transfer 隧道已對齊；多人傳檔 domain e2e 綠（star＋dest backpressure）；Guest↔Guest 檔 bytes 見 1c；不掛資料夾** |
 | **1b. SDP 2+2** | 進門 offer／answer **2 audio + 2 video**（軌空）；具名 booth helper；遊戲 SDP 不動 | 進門 SDP 含兩組 `m=audio`、兩組 `m=video`；遊戲 compose 仍無須 2+2 | **已落地**（`reserveBoothMediaTransceivers`） |
 | **1c. Mesh 直連（檔）** | 在線 Guest 變動時主動 `session_mesh`；邊＝**DC-only**；**一次機會**；傳檔只路由不 dial；chunk 直連／star | 進門／新人加入即試連；失敗不再對同一 guest 重試；有直連則下載／私下播不經 Host；**節目／在場 RTP 仍 Hub（mesh 不進 goRoomMedia peers）** | **已落地**（`GO_ROOM_MESH_ENABLED`；`media: "none"`；fail／close 不重試；Host introduce） |
 | **2a. Live（鏡頭／麥／畫面）** | 開在名單；在場**影像**仍 `request` 才送；麥＝房級；`getUserMedia` XOR `getDisplayMedia`；不做格子牆 | 不經 Platform 二次 O／A；預設未開相機；無指定則零在場影像 RTP | **已落地**（房級麥；多人混音 **2f**） |
@@ -1126,7 +1126,7 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 | **2g. 主持私有檔** | Host OPFS 片庫；與分享分離；可上大螢幕（`scope: private`）；掛到分享才可「要」；Guest 無私有區 | 私有不 fanout、不上 `/room-file`；cast 僅 RTP；散場不清 OPFS | **已落地**（OPFS＋`scope:private`；手測影／音；**圖同 2e**；Safari 影音片源仍同既有限制） |
 | **3. 重用 peer 開局** | 包廂已連 → `session_play`；大螢幕槽掛 SAM；主持選遊戲＋指定／自動入座；觀戰看同一畫布 | 不必再掃 compose；Guest 留 `/i/`；終局可結束這一局而包廂還在。第一刀：五子棋 2 席 | **第一刀已落地**（gomoku 手測；手動席；**redpick** 四席＋觀戰＋deal→end domain） |
 
-建議實作順序 **0 → 1 → 1b → 2c → 2d → 2e → 2f → 2g → 1c → 2b**（皆已落地）→ **3 開局第一刀＋redpick 入座／觀戰／deal→end domain 已綠**；**下一刀候選：多人傳檔 e2e／doc 上大螢幕**。2b 私下播保留在檔案區。**不要**排多路視訊合成。1c 打開後節目 RTP／在場聲仍走 Hub，直到另刀評估直連媒體。
+建議實作順序 **0 → 1 → 1b → 2c → 2d → 2e → 2f → 2g → 1c → 2b**（皆已落地）→ **3 開局＋redpick＋多人傳檔 domain e2e 已綠**；**下一刀候選：doc 上大螢幕／瀏覽器抽樣**。2b 私下播保留在檔案區。**不要**排多路視訊合成。1c 打開後節目 RTP／在場聲仍走 Hub，直到另刀評估直連媒體。
 
 ---
 
@@ -1204,8 +1204,8 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 - [x] 進 `/room` 不按請人：主面在、**沒有** TTL、**沒有**可分享短鏈
 - [x] 未登入不能開這一間；導向登入；不擋 `/s/`
 - [x] Guest 無帳號、不下載 SAM，同意後進入包廂 UI（網址仍 `/i/`）
-- [ ] 同一短鏈 ≥2 Guest 與 Host 互傳≥1 則文字；分享區掛檔後第二人對同源 URL `fetch`／下載成功（≤上限）；無落盤能力則頁內說明且**禁止**整檔 Blob；超限／可執行檔拒
-- [x] **同源靜態檔門面：** 遠端與本機掛檔皆對同一 **`/room-file/<id>`** 發 HTTP；本機零 DC；遠端得正確 status／header；頁面不直讀 DC chunk、不另開 object URL 產品路徑（單元已對齊；多人傳檔手測仍見下一項）
+- [x] 同一短鏈 ≥2 Guest 與 Host 互傳≥1 則文字；分享區掛檔後第二人對同源 URL `fetch`／下載成功（≤上限）；無落盤能力則頁內說明且**禁止**整檔 Blob；超限／可執行檔拒（**多人傳檔 domain e2e：** Host＋2 Guest star 下載、Guest→Guest 經 Host star、並發 `bufferedAmount(dest)`；瀏覽器抽樣仍宜）
+- [x] **同源靜態檔門面：** 遠端與本機掛檔皆對同一 **`/room-file/<id>`** 發 HTTP；本機零 DC；遠端得正確 status／header；頁面不直讀 DC chunk、不另開 object URL 產品路徑（單元已對齊）
 - [x] **2b：** 影／音／圖私下播／檢視與下載同一 `/room-file/`（撤 blob image sink）
 - [x] **HTTP↔transfer 隧道：** 遠端每一筆 GET／Range 開一條 `transferId`（SW 分配＋`open-transfer`）；SW 依宣告交完 body 後 `transfer-complete`／abort 才終態；owner `done` 不得單獨標成功；本機不開 transfer；禁止 file-level 常駐池與 HTTP 脫鉤完成條件
 - [x] 訊息不經 Platform；檔 bytes 不經 Platform；散場丟目錄（已存檔不刪）
@@ -1310,3 +1310,4 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 | 2026-08-22 | **2b 收斂：** 下載／圖檢視與影音私下播同一 `/room-file/`；撤未用 `createImagePreviewSink` blob 路徑；**3** act 隧道單元（`attachExistingPeer`＋`session_act`） |
 | 2026-08-22 | **開局第一刀手測：** `pg-gomoku` Host＋Guest 連線對弈至終局、可重開；TV memory BC 綁定修復；Phase **3**／PLAY Phase 5 第一刀完成 |
 | 2026-08-22 | **redpick deal→end：** domain 全手；終局剩桌歸 `lastCapturer`（跨 act）；下一刀＝多人傳檔 e2e |
+| 2026-08-22 | **多人傳檔 e2e：** Host＋2 Guest star 下載／Guest→Guest 經 Host；`requesterBufferedAmount(dest)` 修正並發 backpressure |

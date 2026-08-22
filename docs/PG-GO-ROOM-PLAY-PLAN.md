@@ -227,7 +227,7 @@ session_play.end    { from: host }
 | **4. 主持 sheet UX** | 型錄 game → Modal 選局；自動入座；狀態／結束局；Guest 無 CTA | 窄屏可開局；席不滿頁內說明；無原生 dialog | **完成**（「玩遊戲」Modal＋手動指定席） |
 | **5. 五子棋 e2e** | Host＋Guest 包廂內對弈至終局；第三人觀戰；結束局後包廂仍在 | Guest URL 始終包廂 `/i/`；可再播片／文字 | **第一刀手測完成**（連線對弈＋重開新局；觀戰 event channel **單元綠**；**harness 第三人觀戰已確認**） |
 
-**前置（非本文件交付）：** ROOM Phase **2d** 殼面 RWD 手測已完成。剩餘：多人傳檔 e2e。**redpick** 發牌至終局＝domain 單測綠（含 `lastCapturer` 持久化）；瀏覽器 harness 手測仍宜抽樣。
+**前置（非本文件交付）：** ROOM Phase **2d** 殼面 RWD 手測已完成；**多人傳檔 domain e2e** 已綠。**redpick** 發牌至終局＝domain 單測綠（含 `lastCapturer` 持久化）。
 
 建議刀序：**0 → 1 → 2 → 3 → 4 → 5**（第一刀已過）。TDD：可執行邏輯先寫失敗測試（席次、wire、peer 掛 session）。
 

@@ -321,7 +321,7 @@ export function createRoomRuntime(opts?: {
       localName: hostName(),
       sendJson: (msg) => hub.outboundControl(msg),
       sendBinary: (buf) => hub.outboundBinary(buf),
-      bufferedAmount: () => hub.requesterBufferedAmount(),
+      bufferedAmount: (destPeerId) => hub.requesterBufferedAmount(destPeerId),
     });
     goRoomPrivateFiles.attach();
     goRoomMedia.attach({
