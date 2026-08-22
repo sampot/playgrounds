@@ -19,6 +19,7 @@
     kind: FileShareKind;
     meta: string;
     onAir?: boolean;
+    liveBadge?: string | null;
     owner?: Owner | null;
     menu: RoomFileMenuItem[];
     menuOpen?: boolean;
@@ -32,6 +33,7 @@
     kind,
     meta,
     onAir = false,
+    liveBadge = null,
     owner = null,
     menu,
     menuOpen = false,
@@ -39,9 +41,13 @@
     onAction,
   }: Props = $props();
 
+  const badge = $derived(
+    liveBadge ?? (onAir ? GO_ROOM_FILE_ON_AIR : null)
+  );
+
   const label = $derived.by(() => {
     const bits = [name, meta];
-    if (onAir) bits.push(GO_ROOM_FILE_ON_AIR);
+    if (badge) bits.push(badge);
     if (owner) bits.push(owner.name);
     return bits.filter(Boolean).join(" · ");
   });
@@ -49,7 +55,7 @@
 
 <div class="file-item" data-file-id={fileId}>
   <div
-    class={["file-card", onAir && "file-card--on-air"].filter(Boolean).join(" ")}
+    class={["file-card", badge && "file-card--on-air"].filter(Boolean).join(" ")}
     role="group"
     aria-label={label}
   >
@@ -57,8 +63,8 @@
     <span class="file-body">
       <span class="file-name-row">
         <span class="file-name">{name}</span>
-        {#if onAir}
-          <span class="file-live">{GO_ROOM_FILE_ON_AIR}</span>
+        {#if badge}
+          <span class="file-live">{badge}</span>
         {/if}
       </span>
       {#if meta}

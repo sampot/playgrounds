@@ -9,6 +9,7 @@ import {
   GO_ROOM_FILE_FILTER_LABEL,
   GO_ROOM_FILE_MORE,
   GO_ROOM_FILE_ON_AIR,
+  GO_ROOM_FILE_CASTING,
   GO_ROOM_FILE_PREVIEW,
   GO_ROOM_FILE_PLAY,
   GO_ROOM_FILE_VIEW,
@@ -22,6 +23,7 @@ import {
   roomFileDownloadDisabled,
   roomFileDownloadMode,
   roomFileOnAir,
+  roomFileLiveBadge,
   roomFilePreviewMountsMedia,
   roomFilePreviewShouldAttachUrl,
   roomFileShareActions,
@@ -241,6 +243,7 @@ describe("roomFileDownloadDisabled", () => {
 describe("roomFileOnAir", () => {
   it("marks the catalog file the host put on the TV", () => {
     expect(GO_ROOM_FILE_ON_AIR).toBe("大螢幕播放中");
+    expect(GO_ROOM_FILE_CASTING).toBe("推送中…");
     expect(
       roomFileOnAir({
         fileId: "a",
@@ -250,6 +253,22 @@ describe("roomFileOnAir", () => {
         liveOnTv: false,
       })
     ).toBe(true);
+    expect(
+      roomFileOnAir({
+        fileId: "a",
+        fileName: "mv.mp4",
+        streamingFileId: null,
+        castingFileId: "a",
+        programName: null,
+        liveOnTv: false,
+      })
+    ).toBe(true);
+    expect(roomFileLiveBadge({ casting: true, onAir: true })).toBe(
+      GO_ROOM_FILE_CASTING
+    );
+    expect(roomFileLiveBadge({ casting: false, onAir: true })).toBe(
+      GO_ROOM_FILE_ON_AIR
+    );
     expect(
       roomFileOnAir({
         fileId: "a",

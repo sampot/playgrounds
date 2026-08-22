@@ -4,6 +4,7 @@
 
 export const GO_ROOM_FILE_PREVIEW = "預覽";
 export const GO_ROOM_FILE_CAST = "推播至大螢幕";
+export const GO_ROOM_FILE_CASTING = "推送中…";
 export const GO_ROOM_FILE_DELETE = "撤回";
 export const GO_ROOM_FILE_ON_AIR = "大螢幕播放中";
 export const GO_ROOM_FILE_DOWNLOAD = "下載";
@@ -238,12 +239,26 @@ export function roomFileOnAir(opts: {
   streamingFileId: string | null;
   programName: string | null;
   liveOnTv: boolean;
+  /** Host is still capturing／offering this file. */
+  castingFileId?: string | null;
 }): boolean {
   if (opts.liveOnTv) return false;
+  const casting = opts.castingFileId?.trim() || "";
+  if (casting && casting === opts.fileId) return true;
   const listed = opts.streamingFileId?.trim() || "";
   if (listed) return listed === opts.fileId;
   const name = opts.programName?.trim() || "";
   return Boolean(name) && name === opts.fileName.trim();
+}
+
+/** Badge on the file card while on the TV or mid-cast. */
+export function roomFileLiveBadge(opts: {
+  casting?: boolean;
+  onAir?: boolean;
+}): string | null {
+  if (opts.casting) return GO_ROOM_FILE_CASTING;
+  if (opts.onAir) return GO_ROOM_FILE_ON_AIR;
+  return null;
 }
 
 /** Human size label using decimal units (SI) — matches Finder／Chrome downloads. */

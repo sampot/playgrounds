@@ -84,6 +84,8 @@ export type RoomMediaState = {
   tvSourcePeerId: string | null;
   /** Catalog file currently on the TV (local capture or remote offer id). */
   streamingFileId: string | null;
+  /** Host mid capture／offer for this file id (UI「推送中…」). */
+  castingFileId: string | null;
   /** share｜private when a file is on the TV; null for live／off. */
   programScope: "share" | "private" | null;
 };
@@ -285,6 +287,7 @@ export function createRoomMedia(opts: {
   let listening = false;
   let watchingProgram = false;
   let streamingFileId: string | null = null;
+  let castingFileId: string | null = null;
   let programScope: "share" | "private" | null = null;
   const cameraWatchers = new Set<string>();
   const micListeners = new Set<string>();
@@ -508,6 +511,7 @@ export function createRoomMedia(opts: {
       streamingFileId: programFromLive
         ? null
         : streamingFileId || remoteProgramFileId,
+      castingFileId: programFromLive ? null : castingFileId,
       programScope: programFromLive ? null : programScope,
     };
   }
@@ -699,6 +703,7 @@ export function createRoomMedia(opts: {
     watchingProgram = false;
     clearRemoteProgramClock();
     streamingFileId = null;
+    castingFileId = null;
     programScope = null;
     revokeOwnerDecode();
     await push();
@@ -924,7 +929,7 @@ export function createRoomMedia(opts: {
     file: File,
     quiet = false,
     fileId?: string,
-    via: "http" | "blob" = fileId ? "http" : "blob"
+    via: "http" | "blob" = localFileProgramCaptureMode(fileId)
   ): Promise<RoomMediaResult> {
     const capture =
       opts.captureProgram ??
@@ -1162,14 +1167,21 @@ export function createRoomMedia(opts: {
     async startListedProgram(id) {
       const local = opts.resolveLocalFile?.(id) ?? null;
       if (local) {
-        const out = await ensureCaptured(id);
-        if (!out.ok) return out;
-        programScope = "share";
-        markAll(programWatchers);
-        offerProgram();
-        await push();
+        castingFileId = id;
         emit();
-        return { ok: true };
+        try {
+          const out = await ensureCaptured(id);
+          if (!out.ok) return out;
+          programScope = "share";
+          markAll(programWatchers);
+          offerProgram();
+          await push();
+          emit();
+          return { ok: true };
+        } finally {
+          castingFileId = null;
+          emit();
+        }
       }
       const owner = opts.ownerOf?.(id)?.trim() || "";
       if (!owner || owner === opts.localAgentId) {
@@ -1177,9 +1189,16 @@ export function createRoomMedia(opts: {
         emit();
         return { ok: false, error: GO_ROOM_CAST_UNSUPPORTED };
       }
-      const remote = await offerRemoteListedProgram(id, owner);
-      if (remote.ok) programScope = "share";
-      return remote;
+      castingFileId = id;
+      emit();
+      try {
+        const remote = await offerRemoteListedProgram(id, owner);
+        if (remote.ok) programScope = "share";
+        return remote;
+      } finally {
+        castingFileId = null;
+        emit();
+      }
     },
     async startPrivateProgram(id) {
       const file = (await opts.resolvePrivateFile?.(id)) ?? null;
@@ -1188,15 +1207,22 @@ export function createRoomMedia(opts: {
         emit();
         return { ok: false, error: GO_ROOM_CAST_UNSUPPORTED };
       }
-      const out = await captureLocalFile(file, false, id, "blob");
-      if (!out.ok) return out;
-      streamingFileId = id;
-      programScope = "private";
-      markAll(programWatchers);
-      offerProgram();
-      await push();
+      castingFileId = id;
       emit();
-      return { ok: true };
+      try {
+        const out = await captureLocalFile(file, false, id, "blob");
+        if (!out.ok) return out;
+        streamingFileId = id;
+        programScope = "private";
+        markAll(programWatchers);
+        offerProgram();
+        await push();
+        emit();
+        return { ok: true };
+      } finally {
+        castingFileId = null;
+        emit();
+      }
     },
     pauseProgram() {
       if (program?.pause) {
@@ -1758,6 +1784,7 @@ export function createRoomMedia(opts: {
       program = null;
       programName = null;
       streamingFileId = null;
+      castingFileId = null;
       programScope = null;
       revokeOwnerDecode();
       clearIngest();
@@ -1809,6 +1836,14 @@ function programKindOfFile(file: File): "audio" | "video" {
     return "audio";
   }
   return "video";
+}
+
+/**
+ * Share-catalog file ids must decode via `/room-file` (SW) — plan §8.2.
+ * Private／ad-hoc File (no catalog id) may use blob: for capture only.
+ */
+export function localFileProgramCaptureMode(fileId?: string): "blob" | "http" {
+  return fileId ? "http" : "blob";
 }
 
 function captureFromMediaElement(el: HTMLMediaElement): CapturedProgram | null {
@@ -1940,6 +1975,32 @@ async function captureProgramFromBlob(
   };
 }
 
+async function waitForProgramMediaReady(
+  el: HTMLMediaElement,
+  isAudio: boolean,
+  ms = 12_000
+): Promise<boolean> {
+  const video = el as HTMLVideoElement;
+  const deadline = Date.now() + ms;
+  const tryPlay = () => {
+    void el.play().catch(() => {
+      /* Background tabs often reject play(); keep retrying until ready. */
+    });
+  };
+  tryPlay();
+  while (Date.now() < deadline) {
+    if (isAudio) {
+      if (el.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) return true;
+    } else if (video.videoWidth >= 2 && video.videoHeight >= 2) {
+      return true;
+    }
+    await new Promise((r) => setTimeout(r, 40));
+    tryPlay();
+  }
+  if (isAudio) return el.readyState >= HTMLMediaElement.HAVE_METADATA;
+  return video.videoWidth >= 2 && video.videoHeight >= 2;
+}
+
 async function captureProgramFromHttp(
   src: string,
   file: File
@@ -1955,14 +2016,17 @@ async function captureProgramFromHttp(
   el.volume = 0;
   el.autoplay = true;
   el.loop = true;
-  el.preload = "metadata";
+  el.preload = "auto";
   el.controls = false;
   el.setAttribute("muted", "");
   el.setAttribute("playsinline", "");
   el.setAttribute("webkit-playsinline", "");
-  // Keep a real on-screen box: opacity 0 / off-screen often skips decode.
+  /**
+   * Keep a real on-screen box: opacity 0 / off-screen often skips decode.
+   * Edge was especially picky — tiny＋near-invisible → black captureStream.
+   */
   el.style.cssText =
-    "position:fixed;left:0;bottom:0;width:32px;height:18px;opacity:0.04;pointer-events:none;z-index:0;border:0;";
+    "position:fixed;left:0;bottom:0;width:160px;height:90px;opacity:0.08;pointer-events:none;z-index:0;border:0;";
   if ("playsInline" in el) {
     (el as HTMLVideoElement).playsInline = true;
   }
@@ -1980,40 +2044,25 @@ async function captureProgramFromHttp(
     }
   };
 
-  const waitEvent = (name: string, ms: number) =>
-    new Promise<boolean>((resolve) => {
-      const t = window.setTimeout(() => resolve(false), ms);
-      el.addEventListener(
-        name,
-        () => {
-          window.clearTimeout(t);
-          resolve(true);
-        },
-        { once: true }
-      );
-    });
-
   let sawError = false;
-  el.addEventListener("error", () => {
-    sawError = true;
-  }, { once: true });
-  await Promise.race([
-    waitEvent("loadedmetadata", 8000),
-    waitEvent("loadeddata", 8000),
-    waitEvent("canplay", 8000),
-  ]);
-  if (sawError) {
+  el.addEventListener(
+    "error",
+    () => {
+      sawError = true;
+    },
+    { once: true }
+  );
+
+  const ready = await waitForProgramMediaReady(el, isAudio);
+  if (sawError || !ready) {
     failCleanup();
     return null;
   }
-  const tryPlay = () => {
-    void el.play().catch(() => {
-      /* Background tabs often reject play(); captureStream can still attach. */
-    });
-  };
-  tryPlay();
+
   const onVisible = () => {
-    if (!document.hidden) tryPlay();
+    if (!document.hidden) {
+      void el.play().catch(() => {});
+    }
   };
   document.addEventListener("visibilitychange", onVisible);
 
@@ -2073,9 +2122,17 @@ async function captureProgramFromHttp(
   }
   for (const t of stream.getTracks()) t.enabled = true;
   const captured = stream;
+  const videoTrack = captured.getVideoTracks()[0] ?? null;
+  if (videoTrack) {
+    try {
+      videoTrack.contentHint = "motion";
+    } catch {
+      /* ignore */
+    }
+  }
   return {
     audio: captured.getAudioTracks()[0] ?? null,
-    video: captured.getVideoTracks()[0] ?? null,
+    video: videoTrack,
     ...transportFromElement(el),
     stop() {
       if (raf) window.cancelAnimationFrame(raf);

@@ -127,6 +127,7 @@
     roomFileDownloadDisabled,
     roomFileDownloadMode,
     roomFileOnAir,
+    roomFileLiveBadge,
     roomFilePreviewMountsMedia,
     roomFilePreviewShouldAttachUrl,
     roomFilePrivateMenu,
@@ -1368,8 +1369,20 @@
       fileId: f.id,
       fileName: f.name,
       streamingFileId: goRoomMedia.streamingFileId,
+      castingFileId: goRoomMedia.castingFileId,
       programName: goRoomMedia.remoteProgramName || goRoomMedia.programName,
       liveOnTv: Boolean(goRoomMedia.tvSourcePeerId),
+    });
+  }
+
+  function fileLiveBadgeFor(opts: {
+    fileId: string;
+    fileName: string;
+    onAir: boolean;
+  }): string | null {
+    return roomFileLiveBadge({
+      casting: goRoomMedia.castingFileId === opts.fileId,
+      onAir: opts.onAir,
     });
   }
 
@@ -1911,6 +1924,12 @@
           {#if fileError}
             <p class="err" role="alert">{fileError}</p>
           {/if}
+          {#if mediaError}
+            <p class="err" role="alert">{mediaError}</p>
+          {/if}
+          {#if goRoomMedia.error && goRoomMedia.error !== mediaError}
+            <p class="err" role="alert">{goRoomMedia.error}</p>
+          {/if}
           {#if fileHint}
             <p class="muted" role="status">{fileHint}</p>
           {/if}
@@ -1932,8 +1951,14 @@
                   fileId: f.id,
                   fileName: f.name,
                   streamingFileId: goRoomMedia.streamingFileId,
+                  castingFileId: goRoomMedia.castingFileId,
                   programName: goRoomMedia.programName,
                   liveOnTv: Boolean(goRoomMedia.tvSourcePeerId),
+                })}
+                {@const liveBadge = fileLiveBadgeFor({
+                  fileId: f.id,
+                  fileName: f.name,
+                  onAir,
                 })}
                 <li>
                   <GoRoomFileCard
@@ -1942,6 +1967,7 @@
                     {kind}
                     meta={`${formatSize(f.size)} · 僅這台`}
                     {onAir}
+                    {liveBadge}
                     menu={roomFilePrivateMenu({ kind })}
                     menuOpen={fileMenuId === f.id}
                     onMenuToggle={() => toggleFileMenu(f.id)}
@@ -1959,6 +1985,11 @@
                 {@const kind = fileShareKind({ mime: f.mime, name: f.name })}
                 {@const owner = fileOwnerCard(f)}
                 {@const onAir = fileOnAir(f)}
+                {@const liveBadge = fileLiveBadgeFor({
+                  fileId: f.id,
+                  fileName: f.name,
+                  onAir,
+                })}
                 <li>
                   <GoRoomFileCard
                     fileId={f.id}
@@ -1966,6 +1997,7 @@
                     {kind}
                     meta={shareFileMeta(f)}
                     {onAir}
+                    {liveBadge}
                     owner={{
                       name: f.mine ? "我" : f.ownerName,
                       avatarUrl: owner?.avatarUrl,

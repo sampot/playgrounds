@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { BOOTH_TRANSCEIVER_SLOTS } from "@pg/roster/rosterBoothMedia";
 import { SESSION_CAST_TYPE } from "@pg/roster/rosterSessionCast";
 import { SESSION_CAMERA_TYPE, SESSION_MIC_TYPE } from "@pg/roster/rosterSessionCamera";
-import { createRoomMedia } from "./goRoomMedia";
+import { createRoomMedia, localFileProgramCaptureMode } from "./goRoomMedia";
 import {
   GO_ROOM_CAST_SOURCE_UNSUPPORTED,
   GO_ROOM_CAST_UNSUPPORTED,
@@ -469,6 +469,7 @@ describe("createRoomMedia", () => {
     });
     expect((await media.startListedProgram("file-1")).ok).toBe(true);
     expect(media.getState().streamingFileId).toBe("file-1");
+    expect(media.getState().castingFileId).toBeNull();
     expect(json).toContainEqual({
       type: SESSION_CAST_TYPE,
       v: 1,
@@ -478,6 +479,42 @@ describe("createRoomMedia", () => {
       name: "MTV.mp4",
       id: "file-1",
     });
+  });
+
+  it("exposes castingFileId while local capture is in flight", async () => {
+    const video = track("video", "prog-v");
+    const file = new File([new Uint8Array(4)], "edge.mp4", {
+      type: "video/mp4",
+    });
+    let release!: () => void;
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    const media = createRoomMedia({
+      localAgentId: "host",
+      occupantCount: () => 1,
+      peers: () => [],
+      sendJson: () => {},
+      resolveLocalFile: (id) => (id === "file-1" ? file : null),
+      captureProgram: async () => {
+        await gate;
+        return { audio: null, video, stop: vi.fn() };
+      },
+    });
+    const pending = media.startListedProgram("file-1");
+    await vi.waitFor(() => {
+      expect(media.getState().castingFileId).toBe("file-1");
+    });
+    expect(media.getState().streamingFileId).toBeNull();
+    release();
+    expect((await pending).ok).toBe(true);
+    expect(media.getState().castingFileId).toBeNull();
+    expect(media.getState().streamingFileId).toBe("file-1");
+  });
+
+  it("uses /room-file HTTP capture for share-catalog ids (not blob:)", () => {
+    expect(localFileProgramCaptureMode("file-1")).toBe("http");
+    expect(localFileProgramCaptureMode()).toBe("blob");
   });
 
   it("casts a private OPFS file with scope private and no share resolve", async () => {

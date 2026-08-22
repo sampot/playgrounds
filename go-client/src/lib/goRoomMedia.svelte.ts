@@ -37,6 +37,7 @@ const EMPTY: RoomMediaState = {
   remoteLives: [],
   tvSourcePeerId: null,
   streamingFileId: null,
+  castingFileId: null,
   programScope: null,
 };
 
@@ -66,6 +67,7 @@ class GoRoomMedia {
   remoteLives = $state<{ peerId: string; camera: boolean; mic: boolean }[]>([]);
   tvSourcePeerId = $state<string | null>(null);
   streamingFileId = $state<string | null>(null);
+  castingFileId = $state<string | null>(null);
   programScope = $state<"share" | "private" | null>(null);
   #media: RoomMedia | null = null;
   #unsub: (() => void) | null = null;
@@ -109,6 +111,7 @@ class GoRoomMedia {
       this.remoteLives = s.remoteLives;
       this.tvSourcePeerId = s.tvSourcePeerId;
       this.streamingFileId = s.streamingFileId;
+      this.castingFileId = s.castingFileId;
       this.programScope = s.programScope;
     });
   }
@@ -143,6 +146,7 @@ class GoRoomMedia {
     this.remoteLives = [];
     this.tvSourcePeerId = null;
     this.streamingFileId = null;
+    this.castingFileId = null;
     this.programScope = null;
   }
 
