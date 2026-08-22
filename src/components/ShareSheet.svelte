@@ -232,8 +232,6 @@
     border: none;
     max-width: none;
     width: 100%;
-    max-height: 100dvh;
-    max-height: 100svh;
     background: transparent;
     color: rgb(var(--ss-ink));
     box-sizing: border-box;
@@ -247,6 +245,13 @@
     justify-content: flex-end;
     position: fixed;
     inset: 0;
+    width: 100%;
+    max-width: 100vw;
+    /* Definite height — Safari dialog UA is height:fit-content; without this,
+       panel max-height:100% collapses to a header sliver (關閉 barely visible). */
+    height: 100%;
+    max-height: 100%;
+    overflow: hidden;
     /* Clear chrome flash under the header (phone + desktop). */
     padding-top: calc(5.5rem + env(safe-area-inset-top, 0px));
     box-sizing: border-box;
@@ -281,9 +286,11 @@
     gap: 0.75rem;
     width: 100%;
     max-width: 28rem;
-    max-height: 100%;
+    flex: 0 1 auto;
     min-height: 0;
+    max-height: 100%;
     overflow: auto;
+    -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
     margin: 0 auto;
     padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px));
