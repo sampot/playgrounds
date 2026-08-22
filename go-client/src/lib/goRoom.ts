@@ -36,11 +36,6 @@ export const GO_ROOM_TEXT_CAPTION = "推播至大螢幕";
 export const GO_ROOM_TEXT_LOCKED_HINT = "僅主持人可發言";
 export const GO_ROOM_TEXT_SILENCED_HINT = "你已被暫時禁言";
 
-/** Right overlay width in rem. Always overlay; never in-flow. */
-export const ROOM_CHAT_PANEL_REM = 22;
-/** Leave a sliver of the page visible beside a covering overlay. */
-export const ROOM_CHAT_PANEL_GUTTER_REM = 2.75;
-
 /** Phone landscape: height is the scarce axis. Keep in sync with CSS max-height. */
 export const ROOM_SHORT_LANDSCAPE_MAX_HEIGHT_PX = 560;
 export const ROOM_SHORT_LANDSCAPE_MQ = `(orientation: landscape) and (max-height: ${ROOM_SHORT_LANDSCAPE_MAX_HEIGHT_PX}px)`;
@@ -65,6 +60,21 @@ export function roomShortLandscape(opts: {
   heightPx: number;
 }): boolean {
   return opts.widthPx > opts.heightPx && opts.heightPx <= ROOM_SHORT_LANDSCAPE_MAX_HEIGHT_PX;
+}
+
+/** Viewport box for shell mode — keep in sync with CSS `@media` breakpoints. */
+export function roomShellViewportBox(doc: {
+  documentElement: { clientWidth: number; clientHeight: number };
+} = typeof document !== "undefined"
+  ? document
+  : { documentElement: { clientWidth: 0, clientHeight: 0 } }): {
+  widthPx: number;
+  heightPx: number;
+} {
+  return {
+    widthPx: doc.documentElement.clientWidth,
+    heightPx: doc.documentElement.clientHeight,
+  };
 }
 
 export function roomShellMode(opts: {
@@ -272,7 +282,6 @@ export type RoomEscStep =
   | "close-preview"
   | "close-tv-hud"
   | "clear-peer"
-  | "close-drawer"
   | "exit-cinema"
   | "confirm-end";
 
@@ -283,13 +292,11 @@ export function roomEscStep(opts: {
   tvHudOpen?: boolean;
   selectedPeerId?: string | null;
   cinema?: boolean;
-  drawerOpen?: boolean;
 }): RoomEscStep {
   if (opts.shareOpen) return "close-share";
   if (opts.previewOpen) return "close-preview";
   if (opts.tvHudOpen) return "close-tv-hud";
   if (opts.selectedPeerId) return "clear-peer";
-  if (opts.cinema && opts.drawerOpen) return "close-drawer";
   if (opts.cinema) return "exit-cinema";
   return "confirm-end";
 }
@@ -311,87 +318,9 @@ export function roomInviteDoorRow(opts: {
   return { label: "還沒發邀請", action: "請人進來" };
 }
 
-export type RoomChatLayout = "drawer" | "sidebar";
-
-export type RoomChatBox = {
-  left: number;
-  right: number;
-  top: number;
-  bottom: number;
-};
-
-/** Chat is always a fixed overlay. Drawer = it covers the canvas. */
-export function roomChatLayout(coversCanvas: boolean): RoomChatLayout {
-  return coversCanvas ? "drawer" : "sidebar";
-}
-
-export function roomChatBoxesOverlap(a: RoomChatBox, b: RoomChatBox): boolean {
-  return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
-}
-
-export function roomChatBoxHasSize(box: RoomChatBox): boolean {
-  return box.right > box.left && box.bottom > box.top;
-}
-
-export function roomChatBoxFromRect(rect: {
-  left: number;
-  right: number;
-  top: number;
-  bottom: number;
-}): RoomChatBox {
-  return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
-}
-
-/** Right-edge overlay box before the panel is in the DOM. */
-export function roomChatPredictedOverlayBox(opts: {
-  viewportWidthPx: number;
-  viewportHeightPx: number;
-  chromeHeightPx: number;
-  remPx?: number;
-}): RoomChatBox {
-  const rem = opts.remPx ?? 16;
-  const width = Math.min(
-    ROOM_CHAT_PANEL_REM * rem,
-    Math.max(0, opts.viewportWidthPx - ROOM_CHAT_PANEL_GUTTER_REM * rem)
-  );
-  return {
-    left: opts.viewportWidthPx - width,
-    right: opts.viewportWidthPx,
-    top: opts.chromeHeightPx,
-    bottom: opts.viewportHeightPx,
-  };
-}
-
-export function roomChatDismissesOnFocusLoss(coversCanvas: boolean): boolean {
-  return coversCanvas;
-}
-
-export function roomChatShouldCloseOnFocusMove(opts: {
-  coversCanvas: boolean;
-  panelContainsNext: boolean;
-  nextIsNull: boolean;
-  /** Quick replies unmount the focused chip; that blur must not dismiss chat. */
-  lostControlRemoved?: boolean;
-}): boolean {
-  if (!roomChatDismissesOnFocusLoss(opts.coversCanvas)) return false;
-  if (opts.panelContainsNext) return false;
-  if (opts.lostControlRemoved) return false;
-  return true;
-}
-
-export function roomChatShouldCloseOnOutsidePress(opts: {
-  coversCanvas: boolean;
-  pressInsidePanel: boolean;
-  pressOnToggle: boolean;
-}): boolean {
-  if (!roomChatDismissesOnFocusLoss(opts.coversCanvas)) return false;
-  if (opts.pressInsidePanel || opts.pressOnToggle) return false;
-  return true;
-}
-
 export const GO_ROOM_EMPTY_TIMELINE = "還沒有訊息。";
 
-export const GO_ROOM_KEEP_OPEN = "這一間只在這個畫面開著的時候存在。";
+export const GO_ROOM_TV_HINT_STORAGE = "go-room-tv-hint-v1";
 
 export const GO_ROOM_GATE_BODY =
   "請人進來：即時視訊、共享檔案。被請進來的人不必有通行證。";
@@ -431,6 +360,34 @@ export const GO_ROOM_TV_VOLUME = "音量";
 export const GO_ROOM_TV_HINT_HOST =
   "片子在檔案區掛上後按放到大螢幕上。鏡頭在成員區指定。";
 export const GO_ROOM_TV_HINT_GUEST = "大螢幕畫面由主持指定。點全螢幕可放大。";
+
+export function roomTvHintCopy(role: "host" | "guest"): string {
+  return role === "host" ? GO_ROOM_TV_HINT_HOST : GO_ROOM_TV_HINT_GUEST;
+}
+
+/** One-time members-pane hint while the booth TV is still idle. */
+export function roomTvHintEligible(opts: {
+  tvOn: boolean;
+  playActive: boolean;
+}): boolean {
+  return !opts.tvOn && !opts.playActive;
+}
+
+export function roomTvHintSeen(
+  storage: Pick<Storage, "getItem"> = typeof localStorage !== "undefined"
+    ? localStorage
+    : { getItem: () => null }
+): boolean {
+  return storage.getItem(GO_ROOM_TV_HINT_STORAGE) === "1";
+}
+
+export function markRoomTvHintSeen(
+  storage: Pick<Storage, "setItem"> = typeof localStorage !== "undefined"
+    ? localStorage
+    : { setItem: () => {} }
+): void {
+  storage.setItem(GO_ROOM_TV_HINT_STORAGE, "1");
+}
 export const GO_ROOM_PUT_ON_TV = "放到大螢幕上";
 export const GO_ROOM_FORCE_MUTE = "強制靜音";
 export const GO_ROOM_FORCE_CAMERA_OFF = "關閉鏡頭";

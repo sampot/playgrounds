@@ -86,6 +86,7 @@
     roomShellPanesConcurrent,
     roomShellShowPane,
     roomShellTabPanes,
+    roomShellViewportBox,
     roomStageStatus,
     roomStatusLineVisible,
     roomTvHudHasTransport,
@@ -94,6 +95,10 @@
     roomTvLabel,
     roomTvBindStream,
     roomTvPictureOn,
+    roomTvHintCopy,
+    roomTvHintEligible,
+    roomTvHintSeen,
+    markRoomTvHintSeen,
     syncTvSinkPlayback,
     toggleTvFullscreen,
     tvFullscreenElement,
@@ -304,6 +309,7 @@
   let tvVideoEl = $state<HTMLVideoElement | null>(null);
   let tvSlotEl = $state<HTMLElement | null>(null);
   let cinemaUserEnter = $state(false);
+  let tvHintConsumed = $state(false);
   let menuMsgId = $state<string | null>(null);
   let holdTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -534,6 +540,20 @@
     })
   );
 
+  const showTvHint = $derived(
+    showMembers &&
+      roomTvHintEligible({ tvOn, playActive }) &&
+      !tvHintConsumed
+  );
+
+  onMount(() => {
+    tvHintConsumed = roomTvHintSeen();
+  });
+
+  $effect(() => {
+    if (showTvHint) markRoomTvHintSeen();
+  });
+
   const statusLabel = $derived.by(() => {
     if (error) return error;
     if (phase === "connecting") return message || GO_ROOM_CONNECTING_TITLE;
@@ -573,7 +593,7 @@
     const rail = railEl;
     if (!el) return;
     const apply = () => {
-      shellBox = { widthPx: el.clientWidth, heightPx: el.clientHeight };
+      shellBox = roomShellViewportBox();
       railLeftPx = rail?.getBoundingClientRect().left ?? 0;
     };
     apply();
@@ -802,9 +822,6 @@
       }
       if (step === "clear-peer") {
         selectedPeerId = null;
-        return false;
-      }
-      if (step === "close-drawer") {
         return false;
       }
       if (step === "exit-cinema") {
@@ -1822,6 +1839,9 @@
               </div>
             {/if}
           {/if}
+          {#if showTvHint}
+            <p class="muted room-tv-hint">{roomTvHintCopy(role)}</p>
+          {/if}
           <ul class="member-list">
             {#each memberCards as card (card.peerId)}
               <li>
@@ -2434,7 +2454,7 @@
       <p class="room-owner-decode" role="status">{GO_ROOM_OWNER_DECODE}</p>
     {/if}
     </div>
-  {/if}
+    {/if}
     <video
       bind:this={localPreviewEl}
       class="media-video media-video--idle"
@@ -2838,6 +2858,11 @@
     min-height: 0;
     flex: 1 1 auto;
     gap: 0.35rem;
+  }
+  .room-tv-hint {
+    margin: 0 0 0.55rem;
+    line-height: 1.45;
+    font-size: 0.88rem;
   }
   .room-tabs {
     display: flex;
@@ -3430,7 +3455,7 @@
       height: auto;
       aspect-ratio: 16 / 9;
     }
-    .room--desktop .room-lower {
+    .room--desktop:not(.room--cinema) .room-lower {
       display: flex;
       flex-direction: column;
       min-height: 0;
@@ -3444,7 +3469,7 @@
     .room--desktop:not(.room--cinema) .room-lower {
       grid-column: 2;
     }
-    .room--desktop .room-dock {
+    .room--desktop:not(.room--cinema) .room-dock {
       flex: 0 0 auto;
       padding-bottom: 0.35rem;
       border-bottom: 1px solid color-mix(in oklab, rgb(var(--ink)) 18%, transparent);
@@ -3533,7 +3558,7 @@
       height: 100%;
       aspect-ratio: auto;
     }
-    .room--short-landscape .room-lower {
+    .room--short-landscape:not(.room--cinema) .room-lower {
       display: flex;
       flex-direction: column;
       min-height: 0;

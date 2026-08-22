@@ -1,6 +1,6 @@
 # Playgrounds 純玩版：包廂（go `/room`）
 
-> **狀態：** Draft（2026-08-22）— 主面＝**主視訊區**（沒訊號／片子／live 同一塊；槽內無字；**劇院態可滿窗**，三區／底列 overlay；**2d 殼面 RWD 手測完成**；**開局第一刀手測完成**（五子棋對弈＋重開））；chrome **可收**；廳態＝大螢幕＋**成員／檔案／文字**（RWD）；文字＝開口備援（非主欄）；兩層螢幕（大螢幕 ≠ 我這台）；**大螢幕＝同時一路主畫面**（主持指定；再指定＝切台）；**否決**瀏覽器多路視訊合成進節目；**在場聲＝星狀下 Host `AudioContext` 混音再送**（開麥彼此聽得到；靜音＝不進混）；**放到大螢幕上＝主持指定 `file { owner, id }`，一律由持檔端本機渲染 → 節目 RTP**（可別人掛的檔、**可主持私有檔**；**影→音→圖**；doc 延後；**音檔大螢幕＝audio player 面＋節奏動畫＝2h 已落地**）；**分享目錄**前端一律 `/room-file/<id>`（SW＝HTTP server；本機掛檔 SW 直出、不經 DC；遠端每 roundtrip ↔ transfer）；**Guest↔Guest mesh（Phase 1c）：** 索檔／持檔有直連 DC 時檔 bytes **不**經 Host relay；失敗回 star；**節目／在場 RTP 仍走 Hub**；**主持私有檔＝OPFS、不進分享、上大螢幕≠分享**（**2g 手測：私有影／音／圖可上大螢幕**）；其餘：進門即主面、不鎖 1:1、兩個時鐘、SDP **2+2**
+> **狀態：** Draft（2026-08-22）— 主面＝**主視訊區**（`GoRoomTvSlot` 16:9；沒訊號／片子／live／開局同一塊；槽內無字）；**劇院態**＝應用內**滿窗僅主視訊**（**不顯示** dock／三 tab）；叫出 chrome／Esc → **回廳態**；**2d 殼面 RWD 手測完成**；**開局第一刀手測完成**（五子棋＋redpick）；chrome **可收**；廳態＝大螢幕＋**成員／檔案／聊天** tab + dock；聊天＝`session_chat` 開口備援（非主欄）；兩層螢幕；**大螢幕＝同時一路主畫面**；**否決**多路視訊合成；**在場聲混音（2f）**；**放到大螢幕上＝持檔端渲染 → 節目 RTP**（影／音／圖；**2h 音檔 player 面已落地**）；**分享目錄**一律 `/room-file/<id>`；**mesh（1c）** 檔直連、節目／在場 RTP 仍 Hub；**主持私有 OPFS（2g）**；進門即主面、不鎖 1:1、兩個時鐘、SDP **2+2**；shell 斷點＝**viewport**（與 CSS `@media` 一致）
 > **權威決策：** 從屬 [DECISIONS.md](./DECISIONS.md) **DEC-050**（純玩版）、**DEC-045**（Roster／薄 signaling；**非** Avatars 產品面）、**DEC-047**（Platform Invite）；**不另開 DEC**  
 > **相關：** [PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)、[PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md)（登入＋記憶體 field API key）、[PG-GO-HOST-INVITE-PLAN.md](./PG-GO-HOST-INVITE-PLAN.md)（GO-INVITE＝遊戲 compose；**勿混**）、[PG-GO-ROOM-PLAY-PLAN.md](./PG-GO-ROOM-PLAY-PLAN.md)（包廂內重用 peer 開局＝`session_play`；Phase 3；**第一刀手測完成**）、[PG-GO-ROOM-DEV-HARNESS-PLAN.md](./PG-GO-ROOM-DEV-HARNESS-PLAN.md)（localhost／Agent 多 tab 進門；**勿**當產品契約）、[PG-GO-SESSION-CHAT-PLAN.md](./PG-GO-SESSION-CHAT-PLAN.md)（局內 overlay 對話——**勿混**）、[PG-GO-SHOP-LOBBY-PLAN.md](./PG-GO-SHOP-LOBBY-PLAN.md)（大廳熱點入口）、[PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)、[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（官方 TURN；包廂 ICE **與**遊戲邀請分開）、`.cursor/rules/no-native-dialogs.mdc`、`.cursor/rules/mobile-first-ux.mdc`、[GLOSSARY.md](./GLOSSARY.md)
 
@@ -292,7 +292,7 @@ game { catalogId, seats[] } // 大螢幕槽掛該 SAM 畫布；席次＝指定�
 | **大螢幕／主視訊區** | 主舞台。同一塊 slot：沒訊號也佔位；片子／圖／**音（audio player 面，§5.7.1）**／live＝節目 `<video>`（進門即綁，**不要** `display:none`）；開局＝同一塊掛 SAM 畫布。預設 **16:9**、`object-fit: contain`。**槽內禁止疊字**（片名、沒訊號、人數都在槽外狀態或 overlay；**音檔視覺化／player chrome 不算疊字**）。**不要**再把大廳 320×200 內景當頁面主內容、把節目縮成牆上小洞。 |
 | **成員** | 在場名單（顯示名、主持標、麥／鏡頭點）。主持：請人進來、放到大螢幕上、**玩遊戲**。**不是**每人一格視訊牆。**指定入座＝開局**（§5.9；自動＋手動席已落地） |
 | **檔案** | **分享**目錄：掛、下載、私下播／檢視；主持可把**別人掛的**影音／圖放到大螢幕上。**主持另有私有／分享分段**（§5.5.1；2g）：私有＝匯入／刪／推播／**掛到分享**；Guest 只見分享。私下播迷你列在本區，不佔大螢幕槽。 |
-| **文字** | 開口備援。時間線＋輸入。**禁止**當進門英雄空態。 |
+| **文字（UI：聊天）** | 開口備援。時間線＋輸入在**聊天** tab 內。**禁止**當進門英雄空態；**禁止** overlay 抽屜蓋住大螢幕當唯一入口。 |
 
 pixel 畫風可留在**大螢幕外框／沒訊號雪花**；**禁止**行走、碰撞、重用 `GoShopLobby` 地圖。門／架／椅**不是**主導航（請人／檔案／成員走三區）。
 
@@ -304,27 +304,27 @@ Guest `/i/` 不經大廳；進主面須讀成「你在一間包廂」。可選�
 
 **兩種殼態（硬）：**
 
-| 態 | 何時 | 主視訊 | 成員／檔案／文字、底列、廣告 |
+| 態 | 何時 | 主視訊 | 成員／檔案／聊天、dock、廣告 |
 | --- | --- | --- | --- |
-| **廳態** | 沒訊號、進門預設；未登入／connecting／ended **只廳態** | 直式上半；短橫屏左；寬屏可與欄並排。影片 `object-fit: contain`。槽內無字 | 可在文檔流：窄屏下半 tab、寬屏右欄。麥／鏡頭列在控制面板上方。廣告浮在主視訊區（沒訊號時） |
-| **劇院態** | 使用者**隱藏控制面板**。播放**不**自動進。畫面＝只有主視訊 | **應用內滿窗**（視窗客戶區／`100svh`；同一顆進門綁定的 `<video>` 或日後畫布；`object-fit: contain`）。沒訊號視覺可留在滿窗裡 | **不顯示**控制面板。下拉／頂緣 peek／Esc 叫出 header＝**回廳態**（面板回文檔流）。再進劇院要再按「隱藏控制面板」 |
+| **廳態** | 沒訊號、進門預設；未登入／connecting／ended **只廳態** | 直式上 16:9；短橫屏左；寬屏與右欄並排。`object-fit: contain`。槽內無字 | 文檔流：**成員／檔案／聊天** tab（窄屏下半；寬屏右欄）。**dock**（麥／鏡頭／畫面／劇院／結束）在 tab **上方**。廣告浮在主視訊（沒訊號時） |
+| **劇院態** | 使用者按「隱藏控制面板」。播放**不**自動進 | **應用內滿窗**（`100svh`；同一顆 `<video>`／開局畫布；`object-fit: contain`） | **不顯示** dock 與三 tab。**僅**主視訊。下拉／peek／Esc 叫出 playground 頂列 → **回廳態**（dock／tab 回來）。槽外狀態列**隱藏** |
 
-- **禁止**用瀏覽器 Fullscreen API（含 iOS `<video>` 全螢幕）當劇院態的**唯一**或**預設**手段。系統全螢幕裡殼 overlay／麥／成員不可用；開局畫布必須留在文件。系統全螢幕可當加分，從劇院態再點。
-- 沒訊號不強迫回廳態。Esc／下拉／頂緣 peek：**先關 overlay**；不要第一次 Esc 就散場。無 overlay 時這些操作**離開劇院、回到廳態**（仍在包廂）——**劇院態本身不是散場**。控制面板只在廳態；**不要**劇院態 overlay 面板。
-- 分享面、結束確認：暫停頂列自動收；drawer 開著時同。**文字輸入／composer focus 不得叫出或釘住遊樂場 header。**
-- 讀屏：滿窗仍是那顆 `<video>`／可及遊戲面；三區改 drawer 後仍要有明確開關（成員／檔案／文字全名；熱區 ≥44px）。
+- **禁止**用瀏覽器 Fullscreen API 當劇院態**唯一**手段。系統全螢幕可當加分（從廳態 TV HUD 進入）。
+- 沒訊號不強迫回廳態。Esc／peek：**先關 overlay**；無 overlay 且已在劇院態 → **回廳態**（仍在包廂）。**禁止**劇院態 overlay dock／三 tab。
+- 分享面、結束確認：暫停頂列自動收。**文字 composer focus 不得叫出 playground header。**
+- 讀屏：滿窗仍是那顆 `<video>`／遊戲面；回廳態後 tab 標籤寫全名（成員／檔案／聊天）；熱區 ≥44px。
 
-**RWD（mobile-first；禁止桌面先做再 `max-width` 縮小）：** 預設 CSS＝手機直式。可用容器查詢掛在包廂根（殼有側欄時勿誤判已是桌機）。下列是**廳態**；劇院態只有主視訊滿窗，叫出控制即回廳態。
+**RWD（mobile-first）：** 預設 CSS＝手機直式。**`roomShellMode` 與 CSS `@media` 皆以 viewport 為準**（`document.documentElement.clientWidth/Height`）。下列是**廳態**；劇院態見上表。
 
 | 模式 | 條件（約） | 廳態結構 |
 | --- | --- | --- |
-| **窄屏** | 寬不到 768px | 螢幕對半：上半主視訊（槽內無字）；**下半控制面板** tab 切換成員／檔案／文字（預設**成員**）。麥／鏡頭／畫面列在控制面板**上方**。**禁止**三欄並排 |
-| **短橫屏** | `landscape` 且短高（現況 ~560px；含寬過 768 的手機橫式） | 左大螢幕、**右控制面板三段 tab**（成員／檔案／文字，一次一區，**不是**上檔案下成員）。麥列在右欄頂。廣告浮在大螢幕槽（沒訊號時；串流藏） |
-| **寬屏／桌機** | `min-width: 48rem`（768px）且高度夠 | 大螢幕左約 2／3；**右欄控制面板佔滿視窗高**（約 20–24rem）：頂列麥／鏡頭／畫面，其下**上半檔案**、**下半 tab 切成員／文字**。門牌小狀態在成員區。**禁止**成員／檔案／文字三欄。短橫屏不走這套 |
+| **窄屏** | viewport 寬 < 768px | **上：** 主視訊 16:9。**下：** dock + **成員／檔案／聊天** tab（預設成員）。**禁止**三欄並排 |
+| **短橫屏** | `landscape` 且 viewport 高 ≤ ~560px | 左大螢幕、右 dock + 三 tab（一次一區）。麥列在右欄頂 |
+| **寬屏／桌機** | viewport `min-width: 48rem` 且高夠 | 左大螢幕；右欄：dock 頂、**上半檔案**、**下半 tab 成員／聊天**。>1280px 檔案與成員／聊天並排。門牌小狀態在成員區 |
 
-廳態窄屏三段是 **tab**，不是蓋滿螢幕、把大螢幕藏起來的 modal。劇院態不排三區；叫出控制＝回廳態 tab。熱區 ≥44px；分段標籤寫全名。
+廳態 tab **不是**蓋滿大螢幕的 modal。劇院態不排 tab；叫出控制＝回廳態。首次空包廂（沒訊號）可在**成員區**顯示一次大螢幕操作 hint（`GO_ROOM_TV_HINT_*`）。
 
-**頂列可收（硬）：** 對齊對弈 chrome（overlay、閒置約 3s、往下拉／頂緣展開、收起**不留**角標 logo）。進包廂**主面**即 hideable（主持 `/room`、Guest 同意後的 `/i/`）。consent／未登入／connecting／ended：**不收**。分享面、結束／離開確認、更多、profile、登入 sheet、劇院態 drawer 開著時：**暫停收起**。**文字輸入不影響頂列顯示／收起。**請人進來與結束／離開**不得只活在頂列**——請人在成員區（廳態常駐）。結束／離開在底列或成員區底。人數／大螢幕一句在**槽外**（廳態大螢幕下緣薄狀態），**不要**寫進主視訊畫面裡。
+**頂列可收（硬）：** 對齊對弈（3s、下拉／peek）。請人在**成員區**；**結束／離開**在 **dock**（icon；`aria-label` 全名）。人數／大螢幕一句在**槽外狀態列**（**僅廳態**）。
 
 ### 5.9 大螢幕上開局（硬；契約凍；**第一刀已手測**）
 
@@ -1014,15 +1014,15 @@ session_play.end    { from: host }
 
 1. **殼頂列（可 overlay 收起）**  
    對齊對弈 3s 自動收（§5.8）。展開時：左品牌／包廂；右人數膠囊可在大螢幕下緣薄狀態重複，避免收起後找不到「幾人在」。  
-   **請人進來**不依賴頂列——在**成員區**頂。結束／離開在底列或成員區底。熱區 ≥44×44px。
+   **請人進來**在**成員區**。結束／離開在 **dock**（icon）。熱區 ≥44×44px。
 2. **一句狀態**  
    人數＋大螢幕（沒訊號／正在播〈名〉／大螢幕上是〈誰〉／正在玩〈遊戲〉）。**不講 TTL。** 一個人且沒訊號：**不要**寫 `就你一個人 · 把這頁開著，這一間才還在`（這行拿掉）。有人：`3 人在`。門牌過期**不**取代這一行。
 3. **主視訊區（主體）**  
    廳態：全寬 16:9。劇院態：滿窗。沒訊號＝雪花、**不要在畫面裡寫字**。片子／live＝DOM `<video>`。開局＝同一塊 SAM 畫布。**不要**把整間 pixel 內景當主內容。
 4. **分段面板**  
-   **成員**（預設）／**檔案**／**文字**。廳態直式（不到 768px）＝螢幕下半 tab（上半大螢幕始終可見）。劇院態不排這三區；叫出控制＝回廳態。
-5. **麥／鏡頭列**  
-   開麥克風（主）／鏡頭／畫面＝**icon 按鈕**（`aria-label` 仍寫全名；熱區 ≥44px），放在控制面板**上方**（窄屏＝下半 tab 之上；寬屏＝右欄頂）。劇院態＝薄 overlay，可跟頂列一起收。快捷語在文字區、預設收起。主持「放到大螢幕上」「玩遊戲」在成員／檔案／大螢幕控制，不擠這列。
+   **成員**（預設）／**檔案**／**聊天**（wire＝`session_chat`）。廳態直式＝下半 tab。劇院態不排 tab；回廳態後可操作。
+5. **麥／鏡頭列（dock）**  
+   icon 按鈕（`aria-label` 全名；≥44px），在 tab **上方**；**僅廳態**顯示。**劇院態**整段 dock 隱藏——開麥／結束等須 **Esc／peek 回廳態**。快捷語在聊天區、預設收起。
 6. **文字**  
    不要全頁時間線，不要空態「先打字也可以」當英雄。
 7. **檔案**  
@@ -1044,18 +1044,14 @@ session_play.end    { from: host }
 
 ### 10.3 寬屏（`min-width` 遞增）
 
-**廳態：** 大螢幕左（可較高）。**右欄控制面板佔滿視窗高**：頂列麥／鏡頭，其下上半檔案、下半成員／文字 tab。**禁止**三欄並排。規則同 §5.8。
+**廳態：** 大螢幕左；右欄 dock + 檔案 + 成員／**聊天** tab。
 
-**劇院態（片子／live／日後開局）：** 主視訊滿窗。下拉／peek／Esc 回廳態再看右欄。不要劇院 overlay 面板。
+**劇院態：** 主視訊滿窗；**無** dock／tab。Esc／peek 回廳態後可操作。
 
-- 在場名單（主持金色標記＋顯示名；主持可指定誰上大螢幕、誰入座）
-- 一句：`這一間只在這個畫面開著的時候存在。`
-- 門牌列：**小狀態**，不是英雄 QR  
-  - 尚未請人：`還沒發邀請`＋「請人進來」  
-  - 有效：`邀請有效 · 還有 4:32`＋「顯示邀請」  
-  - 過期：`邀請已過期`＋「再發一張」
-- 大螢幕控制（主持）：從大螢幕拿掉／放到大螢幕上／切來源／玩遊戲
-- `結束這一間`；開局中另有 `結束這一局`
+- 在場名單（主持可指定上大螢幕／入座）
+- 門牌列：小狀態（見 §10.2 §8）
+- 大螢幕控制（主持）：成員／檔案卡與 TV HUD
+- `結束這一間`／`離開`在 dock；開局中另有 `結束這一局`（成員區）
 
 **禁止**桌面先做再 `max-width` 縮小。**禁止**把大 QR 等待面當成已登入會員的預設首屏。**禁止**左欄全頁時間線。現場掃碼是分享面的工作。寬屏頂列同樣可收，游標靠近頂可展開。
 
@@ -1073,8 +1069,8 @@ Esc 回大廳（現況 `goEscapeHome` 含 `/chat` → 改 `/room`）。**劇院�
 
 - 主視訊區永遠在舞台；沒訊號也在。槽內**無字**。節目 `<video>` 綁定進門即做；開局改掛畫布時可藏視覺，**不要**拆綁、**不要** `display:none` 到解碼停（切回片子時還要用）。
 - 主持指定片子／live 後全場大螢幕亮；收看端不可對片子／live 獨立 seek（想自己拖進度＝私下播放／下載）。
-- **劇院態：** 應用內滿窗；三區／底列 overlay。開局後點主視訊＝操作畫布（入座席）或觀看（觀戰）；不要誤開「影片控制」。系統全螢幕是加分，不是劇院態本體。
-- 私下播放與大螢幕**並行**；第二個本機 `<video>` 在檔案區（劇院態＝檔案 drawer 裡的迷你列）。
+- **劇院態：** 滿窗、**僅**主視訊；開局點主視訊＝操作畫布或觀戰。Esc／peek 回廳態後才有 dock。系統全螢幕是加分。
+- 私下播與大螢幕並行；播放器 UI 在**廳態檔案 tab**；劇院態須回廳態才能掛檔／操作檔案 UI（已在播可背景繼續）。
 - 開鏡頭／麥＝瀏覽器權限對話；失敗頁內說明。
 - 對讀者不說直播／推流／WebRTC；不要會議格子牆；第三人在場**不**藏鏡頭控件。
 - 點主視訊（非開局、節目播放中）展開**半透明浮動控制**（疊在主視訊區上，**禁止**頁底 bottom sheet）。列序對齊常見播放器、**單列不換行**：播放／暫停、當前時間、進度、總長、喇叭、全螢幕（已滿屏改還原）。**音量條不常駐**——點喇叭才出現直向滑桿（**本機**音量）。**僅主持**對片子／**音檔**有播／停／seek／快轉／倒帶（含別人掛的檔，經 `session_cast.state` 遙控 owner）。系統全螢幕＝大螢幕槽容器（同一套 HUD，**禁止** `<video>`／`<audio>` 原生播放器）。主持可從大螢幕拿掉（列尾）。片名仍在槽外狀態。
@@ -1116,7 +1112,7 @@ Esc 回大廳（現況 `goEscapeHome` 含 `/chat` → 改 `/room`）。**劇院�
 | Mesh | **1c。** 在線 Guest 變動 → Host `hello` → Guest **立刻**建 **DC-only** 邊；失敗對該 peerId **不重試**；傳檔只查 `hasDirect`。檔 chunk 直連／star；**節目／在場 RTP 永不走 mesh**（仍 Hub） |
 | Peer | 進門 booth 2+2 helper（勿把遊戲 DC-only／現況 1+1 默默改掉）。**mesh 邊＝DC-only**（勿再給 mesh 留 2+2 再當媒體 peers） |
 | 媒體 | **節目槽＝片子／live／音檔 player 面**（進門綁 program `<video>`；房級送**單一路**來源；電影 `captureStream`；**audio＝2h player＋本機 Analyser 跳動**）。開局＝大螢幕槽掛 SAM，節目可 unoffer。在場＝開口／可指定上大螢幕。**在場聲＝Host 混音**（§9.8.1／2f）。目錄「要」＝同源 HTTP。人數不關鏡頭。**不做**多路視訊合成 |
-| 殼面 | 主視訊區 16:9（槽內無字）＋廳態三區／劇院態 overlay（§5.8）。內景降級為外框／沒訊號雪花。**不要**重用 `GoShopLobby`。chrome hideable 對齊對弈 overlay。**不要**用系統全螢幕冒充劇院態 |
+| 殼面 | `GoRoomTvSlot` + `GoRoomSurface` 廳態 tab／dock；劇院態滿窗無 chrome（§5.8） |
 | 開局 | **第一刀已手測**（`pg-gomoku`）。契約：`session_play`；重用進門 PC；席次從協議 roles；自動＝主持＋進門序。實作計劃：[PG-GO-ROOM-PLAY-PLAN.md](./PG-GO-ROOM-PLAY-PLAN.md) |
 | 分享 | `GoShareSheet` 邀請模式；title「邀請你進包廂」；**必備**「另一台請掃碼、不要再開一間」 |
 | 路由 | `go-client/src/routes/room/`；`/chat` 導向 `/room` |
@@ -1137,8 +1133,8 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 | **1c. Mesh 直連（檔）** | 在線 Guest 變動時主動 `session_mesh`；邊＝**DC-only**；**一次機會**；傳檔只路由不 dial；chunk 直連／star | 進門／新人加入即試連；失敗不再對同一 guest 重試；有直連則下載／私下播不經 Host；**節目／在場 RTP 仍 Hub（mesh 不進 goRoomMedia peers）** | **已落地**（`GO_ROOM_MESH_ENABLED`；`media: "none"`；fail／close 不重試；Host introduce） |
 | **2a. Live（鏡頭／麥／畫面）** | 開在名單；在場**影像**仍 `request` 才送；麥＝房級；`getUserMedia` XOR `getDisplayMedia`；不做格子牆 | 不經 Platform 二次 O／A；預設未開相機；無指定則零在場影像 RTP | **已落地**（房級麥；多人混音 **2f**） |
 | **2b. 目錄影音私下播** | 掛在目錄的影片／音樂經同源 URL 邊收邊播；不走節目 RTP | 片源不出雲；可 seek；**不**當大螢幕；與下載／檢視同一 HTTP 門面 | **已落地**（影／音／圖／下載皆 `/room-file/<id>`；撤 blob image sink） |
-| **2c. 包廂大螢幕＋內景** | 靜態內景；節目槽＝大螢幕；主持指定來源（**本機**檔 `captureStream` 或 peer live）；房級收節目／在場聲；文字收成抽屜 | 沒訊號大螢幕佔主高度；一起看 MTV 走 RTP；私下播與大螢幕並行；不走動 | **已落地**（`GoBoothStage`；節目 RTP；文字／分享抽屜）。殼面改大螢幕槽＋三區見 **2d**；別人掛的檔見 **2e** |
-| **2d. 大螢幕槽殼面** | 主視訊區（沒訊號也佔；槽內無字）；廳態三區 RWD；**劇院態滿窗＋三區／底列 overlay**；頂列 overlay 可收；家具熱點降為非主導航 | 直／橫／平板／桌機可用；看電影時主視訊滿窗、其餘 overlay；請人在成員區／drawer | **已落地**（廳態＋劇院態；RWD 手測完成） |
+| **2c. 包廂大螢幕** | `GoRoomTvSlot` 16:9；節目 RTP；房級收節目／在場聲；聊天在 tab 內 | 沒訊號佔主高度；一起看 MTV；私下播與大螢幕並行 | **已落地**（`GoRoomTvSlot`；節目 RTP）。別人掛的檔見 **2e** |
+| **2d. 大螢幕槽殼面** | `GoRoomSurface` 廳態三 tab + dock RWD；劇院態滿窗**無** dock／tab；頂列可收 | 直／橫／平板／桌機；請人在成員區 | **已落地** |
 | **2e. 別人掛的檔上大螢幕** | 主持 `session_cast` → **owner** 本機渲染 → Hub 轉節目；先 video／audio；image 同模型；doc 延後 | 主持可把 Guest 掛的片子／歌放到大螢幕；不能 capture → reject＋頁內說明；**不**為上大螢幕拉檔到主持 | **video／audio／image 已落地**（`fromPeer`；圖＝canvas 靜態軌；doc 延後） |
 | **2f. 在場聲混音** | 星狀下 Host `AudioContext` 混多路上行麥 → 各 peer 一條 presence audio；單開麥可轉發；排除自迴音；節目音不混入 | ≥2 開麥者彼此聽得到；關麥即離混；**不做**多路視訊合成 | **已落地**（`goRoomPresenceAudioMix`；Hub `pushPresenceAudio`） |
 | **2g. 主持私有檔** | Host OPFS 片庫；與分享分離；可上大螢幕（`scope: private`）；掛到分享才可「要」；Guest 無私有區 | 私有不 fanout、不上 `/room-file`；cast 僅 RTP；散場不清 OPFS | **已落地**（OPFS＋`scope:private`；手測影／音；**圖同 2e**；Safari 影音片源仍同既有限制） |
@@ -1158,7 +1154,7 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 | 3 | Invite | **`invite.room`**；門牌仍 `/i/`；進門無 SAM；開局才掛 |
 | 4 | 文字 | 重用 `session_chat`；**三區之一**，不是主面（對齊視訊會議 chat） |
 | 5 | 傳檔 | `session_file` **分享目錄**。前端一律 **`/room-file/<id>`**（SW＝標準 server）。**本機掛檔 SW 直出、不經 DC**；遠端每 HTTP roundtrip ↔ `transferId`。**禁止**整檔 RAM／Blob／**分享路徑** OPFS／Cache／目錄檔 object URL。**只掛檔，不掛資料夾**。Host 私有 OPFS＝#33 |
-| 6 | SDP | 進門 **2 audio + 2 video**＋DC；**在場**＝開口／鏡頭；**節目**＝房級大螢幕；mesh 邊日後同一套；**禁止** Platform renegotiation；遊戲 compose 維持 DC-only |
+| 6 | SDP | 進門 **2 audio + 2 video**＋DC；mesh 邊＝**DC-only**（`media: "none"`；§7.4／**1c**）；遊戲 compose 維持 DC-only |
 | 7 | ICE | 包廂 **≠** 遊戲 relay-only stamp；高碼率以同一網路為快樂路徑 |
 | 8 | 登入 | 開這一間要；被請進來不要（自己的第二台當 Guest 也不要） |
 | 9 | 雲 | 無；散場丟分享目錄；**不錄製**。Host 私有 OPFS 非雲、散場不清 |
@@ -1180,7 +1176,7 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 | 25 | 一條出站在場 live | `getUserMedia` XOR `getDisplayMedia`；可含影像＋聲音 |
 | 26 | 兩層螢幕 | 包廂大螢幕 ≠ 我這台。私下播／掛／下載不跟大螢幕互斥 |
 | 27 | 主持導播 | 僅主持指定大螢幕來源（**含別人掛的檔**／**主持私有**／peer／開局）。被指定者不是新主持。再指定＝切台 |
-| 28 | 殼面 | **主視訊區**＝主內容（16:9；沒訊號也佔；**槽內無字**）。廳態：不到 768px 上半大螢幕下半 tab；≥768px 右欄控制面板（頂麥列、上檔案、下成員／文字 tab）。**禁止**三欄並排。**劇院態：** 使用者隱藏控制面板才應用內滿窗（**禁止**一播放就進）；畫面只有主視訊；下拉／peek／Esc 叫出控制＝**回廳態**（**禁止**劇院 overlay 面板／頁底扁條）。廣告浮在主視訊區，**串流時藏**。**禁止**以系統 Fullscreen 當劇院態預設。**不**用可行走大廳。家具熱點非主導航 |
+| 28 | 殼面 | **主視訊區**＝`GoRoomTvSlot`（16:9；槽內無字）。廳態：viewport <768px 上 16:9 + 下 tab + dock；≥768px 右欄（dock、檔案、成員／聊天 tab）。**劇院態：** 隱藏控制面板 → **滿窗僅主視訊**（**不**顯示 dock／tab）；Esc／peek → 廳態。槽外狀態列**僅廳態**。RWD 斷點＝viewport |
 | 29 | 頂列 | 包廂主面 **可 overlay 收起**（約 3s；對齊對弈）。請人／結束不只活在頂列。consent／錯誤面不收 |
 | 30 | 開局 | 契約凍：重用進門 PC；`session_play`；主持選遊戲＋指定或自動入座；未入座觀戰；不鑄 compose、不改 Guest 網址。第一刀不做局中換席。**第一刀已手測**（落地見 [PG-GO-ROOM-PLAY-PLAN.md](./PG-GO-ROOM-PLAY-PLAN.md)） |
 | 31 | 檔上大螢幕 | **`file { owner, id, scope? }`＝持檔端渲染 → 節目 RTP**。`scope: "private"`＝Host OPFS。呈現型別影→音→圖遞增；**現況影／音／圖**；doc／任意 MIME 不承諾。傳輸模型不變 |
@@ -1194,7 +1190,7 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 
 | 流 | 是 | 不是 |
 | --- | --- | --- |
-| **包廂 `/room`** | 臨時隔間；進門即**主視訊區**；劇院態滿窗、三區 overlay；Invite 請人**或自己的另一台**；**活著＝主持畫面開著**；一起看大螢幕（片子／live RTP）或在大螢幕上開局（重用 PC，延後）；自帶裝置可私下播／掛／下載；開口為主、文字為輔；現況 Hub | 大廳可行走地圖、全頁聊天室、局內 overlay、必須先邀請才看得到 UI、入座只能兩人、5 分鐘租期的雲端房間、視訊會議格子牆、再開 `/room` 當連線、用 DC 當片子大螢幕、為開局另鑄 compose、用系統全螢幕冒充劇院態 |
+| **包廂 `/room`** | 臨時隔間；`GoRoomTvSlot` 主視訊；劇院態滿窗無 dock；Invite 請人 | 大廳地圖、全頁聊天、格子牆、劇院態仍顯示 dock |
 | **Session chat** | 已在遊戲 session 裡的附屬對話 | 包廂主面；包廂文字三區可同族但不是局內 overlay |
 | **GO-INVITE** | `invite.compose` 開指定 SAM（還沒進包廂時拉人） | 包廂 kind；包廂內開局 |
 | **布告** | 全站營運公告 | peer 對話 |
@@ -1230,7 +1226,6 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 - [x] **2b：** 影／音／圖私下播／檢視與下載同一 `/room-file/`（撤 blob image sink）
 - [x] **HTTP↔transfer 隧道：** 遠端每一筆 GET／Range 開一條 `transferId`（SW 分配＋`open-transfer`）；SW 依宣告交完 body 後 `transfer-complete`／abort 才終態；owner `done` 不得單獨標成功；本機不開 transfer；禁止 file-level 常駐池與 HTTP 脫鉤完成條件
 - [x] 訊息不經 Platform；檔 bytes 不經 Platform；散場丟目錄（已存檔不刪）
-- [x] 包廂 offer SDP 含 `m=audio`、`m=video`（現況 **1+1**）
 - [x] **1b：** 包廂 offer SDP 含**兩組** `m=audio`、**兩組** `m=video`；遊戲 compose 不變
 - [x] `/chat` 進 `/room`；大廳／更多文案為「包廂」
 - [x] 無 `alert`／`confirm`／`prompt`；窄屏可請人進來、可傳、可結束（結束有頁內確認）
@@ -1326,7 +1321,8 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 | 2026-08-21 | **開局 Phase 1–2 初刀：** `session_play` wire／席次／Host fanout＋晚進門重送；見 PLAY 計劃（主面仍不露 CTA） |
 | 2026-08-21 | **2g 實作（初刀）：** `goRoomPrivateOpfs`＋`goRoomPrivateFiles`；`session_cast.scope`；`startPrivateProgram`（blob 片源、不 register `/room-file`）；主持檔案區私有／分享分段；掛到分享→既有 `shareLocalFile`；散場 detach 不清 OPFS |
 | 2026-08-21 | **Mesh＝DC-only（修雙 Guest 大螢幕黑屏）：** `session_mesh` 改 `media: "none"`；`goRoomMedia` 忽略 `via: "mesh"`；Guest 媒體 peers 只含進門 Host。兩 Guest 時 mesh 空節目軌曾蓋掉 Host RTP → 雙黑、一人離則恢復 |
-| 2026-08-22 | **手測收斂：** Phase **2d** RWD 完成；**2g** 私有影／音可上大螢幕 |
+| 2026-08-22 | **劇院態：** 改回滿窗**不顯示** dock／tab（叫出 chrome＝回廳態）；撤薄 dock 實驗 |
+| 2026-08-22 | **文件↔實作對齊：** 主舞台＝`GoRoomTvSlot`；UI tab「**聊天**」；結束／離開在 dock（廳態）；RWD 斷點＝viewport；凍結 #6 mesh＝DC-only；成員區一次性 TV hint |
 | 2026-08-22 | **2e image：** 圖檔上大螢幕（`<img>`／canvas.`captureStream` 低幀靜態節目軌；分享＋私有；無 seek HUD；wire kind＝video；doc 仍延後） |
 | 2026-08-22 | **2b 收斂：** 下載／圖檢視與影音私下播同一 `/room-file/`；撤未用 `createImagePreviewSink` blob 路徑；**3** act 隧道單元（`attachExistingPeer`＋`session_act`） |
 | 2026-08-22 | **開局第一刀手測：** `pg-gomoku` Host＋Guest 連線對弈至終局、可重開；TV memory BC 綁定修復；Phase **3**／PLAY Phase 5 第一刀完成 |

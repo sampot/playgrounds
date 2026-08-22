@@ -29,17 +29,12 @@ import {
   GO_ROOM_TV_FULLSCREEN,
   GO_ROOM_TV_HINT_GUEST,
   GO_ROOM_TV_HINT_HOST,
+  GO_ROOM_TV_HINT_STORAGE,
   GO_ROOM_TV_OFF,
   GO_ROOM_TV_TITLE,
   isRoomInviteShareable,
   mediaTrackHasFrames,
-  roomChatBoxesOverlap,
-  roomChatBoxHasSize,
-  roomChatDismissesOnFocusLoss,
-  roomChatLayout,
-  roomChatPredictedOverlayBox,
-  roomChatShouldCloseOnFocusMove,
-  roomChatShouldCloseOnOutsidePress,
+  markRoomTvHintSeen,
   roomChatWhoLabel,
   roomHostDisplayName,
   playerDisplayName,
@@ -77,6 +72,9 @@ import {
   roomTvHudKind,
   roomTvHudHasTransport,
   roomTvHudRestore,
+  roomTvHintCopy,
+  roomTvHintEligible,
+  roomTvHintSeen,
   roomTvHudDefaultSink,
   roomTvVolumeIconClick,
   roomTvVolumePanelAfterIconClick,
@@ -95,6 +93,7 @@ import {
   roomShellPanesConcurrent,
   roomShellShowPane,
   roomShellTabPanes,
+  roomShellViewportBox,
   ROOM_SHELL_WIDE_MIN_PX,
   roomStageStatus,
   roomTvBindStream,
@@ -1525,9 +1524,6 @@ describe("roomEscStep", () => {
     expect(roomEscStep({ selectedPeerId: "p", cinema: true })).toBe(
       "clear-peer"
     );
-    expect(roomEscStep({ cinema: true, drawerOpen: true })).toBe(
-      "close-drawer"
-    );
     expect(roomEscStep({ cinema: true })).toBe("exit-cinema");
     expect(roomEscStep({})).toBe("confirm-end");
   });
@@ -1625,114 +1621,36 @@ describe("roomInviteDoorRow", () => {
   });
 });
 
-describe("room chat overlay vs canvas", () => {
-  const phoneCanvas = { left: 16, right: 374, top: 80, bottom: 304 };
-  const wideCanvas = { left: 396, right: 1004, top: 80, bottom: 460 };
-
-  it("treats chat as a covering drawer when the overlay overlaps the canvas", () => {
-    const overlay = roomChatPredictedOverlayBox({
-      viewportWidthPx: 390,
-      viewportHeightPx: 844,
-      chromeHeightPx: 60,
-    });
-    expect(roomChatBoxesOverlap(phoneCanvas, overlay)).toBe(true);
-    expect(roomChatLayout(true)).toBe("drawer");
+describe("roomShellViewportBox", () => {
+  it("reads the document element client box", () => {
+    expect(
+      roomShellViewportBox({
+        documentElement: { clientWidth: 390, clientHeight: 844 },
+      })
+    ).toEqual({ widthPx: 390, heightPx: 844 });
   });
+});
 
-  it("keeps a right overlay when the panel sits in the empty margin", () => {
-    const overlay = roomChatPredictedOverlayBox({
-      viewportWidthPx: 1400,
-      viewportHeightPx: 900,
-      chromeHeightPx: 60,
-    });
-    expect(overlay.left).toBe(1048);
-    expect(roomChatBoxesOverlap(wideCanvas, overlay)).toBe(false);
-    expect(roomChatLayout(false)).toBe("sidebar");
-  });
-
-  it("still covers a centered canvas at 1024px — a 22rem rail does not fit beside 40rem", () => {
-    const overlay = roomChatPredictedOverlayBox({
-      viewportWidthPx: 1024,
-      viewportHeightPx: 768,
-      chromeHeightPx: 60,
-    });
-    const canvas = { left: 208, right: 816, top: 80, bottom: 460 };
-    expect(roomChatBoxesOverlap(canvas, overlay)).toBe(true);
-  });
-
-  it("does not treat an unmeasured canvas as clear of the overlay", () => {
-    const empty = { left: 0, right: 0, top: 0, bottom: 0 };
-    expect(roomChatBoxHasSize(empty)).toBe(false);
-    expect(roomChatBoxHasSize(phoneCanvas)).toBe(true);
-  });
-
-  it("dismisses on focus loss only while the overlay covers the canvas", () => {
-    expect(roomChatDismissesOnFocusLoss(false)).toBe(false);
-    expect(roomChatDismissesOnFocusLoss(true)).toBe(true);
-    expect(
-      roomChatShouldCloseOnFocusMove({
-        coversCanvas: false,
-        panelContainsNext: false,
-        nextIsNull: true,
-      })
-    ).toBe(false);
-    expect(
-      roomChatShouldCloseOnFocusMove({
-        coversCanvas: true,
-        panelContainsNext: true,
-        nextIsNull: false,
-      })
-    ).toBe(false);
-    expect(
-      roomChatShouldCloseOnFocusMove({
-        coversCanvas: true,
-        panelContainsNext: false,
-        nextIsNull: false,
-      })
-    ).toBe(true);
-    expect(
-      roomChatShouldCloseOnFocusMove({
-        coversCanvas: true,
-        panelContainsNext: false,
-        nextIsNull: true,
-      })
-    ).toBe(true);
-    expect(
-      roomChatShouldCloseOnFocusMove({
-        coversCanvas: true,
-        panelContainsNext: false,
-        nextIsNull: true,
-        lostControlRemoved: true,
-      })
-    ).toBe(false);
-    expect(
-      roomChatShouldCloseOnOutsidePress({
-        coversCanvas: false,
-        pressInsidePanel: false,
-        pressOnToggle: false,
-      })
-    ).toBe(false);
-    expect(
-      roomChatShouldCloseOnOutsidePress({
-        coversCanvas: true,
-        pressInsidePanel: true,
-        pressOnToggle: false,
-      })
-    ).toBe(false);
-    expect(
-      roomChatShouldCloseOnOutsidePress({
-        coversCanvas: true,
-        pressInsidePanel: false,
-        pressOnToggle: true,
-      })
-    ).toBe(false);
-    expect(
-      roomChatShouldCloseOnOutsidePress({
-        coversCanvas: true,
-        pressInsidePanel: false,
-        pressOnToggle: false,
-      })
-    ).toBe(true);
+describe("roomTvHint", () => {
+  it("shows host vs guest copy once while the TV is idle", () => {
+    const storage = {
+      data: {} as Record<string, string>,
+      getItem(k: string) {
+        return this.data[k] ?? null;
+      },
+      setItem(k: string, v: string) {
+        this.data[k] = v;
+      },
+    };
+    expect(roomTvHintEligible({ tvOn: false, playActive: false })).toBe(true);
+    expect(roomTvHintEligible({ tvOn: true, playActive: false })).toBe(false);
+    expect(roomTvHintEligible({ tvOn: false, playActive: true })).toBe(false);
+    expect(roomTvHintSeen(storage)).toBe(false);
+    expect(roomTvHintCopy("host")).toBe(GO_ROOM_TV_HINT_HOST);
+    expect(roomTvHintCopy("guest")).toBe(GO_ROOM_TV_HINT_GUEST);
+    markRoomTvHintSeen(storage);
+    expect(storage.getItem(GO_ROOM_TV_HINT_STORAGE)).toBe("1");
+    expect(roomTvHintSeen(storage)).toBe(true);
   });
 });
 
