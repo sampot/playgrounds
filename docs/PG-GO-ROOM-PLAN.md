@@ -312,7 +312,7 @@ Guest `/i/` 不經大廳；進主面須讀成「你在一間包廂」。可選�
 
 ### 5.9 大螢幕上開局（硬；契約凍；**第一刀已手測**）
 
-契約凍（重用進門 PC、不鑄 `invite.compose`、Guest 留 `/i/`）。**第一刀：** `pg-gomoku` Host＋Guest 連線對弈至終局、結束這一局後可再開——手測通過。**redpick 四席：** harness 自動入座（Host＋3 Guest → 滿席可發牌）已確認；觀戰 boot 已補。剩餘：多人傳檔 e2e、redpick 發牌至終局手測。Mesh 檔直連見 §7.4／**1c**（與開局無關）。
+契約凍（重用進門 PC、不鑄 `invite.compose`、Guest 留 `/i/`）。**第一刀：** `pg-gomoku` Host＋Guest 連線對弈至終局、結束這一局後可再開——手測通過。**redpick：** 四席入座／觀戰／`deal→end` domain 已綠。剩餘：多人傳檔 e2e。Mesh 檔直連見 §7.4／**1c**（與開局無關）。
 
 **實作計劃（索引）：** [PG-GO-ROOM-PLAY-PLAN.md](./PG-GO-ROOM-PLAY-PLAN.md)（`session_play`、席次、重用 peer、大螢幕掛 SAM、與 GO-INVITE 切界；Phase 0–5）。本節凍產品契約；落地步驟與模組邊界以該文件為準。
 
@@ -1124,9 +1124,9 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 | **2e. 別人掛的檔上大螢幕** | 主持 `session_cast` → **owner** 本機渲染 → Hub 轉節目；先 video／audio；image 同模型；doc 延後 | 主持可把 Guest 掛的片子／歌放到大螢幕；不能 capture → reject＋頁內說明；**不**為上大螢幕拉檔到主持 | **video／audio／image 已落地**（`fromPeer`；圖＝canvas 靜態軌；doc 延後） |
 | **2f. 在場聲混音** | 星狀下 Host `AudioContext` 混多路上行麥 → 各 peer 一條 presence audio；單開麥可轉發；排除自迴音；節目音不混入 | ≥2 開麥者彼此聽得到；關麥即離混；**不做**多路視訊合成 | **已落地**（`goRoomPresenceAudioMix`；Hub `pushPresenceAudio`） |
 | **2g. 主持私有檔** | Host OPFS 片庫；與分享分離；可上大螢幕（`scope: private`）；掛到分享才可「要」；Guest 無私有區 | 私有不 fanout、不上 `/room-file`；cast 僅 RTP；散場不清 OPFS | **已落地**（OPFS＋`scope:private`；手測影／音；**圖同 2e**；Safari 影音片源仍同既有限制） |
-| **3. 重用 peer 開局** | 包廂已連 → `session_play`；大螢幕槽掛 SAM；主持選遊戲＋指定／自動入座；觀戰看同一畫布 | 不必再掃 compose；Guest 留 `/i/`；終局可結束這一局而包廂還在。第一刀：五子棋 2 席 | **第一刀已落地**（gomoku 手測；手動席；**redpick 四席 harness 滿席**） |
+| **3. 重用 peer 開局** | 包廂已連 → `session_play`；大螢幕槽掛 SAM；主持選遊戲＋指定／自動入座；觀戰看同一畫布 | 不必再掃 compose；Guest 留 `/i/`；終局可結束這一局而包廂還在。第一刀：五子棋 2 席 | **第一刀已落地**（gomoku 手測；手動席；**redpick** 四席＋觀戰＋deal→end domain） |
 
-建議實作順序 **0 → 1 → 1b → 2c → 2d → 2e → 2f → 2g → 1c → 2b**（皆已落地）→ **3 開局第一刀＋redpick 四席入座已手測**；**下一刀候選：多人傳檔 e2e／redpick 發牌終局／doc 上大螢幕**。2b 私下播保留在檔案區。**不要**排多路視訊合成。1c 打開後節目 RTP／在場聲仍走 Hub，直到另刀評估直連媒體。
+建議實作順序 **0 → 1 → 1b → 2c → 2d → 2e → 2f → 2g → 1c → 2b**（皆已落地）→ **3 開局第一刀＋redpick 入座／觀戰／deal→end domain 已綠**；**下一刀候選：多人傳檔 e2e／doc 上大螢幕**。2b 私下播保留在檔案區。**不要**排多路視訊合成。1c 打開後節目 RTP／在場聲仍走 Hub，直到另刀評估直連媒體。
 
 ---
 
@@ -1309,3 +1309,4 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 | 2026-08-22 | **2e image：** 圖檔上大螢幕（`<img>`／canvas.`captureStream` 低幀靜態節目軌；分享＋私有；無 seek HUD；wire kind＝video；doc 仍延後） |
 | 2026-08-22 | **2b 收斂：** 下載／圖檢視與影音私下播同一 `/room-file/`；撤未用 `createImagePreviewSink` blob 路徑；**3** act 隧道單元（`attachExistingPeer`＋`session_act`） |
 | 2026-08-22 | **開局第一刀手測：** `pg-gomoku` Host＋Guest 連線對弈至終局、可重開；TV memory BC 綁定修復；Phase **3**／PLAY Phase 5 第一刀完成 |
+| 2026-08-22 | **redpick deal→end：** domain 全手；終局剩桌歸 `lastCapturer`（跨 act）；下一刀＝多人傳檔 e2e |

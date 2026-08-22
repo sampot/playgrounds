@@ -1,6 +1,6 @@
 # Playgrounds 純玩版：包廂內重用 peer 開局（`session_play`）
 
-> **狀態：** Draft（2026-08-22）— **契約從屬** [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md) §5.9／凍結 #30／Phase **3**；**Phase 0–5 第一刀手測完成**（`pg-gomoku` Host＋Guest 連線對弈至終局、結束局後可再開；觀戰：殼 channel＋`pg-gomoku` `tryBootAsSpectator`；**harness 第三人觀戰已確認**）  
+> **狀態：** Draft（2026-08-22）— **契約從屬** [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md) §5.9／凍結 #30／Phase **3**；**Phase 0–5 第一刀手測完成**（`pg-gomoku`；觀戰 harness；**redpick** 四席＋觀戰名稱／牌背＋`deal→end` domain）  
 > **權威決策：** 從屬 [DECISIONS.md](./DECISIONS.md) **DEC-050**（純玩版）、**DEC-045**（已有可用 PeerConnection → **重用**，禁止 Platform renegotiation）、**DEC-047**（Platform Invite）；**不另開 DEC**  
 > **相關：** [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)（包廂產品契約／媒體／傳檔——**本文件只寫開局落地**）、[PG-GO-HOST-INVITE-PLAN.md](./PG-GO-HOST-INVITE-PLAN.md)（GO-INVITE＝`invite.compose`；**勿混**）、[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)（五子棋 `gomoku.v1`）、[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)、[PG-GO-ROOM-DEV-HARNESS-PLAN.md](./PG-GO-ROOM-DEV-HARNESS-PLAN.md)（localhost／Agent 多 tab；開局 E2E 可建其上）、[PG-GO-SESSION-CHAT-PLAN.md](./PG-GO-SESSION-CHAT-PLAN.md)（局內 overlay——**勿混**）、`.cursor/rules/no-native-dialogs.mdc`、`.cursor/rules/mobile-first-ux.mdc`、[GLOSSARY.md](./GLOSSARY.md)  
 > **載體 SAM：** 型錄 [`pg-gomoku`](../catalog/entries/pg-gomoku.yaml)（`gomoku.v1`；roles＝`host`＋`player`）；[`pg-redpick`](../catalog/entries/pg-redpick.yaml)（`redpick.v1`；roles＝`host`＋`p2`＋`p3`＋`p4`）
@@ -227,7 +227,7 @@ session_play.end    { from: host }
 | **4. 主持 sheet UX** | 型錄 game → Modal 選局；自動入座；狀態／結束局；Guest 無 CTA | 窄屏可開局；席不滿頁內說明；無原生 dialog | **完成**（「玩遊戲」Modal＋手動指定席） |
 | **5. 五子棋 e2e** | Host＋Guest 包廂內對弈至終局；第三人觀戰；結束局後包廂仍在 | Guest URL 始終包廂 `/i/`；可再播片／文字 | **第一刀手測完成**（連線對弈＋重開新局；觀戰 event channel **單元綠**；**harness 第三人觀戰已確認**） |
 
-**前置（非本文件交付）：** ROOM Phase **2d** 殼面 RWD 手測已完成。剩餘：多人傳檔 e2e；redpick 發牌至終局手測。
+**前置（非本文件交付）：** ROOM Phase **2d** 殼面 RWD 手測已完成。剩餘：多人傳檔 e2e。**redpick** 發牌至終局＝domain 單測綠（含 `lastCapturer` 持久化）；瀏覽器 harness 手測仍宜抽樣。
 
 建議刀序：**0 → 1 → 2 → 3 → 4 → 5**（第一刀已過）。TDD：可執行邏輯先寫失敗測試（席次、wire、peer 掛 session）。
 
@@ -243,9 +243,10 @@ session_play.end    { from: host }
 - [x] 入座席可對弈（Host＋Guest 手測；觀戰 event channel **單元綠**；harness 第三人觀戰已確認）
 - [x] 晚進門重送 play snapshot（含 `sessionId`／`channelName`）；只能觀戰
 - [x] 結束這一局後包廂仍 open（文字／檔／可再 cast；**可再開新局**手測）
-- [ ] 結束這一間確認文案含遊戲會停
+- [x] 結束這一間確認文案含遊戲會停
 - [x] 無 `alert`／`confirm`／`prompt`；窄屏可完成選局／自動入座／終局
 - [x] 第一刀：`pg-gomoku`／`gomoku.v1` Host＋1 player 至終局（手測；可重開）
+- [x] **redpick：** 四席入座＋觀戰牌背／名稱；`deal→end` domain（`lastCapturer` 跨 act；spectator 見終局）
 
 ---
 
@@ -275,3 +276,5 @@ session_play.end    { from: host }
 | 2026-08-22 | **手測：** `pg-gomoku` Host＋Guest 連線對弈至終局、結束局後可再開；Phase 3／5 第一刀完成 |
 | 2026-08-22 | harness 確認第三人觀戰；**手動指定席 UI：** picker 兩步（選局→指定席）＋`startManualPlay`；自動入座仍一鍵 |
 | 2026-08-22 | **redpick 四席：** harness Host＋3 Guest 自動入座→滿席可發牌；結束局包廂仍 open；`pg-redpick` 補 `tryBootAsSpectator` |
+| 2026-08-22 | **redpick 觀戰＋名稱：** 公開事件帶 `names`；四席牌背；`open` 同 session 不洗席；meter「下一位」 |
+| 2026-08-22 | **redpick deal→end：** domain 全手＋終局剩桌歸 `lastCapturer`（跨 act 持久化） |
