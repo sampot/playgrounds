@@ -156,8 +156,10 @@
     box-sizing: border-box;
   }
   .file-card--on-air {
-    border-color: #3dff8a;
-    box-shadow: 0 0 0 2px color-mix(in oklab, #3dff8a 55%, transparent);
+    border-color: color-mix(in oklab, rgb(var(--accent)) 72%, rgb(var(--ink)));
+    box-shadow:
+      0 0 0 2px color-mix(in oklab, rgb(var(--accent)) 42%, transparent),
+      var(--pixel-shadow);
   }
   .file-type {
     flex: 0 0 auto;
@@ -189,8 +191,8 @@
     padding: 0.05rem 0.28rem;
     border: 2px solid rgb(var(--ink));
     border-radius: var(--radius);
-    background: #3dff8a;
-    color: #0a2e18;
+    background: color-mix(in oklab, rgb(var(--accent)) 78%, rgb(var(--gold-soft)));
+    color: rgb(var(--ink));
     font-size: 0.62rem;
     font-weight: 800;
     letter-spacing: 0.02em;

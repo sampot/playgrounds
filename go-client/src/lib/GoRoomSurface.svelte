@@ -21,6 +21,7 @@
   import GoRoomMemberCard from "$lib/GoRoomMemberCard.svelte";
   import GoRoomFileCard from "$lib/GoRoomFileCard.svelte";
   import GoRoomPlayPicker from "$lib/GoRoomPlayPicker.svelte";
+  import GoRoomSettingsPanel from "$lib/GoRoomSettingsPanel.svelte";
   import GoSamLoadBar from "$lib/GoSamLoadBar.svelte";
   import { listRoomPlayableGames } from "$lib/goRoomPlayBootstrap";
   import { getGoCatalogEntry } from "$lib/goCatalog";
@@ -109,6 +110,7 @@
     GO_ROOM_CINEMA_PEEK_HINT_MS,
     markRoomCinemaPeekHintSeen,
     markRoomHostChecklistDismissed,
+    roomTvSnowEnabled,
     roomCinemaPeekHintSeen,
     roomHostChecklistDismissed,
     roomHostChecklistEligible,
@@ -273,6 +275,7 @@
   }: Props = $props();
 
   let playPickerOpen = $state(false);
+  let roomSettingsOpen = $state(false);
   const playableGames = $derived(listRoomPlayableGames());
   const nativeFileCapture = htmlMediaCaptureStreamSupported();
   const playPickerOccupants = $derived.by(() => {
@@ -340,6 +343,7 @@
   let cinemaUserEnter = $state(false);
   let tvHintConsumed = $state(false);
   let hostChecklistDismissed = $state(false);
+  let tvSnowEnabled = $state(true);
   let cinemaPeekConsumed = $state(false);
   let cinemaPeekToast = $state(false);
   let cinemaPeekFading = $state(false);
@@ -573,6 +577,7 @@
     })
   );
 
+  const tvIdleSnow = $derived(role === "host" ? tvSnowEnabled : true);
   const showTvHint = $derived(
     role === "guest" &&
       showMembers &&
@@ -613,6 +618,7 @@
     tvHintConsumed = roomTvHintSeen();
     hostChecklistDismissed = roomHostChecklistDismissed();
     cinemaPeekConsumed = roomCinemaPeekHintSeen();
+    tvSnowEnabled = roomTvSnowEnabled();
   });
 
   $effect(() => {
@@ -677,6 +683,7 @@
   const statusLineVisible = $derived(
     roomStatusLineVisible({ cinemaHud, phase })
   );
+  const statusOccupied = $derived(guestCount > 0);
 
   const showComposer = $derived(
     inBooth && (role === "host" || connected)
@@ -737,7 +744,7 @@
         Boolean(kickTarget) ||
         Boolean(deleteFileId) ||
         Boolean(privatePendingDelete),
-      // Member／file card「更多」must not reveal or pin the playground header.
+      // 包廂設定：勿 pin／拉出 playground header（對齊 composer、卡片更多選單）。
     });
     return () => {
       chromeSession.holdAutoHide = false;
@@ -1634,6 +1641,7 @@
     `room--${shellMode}`,
     hideChrome && "room--chrome-overlay",
     cinema && "room--cinema",
+    inBooth && "room--in-booth",
   ]
     .filter(Boolean)
     .join(" ")}
@@ -1648,6 +1656,7 @@
     <div class="room-tv-stage">
       <GoRoomTvSlot
         {tvOn}
+        idleSnow={tvIdleSnow}
         {tvStream}
         hudOpen={tvHudOpen}
         hudKind={tvHudKind}
@@ -1717,7 +1726,16 @@
           </p>
         </div>
       {:else if tvStatusGate}
-        <div class="room-tv-gate" role="region" aria-labelledby="room-status-gate-title">
+        <div
+          class={[
+            "room-tv-gate",
+            phase === "connecting" && "room-tv-gate--connecting",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+          role="region"
+          aria-labelledby="room-status-gate-title"
+        >
           {#if phase === "connecting"}
             <p id="room-status-gate-title" class="room-tv-gate-title pixel-text">
               {message || GO_ROOM_CONNECTING_TITLE}
@@ -1772,7 +1790,21 @@
       {/if}
     </div>
     {#if statusLabel && statusLineVisible}
-      <p class="room-status">{statusLabel}</p>
+      <p
+        class={[
+          "room-status",
+          tvOn && "room-status--on-air",
+          statusOccupied && "room-status--occupied",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+        role="status"
+      >
+        {#if statusOccupied}
+          <span class="room-status-dot" aria-hidden="true"></span>
+        {/if}
+        <span class="room-status-text">{statusLabel}</span>
+      </p>
     {/if}
   </div>
 
@@ -1780,6 +1812,7 @@
     {#if cinemaHud}
     <div class="room-lower">
     <nav class="room-dock" aria-label="包廂操作">
+      <div class="room-dock-group" role="group" aria-label="媒體與顯示">
       <button
         type="button"
         class={["pixel-btn", "room-dock-btn", cinema && "pixel-btn--primary"]
@@ -1886,9 +1919,30 @@
           </svg>
         </button>
       {/if}
+      </div>
+      <div class="room-dock-group room-dock-group--end" role="group" aria-label="設定與離開">
+      {#if role === "host"}
+        <button
+          type="button"
+          class={["pixel-btn", "room-dock-btn", roomSettingsOpen && "pixel-btn--primary"]
+            .filter(Boolean)
+            .join(" ")}
+          aria-label="包廂設定"
+          aria-expanded={roomSettingsOpen}
+          title="包廂設定"
+          onclick={() => (roomSettingsOpen = true)}
+        >
+          <svg class="dock-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="3" />
+            <path
+              d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.65 1.65 0 0 0 15 19.4a1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"
+            />
+          </svg>
+        </button>
+      {/if}
       <button
         type="button"
-        class="pixel-btn pixel-btn--danger-outline room-dock-btn"
+        class="pixel-btn pixel-btn--danger-outline room-dock-btn room-dock-btn--leave"
         aria-label={role === "host" ? "結束" : "離開"}
         title={role === "host" ? "結束" : "離開"}
         onclick={() => askEnd()}
@@ -1899,6 +1953,7 @@
           <line x1="21" y1="12" x2="9" y2="12" />
         </svg>
       </button>
+      </div>
     </nav>
     <div
       class="room-shell"
@@ -1909,7 +1964,7 @@
           {#if tabPanes.includes("members")}
             <button
               type="button"
-              class={["pixel-btn", paneTabOn("members") && "pixel-btn--primary"].filter(Boolean).join(" ")}
+              class={["room-tab-btn", paneTabOn("members") && "room-tab-btn--on"].filter(Boolean).join(" ")}
               aria-pressed={paneTabOn("members")}
               onclick={() => onPaneTab("members")}
             >
@@ -1919,7 +1974,7 @@
           {#if tabPanes.includes("files")}
             <button
               type="button"
-              class={["pixel-btn", paneTabOn("files") && "pixel-btn--primary"].filter(Boolean).join(" ")}
+              class={["room-tab-btn", paneTabOn("files") && "room-tab-btn--on"].filter(Boolean).join(" ")}
               aria-pressed={paneTabOn("files")}
               onclick={() => onPaneTab("files")}
             >
@@ -1929,7 +1984,7 @@
           {#if tabPanes.includes("chat")}
             <button
               type="button"
-              class={["pixel-btn", paneTabOn("chat") && "pixel-btn--primary"].filter(Boolean).join(" ")}
+              class={["room-tab-btn", paneTabOn("chat") && "room-tab-btn--on"].filter(Boolean).join(" ")}
               aria-pressed={paneTabOn("chat")}
               onclick={() => onPaneTab("chat")}
             >
@@ -2812,6 +2867,8 @@
     />
   {/if}
 
+  <GoRoomSettingsPanel bind:open={roomSettingsOpen} bind:tvSnowEnabled />
+
   <GoRoomPlayPicker
     bind:open={playPickerOpen}
     games={playableGames}
@@ -2862,6 +2919,41 @@
     min-height: 0;
     min-width: 0;
     box-sizing: border-box;
+  }
+  .room--in-booth {
+    position: relative;
+    isolation: isolate;
+  }
+  .room--in-booth::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(
+        ellipse 90% 50% at 50% -5%,
+        color-mix(in oklab, rgb(var(--gold)) 10%, transparent),
+        transparent 58%
+      ),
+      radial-gradient(
+        ellipse 120% 75% at 50% 105%,
+        color-mix(in oklab, #000 14%, transparent),
+        transparent 52%
+      );
+  }
+  html[data-theme="dark"] .room--in-booth::before {
+    background:
+      radial-gradient(
+        ellipse 75% 42% at 50% -8%,
+        color-mix(in oklab, rgb(var(--accent)) 12%, transparent),
+        transparent 55%
+      ),
+      radial-gradient(
+        ellipse 110% 68% at 50% 108%,
+        color-mix(in oklab, #000 38%, transparent),
+        transparent 58%
+      );
   }
   .room--chrome-overlay {
     height: 100%;
@@ -2935,6 +3027,12 @@
     pointer-events: none;
     text-shadow: 0 1px 0 #000;
     color: #f4efe4;
+    border-color: color-mix(in oklab, #f4efe4 32%, transparent);
+    background: color-mix(in oklab, #000 58%, transparent);
+  }
+  .room--cinema .room-status--on-air {
+    border-color: color-mix(in oklab, rgb(var(--gold-soft)) 55%, transparent);
+    background: color-mix(in oklab, #000 62%, rgb(var(--gold)) 12%);
   }
   .room-tv-col {
     flex: 0 0 auto;
@@ -2959,6 +3057,37 @@
     background: color-mix(in oklab, rgb(var(--ink)) 42%, transparent);
     color: #f4efe4;
     pointer-events: auto;
+    overflow: hidden;
+  }
+  .room-tv-gate--connecting::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: -40%;
+    height: 35%;
+    pointer-events: none;
+    background: linear-gradient(
+      180deg,
+      transparent 0%,
+      color-mix(in oklab, rgb(var(--accent)) 32%, transparent) 48%,
+      transparent 100%
+    );
+    animation: room-gate-scan 2s ease-in-out infinite;
+  }
+  @keyframes room-gate-scan {
+    0% {
+      transform: translateY(0);
+      opacity: 0.35;
+    }
+    50% {
+      transform: translateY(320%);
+      opacity: 0.75;
+    }
+    100% {
+      transform: translateY(640%);
+      opacity: 0.35;
+    }
   }
   .room-tv-gate-title {
     margin: 0;
@@ -3039,9 +3168,48 @@
     }
   }
   .room-status {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
     margin: 0.35rem 0 0;
-    font-size: 0.85rem;
-    color: color-mix(in oklab, rgb(var(--ink)) 72%, transparent);
+    padding: 0.28rem 0.6rem;
+    max-width: 100%;
+    border: 2px solid color-mix(in oklab, rgb(var(--ink)) 20%, transparent);
+    border-radius: 999px;
+    background: color-mix(in oklab, rgb(var(--card)) 88%, transparent);
+    font-size: 0.82rem;
+    line-height: 1.35;
+    color: color-mix(in oklab, rgb(var(--ink)) 78%, transparent);
+    box-sizing: border-box;
+  }
+  .room-status--on-air {
+    border-color: color-mix(in oklab, rgb(var(--gold)) 58%, rgb(var(--ink)));
+    background: color-mix(in oklab, rgb(var(--gold-soft)) 24%, rgb(var(--card)));
+    color: rgb(var(--ink));
+  }
+  .room-status-dot {
+    flex: 0 0 auto;
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 50%;
+    background: rgb(var(--accent));
+    box-shadow: 0 0 0 2px color-mix(in oklab, rgb(var(--accent)) 32%, transparent);
+    animation: room-status-pulse 2.2s ease-in-out infinite;
+  }
+  .room-status-text {
+    min-width: 0;
+  }
+  @keyframes room-status-pulse {
+    0%,
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(1.15);
+      opacity: 0.82;
+    }
   }
   .room-shell {
     display: flex;
@@ -3066,8 +3234,10 @@
   .room-host-checklist {
     margin: 0 0 0.55rem;
     padding: 0.55rem 0.65rem;
-    border: 1px solid color-mix(in oklab, rgb(var(--ink)) 22%, transparent);
-    background: color-mix(in oklab, rgb(var(--paper)) 92%, transparent);
+    border: var(--pixel-edge) solid color-mix(in oklab, rgb(var(--ink)) 28%, transparent);
+    border-radius: var(--radius);
+    background: color-mix(in oklab, rgb(var(--card)) 92%, rgb(var(--gold-soft)) 8%);
+    box-shadow: var(--pixel-shadow);
     line-height: 1.45;
     font-size: 0.88rem;
   }
@@ -3152,11 +3322,40 @@
   .room-tabs {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.35rem;
+    gap: 0.15rem;
+    padding: 0.2rem;
+    border: var(--pixel-edge) solid color-mix(in oklab, rgb(var(--ink)) 16%, transparent);
+    border-radius: var(--radius);
+    background: color-mix(in oklab, rgb(var(--fill)) 65%, rgb(var(--card)));
   }
-  .room-tabs .pixel-btn {
-    min-height: 44px;
+  .room-tab-btn {
     flex: 1 1 auto;
+    min-height: 44px;
+    margin: 0;
+    padding: 0.35rem 0.55rem;
+    border: none;
+    border-bottom: 3px solid transparent;
+    border-radius: calc(var(--radius) - 1px);
+    background: transparent;
+    color: color-mix(in oklab, rgb(var(--ink)) 78%, transparent);
+    font: inherit;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+      background 0.15s ease,
+      border-color 0.15s ease,
+      color 0.15s ease;
+  }
+  .room-tab-btn--on {
+    border-bottom-color: rgb(var(--accent));
+    background: color-mix(in oklab, rgb(var(--accent)) 14%, transparent);
+    color: rgb(var(--ink));
+    font-weight: 700;
+  }
+  .room-tab-btn:focus-visible {
+    outline: 2px solid rgb(var(--accent));
+    outline-offset: 2px;
   }
   .room-pane {
     flex: 1 1 auto;
@@ -3184,11 +3383,12 @@
     gap: 0.25rem;
   }
   .room--portrait .room-tabs {
-    gap: 0.25rem;
+    gap: 0.1rem;
   }
-  .room--portrait .room-tabs .pixel-btn {
+  .room--portrait .room-tab-btn {
     padding-left: 0.45rem;
     padding-right: 0.45rem;
+    font-size: 0.86rem;
   }
   .door-row {
     display: flex;
@@ -3217,8 +3417,23 @@
   .room-dock {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: 0.35rem;
     flex: 0 0 auto;
+    padding: 0.35rem 0.45rem;
+    border: var(--pixel-edge) solid color-mix(in oklab, rgb(var(--ink)) 18%, transparent);
+    border-radius: var(--radius);
+    background: color-mix(in oklab, rgb(var(--card)) 90%, transparent);
+    box-shadow: var(--pixel-inset);
+  }
+  .room-dock-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+  }
+  .room-dock-group--end {
+    margin-left: auto;
   }
   .room-dock-btn {
     min-height: 44px;
@@ -3228,6 +3443,15 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    transition: transform 0.12s ease;
+  }
+  .room-dock-btn:active:not(:disabled) {
+    transform: scale(0.96);
+  }
+  .room-dock-btn.pixel-btn--primary {
+    box-shadow:
+      var(--pixel-shadow),
+      0 0 0 2px color-mix(in oklab, rgb(var(--accent)) 28%, transparent);
   }
   .dock-icon {
     width: 22px;
@@ -3941,6 +4165,15 @@
     font-size: 0.85rem;
     line-height: 1.35;
     color: var(--go-muted, #8a8694);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .room-status-dot,
+    .room-tv-gate--connecting::after {
+      animation: none;
+    }
+    .room-dock-btn:active:not(:disabled) {
+      transform: none;
+    }
   }
 </style>
 

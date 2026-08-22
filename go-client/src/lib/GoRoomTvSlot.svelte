@@ -26,6 +26,7 @@
 
   let {
     tvOn = false,
+    idleSnow = true,
     tvStream = null,
     hudOpen = false,
     hudKind = "none",
@@ -51,6 +52,7 @@
     caption = null,
   }: {
     tvOn?: boolean;
+    idleSnow?: boolean;
     tvStream?: MediaStream | null;
     hudOpen?: boolean;
     hudKind?: RoomTvHudKind;
@@ -191,7 +193,60 @@
   }
 </script>
 
-<div class="tv-slot" bind:this={slotEl} class:tv-slot--fs={slotFullscreen}>
+<div
+  class={[
+    "tv-slot",
+    slotFullscreen && "tv-slot--fs",
+    tvOn && "tv-slot--on-air",
+  ]
+    .filter(Boolean)
+    .join(" ")}
+  bind:this={slotEl}
+>
+  {#if !playActive && !tvOn}
+    <div
+      class={["tv-idle", idleSnow && "tv-idle--snow"].filter(Boolean).join(" ")}
+      aria-hidden="true"
+    >
+      {#if idleSnow}
+        <svg
+          class="tv-noise"
+          xmlns="http://www.w3.org/2000/svg"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <filter id="go-room-tv-noise" color-interpolation-filters="sRGB">
+            <feTurbulence
+              type="fractalNoise"
+              baseFrequency="0.72"
+              numOctaves="4"
+              stitchTiles="stitch"
+              result="noise"
+            >
+              <animate
+                attributeName="seed"
+                dur="0.55s"
+                repeatCount="indefinite"
+                values="0;3;7;11;15;19;23;0"
+                media="(prefers-reduced-motion: no-preference)"
+              />
+            </feTurbulence>
+            <feColorMatrix
+              type="matrix"
+              values="0 0 0 0 0.92
+                      0 0 0 0 0.92
+                      0 0 0 0 0.96
+                      0 0 0 0.55 0"
+              in="noise"
+            />
+          </filter>
+          <rect width="100%" height="100%" filter="url(#go-room-tv-noise)" />
+        </svg>
+        <span class="tv-snow-grain"></span>
+        <span class="tv-crt-overlay"></span>
+      {/if}
+    </div>
+  {/if}
   <video
     bind:this={videoEl}
     class={[
@@ -228,8 +283,6 @@
         ></iframe>
       {/key}
     {/if}
-  {:else if !tvOn}
-    <span class="tv-snow" aria-hidden="true"></span>
   {:else if audioFace}
     <div
       class="tv-audio-face"
@@ -391,8 +444,21 @@
     background: #0a0a0e;
     border: var(--pixel-edge) solid rgb(var(--ink));
     border-radius: var(--radius);
-    box-shadow: var(--pixel-shadow);
+    box-shadow:
+      var(--pixel-shadow),
+      inset 0 0 0 2px color-mix(in oklab, rgb(var(--line)) 35%, #0a0a0e);
     overflow: hidden;
+    transition:
+      box-shadow 0.35s ease,
+      border-color 0.35s ease;
+  }
+  .tv-slot--on-air {
+    border-color: color-mix(in oklab, rgb(var(--gold)) 72%, rgb(var(--ink)));
+    box-shadow:
+      var(--pixel-shadow),
+      0 0 0 2px color-mix(in oklab, rgb(var(--gold)) 42%, transparent),
+      0 0 1.35rem color-mix(in oklab, rgb(var(--gold)) 22%, transparent),
+      inset 0 0 0 2px color-mix(in oklab, rgb(var(--gold-soft)) 18%, #0a0a0e);
   }
   .tv-slot:fullscreen,
   .tv-slot:-webkit-full-screen,
@@ -415,6 +481,8 @@
     cursor: pointer;
   }
   .tv-video {
+    position: relative;
+    z-index: 2;
     display: block;
     width: 100%;
     height: 100%;
@@ -423,6 +491,9 @@
   }
   .tv-video--off {
     opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    z-index: 0;
   }
   .tv-video--play-hidden,
   .tv-video--audio-face {
@@ -438,17 +509,84 @@
     border: 0;
     background: #000;
   }
-  .tv-snow {
+  .tv-idle {
     position: absolute;
     inset: 0;
+    z-index: 1;
+    overflow: hidden;
+    background: #08080c;
     pointer-events: none;
+  }
+  .tv-idle--snow {
+    background:
+      radial-gradient(
+        ellipse 85% 70% at 50% 48%,
+        #2a2a36 0%,
+        #12121a 45%,
+        #08080c 100%
+      );
+  }
+  .tv-noise {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0.72;
+    mix-blend-mode: screen;
+  }
+  .tv-snow-grain {
+    position: absolute;
+    inset: -25%;
+    pointer-events: none;
+    opacity: 0.42;
+    mix-blend-mode: overlay;
     background:
       repeating-linear-gradient(
+        90deg,
+        rgb(255 255 255 / 0.09) 0 1px,
+        rgb(0 0 0 / 0.12) 1px 2px,
+        rgb(255 255 255 / 0.05) 2px 3px
+      ),
+      repeating-linear-gradient(
         0deg,
-        #1a1a22 0 1px,
-        #0c0c10 1px 3px
+        rgb(255 255 255 / 0.07) 0 1px,
+        rgb(0 0 0 / 0.1) 1px 2px
       );
-    opacity: 0.85;
+    background-size:
+      4px 100%,
+      100% 3px;
+    animation: tv-snow-drift 0.12s steps(4) infinite;
+  }
+  .tv-crt-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    border-radius: inherit;
+    box-shadow: inset 0 0 3.5rem color-mix(in oklab, #000 62%, transparent);
+    background: repeating-linear-gradient(
+      0deg,
+      color-mix(in oklab, #000 0%, transparent) 0 2px,
+      color-mix(in oklab, #000 18%, transparent) 2px 4px
+    );
+    opacity: 0.34;
+  }
+  @keyframes tv-snow-drift {
+    0% {
+      transform: translate(0, 0);
+    }
+    25% {
+      transform: translate(-3px, 2px);
+    }
+    50% {
+      transform: translate(2px, -2px);
+    }
+    75% {
+      transform: translate(-1px, -3px);
+    }
+    100% {
+      transform: translate(0, 0);
+    }
   }
   .tv-audio-face {
     position: absolute;
@@ -484,9 +622,9 @@
     border-radius: 2px 2px 0 0;
     background: linear-gradient(
       180deg,
-      #f0e6c8 0%,
-      #c4a574 55%,
-      #8a6a3a 100%
+      rgb(var(--gold-soft)) 0%,
+      color-mix(in oklab, rgb(var(--gold)) 78%, #8a6a3a) 55%,
+      color-mix(in oklab, rgb(var(--gold)) 55%, #5a4a2a) 100%
     );
     opacity: 0.92;
     transition: height 40ms linear;
@@ -518,6 +656,12 @@
   @keyframes tv-audio-spin {
     to {
       transform: rotate(360deg);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .tv-snow-grain,
+    .tv-audio-disc--spin {
+      animation: none;
     }
   }
   .tv-hud {

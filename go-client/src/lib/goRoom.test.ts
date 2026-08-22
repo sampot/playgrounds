@@ -31,6 +31,9 @@ import {
   GO_ROOM_TV_HINT_HOST,
   GO_ROOM_TV_HINT_STORAGE,
   GO_ROOM_TV_OFF,
+  GO_ROOM_SETTINGS_TV_SNOW_HINT,
+  GO_ROOM_SETTINGS_TV_SNOW_LABEL,
+  GO_ROOM_TV_SNOW_STORAGE,
   GO_ROOM_TV_TITLE,
   isRoomInviteShareable,
   mediaTrackHasFrames,
@@ -85,6 +88,8 @@ import {
   roomTvHintCopy,
   roomTvHintEligible,
   roomTvHintSeen,
+  roomTvSnowEnabled,
+  setRoomTvSnowEnabled,
   roomTvHudDefaultSink,
   roomTvVolumeIconClick,
   roomTvVolumePanelAfterIconClick,
@@ -1760,6 +1765,28 @@ describe("roomTvHint", () => {
     markRoomTvHintSeen(storage);
     expect(storage.getItem(GO_ROOM_TV_HINT_STORAGE)).toBe("1");
     expect(roomTvHintSeen(storage)).toBe(true);
+  });
+});
+
+describe("roomTvSnow", () => {
+  it("defaults on and persists host off", () => {
+    const storage = {
+      data: {} as Record<string, string>,
+      getItem(k: string) {
+        return this.data[k] ?? null;
+      },
+      setItem(k: string, v: string) {
+        this.data[k] = v;
+      },
+    };
+    expect(roomTvSnowEnabled(storage)).toBe(true);
+    setRoomTvSnowEnabled(false, storage);
+    expect(storage.getItem(GO_ROOM_TV_SNOW_STORAGE)).toBe("0");
+    expect(roomTvSnowEnabled(storage)).toBe(false);
+    setRoomTvSnowEnabled(true, storage);
+    expect(roomTvSnowEnabled(storage)).toBe(true);
+    expect(GO_ROOM_SETTINGS_TV_SNOW_LABEL).toContain("雪花");
+    expect(GO_ROOM_SETTINGS_TV_SNOW_HINT).toContain("裝置");
   });
 });
 

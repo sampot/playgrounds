@@ -445,6 +445,31 @@ export function markRoomTvHintSeen(
   storage.setItem(GO_ROOM_TV_HINT_STORAGE, "1");
 }
 
+export const GO_ROOM_TV_SNOW_STORAGE = "go-room-tv-snow-v1";
+export const GO_ROOM_SETTINGS_TITLE = "包廂設定";
+export const GO_ROOM_SETTINGS_SECTION_DISPLAY = "大螢幕";
+export const GO_ROOM_SETTINGS_TV_SNOW_LABEL = "沒訊號雪花";
+export const GO_ROOM_SETTINGS_TV_SNOW_HINT =
+  "大螢幕沒有節目時顯示電視雪花效果。只影響你這台裝置。";
+
+/** Host preference: animated idle snow on the booth TV (default on). */
+export function roomTvSnowEnabled(
+  storage: Pick<Storage, "getItem"> = typeof localStorage !== "undefined"
+    ? localStorage
+    : { getItem: () => null }
+): boolean {
+  return storage.getItem(GO_ROOM_TV_SNOW_STORAGE) !== "0";
+}
+
+export function setRoomTvSnowEnabled(
+  enabled: boolean,
+  storage: Pick<Storage, "setItem"> = typeof localStorage !== "undefined"
+    ? localStorage
+    : { setItem: () => {} }
+): void {
+  storage.setItem(GO_ROOM_TV_SNOW_STORAGE, enabled ? "1" : "0");
+}
+
 export const GO_ROOM_HOST_CHECKLIST_STORAGE = "go-room-host-checklist-v1";
 
 export type RoomHostChecklistStep = "invite" | "hang_cast" | "live_cast";

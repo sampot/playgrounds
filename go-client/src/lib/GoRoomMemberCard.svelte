@@ -297,6 +297,26 @@
       0 0 0 2px color-mix(in oklab, rgb(var(--gold)) 55%, transparent),
       var(--pixel-shadow);
   }
+  .member-card--on-air .member-avatar-wrap::after {
+    content: "";
+    position: absolute;
+    inset: -3px;
+    border: 2px solid color-mix(in oklab, rgb(var(--gold)) 70%, transparent);
+    border-radius: calc(var(--radius) + 2px);
+    pointer-events: none;
+    animation: member-ring-pulse 2.4s ease-in-out infinite;
+  }
+  @keyframes member-ring-pulse {
+    0%,
+    100% {
+      opacity: 0.55;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.04);
+    }
+  }
   .member-card--direct:not(.member-card--on-air) {
     border-color: color-mix(in oklab, rgb(var(--accent)) 45%, rgb(var(--ink)));
   }
@@ -469,6 +489,10 @@
   @media (prefers-reduced-motion: reduce) {
     .member-wave {
       animation: none;
+    }
+    .member-card--on-air .member-avatar-wrap::after {
+      animation: none;
+      opacity: 0.85;
     }
   }
   .member-more {
