@@ -176,6 +176,8 @@ export type RoomPlayableGame = {
   blurb: string;
   /** Seats required (roles × limits; default 1 per role). */
   seatCount: number;
+  /** Protocol role ids in seat order (limits expanded by seatCount only). */
+  roles: string[];
   cover?: string;
 };
 
@@ -220,6 +222,7 @@ export function listRoomPlayableGames(): RoomPlayableGame[] {
       title: entry.title,
       blurb: roomPlayPickerBlurb(entry.blurb),
       seatCount: roomPlaySeatCount(protocol),
+      roles: protocol.roles.map((r) => r.trim()).filter(Boolean),
       ...(entry.cover ? { cover: entry.cover } : {}),
     });
   }

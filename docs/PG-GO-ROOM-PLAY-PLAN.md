@@ -67,7 +67,7 @@
 5. 第一刀不做局中換席／開局後補位。
 6. 遊戲 SAM 忽略閒置 2+2 A／V；不因開局自動開相機。
 7. 開局時節目可 `unoffer`；結束局＝卸載畫布、節目 `<video>` **綁定不拆**（勿 `display:none` 解碼停）。
-8. 主持主面 CTA＝「玩遊戲」→ **頁內 Modal**（型錄 `listRoomPlayableGames`）；自動入座開局；完整手動指定席＝後續。
+8. 主持主面 CTA＝「玩遊戲」→ **頁內 Modal**（型錄 `listRoomPlayableGames`）→ 指定席／自動入座 → 開局。
 
 ---
 
@@ -224,10 +224,10 @@ session_play.end    { from: host }
 | **1. Wire＋席次** | `rosterSessionPlay`；`assignRoomPlaySeats`；單測 | parse／guard；auto／manual 滿席／缺額案例綠 | **完成** |
 | **2. Peer 上掛 session** | 抽出 session core；room 注入既有 peer；假 DC：offer→載 stub→invite／act 一回合 | **零** Platform mint／join；end 後 peer 仍可 chat | **完成**（`attachExistingPeer`／`inviteRoomPlayPeers`／`closeSessionKeepPeers`；Guest load＋auto-accept；**act 隧道單元**） |
 | **3. 大螢幕槽** | TV slot 掛／卸 canvas；節目綁定保留 | active 見畫布；end 回沒訊號；video 元素仍在 DOM | **完成**（`GoRoomTvSlot`；memory BC 綁定；手測） |
-| **4. 主持 sheet UX** | 型錄 game → Modal 選局；自動入座；狀態／結束局；Guest 無 CTA | 窄屏可開局；席不滿頁內說明；無原生 dialog | **完成**（「玩遊戲」Modal；手動指定席待） |
+| **4. 主持 sheet UX** | 型錄 game → Modal 選局；自動入座；狀態／結束局；Guest 無 CTA | 窄屏可開局；席不滿頁內說明；無原生 dialog | **完成**（「玩遊戲」Modal＋手動指定席） |
 | **5. 五子棋 e2e** | Host＋Guest 包廂內對弈至終局；第三人觀戰；結束局後包廂仍在 | Guest URL 始終包廂 `/i/`；可再播片／文字 | **第一刀手測完成**（連線對弈＋重開新局；觀戰 event channel **單元綠**；**harness 第三人觀戰已確認**） |
 
-**前置（非本文件交付）：** ROOM Phase **2d** 殼面 RWD 手測已完成。剩餘：手動指定席 UI、多人傳檔 e2e。
+**前置（非本文件交付）：** ROOM Phase **2d** 殼面 RWD 手測已完成。剩餘：多人傳檔 e2e。
 
 建議刀序：**0 → 1 → 2 → 3 → 4 → 5**（第一刀已過）。TDD：可執行邏輯先寫失敗測試（席次、wire、peer 掛 session）。
 
@@ -238,7 +238,7 @@ session_play.end    { from: host }
 - [x] `session_play.offer`／`end` 經既有包廂 DC fanout；不經 Platform
 - [x] 開局**不** mint `invite.compose`；Guest **不**改網址
 - [x] 進門 PC 重用（無第二輪 Platform O／A）
-- [x] 自動入座；席不滿不開；同一 peer 不佔兩席（**手動指定席 UI 待**）
+- [x] 自動入座；席不滿不開；同一 peer 不佔兩席（**手動指定席 UI 已落地**）
 - [x] 大螢幕槽掛 SAM；結束局卸載；節目綁定不拆（手測）
 - [x] 入座席可對弈（Host＋Guest 手測；觀戰 event channel **單元綠**；harness 第三人觀戰已確認）
 - [x] 晚進門重送 play snapshot（含 `sessionId`／`channelName`）；只能觀戰
@@ -273,3 +273,4 @@ session_play.end    { from: host }
 | 2026-08-22 | Phase **2** act 隧道單元（`attachExistingPeer`＋`session_act`→`/api/session/act`＋`session_act_result`） |
 | 2026-08-22 | **fix：** 包廂 TV 槽 `onload` 綁 `setGoMemoryCanvasWindow`——srcdoc memory canvas 否則收不到 Guest `session_event`（主持端看不到對方落子） |
 | 2026-08-22 | **手測：** `pg-gomoku` Host＋Guest 連線對弈至終局、結束局後可再開；Phase 3／5 第一刀完成 |
+| 2026-08-22 | harness 確認第三人觀戰；**手動指定席 UI：** picker 兩步（選局→指定席）＋`startManualPlay`；自動入座仍一鍵 |

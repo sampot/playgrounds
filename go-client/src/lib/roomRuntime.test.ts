@@ -627,6 +627,64 @@ describe("roomRuntime", () => {
     );
   });
 
+  it("startManualPlay offers with Host picks; short seats do not offer", async () => {
+    let loopOpts: {
+      prepareHandlers: () => {
+        handlers: { onMessage: (data: unknown) => void };
+        attachSession: (s: ReturnType<typeof mockSession>) => void;
+      };
+    } | null = null;
+    fixtures.startLoop.mockImplementation((opts: typeof loopOpts) => {
+      loopOpts = opts;
+      return { stop: vi.fn(), inviteId: "inv-room" };
+    });
+    const { createRoomRuntime } = await import("./roomRuntime");
+    const { chromeSession } = await import("./chromeSession.svelte");
+    const rt = createRoomRuntime();
+    await rt.openBooth();
+    await rt.mintInviteAndAnswer();
+    const a = mockSession();
+    const first = loopOpts!.prepareHandlers();
+    first.attachSession(a);
+    first.handlers.onChannelOpen();
+    first.handlers.onMessage({
+      type: "presence",
+      agentId: "g-a",
+      name: "甲",
+    });
+    const hostId = rt.getStatus().localPeerId;
+
+    a.send.mockClear();
+    const short = await rt.startManualPlay("pg-gomoku", [
+      { role: "host", peerId: hostId },
+    ]);
+    expect(short.ok).toBe(false);
+    if (!short.ok) expect(short.reason).toBe("seats_short");
+    expect(rt.getPlayState().phase).toBe("idle");
+    expect(a.send).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: "session_play", op: "offer" })
+    );
+    expect(chromeSession.setFlash).not.toHaveBeenCalled();
+
+    const ok = await rt.startManualPlay("pg-gomoku", [
+      { role: "host", peerId: hostId },
+      { role: "player", peerId: "g-a" },
+    ]);
+    expect(ok.ok).toBe(true);
+    expect(rt.getStatus().playCatalogId).toBe("pg-gomoku");
+    expect(a.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "session_play",
+        op: "offer",
+        catalogId: "pg-gomoku",
+        seats: [
+          { role: "host", peerId: hostId },
+          { role: "player", peerId: "g-a" },
+        ],
+      })
+    );
+  });
+
   it("ignores session_play forged by a guest", async () => {
     let loopOpts: {
       prepareHandlers: () => {

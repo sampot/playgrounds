@@ -99,6 +99,8 @@ export type RoomStatus = {
   guestCount: number;
   occupantNames: string[];
   occupantPeers: { peerId: string; name: string }[];
+  /** Host peer id for session_play seats（not the UI alias "local"）. */
+  localPeerId: string;
   /** Booth play canvas (TV slot); null when idle. */
   playCatalogId: string | null;
   /** Tip-check／auto-update while mounting booth play SAM. */
@@ -135,6 +137,11 @@ export function createRoomRuntime(opts?: {
       : typeof sessionStorage !== "undefined"
         ? sessionStorage
         : null;
+  let mintInflight: Promise<{
+    inviteId: string;
+    shortUrl: string;
+  } | null> | null = null;
+  const localAgentId = `go-room-${crypto.randomUUID().slice(0, 8)}`;
   let status: RoomStatus = {
     phase: "idle",
     message: "",
@@ -147,6 +154,7 @@ export function createRoomRuntime(opts?: {
     guestCount: 0,
     occupantNames: [],
     occupantPeers: [],
+    localPeerId: localAgentId,
     playCatalogId: null,
     playLoadProgress: null,
     playCanvasUrl: null,
@@ -157,15 +165,10 @@ export function createRoomRuntime(opts?: {
   const listeners = new Set<Listener>();
   let loop: ReturnType<typeof startPlatformHostAnswerLoop> | null = null;
   let inviteExpiryTimer: ReturnType<typeof setTimeout> | null = null;
-  const localAgentId = `go-room-${crypto.randomUUID().slice(0, 8)}`;
   const slots: PeerSlot[] = [];
   let surfaceAttached = false;
   let closing = false;
   let opening = false;
-  let mintInflight: Promise<{
-    inviteId: string;
-    shortUrl: string;
-  } | null> | null = null;
   let fileHub: RoomFileStarHub | null = null;
   let playHost: HostRuntime | null = null;
   let playCanvas: MountedGoCanvas | null = null;
@@ -945,17 +948,8 @@ export function createRoomRuntime(opts?: {
     return { ok: true, state: out.state };
   }
 
-  /**
-   * Host shortcut: auto-seat + offerPlay for a catalog game (first knife UX).
-   */
-  async function startAutoPlay(catalogId: string): Promise<
-    | { ok: true; state: RoomSessionPlayState }
-    | { ok: false; reason: string }
-  > {
-    const entry = getGoCatalogEntry(catalogId);
-    const protocol = hostableProtocolFor(entry ?? null);
-    if (!protocol) return { ok: false, reason: "not_playable" };
-    const occupants = [
+  function playOccupants() {
+    return [
       {
         peerId: localAgentId,
         displayName: roomHostDisplayName(goAuth.profile) || "主持",
@@ -969,16 +963,61 @@ export function createRoomRuntime(opts?: {
           joinedAt: i + 1,
         })),
     ];
+  }
+
+  /**
+   * Host shortcut: auto-seat + offerPlay for a catalog game (first knife UX).
+   */
+  async function startAutoPlay(catalogId: string): Promise<
+    | { ok: true; state: RoomSessionPlayState }
+    | { ok: false; reason: string }
+  > {
+    const entry = getGoCatalogEntry(catalogId);
+    const protocol = hostableProtocolFor(entry ?? null);
+    if (!protocol) return { ok: false, reason: "not_playable" };
     const seatsOut = assignRoomPlaySeats({
       protocolRoles: protocol.roles,
       roleLimits: protocol.roleLimits,
       hostPeerId: localAgentId,
-      occupantsOrdered: occupants,
+      occupantsOrdered: playOccupants(),
       mode: "auto",
     });
     if (!seatsOut.ok) {
       chromeSession.setFlash("人數不夠開局，請先請人進來", 2800);
       return { ok: false, reason: seatsOut.reason };
+    }
+    return offerPlay({ catalogId, seats: seatsOut.seats });
+  }
+
+  /**
+   * Host: manual seat picks → offerPlay. Failures stay in-sheet（no flash）.
+   */
+  async function startManualPlay(
+    catalogId: string,
+    manualPicks: readonly SessionPlaySeat[]
+  ): Promise<
+    | { ok: true; state: RoomSessionPlayState }
+    | { ok: false; reason: string; missingRoles?: string[] }
+  > {
+    const entry = getGoCatalogEntry(catalogId);
+    const protocol = hostableProtocolFor(entry ?? null);
+    if (!protocol) return { ok: false, reason: "not_playable" };
+    const seatsOut = assignRoomPlaySeats({
+      protocolRoles: protocol.roles,
+      roleLimits: protocol.roleLimits,
+      hostPeerId: localAgentId,
+      occupantsOrdered: playOccupants(),
+      mode: "manual",
+      manualPicks,
+    });
+    if (!seatsOut.ok) {
+      return {
+        ok: false,
+        reason: seatsOut.reason,
+        ...(seatsOut.missingRoles
+          ? { missingRoles: seatsOut.missingRoles }
+          : {}),
+      };
     }
     return offerPlay({ catalogId, seats: seatsOut.seats });
   }
@@ -1091,6 +1130,7 @@ export function createRoomRuntime(opts?: {
     /** Booth host: fanout session_play.offer on existing peers (no compose). */
     offerPlay,
     startAutoPlay,
+    startManualPlay,
     endPlay,
     openBooth,
     mintInviteAndAnswer,

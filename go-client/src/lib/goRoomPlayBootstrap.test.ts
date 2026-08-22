@@ -27,8 +27,10 @@ describe("listRoomPlayableGames", () => {
     const redpick = games.find((g) => g.catalogId === "pg-redpick");
     expect(gomoku?.title).toBeTruthy();
     expect(gomoku?.seatCount).toBe(2);
+    expect(gomoku?.roles).toEqual(["host", "player"]);
     expect(redpick?.title).toMatch(/撿紅點/);
     expect(redpick?.seatCount).toBe(4);
+    expect(redpick?.roles).toEqual(["host", "p2", "p3", "p4"]);
   });
 
   it("does not surface wire protocol ids in picker blurbs", () => {

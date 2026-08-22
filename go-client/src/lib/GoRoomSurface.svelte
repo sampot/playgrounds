@@ -189,7 +189,20 @@
     playCanvasUrl?: string | null;
     playCanvasSrcdoc?: string | null;
     playCanvasGeneration?: number;
+    /** Host wire peer id for manual seats（session_play）. */
+    playLocalPeerId?: string | null;
+    playHostName?: string | null;
     onStartPlay?: (catalogId: string) => void | Promise<void>;
+    onStartManualPlay?: (
+      catalogId: string,
+      picks: { role: string; peerId: string }[]
+    ) =>
+      | void
+      | Promise<
+          | { ok: true }
+          | { ok: false; reason: string; missingRoles?: string[] }
+          | undefined
+        >;
     onEndPlay?: () => void | Promise<void>;
   };
 
@@ -217,12 +230,31 @@
     playCanvasUrl = null,
     playCanvasSrcdoc = null,
     playCanvasGeneration = 0,
+    playLocalPeerId = null,
+    playHostName = null,
     onStartPlay,
+    onStartManualPlay,
     onEndPlay,
   }: Props = $props();
 
   let playPickerOpen = $state(false);
   const playableGames = $derived(listRoomPlayableGames());
+  const playPickerOccupants = $derived.by(() => {
+    const hostId = playLocalPeerId?.trim();
+    if (!hostId) return occupantPeers;
+    const hostName =
+      playHostName?.trim() ||
+      goAuth.profile?.label?.trim() ||
+      "主持";
+    const seen = new Set<string>([hostId]);
+    const rows = [{ peerId: hostId, name: hostName }];
+    for (const p of occupantPeers) {
+      if (!p.peerId || seen.has(p.peerId)) continue;
+      seen.add(p.peerId);
+      rows.push({ peerId: p.peerId, name: p.name?.trim() || "訪客" });
+    }
+    return rows;
+  });
 
   let draft = $state("");
   let clientReady = $state(false);
@@ -2556,7 +2588,21 @@
   <GoRoomPlayPicker
     bind:open={playPickerOpen}
     games={playableGames}
-    onPick={(catalogId) => void onStartPlay?.(catalogId)}
+    occupants={playPickerOccupants}
+    onAutoStart={(catalogId) => void onStartPlay?.(catalogId)}
+    onManualStart={async (catalogId, picks) => {
+      if (!onStartManualPlay) {
+        return { ok: false as const, reason: "not_playable" };
+      }
+      const out = await onStartManualPlay(catalogId, picks);
+      if (!out) return { ok: false as const, reason: "not_playable" };
+      if (out.ok) return { ok: true as const };
+      return {
+        ok: false as const,
+        reason: out.reason,
+        ...(out.missingRoles ? { missingRoles: out.missingRoles } : {}),
+      };
+    }}
   />
 </div>
 

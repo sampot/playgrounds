@@ -1,18 +1,52 @@
 <script lang="ts">
   import type { RoomPlayableGame } from "$lib/goRoomPlayBootstrap";
+  import type { RoomPlaySeatPick } from "$lib/goRoomPlaySeats";
+  import {
+    expandRoomPlaySeatSlots,
+    formatRoomPlaySeatFail,
+    roomPlaySeatDraftComplete,
+    roomPlaySeatDraftToPicks,
+    type RoomPlaySeatSlot,
+  } from "$lib/goRoomPlaySeatDraft";
+
+  export type PlayPickerOccupant = {
+    peerId: string;
+    name: string;
+  };
 
   let {
     open = $bindable(false),
     games,
-    onPick,
+    occupants = [],
+    onAutoStart,
+    onManualStart,
   }: {
     open?: boolean;
     games: RoomPlayableGame[];
-    onPick: (catalogId: string) => void | Promise<void>;
+    /** Host + guests with wire peer ids（Host = localPeerId）. */
+    occupants?: PlayPickerOccupant[];
+    onAutoStart: (catalogId: string) => void | Promise<void>;
+    onManualStart: (
+      catalogId: string,
+      picks: RoomPlaySeatPick[]
+    ) =>
+      | void
+      | Promise<
+          | { ok: true }
+          | { ok: false; reason: string; missingRoles?: string[] }
+          | undefined
+        >;
   } = $props();
 
   let closeBtn = $state<HTMLButtonElement | null>(null);
   let wasOpen = false;
+  let step = $state<"games" | "seats">("games");
+  let selected = $state<RoomPlayableGame | null>(null);
+  let slots = $state<RoomPlaySeatSlot[]>([]);
+  /** peerId per slot index；null = empty. */
+  let draft = $state<(string | null)[]>([]);
+  let seatError = $state("");
+  let busy = $state(false);
 
   $effect(() => {
     if (!open) {
@@ -21,25 +55,122 @@
     }
     if (!wasOpen) {
       wasOpen = true;
+      resetSheet();
       queueMicrotask(() => closeBtn?.focus());
     }
   });
 
+  function resetSheet() {
+    step = "games";
+    selected = null;
+    slots = [];
+    draft = [];
+    seatError = "";
+    busy = false;
+  }
+
   function close() {
     open = false;
+    resetSheet();
   }
 
   function onKeydown(event: KeyboardEvent) {
     if (event.key === "Escape") {
       event.preventDefault();
+      if (step === "seats") {
+        backToGames();
+        return;
+      }
       close();
     }
   }
 
-  async function pick(catalogId: string) {
-    close();
-    await onPick(catalogId);
+  function pickGame(game: RoomPlayableGame) {
+    selected = game;
+    slots = expandRoomPlaySeatSlots(game.roles);
+    draft = slots.map(() => null);
+    // Prefill host seat with local host when present.
+    const hostOcc = occupants[0];
+    const hostSlot = slots.findIndex((s) => s.role === "host");
+    if (hostSlot >= 0 && hostOcc) {
+      draft[hostSlot] = hostOcc.peerId;
+    }
+    seatError = "";
+    step = "seats";
   }
+
+  function backToGames() {
+    step = "games";
+    selected = null;
+    slots = [];
+    draft = [];
+    seatError = "";
+  }
+
+  function assignSeat(slotIndex: number, peerId: string | null) {
+    const next = [...draft];
+    if (peerId) {
+      for (let i = 0; i < next.length; i++) {
+        if (i !== slotIndex && next[i] === peerId) next[i] = null;
+      }
+    }
+    next[slotIndex] = peerId;
+    draft = next;
+    seatError = "";
+  }
+
+  function takenExcept(slotIndex: number): Set<string> {
+    const taken = new Set<string>();
+    for (let i = 0; i < draft.length; i++) {
+      if (i === slotIndex) continue;
+      const id = draft[i];
+      if (id) taken.add(id);
+    }
+    return taken;
+  }
+
+  async function startAuto() {
+    const id = selected?.catalogId;
+    if (!id || busy) return;
+    busy = true;
+    seatError = "";
+    try {
+      close();
+      await onAutoStart(id);
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function startManual() {
+    const game = selected;
+    if (!game || busy) return;
+    const picks = roomPlaySeatDraftToPicks(slots, draft);
+    if (!picks) {
+      seatError = formatRoomPlaySeatFail(
+        "seats_short",
+        slots.filter((_, i) => !draft[i]).map((s) => s.role)
+      );
+      return;
+    }
+    busy = true;
+    seatError = "";
+    try {
+      const out = await onManualStart(game.catalogId, picks);
+      if (!out || out.ok === false) {
+        seatError = formatRoomPlaySeatFail(
+          out && "reason" in out ? out.reason : "not_playable",
+          out && "missingRoles" in out ? out.missingRoles : undefined
+        );
+        return;
+      }
+      close();
+    } finally {
+      busy = false;
+    }
+  }
+
+  const draftReady = $derived(roomPlaySeatDraftComplete(slots, draft));
 </script>
 
 {#if open}
@@ -56,7 +187,9 @@
   >
     <div class="play-picker pixel-frame confirm">
       <header class="play-picker-header">
-        <h2 id="play-picker-title" class="confirm-title pixel-text">玩遊戲</h2>
+        <h2 id="play-picker-title" class="confirm-title pixel-text">
+          {step === "games" ? "玩遊戲" : "指定席次"}
+        </h2>
         <button
           type="button"
           class="pixel-btn play-picker-close"
@@ -66,33 +199,109 @@
           關閉
         </button>
       </header>
-      <p class="confirm-body muted">選一款掛上大螢幕。人數不夠會無法開局。</p>
-      {#if games.length === 0}
-        <p class="confirm-body" role="status">目前沒有可開的遊戲</p>
-      {:else}
-        <ul class="play-picker-list">
-          {#each games as g (g.catalogId)}
-            <li>
-              <button
-                type="button"
-                class="play-picker-item pixel-btn"
-                onclick={() => void pick(g.catalogId)}
-              >
-                <span class="play-picker-item-title">{g.title}</span>
-                <span class="play-picker-item-meta">需 {g.seatCount} 人</span>
-                {#if g.blurb}
-                  <span class="play-picker-item-blurb">{g.blurb}</span>
-                {/if}
-              </button>
+
+      {#if step === "games"}
+        <p class="confirm-body muted">選一款掛上大螢幕。人數不夠會無法開局。</p>
+        {#if games.length === 0}
+          <p class="confirm-body" role="status">目前沒有可開的遊戲</p>
+        {:else}
+          <ul class="play-picker-list">
+            {#each games as g (g.catalogId)}
+              <li>
+                <button
+                  type="button"
+                  class="play-picker-item pixel-btn"
+                  onclick={() => pickGame(g)}
+                >
+                  <span class="play-picker-item-title">{g.title}</span>
+                  <span class="play-picker-item-meta">需 {g.seatCount} 人</span>
+                  {#if g.blurb}
+                    <span class="play-picker-item-blurb">{g.blurb}</span>
+                  {/if}
+                </button>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      {:else if selected}
+        <p class="confirm-body muted">
+          {selected.title} · 點席次選人；未入座的人觀戰。
+        </p>
+        <ul class="play-seat-list">
+          {#each slots as slot, i (slot.index)}
+            {@const taken = takenExcept(i)}
+            <li class="play-seat-row">
+              <span class="play-seat-role">{slot.label}</span>
+              <label class="play-seat-pick">
+                <span class="sr-only">{slot.label}席次</span>
+                <select
+                  class="play-seat-select"
+                  value={draft[i] ?? ""}
+                  onchange={(e) => {
+                    const v = (e.currentTarget as HTMLSelectElement).value;
+                    assignSeat(i, v || null);
+                  }}
+                >
+                  <option value="">尚未指定</option>
+                  {#each occupants as occ (occ.peerId)}
+                    <option
+                      value={occ.peerId}
+                      disabled={taken.has(occ.peerId) && draft[i] !== occ.peerId}
+                    >
+                      {occ.name}
+                    </option>
+                  {/each}
+                </select>
+              </label>
             </li>
           {/each}
         </ul>
+        {#if seatError}
+          <p class="play-seat-error" role="status">{seatError}</p>
+        {/if}
+        <div class="play-seat-actions">
+          <button
+            type="button"
+            class="pixel-btn play-seat-btn"
+            onclick={backToGames}
+            disabled={busy}
+          >
+            返回
+          </button>
+          <button
+            type="button"
+            class="pixel-btn play-seat-btn"
+            onclick={() => void startAuto()}
+            disabled={busy}
+          >
+            自動入座
+          </button>
+          <button
+            type="button"
+            class="pixel-btn play-seat-btn play-seat-btn-primary"
+            onclick={() => void startManual()}
+            disabled={busy || !draftReady}
+          >
+            開局
+          </button>
+        </div>
       {/if}
     </div>
   </div>
 {/if}
 
 <style>
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
   .play-picker-overlay {
     position: fixed;
     inset: 0;
@@ -107,7 +316,7 @@
   }
   .play-picker {
     width: min(28rem, 100%);
-    max-height: min(70vh, 32rem);
+    max-height: min(78vh, 36rem);
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
@@ -163,9 +372,63 @@
     opacity: 0.7;
     line-height: 1.35;
   }
+  .play-seat-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    min-height: 0;
+  }
+  .play-seat-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+  .play-seat-role {
+    font-weight: 700;
+    font-size: 0.9rem;
+  }
+  .play-seat-pick {
+    display: block;
+    width: 100%;
+  }
+  .play-seat-select {
+    width: 100%;
+    min-height: 44px;
+    box-sizing: border-box;
+    padding: 0.55rem 0.65rem;
+    font: inherit;
+    border: 2px solid color-mix(in oklab, currentColor 28%, transparent);
+    background: var(--panel, #fff);
+    color: inherit;
+  }
+  .play-seat-error {
+    margin: 0;
+    color: color-mix(in oklab, #b00020 85%, currentColor);
+    font-size: 0.9rem;
+  }
+  .play-seat-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin-top: 0.25rem;
+  }
+  .play-seat-btn {
+    min-height: 44px;
+    flex: 1 1 auto;
+  }
+  .play-seat-btn-primary {
+    flex: 1 1 100%;
+  }
   @media (min-width: 40rem) {
     .play-picker-overlay {
       align-items: center;
+    }
+    .play-seat-btn-primary {
+      flex: 1 1 auto;
     }
   }
 </style>
