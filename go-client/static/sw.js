@@ -7,7 +7,7 @@
  * GO_SW_REV＝橋／room-play 邏輯；GO_SHELL_CACHE_REV＝殼 Cache 名。
  * 只改 room-play／canvas 時只 bump GO_SW_REV，勿清掉已暖好的離線殼。
  */
-const GO_SW_REV = 44;
+const GO_SW_REV = 45;
 /** Bump only when shell cache policy or cacheable path set changes. */
 const GO_SHELL_CACHE_REV = 26;
 const CANVAS_PREFIX = "/canvas/";
@@ -690,6 +690,10 @@ function waitPlay(s) {
   });
 }
 
+/**
+ * Adjacent chunks stay separate — merging into one Uint8Array is O(n²) and
+ * freezes Chromium mid large-file download. True overlaps still merge.
+ */
 function putPlaySpan(spans, start, chunk) {
   if (!chunk.byteLength) return spans;
   const incoming = { start, bytes: chunk };
@@ -703,7 +707,7 @@ function putPlaySpan(spans, start, chunk) {
     }
     const lastEnd = last.start + last.bytes.byteLength;
     const sEnd = s.start + s.bytes.byteLength;
-    if (s.start > lastEnd) {
+    if (s.start >= lastEnd) {
       out.push(s);
       continue;
     }
@@ -741,16 +745,13 @@ function trimPlaySpans(s) {
       if (span.start < minPin) {
         clipped.push({
           start: minPin,
-          bytes: span.bytes.subarray(minPin - span.start),
+          bytes: span.bytes.slice(minPin - span.start),
         });
       } else {
         clipped.push(span);
       }
     }
-    s.spans = clipped.reduce(
-      (acc, sp) => putPlaySpan(acc, sp.start, sp.bytes),
-      []
-    );
+    s.spans = clipped;
   }
   if (playStoredBytes(s.spans) <= maxBytes) return;
   /** Soft cap: keep windows around pins when over budget. */

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   createRoomPlayRegistry,
+  fileSpansCover,
   isWebKitMediaEngine,
   localFileSlice,
   mediaRangeForBufferedBody,
@@ -9,6 +10,7 @@ import {
   parseRoomFilePurpose,
   parseRoomPlayPath,
   playFetchRange,
+  putFileSpan,
   isBytesRangeHeader,
   roomFileContentType,
   roomFileDownloadPath,
@@ -204,6 +206,54 @@ describe("createRoomPlayRegistry", () => {
     expect(reg.covers("t1", 0, 16)).toBe(true);
     expect(reg.covers("t1", 16, 24)).toBe(false);
     expect(reg.bufferedBytes("t1")).toBeLessThanOrEqual(16);
+  });
+
+  it("keeps adjacent chunks as separate spans (no O(n²) merge copy)", () => {
+    /**
+     * Large-file save used to merge every DC chunk into one growing Uint8Array.
+     * Filling a 32 MiB window with 16 KiB chunks then freezes Chromium mid-download.
+     */
+    let spans: { start: number; bytes: Uint8Array }[] = [];
+    const chunk = 1024;
+    const n = 64;
+    for (let i = 0; i < n; i++) {
+      spans = putFileSpan(spans, i * chunk, new Uint8Array(chunk).fill(i & 0xff));
+    }
+    expect(spans).toHaveLength(n);
+    expect(spans.every((s) => s.bytes.byteLength === chunk)).toBe(true);
+    expect(fileSpansCover(spans, 0, n * chunk)).toBe(true);
+    expect(Array.from(spans[0]!.bytes.subarray(0, 2))).toEqual([0, 0]);
+    expect(Array.from(spans[1]!.bytes.subarray(0, 2))).toEqual([1, 1]);
+  });
+
+  it("still merges true overlapping spans", () => {
+    let spans = putFileSpan([], 0, new Uint8Array([1, 2, 3, 4]));
+    spans = putFileSpan(spans, 2, new Uint8Array([9, 9, 9]));
+    expect(spans).toHaveLength(1);
+    expect(Array.from(spans[0]!.bytes)).toEqual([1, 2, 9, 9, 9]);
+    expect(fileSpansCover(spans, 0, 5)).toBe(true);
+  });
+
+  it("save mode filling many small chunks stays covered without one giant buffer", () => {
+    const reg = createRoomPlayRegistry();
+    reg.open("big-save", {
+      mode: "save",
+      mime: "application/octet-stream",
+      size: 64 * 1024,
+      maxBytes: 32 * 1024,
+      highBytes: 24 * 1024,
+      lowBytes: 8 * 1024,
+    });
+    reg.pin("big-save", "http", 0);
+    const chunk = 1024;
+    for (let at = 0; at < 32 * 1024; at += chunk) {
+      reg.push("big-save", new Uint8Array(chunk).fill(7), at);
+      expect(reg.covers("big-save", at, at + chunk)).toBe(true);
+    }
+    expect(reg.covers("big-save", 0, 32 * 1024)).toBe(true);
+    expect(reg.bufferedBytes("big-save")).toBe(32 * 1024);
+    expect(reg.push("big-save", new Uint8Array(chunk), 32 * 1024)).toBe("high");
+    expect(reg.covers("big-save", 32 * 1024, 33 * 1024)).toBe(false);
   });
 
   it("save mode refuses overflow instead of clipping unread ahead bytes", () => {

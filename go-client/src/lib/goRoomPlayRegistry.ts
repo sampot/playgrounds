@@ -93,18 +93,16 @@ function trimSaveSpans(s: Session): void {
     const end = span.start + span.bytes.byteLength;
     if (end <= minPin) continue;
     if (span.start < minPin) {
+      /** slice() so the consumed prefix ArrayBuffer can be GC'd. */
       clipped.push({
         start: minPin,
-        bytes: span.bytes.subarray(minPin - span.start),
+        bytes: span.bytes.slice(minPin - span.start),
       });
     } else {
       clipped.push(span);
     }
   }
-  s.spans = clipped.reduce(
-    (acc, sp) => putFileSpan(acc, sp.start, sp.bytes),
-    [] as { start: number; bytes: Uint8Array }[]
-  );
+  s.spans = clipped;
 }
 
 function trimPlaySpans(s: Session): void {
@@ -177,6 +175,42 @@ function chunkOverlapsPinWindow(
   return false;
 }
 
+function bytesStoredAfterPin(
+  spans: { start: number; bytes: Uint8Array }[],
+  minPin: number
+): number {
+  let stored = 0;
+  for (const span of spans) {
+    const sEnd = span.start + span.bytes.byteLength;
+    if (sEnd <= minPin) continue;
+    stored += span.start < minPin ? sEnd - minPin : span.bytes.byteLength;
+  }
+  return stored;
+}
+
+/** Bytes of [from, to) not already covered by spans (no allocation). */
+function uncoveredLength(
+  spans: { start: number; bytes: Uint8Array }[],
+  from: number,
+  to: number
+): number {
+  if (to <= from) return 0;
+  let need = from;
+  let add = 0;
+  for (const span of spans) {
+    const sEnd = span.start + span.bytes.byteLength;
+    if (sEnd <= need) continue;
+    if (span.start > need) {
+      add += Math.min(to, span.start) - need;
+      need = Math.min(to, span.start);
+    }
+    need = Math.max(need, Math.min(to, sEnd));
+    if (need >= to) return add;
+  }
+  if (need < to) add += to - need;
+  return add;
+}
+
 /** Save: refuse if storing would exceed max after dropping the consumed prefix. */
 function saveChunkFitsBudget(
   s: Session,
@@ -186,15 +220,9 @@ function saveChunkFitsBudget(
   const minPin = minPinOf(s);
   const end = at + chunk.byteLength;
   if (end <= minPin) return true;
-  const merged = putFileSpan(s.spans, at, chunk);
-  let stored = 0;
-  for (const span of merged) {
-    const sEnd = span.start + span.bytes.byteLength;
-    if (sEnd <= minPin) continue;
-    if (span.start < minPin) stored += sEnd - minPin;
-    else stored += span.bytes.byteLength;
-  }
-  return stored <= s.maxBytes;
+  const stored = bytesStoredAfterPin(s.spans, minPin);
+  const add = uncoveredLength(s.spans, Math.max(at, minPin), end);
+  return stored + add <= s.maxBytes;
 }
 
 function pressureOf(bytes: number, high: number, low: number): PlayPressure {
@@ -442,7 +470,13 @@ export function localFileSlice(
   return file.slice(from, to, type);
 }
 
-function putFileSpan(
+/**
+ * Insert a chunk into the span list.
+ * Adjacent chunks stay separate — merging into one Uint8Array is O(n²) copies
+ * and freezes Chromium mid-download on large saves (~32 MiB window × many chunks).
+ * True overlaps still merge (rare retransmit／seek).
+ */
+export function putFileSpan(
   spans: { start: number; bytes: Uint8Array }[],
   start: number,
   chunk: Uint8Array
@@ -459,7 +493,8 @@ function putFileSpan(
     }
     const lastEnd = last.start + last.bytes.byteLength;
     const sEnd = s.start + s.bytes.byteLength;
-    if (s.start > lastEnd) {
+    if (s.start >= lastEnd) {
+      /** Gap or adjacent — keep as its own entry (no giant merge copy). */
       out.push(s);
       continue;
     }
