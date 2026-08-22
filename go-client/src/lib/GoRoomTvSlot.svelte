@@ -14,7 +14,15 @@
     roomTvVolumeIconClick,
     type RoomTvHudKind,
   } from "$lib/goRoom";
+  import {
+    createProgramAudioAnalyser,
+    roomAudioVisualizerGain,
+    roomTvAudioPlayerFace,
+    type ProgramAudioAnalyser,
+  } from "$lib/goRoomAudioPlayer";
   import { setGoMemoryCanvasWindow } from "$lib/goMemoryCanvas";
+
+  const AUDIO_FACE_BARS = 28;
 
   let {
     tvOn = false,
@@ -30,6 +38,8 @@
     playCanvasUrl = null,
     playCanvasSrcdoc = null,
     playCanvasGeneration = 0,
+    ownerDecodeKind = null,
+    remoteProgramKind = null,
     onToggle,
     onPlayPause,
     onSeek,
@@ -53,6 +63,8 @@
     playCanvasUrl?: string | null;
     playCanvasSrcdoc?: string | null;
     playCanvasGeneration?: number;
+    ownerDecodeKind?: "audio" | "video" | null;
+    remoteProgramKind?: "audio" | "video" | null;
     onToggle: () => void;
     onPlayPause: () => void;
     onSeek: (seconds: number) => void;
@@ -67,6 +79,14 @@
   const playActive = $derived(
     Boolean(playCanvasUrl || playCanvasSrcdoc)
   );
+  const audioFace = $derived(
+    roomTvAudioPlayerFace({
+      tvOn,
+      playActive,
+      ownerDecodeKind,
+      remoteProgramKind,
+    })
+  );
   const showTransport = $derived(roomTvHudHasTransport(hudKind));
   const clockMax = $derived(Math.max(duration, currentTime, 0));
   const expanded = $derived(restore || slotFullscreen);
@@ -75,6 +95,10 @@
   let volMuted = $state(sink.muted);
   let volPanel = $state(false);
   const quiet = $derived(roomTvSinkMuted(volume, volMuted));
+  let barLevels = $state<number[]>(
+    Array.from({ length: AUDIO_FACE_BARS }, () => 0)
+  );
+  let analyser: ProgramAudioAnalyser | null = null;
 
   $effect(() => {
     if (!hudOpen) volPanel = false;
@@ -98,17 +122,49 @@
   $effect(() => {
     attachMediaStream(videoEl, tvStream, {
       volume,
-      muted: volMuted,
+      // Audio face owns speakers via Web Audio GainNode — keep <video> muted.
+      muted: audioFace ? true : volMuted,
       onAutoplayMuted: () => {
-        volMuted = true;
+        if (!audioFace) volMuted = true;
       },
     });
+  });
+
+  $effect(() => {
+    if (!audioFace || !tvStream) {
+      barLevels = Array.from({ length: AUDIO_FACE_BARS }, () => 0);
+      return;
+    }
+
+    const handle = createProgramAudioAnalyser({ stream: tvStream });
+    if (!handle) {
+      barLevels = Array.from({ length: AUDIO_FACE_BARS }, () => 0);
+      return;
+    }
+    analyser = handle;
+    let frame = 0;
+    const tick = () => {
+      // Read sink inside rAF (not effect deps) so volume tweaks do not rebuild AudioContext.
+      const sink = { volume, muted: volMuted };
+      const gain = roomAudioVisualizerGain(sink);
+      handle.setGain(sink);
+      barLevels = handle.levels(AUDIO_FACE_BARS, { gain });
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+
+    return () => {
+      cancelAnimationFrame(frame);
+      handle.close();
+      if (analyser === handle) analyser = null;
+    };
   });
 
   function onVolumeInput(ev: Event) {
     const next = Number((ev.currentTarget as HTMLInputElement).value);
     volume = next;
     volMuted = next <= 0;
+    analyser?.setGain({ volume: next, muted: next <= 0 });
   }
 
   function onVolumeIcon() {
@@ -120,6 +176,7 @@
     volMuted = next.muted;
     volPanel = next.panelOpen;
     volume = next.volume;
+    analyser?.setGain({ volume: next.volume, muted: next.muted });
   }
 </script>
 
@@ -130,6 +187,7 @@
       "tv-video",
       !tvOn && "tv-video--off",
       playActive && "tv-video--play-hidden",
+      audioFace && "tv-video--audio-face",
     ]
       .filter(Boolean)
       .join(" ")}
@@ -161,6 +219,24 @@
     {/if}
   {:else if !tvOn}
     <span class="tv-snow" aria-hidden="true"></span>
+  {:else if audioFace}
+    <div
+      class="tv-audio-face"
+      class:tv-audio-face--paused={paused}
+      aria-hidden="true"
+    >
+      <div class="tv-audio-viz" role="presentation">
+        {#each barLevels as level, i (i)}
+          <span
+            class="tv-audio-bar"
+            style={`--h:${Math.max(0.06, level).toFixed(3)}`}
+          ></span>
+        {/each}
+      </div>
+      <div class="tv-audio-disc" class:tv-audio-disc--spin={!paused && !quiet}>
+        <span class="tv-audio-disc-hole"></span>
+      </div>
+    </div>
   {/if}
   {#if tvOn && !playActive}
     <button
@@ -336,7 +412,8 @@
   .tv-video--off {
     opacity: 0;
   }
-  .tv-video--play-hidden {
+  .tv-video--play-hidden,
+  .tv-video--audio-face {
     opacity: 0;
     pointer-events: none;
   }
@@ -360,6 +437,76 @@
         #0c0c10 1px 3px
       );
     opacity: 0.85;
+  }
+  .tv-audio-face {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(0.75rem, 4vw, 1.5rem);
+    padding: 1rem 0.75rem 2.5rem;
+    background:
+      radial-gradient(
+        ellipse 70% 55% at 50% 42%,
+        #1c2438 0%,
+        #0a0a0e 72%
+      );
+    pointer-events: none;
+  }
+  .tv-audio-viz {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 3px;
+    width: min(92%, 28rem);
+    height: clamp(4.5rem, 28%, 9rem);
+  }
+  .tv-audio-bar {
+    flex: 1 1 0;
+    min-width: 2px;
+    max-width: 10px;
+    height: calc(var(--h, 0.06) * 100%);
+    border-radius: 2px 2px 0 0;
+    background: linear-gradient(
+      180deg,
+      #f0e6c8 0%,
+      #c4a574 55%,
+      #8a6a3a 100%
+    );
+    opacity: 0.92;
+    transition: height 40ms linear;
+  }
+  .tv-audio-face--paused .tv-audio-bar {
+    opacity: 0.45;
+  }
+  .tv-audio-disc {
+    width: clamp(4.5rem, 18vw, 7rem);
+    height: clamp(4.5rem, 18vw, 7rem);
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at 35% 30%, #3a3a48 0%, #1a1a22 45%, #0e0e14 100%);
+    border: 3px solid color-mix(in oklab, #c4a574 55%, #2a2a32);
+    box-shadow: inset 0 0 0 10px #121218;
+    display: grid;
+    place-items: center;
+  }
+  .tv-audio-disc--spin {
+    animation: tv-audio-spin 4.5s linear infinite;
+  }
+  .tv-audio-disc-hole {
+    width: 18%;
+    height: 18%;
+    border-radius: 50%;
+    background: #0a0a0e;
+    border: 2px solid #c4a574;
+  }
+  @keyframes tv-audio-spin {
+    to {
+      transform: rotate(360deg);
+    }
   }
   .tv-hud {
     position: absolute;

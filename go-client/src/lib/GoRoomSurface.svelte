@@ -1519,6 +1519,8 @@
         paused={goRoomMedia.programPaused}
         currentTime={goRoomMedia.programTime}
         duration={goRoomMedia.programDuration}
+        ownerDecodeKind={goRoomMedia.ownerDecodeKind}
+        remoteProgramKind={goRoomMedia.remoteProgramKind}
         {playCanvasUrl}
         {playCanvasSrcdoc}
         {playCanvasGeneration}

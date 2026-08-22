@@ -1,6 +1,6 @@
 # Playgrounds 純玩版：包廂（go `/room`）
 
-> **狀態：** Draft（2026-08-22）— 主面＝**主視訊區**（沒訊號／片子／live 同一塊；槽內無字；**劇院態可滿窗**，三區／底列 overlay；**2d 殼面 RWD 手測完成**；**開局第一刀手測完成**（五子棋對弈＋重開））；chrome **可收**；廳態＝大螢幕＋**成員／檔案／文字**（RWD）；文字＝開口備援（非主欄）；兩層螢幕（大螢幕 ≠ 我這台）；**大螢幕＝同時一路主畫面**（主持指定；再指定＝切台）；**否決**瀏覽器多路視訊合成進節目；**在場聲＝星狀下 Host `AudioContext` 混音再送**（開麥彼此聽得到；靜音＝不進混）；**放到大螢幕上＝主持指定 `file { owner, id }`，一律由持檔端本機渲染 → 節目 RTP**（可別人掛的檔、**可主持私有檔**；**影→音→圖**；doc 延後）；**分享目錄**前端一律 `/room-file/<id>`（SW＝HTTP server；本機掛檔 SW 直出、不經 DC；遠端每 roundtrip ↔ transfer）；**Guest↔Guest mesh（Phase 1c）：** 索檔／持檔有直連 DC 時檔 bytes **不**經 Host relay；失敗回 star；**節目／在場 RTP 仍走 Hub**；**主持私有檔＝OPFS、不進分享、上大螢幕≠分享**（**2g 手測：私有影／音／圖可上大螢幕**）；其餘：進門即主面、不鎖 1:1、兩個時鐘、SDP **2+2**
+> **狀態：** Draft（2026-08-22）— 主面＝**主視訊區**（沒訊號／片子／live 同一塊；槽內無字；**劇院態可滿窗**，三區／底列 overlay；**2d 殼面 RWD 手測完成**；**開局第一刀手測完成**（五子棋對弈＋重開））；chrome **可收**；廳態＝大螢幕＋**成員／檔案／文字**（RWD）；文字＝開口備援（非主欄）；兩層螢幕（大螢幕 ≠ 我這台）；**大螢幕＝同時一路主畫面**（主持指定；再指定＝切台）；**否決**瀏覽器多路視訊合成進節目；**在場聲＝星狀下 Host `AudioContext` 混音再送**（開麥彼此聽得到；靜音＝不進混）；**放到大螢幕上＝主持指定 `file { owner, id }`，一律由持檔端本機渲染 → 節目 RTP**（可別人掛的檔、**可主持私有檔**；**影→音→圖**；doc 延後；**音檔大螢幕＝audio player 面＋節奏動畫＝2h 已落地**）；**分享目錄**前端一律 `/room-file/<id>`（SW＝HTTP server；本機掛檔 SW 直出、不經 DC；遠端每 roundtrip ↔ transfer）；**Guest↔Guest mesh（Phase 1c）：** 索檔／持檔有直連 DC 時檔 bytes **不**經 Host relay；失敗回 star；**節目／在場 RTP 仍走 Hub**；**主持私有檔＝OPFS、不進分享、上大螢幕≠分享**（**2g 手測：私有影／音／圖可上大螢幕**）；其餘：進門即主面、不鎖 1:1、兩個時鐘、SDP **2+2**
 > **權威決策：** 從屬 [DECISIONS.md](./DECISIONS.md) **DEC-050**（純玩版）、**DEC-045**（Roster／薄 signaling；**非** Avatars 產品面）、**DEC-047**（Platform Invite）；**不另開 DEC**  
 > **相關：** [PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)、[PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md)（登入＋記憶體 field API key）、[PG-GO-HOST-INVITE-PLAN.md](./PG-GO-HOST-INVITE-PLAN.md)（GO-INVITE＝遊戲 compose；**勿混**）、[PG-GO-ROOM-PLAY-PLAN.md](./PG-GO-ROOM-PLAY-PLAN.md)（包廂內重用 peer 開局＝`session_play`；Phase 3；**第一刀手測完成**）、[PG-GO-ROOM-DEV-HARNESS-PLAN.md](./PG-GO-ROOM-DEV-HARNESS-PLAN.md)（localhost／Agent 多 tab 進門；**勿**當產品契約）、[PG-GO-SESSION-CHAT-PLAN.md](./PG-GO-SESSION-CHAT-PLAN.md)（局內 overlay 對話——**勿混**）、[PG-GO-SHOP-LOBBY-PLAN.md](./PG-GO-SHOP-LOBBY-PLAN.md)（大廳熱點入口）、[PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)、[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（官方 TURN；包廂 ICE **與**遊戲邀請分開）、`.cursor/rules/no-native-dialogs.mdc`、`.cursor/rules/mobile-first-ux.mdc`、[GLOSSARY.md](./GLOSSARY.md)
 
@@ -252,12 +252,28 @@ game { catalogId, seats[] } // 大螢幕槽掛該 SAM 畫布；席次＝指定�
   | 呈現 | 來源端（owner） | 節目軌 | 時鐘／HUD |
   | --- | --- | --- | --- |
   | **video** | `<video>` → `captureStream` | 視＋可選音 | 播／停／seek＝**主持**遙控來源播放器；音量＝各端本機 |
-  | **audio** | `<audio>` → capture；畫面可空或低幀封面／波形 canvas | 音為主；視可靜態 | 同左 |
+  | **audio** | `<audio>` → capture；節目視可靜態／低幀封面（可選） | **音為主**；視可靜態 | 同左；**大螢幕槽改 audio player 面**（§5.7.1／**2h**） |
   | **image** | `<img>`／`drawImage` → `canvas.captureStream`（低幀或近靜態） | 視（靜態） | 無 seek；拿掉即可 |
   | **可預覽 doc**（延後） | 僅當來源端能穩定畫進可 capture 的表面（canvas 或暫時走畫面分享） | 同節目 RTP | **不**承諾任意 MIME；PDF／office 另刀 |
 
   產品句：**凡來源端能穩定畫進可 `captureStream` 的表面，就能上大螢幕**——不是「凡本機能開的檔，每人各開一份同步」。不能 capture → `session_cast.reject`＋頁內說明（對齊 iOS 不宜當電影來源）。
-- **實作遞增：** 別人掛的 **video／audio／image** 已落地（圖＝canvas 靜態節目軌；無 seek HUD）；doc／「任意可預覽」**不**堵遠端 cast。
+- **實作遞增：** 別人掛的 **video／audio／image** 已落地（圖＝canvas 靜態節目軌；無 seek HUD）；**音檔大螢幕 player 面＋節奏動畫＝2h 已落地**；doc／「任意可預覽」**不**堵遠端 cast。
+
+#### 5.7.1 音檔上大螢幕＝audio player 面（硬；2h）
+
+推播 **音樂／音檔**（`kind: audio`；分享或主持私有）時，**全場**大螢幕槽須呈現同一套 **audio player 面**——不是沒訊號雪花、不是黑屏、也不是只靠節目 `<video>` 空幀裝沒事。
+
+| 項 | 規格 |
+| --- | --- |
+| **誰看見** | 在場全員（含晚進門）；進門即收節目音，槽內切成 player 面 |
+| **時鐘／transport** | 播／停／**seek／快轉／倒帶**＝**僅主持**（`session_cast.state` 遙控 owner；對齊片子）。收看端（含非主持 Guest）**不可**獨立拖進度或改來源時鐘。想自己拖＝私下播／下載 |
+| **音量** | 各端本機喇叭（HUD 喇叭／滑桿）；**不**遙控來源端、**不**走 `state` |
+| **節奏／音量動畫（硬）** | player **上方或面內主視覺**須有依**音量或節奏**跳動的視覺化（bars／波形／等價）。驅動＝各端對**本機已收的節目音 sink** 做 `AnalyserNode`（或等價）本機繪製，跟「我聽得見的那一路」對齊。**禁止**每人另開檔／另走 `/room-file` 冒充大螢幕。**禁止**把跳動動畫編碼進節目視訊當**唯一**解（壓縮差、延遲大；owner 低幀封面可當備援靜態，跳動仍跟本機節目音） |
+| **槽內無字** | 視覺化／player chrome **不算**違規疊字；**片名、沒訊號、人數**仍槽外狀態（對齊 §5.8） |
+| **HUD** | 點主視訊展開半透明浮動控制（同 §10.5）：**僅主持**見播／停／進度／seek；全員見本機喇叭。系統全螢幕＝槽容器，**禁止** `<audio>`／`<video>` 原生播放器當產品面 |
+| **切台** | 再指定影／圖／live／開局＝離開 player 面；`unoffer`＝沒訊號 |
+
+**否決：** 收看端可 scrub 來源；用 DC／每人獨立 `<audio src=/room-file>` 同步冒充大螢幕；無跳動的空白大螢幕當音檔完成態；把開口混進節目音驅動視覺化。
 - **會議式切台：** 主持把來源設成某 peer 的在場 live。大螢幕上是「現在這路」，不是格子牆、不是 speaker view 牆、**不是**多路視訊合成。
 - **開局：** 大螢幕槽改掛 SAM；節目槽可 `unoffer`。**禁止**用 `captureStream` 主持畫面冒充一起玩。見 §5.9。
 - 晚進門對準當下大螢幕（含進行中的局＝觀戰），不必再點「收看」。
@@ -273,7 +289,7 @@ game { catalogId, seats[] } // 大螢幕槽掛該 SAM 畫布；席次＝指定�
 
 | 區 | 角色 |
 | --- | --- |
-| **大螢幕／主視訊區** | 主舞台。同一塊 slot：沒訊號也佔位；片子／圖／音／live＝節目 `<video>`（進門即綁，**不要** `display:none`）；開局＝同一塊掛 SAM 畫布。預設 **16:9**、`object-fit: contain`。**槽內禁止疊字**（片名、沒訊號、人數都在槽外狀態或 overlay）。**不要**再把大廳 320×200 內景當頁面主內容、把節目縮成牆上小洞。 |
+| **大螢幕／主視訊區** | 主舞台。同一塊 slot：沒訊號也佔位；片子／圖／**音（audio player 面，§5.7.1）**／live＝節目 `<video>`（進門即綁，**不要** `display:none`）；開局＝同一塊掛 SAM 畫布。預設 **16:9**、`object-fit: contain`。**槽內禁止疊字**（片名、沒訊號、人數都在槽外狀態或 overlay；**音檔視覺化／player chrome 不算疊字**）。**不要**再把大廳 320×200 內景當頁面主內容、把節目縮成牆上小洞。 |
 | **成員** | 在場名單（顯示名、主持標、麥／鏡頭點）。主持：請人進來、放到大螢幕上、**玩遊戲**。**不是**每人一格視訊牆。**指定入座＝開局**（§5.9；自動＋手動席已落地） |
 | **檔案** | **分享**目錄：掛、下載、私下播／檢視；主持可把**別人掛的**影音／圖放到大螢幕上。**主持另有私有／分享分段**（§5.5.1；2g）：私有＝匯入／刪／推播／**掛到分享**；Guest 只見分享。私下播迷你列在本區，不佔大螢幕槽。 |
 | **文字** | 開口備援。時間線＋輸入。**禁止**當進門英雄空態。 |
@@ -901,7 +917,8 @@ session_cast.reject   { from: owner, id?, reason? }                          // 
 
 - 主持指定**別人掛的檔**：fanout `offer` 後，**owner** 本機開渲染並對節目槽 `replaceTrack`；主持 `forwardFrom(owner)`（對齊 live 轉軌）。
 - 主持指定**私有檔**：本機 OPFS 產軌再 fanout；offer 可帶 `name`／`kind` 給槽外狀態；**禁止**因此 fanout 私有列或開放「要」。
-- **片子時鐘由主持遙控**（`state`）；owner 執行並回報進度。收看端（含非主持 Guest）不可獨立 seek。**音量＝本機喇叭**（HUD 本機 sink），不遙控來源端。
+- **片子時鐘由主持遙控**（`state`）；owner 執行並回報進度。收看端（含非主持 Guest）不可獨立 seek／快轉／倒帶。**音量＝本機喇叭**（HUD 本機 sink），不遙控來源端。
+- **`kind: audio`：** 大螢幕槽呈現 audio player 面＋音量／節奏跳動（§5.7.1／**2h**）；transport 規則同上。
 - 收看端**不必**再 `request` 節目（房級已收）。開局不走 `session_cast`（見 §9.9 `session_play`）。
 
 **私下播／檢視／下載不走 `session_cast`。** **分享**檔前端一律 `/room-file/<id>`。**本機掛檔：** SW 直出，不經 DC。**遠端：** 每一筆 HTTP → SW 開一條 `transferId` → `session_file.request`／chunk；**SW 交完該 response body 後**該 transfer 才結束（owner `done`＝源端泵完，見 §8.2）。同檔可同時多筆遠端 HTTP／`transferId`；**不**在開新 Range 時主動 cancel 舊的——各條以 client finished／cancel／abort 收尾。緩衝滿／下載背壓時 `pause`／`resume` **各** `transferId`。**私有檔不走 `/room-file`。**
@@ -1060,7 +1077,8 @@ Esc 回大廳（現況 `goEscapeHome` 含 `/chat` → 改 `/room`）。**劇院�
 - 私下播放與大螢幕**並行**；第二個本機 `<video>` 在檔案區（劇院態＝檔案 drawer 裡的迷你列）。
 - 開鏡頭／麥＝瀏覽器權限對話；失敗頁內說明。
 - 對讀者不說直播／推流／WebRTC；不要會議格子牆；第三人在場**不**藏鏡頭控件。
-- 點主視訊（非開局、節目播放中）展開**半透明浮動控制**（疊在主視訊區上，**禁止**頁底 bottom sheet）。列序對齊常見播放器、**單列不換行**：播放／暫停、當前時間、進度、總長、喇叭、全螢幕（已滿屏改還原）。**音量條不常駐**——點喇叭才出現直向滑桿（**本機**音量）。**僅主持**對片子有播／停／seek（含別人掛的檔，經 `session_cast.state` 遙控 owner）。系統全螢幕＝大螢幕槽容器（同一套 HUD，**禁止** `<video>` 原生播放器）。主持可從大螢幕拿掉（列尾）。片名仍在槽外狀態。
+- 點主視訊（非開局、節目播放中）展開**半透明浮動控制**（疊在主視訊區上，**禁止**頁底 bottom sheet）。列序對齊常見播放器、**單列不換行**：播放／暫停、當前時間、進度、總長、喇叭、全螢幕（已滿屏改還原）。**音量條不常駐**——點喇叭才出現直向滑桿（**本機**音量）。**僅主持**對片子／**音檔**有播／停／seek／快轉／倒帶（含別人掛的檔，經 `session_cast.state` 遙控 owner）。系統全螢幕＝大螢幕槽容器（同一套 HUD，**禁止** `<video>`／`<audio>` 原生播放器）。主持可從大螢幕拿掉（列尾）。片名仍在槽外狀態。
+- **音檔（`kind: audio`）：** 槽內常駐 **audio player 面**＋音量／節奏跳動（§5.7.1／**2h**）；不是點開才出現空白播控。HUD 規則同上——transport 僅主持、音量本機。
 
 選遊戲＝頁內 sheet（型錄 `kind: game`）；指定人＝同一 sheet 第二步。不要跳去 `/apps` 整頁。
 
@@ -1097,7 +1115,7 @@ Esc 回大廳（現況 `goEscapeHome` 含 `/chat` → 改 `/room`）。**劇院�
 | 檔案 | 共用 `rosterSessionFile.ts`＋單測；索取端一律 **`/room-file/<id>`**＋既有 SW；**本機 File SW 直出（不經 DC）**；遠端 chunk **直連優先（1c）／Host star 備援**、**每 HTTP ↔ 一 `transferId`**；禁止組整檔 Blob／object URL 產品路徑；**只掛檔、不掛資料夾**；**私有 OPFS＝2g**（與分享 id 隔離；見 §8.3） |
 | Mesh | **1c。** 在線 Guest 變動 → Host `hello` → Guest **立刻**建 **DC-only** 邊；失敗對該 peerId **不重試**；傳檔只查 `hasDirect`。檔 chunk 直連／star；**節目／在場 RTP 永不走 mesh**（仍 Hub） |
 | Peer | 進門 booth 2+2 helper（勿把遊戲 DC-only／現況 1+1 默默改掉）。**mesh 邊＝DC-only**（勿再給 mesh 留 2+2 再當媒體 peers） |
-| 媒體 | **節目槽＝片子／live**（進門綁 program `<video>`；房級送**單一路**來源；電影 `captureStream`）。開局＝大螢幕槽掛 SAM，節目可 unoffer。在場＝開口／可指定上大螢幕。**在場聲＝Host 混音**（§9.8.1／2f）。目錄「要」＝同源 HTTP。人數不關鏡頭。**不做**多路視訊合成 |
+| 媒體 | **節目槽＝片子／live／音檔 player 面**（進門綁 program `<video>`；房級送**單一路**來源；電影 `captureStream`；**audio＝2h player＋本機 Analyser 跳動**）。開局＝大螢幕槽掛 SAM，節目可 unoffer。在場＝開口／可指定上大螢幕。**在場聲＝Host 混音**（§9.8.1／2f）。目錄「要」＝同源 HTTP。人數不關鏡頭。**不做**多路視訊合成 |
 | 殼面 | 主視訊區 16:9（槽內無字）＋廳態三區／劇院態 overlay（§5.8）。內景降級為外框／沒訊號雪花。**不要**重用 `GoShopLobby`。chrome hideable 對齊對弈 overlay。**不要**用系統全螢幕冒充劇院態 |
 | 開局 | **第一刀已手測**（`pg-gomoku`）。契約：`session_play`；重用進門 PC；席次從協議 roles；自動＝主持＋進門序。實作計劃：[PG-GO-ROOM-PLAY-PLAN.md](./PG-GO-ROOM-PLAY-PLAN.md) |
 | 分享 | `GoShareSheet` 邀請模式；title「邀請你進包廂」；**必備**「另一台請掃碼、不要再開一間」 |
@@ -1124,9 +1142,10 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 | **2e. 別人掛的檔上大螢幕** | 主持 `session_cast` → **owner** 本機渲染 → Hub 轉節目；先 video／audio；image 同模型；doc 延後 | 主持可把 Guest 掛的片子／歌放到大螢幕；不能 capture → reject＋頁內說明；**不**為上大螢幕拉檔到主持 | **video／audio／image 已落地**（`fromPeer`；圖＝canvas 靜態軌；doc 延後） |
 | **2f. 在場聲混音** | 星狀下 Host `AudioContext` 混多路上行麥 → 各 peer 一條 presence audio；單開麥可轉發；排除自迴音；節目音不混入 | ≥2 開麥者彼此聽得到；關麥即離混；**不做**多路視訊合成 | **已落地**（`goRoomPresenceAudioMix`；Hub `pushPresenceAudio`） |
 | **2g. 主持私有檔** | Host OPFS 片庫；與分享分離；可上大螢幕（`scope: private`）；掛到分享才可「要」；Guest 無私有區 | 私有不 fanout、不上 `/room-file`；cast 僅 RTP；散場不清 OPFS | **已落地**（OPFS＋`scope:private`；手測影／音；**圖同 2e**；Safari 影音片源仍同既有限制） |
+| **2h. 音檔大螢幕 player** | `kind: audio` 推播 → 全場 **audio player 面**；音量／節奏跳動（本機節目音 `AnalyserNode`）；transport 僅主持 | 全員見 player＋跳動；Guest 不可 seek／快轉／倒帶；音量本機；**不**另開檔冒充大螢幕 | **已落地**（`goRoomAudioPlayer`＋`GoRoomTvSlot` face；HUD 沿用 host-file） |
 | **3. 重用 peer 開局** | 包廂已連 → `session_play`；大螢幕槽掛 SAM；主持選遊戲＋指定／自動入座；觀戰看同一畫布 | 不必再掃 compose；Guest 留 `/i/`；終局可結束這一局而包廂還在。第一刀：五子棋 2 席 | **第一刀已落地**（gomoku 手測；手動席；**redpick** 四席＋觀戰＋deal→end domain） |
 
-建議實作順序 **0 → 1 → 1b → 2c → 2d → 2e → 2f → 2g → 1c → 2b**（皆已落地）→ **3 開局＋redpick＋多人傳檔 domain e2e 已綠**；**下一刀候選：doc 上大螢幕／瀏覽器抽樣**。2b 私下播保留在檔案區。**不要**排多路視訊合成。1c 打開後節目 RTP／在場聲仍走 Hub，直到另刀評估直連媒體。
+建議實作順序 **0 → 1 → 1b → 2c → 2d → 2e → 2f → 2g → 1c → 2b**（皆已落地）→ **3 開局＋redpick＋多人傳檔 domain e2e 已綠** → **2h 音檔大螢幕 player 已落地**；**下一刀候選：doc 上大螢幕／瀏覽器抽樣**。2b 私下播保留在檔案區。**不要**排多路視訊合成。1c 打開後節目 RTP／在場聲仍走 Hub，直到另刀評估直連媒體。
 
 ---
 
@@ -1167,6 +1186,7 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 | 31 | 檔上大螢幕 | **`file { owner, id, scope? }`＝持檔端渲染 → 節目 RTP**。`scope: "private"`＝Host OPFS。呈現型別影→音→圖遞增；**現況影／音／圖**；doc／任意 MIME 不承諾。傳輸模型不變 |
 | 32 | 在場聲混音 | 星狀下 Host **混音**再送 presence audio（`AudioContext` 或等價）；單開麥可轉發；≥2 開麥禁止只轉一軌。節目音不混開口。否決多路視訊合成當在場解。**2f** |
 | 33 | 主持私有檔 | **僅 Host**；**OPFS** 片庫與分享目錄分離；不 fanout、不上 `/room-file`；可上大螢幕（僅 RTP；**現況影／音／圖**）；要分享＝顯式掛到分享；散場不清 OPFS；Guest 無私有區。**2g 已落地** |
+| 34 | 音檔大螢幕 player | **`kind: audio` 推播＝全場 audio player 面**（非黑屏／雪花）。播／停／seek／快轉／倒帶＝**僅主持**；音量＝本機。面內／上方須有依音量或節奏跳動的視覺化（本機節目音 Analyser；**禁止**每人另開檔冒充）。片名仍槽外。**2h 已落地** |
 
 ---
 
@@ -1197,6 +1217,7 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 - [x] **2g：** 主持私有檔已落地（OPFS＋`scope:private`；手測私有影／音可上大螢幕；圖同 2e）
 - [x] **2e image：** 圖檔上大螢幕已落地（canvas 靜態節目軌；無 seek；wire kind＝video）
 - [x] **3：** 包廂開局第一刀已手測（`pg-gomoku` 對弈＋重開＋harness 觀戰；手動指定席 UI 已落地；見 [PG-GO-ROOM-PLAY-PLAN.md](./PG-GO-ROOM-PLAY-PLAN.md)）
+- [x] **2h：** 音檔推上大螢幕 → 全員見 audio player 面＋音量／節奏跳動；僅主持可 seek／快轉／倒帶；Guest 音量本機；不另開檔冒充（§5.7.1／#34）
 
 **Phase 1（實作後）**
 
@@ -1311,3 +1332,6 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 | 2026-08-22 | **開局第一刀手測：** `pg-gomoku` Host＋Guest 連線對弈至終局、可重開；TV memory BC 綁定修復；Phase **3**／PLAY Phase 5 第一刀完成 |
 | 2026-08-22 | **redpick deal→end：** domain 全手；終局剩桌歸 `lastCapturer`（跨 act）；下一刀＝多人傳檔 e2e |
 | 2026-08-22 | **多人傳檔 e2e：** Host＋2 Guest star 下載／Guest→Guest 經 Host；`requesterBufferedAmount(dest)` 修正並發 backpressure |
+| 2026-08-22 | **音檔大螢幕 player（契約）：** 推播音樂／音檔 → 全場 audio player 面；僅主持 transport（seek／快轉／倒帶）；音量本機；面內依音量／節奏跳動（本機節目音 Analyser）。§5.7.1／§10.5／Phase **2h**／凍結 **#34** |
+| 2026-08-22 | **2h 實作：** `goRoomAudioPlayer`（face 判定＋Analyser levels）；`GoRoomTvSlot` audio player 面（bars＋碟片）；`remoteProgramKind` 進 UI store；本機推音設 `ownerDecodeKind`；HUD transport 仍僅 host-file |
+| 2026-08-22 | **2h 修：訪客有動畫無聲：** `createMediaStreamSource` 會帶走 `<video>` 可聽路徑；改 `Analyser→Gain→destination`，音量走 GainNode；audio face 時 `<video>` 保持 muted |

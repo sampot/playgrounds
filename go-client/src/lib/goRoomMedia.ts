@@ -960,6 +960,7 @@ export function createRoomMedia(opts: {
     programName = file.name.trim() || "影片";
     remoteProgramName = null;
     remoteProgramKind = null;
+    ownerDecodeKind = programKindOfFile(file);
     error = null;
     bindProgramClock(next);
     return { ok: true };

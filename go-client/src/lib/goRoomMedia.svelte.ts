@@ -47,6 +47,7 @@ class GoRoomMedia {
   display = $state(false);
   programName = $state<string | null>(null);
   remoteProgramName = $state<string | null>(null);
+  remoteProgramKind = $state<"audio" | "video" | null>(null);
   presenceStream = $state<MediaStream | null>(null);
   programStream = $state<MediaStream | null>(null);
   localProgramStream = $state<MediaStream | null>(null);
@@ -91,6 +92,7 @@ class GoRoomMedia {
       this.display = s.display;
       this.programName = s.programName;
       this.remoteProgramName = s.remoteProgramName;
+      this.remoteProgramKind = s.remoteProgramKind;
       this.presenceStream = s.presenceStream;
       this.programStream = s.programStream;
       this.localProgramStream = s.localProgramStream;
@@ -126,6 +128,7 @@ class GoRoomMedia {
     this.display = EMPTY.display;
     this.programName = EMPTY.programName;
     this.remoteProgramName = EMPTY.remoteProgramName;
+    this.remoteProgramKind = EMPTY.remoteProgramKind;
     this.presenceStream = null;
     this.programStream = null;
     this.localProgramStream = null;

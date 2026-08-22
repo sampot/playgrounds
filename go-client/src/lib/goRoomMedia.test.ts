@@ -544,6 +544,46 @@ describe("createRoomMedia", () => {
     ).toBe("audio");
   });
 
+  it("casts listed audio with ownerDecodeKind audio and offer kind audio", async () => {
+    const audio = track("audio", "prog-a");
+    const file = new File([new Uint8Array(4)], "song.mp3", {
+      type: "audio/mpeg",
+    });
+    const json: unknown[] = [];
+    const media = createRoomMedia({
+      localAgentId: "host",
+      occupantCount: () => 2,
+      peers: () => [{ peerId: "g-a", pc: mockPc(), via: "entrance" }],
+      sendJson: (m) => json.push(m),
+      resolveLocalFile: (id) => (id === "file-1" ? file : null),
+      captureProgram: async () => ({
+        audio,
+        video: null,
+        stop: vi.fn(),
+        pause: vi.fn(),
+        play: vi.fn(),
+        seek: vi.fn(),
+        clock: () => ({
+          paused: false,
+          currentTime: 0,
+          duration: 180,
+        }),
+      }),
+    });
+    expect((await media.startListedProgram("file-1")).ok).toBe(true);
+    expect(media.getState().ownerDecodeKind).toBe("audio");
+    expect(media.getState().programTransport).toBe(true);
+    expect(json).toContainEqual({
+      type: SESSION_CAST_TYPE,
+      v: 1,
+      op: "offer",
+      from: "host",
+      kind: "audio",
+      name: "song.mp3",
+      id: "file-1",
+    });
+  });
+
   it("casts a listed image as a static program video track (no seek transport)", async () => {
     const video = track("video", "prog-img");
     const file = new File([new Uint8Array(4)], "shot.png", {
