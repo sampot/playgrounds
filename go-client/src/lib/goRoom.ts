@@ -514,11 +514,15 @@ export function roomTvLabel(opts: {
   programName?: string | null;
   remoteProgramName?: string | null;
   sourceName?: string | null;
+  /** Booth session_play title — counts as signal while the game is up. */
+  playName?: string | null;
 }): string {
   const file = opts.remoteProgramName?.trim() || opts.programName?.trim();
   if (file) return `正在播 ${file}`;
   const who = opts.sourceName?.trim();
   if (who) return `大螢幕上是 ${who}`;
+  const play = opts.playName?.trim();
+  if (play) return `正在玩 ${play}`;
   return GO_ROOM_TV_OFF;
 }
 

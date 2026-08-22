@@ -23,6 +23,7 @@
   import GoRoomPlayPicker from "$lib/GoRoomPlayPicker.svelte";
   import GoSamLoadBar from "$lib/GoSamLoadBar.svelte";
   import { listRoomPlayableGames } from "$lib/goRoomPlayBootstrap";
+  import { getGoCatalogEntry } from "$lib/goCatalog";
   import type { GoLoadProgress } from "$lib/goLoadProgress";
   import { goAuth } from "$lib/goAuth.svelte";
   import { roomAdClickAction } from "$lib/goAds";
@@ -383,10 +384,19 @@
       )
     )
   );
+  const playActive = $derived(
+    Boolean(playCatalogId || playCanvasUrl || playCanvasSrcdoc)
+  );
+  const playTvName = $derived.by(() => {
+    const id = playCatalogId?.trim();
+    if (!id) return playActive ? "遊戲" : null;
+    return getGoCatalogEntry(id)?.title?.trim() || id;
+  });
   const tvLabel = $derived(
     roomTvLabel({
       programName: goRoomMedia.programName,
       remoteProgramName: goRoomMedia.remoteProgramName,
+      playName: playTvName,
     })
   );
   const tvStream = $derived(
@@ -490,7 +500,7 @@
     roomShowAdSlot({
       inBooth,
       tvOn,
-      playActive: Boolean(playCatalogId || playCanvasUrl || playCanvasSrcdoc),
+      playActive,
     })
   );
   const panesConcurrent = $derived(
@@ -528,9 +538,13 @@
     if (phase === "connecting") return message || GO_ROOM_CONNECTING_TITLE;
     if (phase === "ended") return message || "這一間已結束";
     if (inBooth) {
+      // Prefer stage line so cast／play read as signal（not occupancy-only「沒訊號」）.
       const line = roomStageStatus({ guestCount, tvLabel });
-      if (role === "guest" && peerName) return `${line} · ${peerName}`;
-      return message || line;
+      if (role === "guest" && peerName) {
+        return line ? `${line} · ${peerName}` : peerName;
+      }
+      if (line) return line;
+      return message;
     }
     return message;
   });

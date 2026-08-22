@@ -208,6 +208,15 @@ describe("roomTvLabel", () => {
     );
     expect(roomTvLabel({ sourceName: "小明" })).toBe("大螢幕上是 小明");
   });
+
+  it("treats booth play as signal (not 沒訊號)", () => {
+    expect(roomTvLabel({ playName: "五子棋" })).toBe("正在玩 五子棋");
+    expect(roomTvLabel({ playName: "  " })).toBe(GO_ROOM_TV_OFF);
+    // Cast／live still win over play if both somehow present.
+    expect(
+      roomTvLabel({ playName: "五子棋", programName: "MTV.mp4" })
+    ).toBe("正在播 MTV.mp4");
+  });
 });
 
 describe("roomTvPictureOn", () => {
@@ -336,6 +345,9 @@ describe("roomStageStatus", () => {
     expect(
       roomStageStatus({ guestCount: 0, tvLabel: "正在播 MTV.mp4" })
     ).toBe("正在播 MTV.mp4");
+    expect(
+      roomStageStatus({ guestCount: 2, tvLabel: "正在玩 五子棋" })
+    ).toBe("3 人在 · 正在玩 五子棋");
   });
 });
 
