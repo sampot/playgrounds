@@ -1250,9 +1250,14 @@ describe("roomShortLandscape", () => {
     expect(roomShortLandscape({ widthPx: 667, heightPx: 375 })).toBe(true);
   });
 
+  it("uses side rail for medium landscape under the desktop width", () => {
+    expect(roomShortLandscape({ widthPx: 740, heightPx: 600 })).toBe(true);
+  });
+
   it("stays stacked on phone portrait and laptop height", () => {
     expect(roomShortLandscape({ widthPx: 390, heightPx: 844 })).toBe(false);
     expect(roomShortLandscape({ widthPx: 1440, heightPx: 900 })).toBe(false);
+    expect(roomShortLandscape({ widthPx: 1024, heightPx: 768 })).toBe(false);
   });
 });
 
@@ -1277,6 +1282,9 @@ describe("roomShellMode", () => {
     expect(roomShellMode({ widthPx: 844, heightPx: 390 })).toBe(
       "short-landscape"
     );
+    expect(roomShellMode({ widthPx: 740, heightPx: 600 })).toBe(
+      "short-landscape"
+    );
     expect(roomShellPanesConcurrent("short-landscape")).toBe(false);
     expect(roomShellFilesPinned("short-landscape")).toBe(false);
     expect(roomShellTabPanes("short-landscape")).toEqual([
@@ -1286,8 +1294,14 @@ describe("roomShellMode", () => {
     ]);
   });
 
-  it("uses the desktop right rail from 768px when height is not scarce", () => {
-    expect(roomShellMode({ widthPx: 768, heightPx: 1024 })).toBe("desktop");
+  it("keeps tablet portrait stacked even at the desktop width", () => {
+    expect(roomShellMode({ widthPx: 768, heightPx: 1024 })).toBe("portrait");
+    expect(roomShellMode({ widthPx: 834, heightPx: 1194 })).toBe("portrait");
+    expect(roomShellFilesPinned("portrait")).toBe(false);
+  });
+
+  it("uses the desktop right rail on landscape at or above 768px", () => {
+    expect(roomShellMode({ widthPx: 1024, heightPx: 768 })).toBe("desktop");
     expect(roomShellPanesConcurrent("desktop")).toBe(false);
     expect(roomShellFilesPinned("desktop")).toBe(true);
     expect(roomShellTabPanes("desktop")).toEqual(["members", "chat"]);

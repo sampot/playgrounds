@@ -1,6 +1,6 @@
 # Playgrounds 純玩版：包廂（go `/room`）
 
-> **狀態：** Draft（2026-08-22）— 主面＝**主視訊區**（`GoRoomTvSlot` 16:9；沒訊號／片子／live／開局同一塊；槽內無字）；**劇院態**＝應用內**滿窗僅主視訊**（**不顯示** dock／三 tab）；叫出 chrome／Esc → **回廳態**；**2d 殼面 RWD 手測完成**；**開局第一刀手測完成**（五子棋＋redpick）；chrome **可收**；廳態＝大螢幕＋**成員／檔案／聊天** tab + dock；聊天＝`session_chat` 開口備援（非主欄）；兩層螢幕；**大螢幕＝同時一路主畫面**；**否決**多路視訊合成；**在場聲混音（2f）**；**放到大螢幕上＝持檔端渲染 → 節目 RTP**（影／音／圖；**2h 音檔 player 面已落地**）；**分享目錄**一律 `/room-file/<id>`；**mesh（1c）** 檔直連、節目／在場 RTP 仍 Hub；**主持私有 OPFS（2g）**；進門即主面、不鎖 1:1、兩個時鐘、SDP **2+2**；shell 斷點＝**viewport**（與 CSS `@media` 一致）
+> **狀態：** Draft（2026-08-22）— 主面＝**主視訊區**（`GoRoomTvSlot` 16:9；沒訊號／片子／live／開局同一塊；槽內無字）；**劇院態**＝應用內**滿窗僅主視訊**（**不顯示** dock／三 tab）；叫出 chrome／Esc → **回廳態**；**2d 殼面 RWD 手測完成**；**2d+ RWD 邊界精修已落地**（§5.8.1）；**開局第一刀手測完成**（五子棋＋redpick）；chrome **可收**；廳態＝大螢幕＋**成員／檔案／聊天** tab + dock；聊天＝`session_chat` 開口備援（非主欄）；兩層螢幕；**大螢幕＝同時一路主畫面**；**否決**多路視訊合成；**在場聲混音（2f）**；**放到大螢幕上＝持檔端渲染 → 節目 RTP**（影／音／圖；**2h 音檔 player 面已落地**）；**分享目錄**一律 `/room-file/<id>`；**mesh（1c）** 檔直連、節目／在場 RTP 仍 Hub；**主持私有 OPFS（2g）**；進門即主面、不鎖 1:1、兩個時鐘、SDP **2+2**；shell 斷點＝**viewport**（與 CSS `@media` 一致）
 > **權威決策：** 從屬 [DECISIONS.md](./DECISIONS.md) **DEC-050**（純玩版）、**DEC-045**（Roster／薄 signaling；**非** Avatars 產品面）、**DEC-047**（Platform Invite）；**不另開 DEC**  
 > **相關：** [PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)、[PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md)（登入＋記憶體 field API key）、[PG-GO-HOST-INVITE-PLAN.md](./PG-GO-HOST-INVITE-PLAN.md)（GO-INVITE＝遊戲 compose；**勿混**）、[PG-GO-ROOM-PLAY-PLAN.md](./PG-GO-ROOM-PLAY-PLAN.md)（包廂內重用 peer 開局＝`session_play`；Phase 3；**第一刀手測完成**）、[PG-GO-ROOM-DEV-HARNESS-PLAN.md](./PG-GO-ROOM-DEV-HARNESS-PLAN.md)（localhost／Agent 多 tab 進門；**勿**當產品契約）、[PG-GO-SESSION-CHAT-PLAN.md](./PG-GO-SESSION-CHAT-PLAN.md)（局內 overlay 對話——**勿混**）、[PG-GO-SHOP-LOBBY-PLAN.md](./PG-GO-SHOP-LOBBY-PLAN.md)（大廳熱點入口）、[PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)、[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（官方 TURN；包廂 ICE **與**遊戲邀請分開）、`.cursor/rules/no-native-dialogs.mdc`、`.cursor/rules/mobile-first-ux.mdc`、[GLOSSARY.md](./GLOSSARY.md)
 
@@ -306,7 +306,7 @@ Guest `/i/` 不經大廳；進主面須讀成「你在一間包廂」。可選�
 
 | 態 | 何時 | 主視訊 | 成員／檔案／聊天、dock、廣告 |
 | --- | --- | --- | --- |
-| **廳態** | 沒訊號、進門預設；未登入／connecting／ended **只廳態** | 直式上 16:9；短橫屏左；寬屏與右欄並排。`object-fit: contain`。槽內無字 | 文檔流：**成員／檔案／聊天** tab（窄屏下半；寬屏右欄）。**dock**（麥／鏡頭／畫面／劇院／結束）在 tab **上方**。廣告浮在主視訊（沒訊號時） |
+| **廳態** | 沒訊號、進門預設；未登入／connecting／ended **只廳態** | 直式／平板直式上 16:9；橫向窄屏左；橫向寬屏與右欄並排。`object-fit: contain`。槽內無字 | 文檔流：**成員／檔案／聊天** tab（堆疊下半；橫向窄屏右欄；寬屏右欄）。**dock**（麥／鏡頭／畫面／劇院／結束）在 tab **上方**。廣告浮在主視訊（沒訊號時） |
 | **劇院態** | 使用者按「隱藏控制面板」。播放**不**自動進 | **應用內滿窗**（`100svh`；同一顆 `<video>`／開局畫布；`object-fit: contain`） | **不顯示** dock 與三 tab。**僅**主視訊。下拉／peek／Esc 叫出 playground 頂列 → **回廳態**（dock／tab 回來）。槽外狀態列**隱藏** |
 
 - **禁止**用瀏覽器 Fullscreen API 當劇院態**唯一**手段。系統全螢幕可當加分（從廳態 TV HUD 進入）。
@@ -314,15 +314,41 @@ Guest `/i/` 不經大廳；進主面須讀成「你在一間包廂」。可選�
 - 分享面、結束確認：暫停頂列自動收。**文字 composer focus 不得叫出 playground header。**
 - 讀屏：滿窗仍是那顆 `<video>`／遊戲面；回廳態後 tab 標籤寫全名（成員／檔案／聊天）；熱區 ≥44px。
 
-**RWD（mobile-first）：** 預設 CSS＝手機直式。**`roomShellMode` 與 CSS `@media` 皆以 viewport 為準**（`document.documentElement.clientWidth/Height`）。下列是**廳態**；劇院態見上表。
+**RWD（mobile-first）：** 預設 CSS＝手機直式。**`roomShellMode` 與 CSS `@media` 皆以 viewport 為準**（`document.documentElement.clientWidth/Height`；實作常數見 `goRoom.ts` 的 `ROOM_SHELL_*`）。下列是**廳態**；劇院態見上表。
 
-| 模式 | 條件（約） | 廳態結構 |
-| --- | --- | --- |
-| **窄屏** | viewport 寬 < 768px | **上：** 主視訊 16:9。**下：** dock + **成員／檔案／聊天** tab（預設成員）。**禁止**三欄並排 |
-| **短橫屏** | `landscape` 且 viewport 高 ≤ ~560px | 左大螢幕、右 dock + 三 tab（一次一區）。麥列在右欄頂 |
-| **寬屏／桌機** | viewport `min-width: 48rem` 且高夠 | 左大螢幕；右欄：dock 頂、**上半檔案**、**下半 tab 成員／聊天**。>1280px 檔案與成員／聊天並排。門牌小狀態在成員區 |
+| 模式 | `roomShellMode` | 條件（硬；依序判定） | 廳態結構 |
+| --- | --- | --- | --- |
+| **直式堆疊** | `portrait` | ① `height ≥ width` 且 `width < 768px`（手機直式）；**或** ② `height ≥ width` 且 `width ≥ 768px`（**平板直式**——寬達桌機門檻仍上下分，**不**走右欄） | **上：** 主視訊 16:9。**下：** dock + **成員／檔案／聊天** tab（預設成員）。**禁止**三欄並排 |
+| **橫向分欄** | `short-landscape` | `width > height` **且**（`height ≤ 560px` **或** `width < 768px`） | 左大螢幕、右 dock + 三 tab（一次一區）。麥列在右欄頂。**涵蓋**手機橫屏（常 `width ≥ 768` 但 `height ≤ 560`）與 split view／矮橫窗（`width < 768` 且 `height > 560`） |
+| **寬屏／桌機** | `desktop` | `width ≥ 768px` **且** `width > height`（橫向寬屏；已排除上兩列） | 左大螢幕；右欄：dock 頂、**上半檔案**、**下半 tab 成員／聊天**。`width > 1280px` 檔案與成員／聊天並排。門牌小狀態在成員區 |
+
+**判定順序（硬，與 `roomShellMode()` 一致）：**
+
+```text
+1. width > height 且 (height ≤ 560 或 width < 768) → short-landscape
+2. height ≥ width 且 width ≥ 768                  → portrait（平板直式）
+3. width ≥ 768 且 width > height                  → desktop
+4. 其餘                                           → portrait（手機直式）
+```
+
+**`560px` 雙用途：** ① 上表 **OR** 分支之一（手機橫屏分欄）；② **僅**壓縮 playground 頂列／`.main` padding（`ROOM_SHORT_LANDSCAPE_MQ`；`styles.css` `.site:has(.room)`）——**不再**單獨決定「是否分欄」。
 
 廳態 tab **不是**蓋滿大螢幕的 modal。劇院態不排 tab；叫出控制＝回廳態。首次空包廂（沒訊號）可在**成員區**顯示一次大螢幕操作 hint（`GO_ROOM_TV_HINT_*`）。
+
+#### 5.8.1 RWD 邊界精修（2d+；**已落地**）
+
+首版 **2d** 四斷點手測已過；下列為實作與 §5.8 表對齊時的**精修**（不改劇院態／頂列可收契約）：
+
+| 項 | 問題 | 定案 |
+| --- | --- | --- |
+| **中等橫屏死區** | 現況：`landscape`＋`height > 560`＋`width < 768` 誤落直式堆疊 | 併入 **橫向分欄**（上表 OR `width < 768`） |
+| **平板直式** | 現況：`width ≥ 768` 一律右欄，直式 iPad 右欄過擠 | **`height ≥ width` 且 `width ≥ 768` → 直式堆疊**（上表②） |
+| **手機橫屏** | 現況：僅 `height ≤ 560`；Pro 系橫向常 `width ≥ 768` | 保留 **`height ≤ 560` OR**；與上列 OR 並存 |
+| **TV HUD 極窄** | 廳態 HUD 單列不換行；~320px 槽寬時 seek 過窄 | `@container` 窄槽：隱藏次要 clock **或** transport 收成二級（仍 **禁止**整列換行） |
+| **檔案 filter 直式** | 私有／分享＋四類 filter 吃光下半高度 | 窄直式：**水平捲動** segmented **或**「篩選」收合；預設 tab 仍 **成員** |
+| **虛擬鍵盤** | `clientHeight` 驟變可能讓 `roomShellMode` 在邊界抖動 | 聊天 composer focus 期間可鎖 mode（`visualViewport`）；**不得**因此叫出 playground header |
+
+**實作同步（硬）：** 改斷點須同改 `goRoom.ts`（`roomShellMode`／`roomShortLandscape`）、`GoRoomSurface.svelte`（`room--*` 與 `@media`）、`styles.css`（`.site:has(.room)`）；`goRoom.test.ts` 補邊界 case。`560`／`768`／`1281` 常數與 CSS `48rem`／`80.0625rem` 保持單一來源註解。
 
 **頂列可收（硬）：** 對齊對弈（3s、下拉／peek）。請人在**成員區**；**結束／離開**在 **dock**（icon；`aria-label` 全名）。人數／大螢幕一句在**槽外狀態列**（**僅廳態**）。
 
@@ -1040,11 +1066,13 @@ session_play.end    { from: host }
    - 結束這一局：包廂還在；不要寫成散場。
    - 清空私有（若提供）：明示確認；**不是**散場。
 
-**手機橫式：** 廳態左大螢幕、右分段；廣告浮在大螢幕槽（沒訊號時）；頂緣拉出殼。高度不夠仍由使用者隱藏控制面板進劇院態，**不要**自動滿窗。見 §5.8。
+**手機橫式／橫向窄窗：** 廳態 **橫向分欄**（左大螢幕、右 dock + 三 tab）；廣告浮在大螢幕槽（沒訊號時）；頂緣拉出殼。高度不夠由使用者按劇院進滿窗，**不要**自動滿窗。split view 橫向（`width < 768`）亦走分欄，**不要**落回直式堆疊。見 §5.8。
 
-### 10.3 寬屏（`min-width` 遞增）
+**平板直式（`width ≥ 768` 且 `height ≥ width`）：** 維持 **直式堆疊**（上 16:9 + 下 tab），**不要**因寬度達門檻就改右欄。見 §5.8 表②。
 
-**廳態：** 大螢幕左；右欄 dock + 檔案 + 成員／**聊天** tab。
+### 10.3 寬屏（橫向 `width ≥ 768px`）
+
+**廳態：** 大螢幕左；右欄 dock + 檔案 + 成員／**聊天** tab（**僅** `width > height`；平板直式見 §10.2）。
 
 **劇院態：** 主視訊滿窗；**無** dock／tab。Esc／peek 回廳態後可操作。
 
@@ -1135,6 +1163,7 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 | **2b. 目錄影音私下播** | 掛在目錄的影片／音樂經同源 URL 邊收邊播；不走節目 RTP | 片源不出雲；可 seek；**不**當大螢幕；與下載／檢視同一 HTTP 門面 | **已落地**（影／音／圖／下載皆 `/room-file/<id>`；撤 blob image sink） |
 | **2c. 包廂大螢幕** | `GoRoomTvSlot` 16:9；節目 RTP；房級收節目／在場聲；聊天在 tab 內 | 沒訊號佔主高度；一起看 MTV；私下播與大螢幕並行 | **已落地**（`GoRoomTvSlot`；節目 RTP）。別人掛的檔見 **2e** |
 | **2d. 大螢幕槽殼面** | `GoRoomSurface` 廳態三 tab + dock RWD；劇院態滿窗**無** dock／tab；頂列可收 | 直／橫／平板／桌機；請人在成員區 | **已落地** |
+| **2d+. RWD 邊界精修** | §5.8.1：`roomShellMode` 判定、平板直式、橫向窄窗、HUD／filter／鍵盤 | 手測四類裝置＋split view | **已落地** |
 | **2e. 別人掛的檔上大螢幕** | 主持 `session_cast` → **owner** 本機渲染 → Hub 轉節目；先 video／audio；image 同模型；doc 延後 | 主持可把 Guest 掛的片子／歌放到大螢幕；不能 capture → reject＋頁內說明；**不**為上大螢幕拉檔到主持 | **video／audio／image 已落地**（`fromPeer`；圖＝canvas 靜態軌；doc 延後） |
 | **2f. 在場聲混音** | 星狀下 Host `AudioContext` 混多路上行麥 → 各 peer 一條 presence audio；單開麥可轉發；排除自迴音；節目音不混入 | ≥2 開麥者彼此聽得到；關麥即離混；**不做**多路視訊合成 | **已落地**（`goRoomPresenceAudioMix`；Hub `pushPresenceAudio`） |
 | **2g. 主持私有檔** | Host OPFS 片庫；與分享分離；可上大螢幕（`scope: private`）；掛到分享才可「要」；Guest 無私有區 | 私有不 fanout、不上 `/room-file`；cast 僅 RTP；散場不清 OPFS | **已落地**（OPFS＋`scope:private`；手測影／音；**圖同 2e**；Safari 影音片源仍同既有限制） |
@@ -1176,7 +1205,7 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 | 25 | 一條出站在場 live | `getUserMedia` XOR `getDisplayMedia`；可含影像＋聲音 |
 | 26 | 兩層螢幕 | 包廂大螢幕 ≠ 我這台。私下播／掛／下載不跟大螢幕互斥 |
 | 27 | 主持導播 | 僅主持指定大螢幕來源（**含別人掛的檔**／**主持私有**／peer／開局）。被指定者不是新主持。再指定＝切台 |
-| 28 | 殼面 | **主視訊區**＝`GoRoomTvSlot`（16:9；槽內無字）。廳態：viewport <768px 上 16:9 + 下 tab + dock；≥768px 右欄（dock、檔案、成員／聊天 tab）。**劇院態：** 隱藏控制面板 → **滿窗僅主視訊**（**不**顯示 dock／tab）；Esc／peek → 廳態。槽外狀態列**僅廳態**。RWD 斷點＝viewport |
+| 28 | 殼面 | **主視訊區**＝`GoRoomTvSlot`（16:9；槽內無字）。廳態：**直式堆疊**（手機直式＋**平板直式** `height ≥ width` 且 `width ≥ 768`）；**橫向分欄**（`width > height` 且 `height ≤ 560` 或 `width < 768`）；**寬屏右欄**（`width ≥ 768` 且 `width > height`）。判定順序見 §5.8。**劇院態：** 隱藏控制面板 → **滿窗僅主視訊**（**不**顯示 dock／tab）；Esc／peek → 廳態。槽外狀態列**僅廳態**。RWD 斷點＝viewport；邊界精修見 §5.8.1 |
 | 29 | 頂列 | 包廂主面 **可 overlay 收起**（約 3s；對齊對弈）。請人／結束不只活在頂列。consent／錯誤面不收 |
 | 30 | 開局 | 契約凍：重用進門 PC；`session_play`；主持選遊戲＋指定或自動入座；未入座觀戰；不鑄 compose、不改 Guest 網址。第一刀不做局中換席。**第一刀已手測**（落地見 [PG-GO-ROOM-PLAY-PLAN.md](./PG-GO-ROOM-PLAY-PLAN.md)） |
 | 31 | 檔上大螢幕 | **`file { owner, id, scope? }`＝持檔端渲染 → 節目 RTP**。`scope: "private"`＝Host OPFS。呈現型別影→音→圖遞增；**現況影／音／圖**；doc／任意 MIME 不承諾。傳輸模型不變 |
@@ -1209,6 +1238,7 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 - [x] **兩個時鐘：** 包廂＝Host document；門牌 TTL 分開；按需鑄；Guest 留 `/i/`
 - [x] **契約本刀：** 主面＝主視訊區；廳態／劇院態；兩層螢幕；片子／live＝節目 RTP；開局＝重用 PC（延後）；**目錄索取＝同源靜態檔 HTTP**；主持導播；槽內無字；頂列可收；房級收節目／在場聲（§5.6–5.9／§8.2／§9／§10）；**單主畫面＋否決視訊合成；在場聲混音（§9.8.1／#32／2f）**；**主持私有 OPFS（#33／2g）**
 - [x] **2d：** 殼面已落地（廳態＋劇院態；RWD 手測完成）
+- [x] **2d+：** RWD 邊界精修（§5.8.1；`roomShellMode`／平板直式／橫向窄窗）
 - [x] **2f：** 星狀在場聲混音（≥2 開麥彼此聽得到；節目音不混）
 - [x] **2g：** 主持私有檔已落地（OPFS＋`scope:private`；手測私有影／音可上大螢幕；圖同 2e）
 - [x] **2e image：** 圖檔上大螢幕已落地（canvas 靜態節目軌；無 seek；wire kind＝video）
@@ -1331,3 +1361,4 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 | 2026-08-22 | **音檔大螢幕 player（契約）：** 推播音樂／音檔 → 全場 audio player 面；僅主持 transport（seek／快轉／倒帶）；音量本機；面內依音量／節奏跳動（本機節目音 Analyser）。§5.7.1／§10.5／Phase **2h**／凍結 **#34** |
 | 2026-08-22 | **2h 實作：** `goRoomAudioPlayer`（face 判定＋Analyser levels）；`GoRoomTvSlot` audio player 面（bars＋碟片）；`remoteProgramKind` 進 UI store；本機推音設 `ownerDecodeKind`；HUD transport 仍僅 host-file |
 | 2026-08-22 | **2h 修：訪客有動畫無聲：** `createMediaStreamSource` 會帶走 `<video>` 可聽路徑；改 `Analyser→Gain→destination`，音量走 GainNode；audio face 時 `<video>` 保持 muted |
+| 2026-08-22 | **2d+ RWD 邊界精修（實作）：** `roomLandscapeRail`／`roomTabletPortrait`；`GoRoomSurface` 橫向分欄 CSS 改 class 驅動；窄直式檔案 filter 水平捲動；TV HUD 窄槽藏總長；composer focus 鎖 shell mode |

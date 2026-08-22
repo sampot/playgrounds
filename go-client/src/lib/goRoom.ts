@@ -54,12 +54,36 @@ export type RoomShellPane = "members" | "files" | "chat";
 
 export type RoomUiPhase = "idle" | "open" | "ended" | "error" | "connecting" | "ready";
 
-/** Stacked portrait chrome vs a short-landscape stage+rail. */
+/**
+ * Landscape side-rail hall (phone on its side, split view). Keep in sync with
+ * §5.8 PG-GO-ROOM-PLAN and `.room--short-landscape` in GoRoomSurface.
+ */
+export function roomLandscapeRail(opts: {
+  widthPx: number;
+  heightPx: number;
+}): boolean {
+  const { widthPx: w, heightPx: h } = opts;
+  return (
+    w > h &&
+    (h <= ROOM_SHORT_LANDSCAPE_MAX_HEIGHT_PX || w < ROOM_SHELL_DESKTOP_MIN_PX)
+  );
+}
+
+/** @deprecated Name kept for callers; prefer `roomLandscapeRail`. */
 export function roomShortLandscape(opts: {
   widthPx: number;
   heightPx: number;
 }): boolean {
-  return opts.widthPx > opts.heightPx && opts.heightPx <= ROOM_SHORT_LANDSCAPE_MAX_HEIGHT_PX;
+  return roomLandscapeRail(opts);
+}
+
+/** Tablet portrait: wide enough for desktop rail but still stacked. §5.8 step 2. */
+export function roomTabletPortrait(opts: {
+  widthPx: number;
+  heightPx: number;
+}): boolean {
+  const { widthPx: w, heightPx: h } = opts;
+  return h >= w && w >= ROOM_SHELL_DESKTOP_MIN_PX;
 }
 
 /** Viewport box for shell mode — keep in sync with CSS `@media` breakpoints. */
@@ -81,8 +105,14 @@ export function roomShellMode(opts: {
   widthPx: number;
   heightPx: number;
 }): RoomShellMode {
-  if (roomShortLandscape(opts)) return "short-landscape";
-  if (opts.widthPx >= ROOM_SHELL_DESKTOP_MIN_PX) return "desktop";
+  if (roomLandscapeRail(opts)) return "short-landscape";
+  if (roomTabletPortrait(opts)) return "portrait";
+  if (
+    opts.widthPx >= ROOM_SHELL_DESKTOP_MIN_PX &&
+    opts.widthPx > opts.heightPx
+  ) {
+    return "desktop";
+  }
   return "portrait";
 }
 

@@ -120,6 +120,7 @@
     type RoomHostMenuAction,
     type RoomInviteDoor,
     type RoomOccupantPeer,
+    type RoomShellMode,
     type RoomShellPane,
   } from "$lib/goRoom";
   import {
@@ -324,6 +325,7 @@
   let roomEl = $state<HTMLElement | null>(null);
   let railEl = $state<HTMLElement | null>(null);
   let shellBox = $state({ widthPx: 0, heightPx: 0 });
+  let shellModeLocked = $state<RoomShellMode | null>(null);
   let railLeftPx = $state(0);
   let tvHudOpen = $state(false);
   let tvSlotFullscreen = $state(false);
@@ -510,9 +512,10 @@
       : phase === "open" || (loggedIn && phase === "idle")
   );
   /** Logged-out／connecting／ended: full-width TV, not the in-booth rail split. */
-  const shellMode = $derived(
+  const shellModeLive = $derived(
     inBooth ? roomShellMode(shellBox) : "portrait"
   );
+  const shellMode = $derived(shellModeLocked ?? shellModeLive);
   const doorRow = $derived(
     roomInviteDoorRow({
       door,
@@ -1096,6 +1099,15 @@
     ev.preventDefault();
     if (!freeText || !canSpeak) return;
     if (goSessionChat.sendText(draft)) draft = "";
+  }
+
+  /** Hold layout while the chat composer is focused (virtual keyboard resize). */
+  function lockShellModeForComposer() {
+    shellModeLocked = shellModeLive;
+  }
+
+  function unlockShellModeForComposer() {
+    shellModeLocked = null;
   }
 
   function onQuick(q: string) {
@@ -2602,6 +2614,8 @@
                 enterkeyhint="send"
                 disabled={!canSpeak}
                 bind:value={draft}
+                onfocus={lockShellModeForComposer}
+                onblur={unlockShellModeForComposer}
               />
               <button
                 type="submit"
@@ -3426,6 +3440,25 @@
     gap: 0.35rem;
     margin: 0.15rem 0 0.45rem;
   }
+  .room--portrait:not(.room--cinema) .file-filters,
+  .room--portrait:not(.room--cinema) .file-filters-row {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+  @media (min-width: 48rem) {
+    .room--portrait:not(.room--cinema) .file-filters,
+    .room--portrait:not(.room--cinema) .file-filters-row {
+      flex-wrap: wrap;
+      overflow-x: visible;
+    }
+  }
+  .room--portrait:not(.room--cinema) .file-filter,
+  .room--portrait:not(.room--cinema) .file-filter-radio {
+    flex: 0 0 auto;
+  }
   .file-filters--kind {
     border: 0;
     padding: 0;
@@ -3805,64 +3838,61 @@
       padding-left: 0.45rem;
     }
   }
-  @media (orientation: landscape) and (max-height: 560px) {
-    .room--short-landscape:not(.room--cinema) {
-      display: grid;
-      grid-template-columns: minmax(0, 1.4fr) minmax(12rem, 1fr);
-      grid-template-rows: minmax(0, 1fr);
-      height: 100%;
-      max-height: 100%;
-      overflow: hidden;
-      gap: 0.35rem;
-      padding: 0.2rem 0.4rem;
-    }
-    .room--short-landscape:not(.room--cinema) .room-tv-col {
-      grid-column: 1;
-      min-height: 0;
-      display: flex;
-      flex-direction: column;
-    }
-    .room--short-landscape:not(.room--cinema) .room-tv-stage {
-      flex: 1 1 auto;
-      min-height: 0;
-    }
-    .room--short-landscape:not(.room--cinema) .room-tv-col :global(.tv-slot) {
-      height: 100%;
-      aspect-ratio: auto;
-    }
-    .room--short-landscape:not(.room--cinema) .room-lower {
-      display: flex;
-      flex-direction: column;
-      min-height: 0;
-      min-width: 0;
-      background: rgb(var(--card));
-      border-left: var(--pixel-edge) solid rgb(var(--ink));
-      padding: 0.3rem 0.4rem calc(0.3rem + env(safe-area-inset-bottom, 0px));
-      box-sizing: border-box;
-    }
-    .room--short-landscape:not(.room--cinema) .room-lower {
-      grid-column: 2;
-    }
-    .room--short-landscape .room-dock {
-      flex: 0 0 auto;
-    }
-    .room--short-landscape .room-shell {
-      display: flex;
-      flex-direction: column;
-      flex: 1 1 auto;
-      min-height: 0;
-      gap: 0.35rem;
-    }
-    .room--short-landscape .room-tabs {
-      display: flex;
-      flex: none;
-    }
-    .room--short-landscape .room-pane,
-    .room--short-landscape .room-pane--chat {
-      flex: 1 1 auto;
-      min-height: 0;
-      grid-area: auto;
-    }
+  /* Landscape side-rail: class from roomShellMode (§5.8), not height-only MQ. */
+  .room--short-landscape:not(.room--cinema) {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(12rem, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    height: 100%;
+    max-height: 100%;
+    overflow: hidden;
+    gap: 0.35rem;
+    padding: 0.2rem 0.4rem;
+  }
+  .room--short-landscape:not(.room--cinema) .room-tv-col {
+    grid-column: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .room--short-landscape:not(.room--cinema) .room-tv-stage {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+  .room--short-landscape:not(.room--cinema) .room-tv-col :global(.tv-slot) {
+    height: 100%;
+    aspect-ratio: auto;
+  }
+  .room--short-landscape:not(.room--cinema) .room-lower {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
+    background: rgb(var(--card));
+    border-left: var(--pixel-edge) solid rgb(var(--ink));
+    padding: 0.3rem 0.4rem calc(0.3rem + env(safe-area-inset-bottom, 0px));
+    box-sizing: border-box;
+    grid-column: 2;
+  }
+  .room--short-landscape .room-dock {
+    flex: 0 0 auto;
+  }
+  .room--short-landscape .room-shell {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    gap: 0.35rem;
+  }
+  .room--short-landscape .room-tabs {
+    display: flex;
+    flex: none;
+  }
+  .room--short-landscape .room-pane,
+  .room--short-landscape .room-pane--chat {
+    flex: 1 1 auto;
+    min-height: 0;
+    grid-area: auto;
   }
   @media (min-width: 40rem) {
     .confirm-actions {

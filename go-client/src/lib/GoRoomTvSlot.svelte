@@ -291,7 +291,7 @@
             oninput={(e) => onSeek(Number((e.currentTarget as HTMLInputElement).value))}
           />
         </label>
-        <span class="tv-hud-clock">
+        <span class="tv-hud-clock tv-hud-clock--duration">
           {duration > 0 ? roomTvClockLabel(duration) : "0:00"}
         </span>
       {/if}
@@ -387,6 +387,7 @@
     width: 100%;
     aspect-ratio: 16 / 9;
     min-height: 0;
+    container-type: inline-size;
     background: #0a0a0e;
     border: var(--pixel-edge) solid rgb(var(--ink));
     border-radius: var(--radius);
@@ -573,6 +574,14 @@
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
     padding: 0 0.1rem;
+  }
+  @container (max-width: 24rem) {
+    .tv-hud-clock--duration {
+      display: none;
+    }
+    .tv-hud-seek {
+      min-width: 2rem;
+    }
   }
   .tv-hud-seek {
     flex: 1 1 auto;
