@@ -318,16 +318,16 @@ Guest `/i/` 不經大廳；進主面須讀成「你在一間包廂」。可選�
 
 | 模式 | `roomShellMode` | 條件（硬；依序判定） | 廳態結構 |
 | --- | --- | --- | --- |
-| **直式堆疊** | `portrait` | ① `height ≥ width` 且 `width < 768px`（手機直式）；**或** ② `height ≥ width` 且 `width ≥ 768px`（**平板直式**——寬達桌機門檻仍上下分，**不**走右欄） | **上：** 主視訊 16:9。**下：** dock + **成員／檔案／聊天** tab（預設成員）。**禁止**三欄並排 |
-| **橫向分欄** | `short-landscape` | `width > height` **且**（`height ≤ 560px` **或** `width < 768px`） | 左大螢幕、右 dock + 三 tab（一次一區）。麥列在右欄頂。**涵蓋**手機橫屏（常 `width ≥ 768` 但 `height ≤ 560`）與 split view／矮橫窗（`width < 768` 且 `height > 560`） |
-| **寬屏／桌機** | `desktop` | `width ≥ 768px` **且** `width > height`（橫向寬屏；已排除上兩列） | 左大螢幕；右欄：dock 頂、**上半檔案**、**下半 tab 成員／聊天**。`width > 1280px` 檔案與成員／聊天並排。門牌小狀態在成員區 |
+| **直式堆疊** | `portrait` | ① `height ≥ width` 且 `width < 1024px`（手機直式）；**或** ② `height ≥ width` 且 `width ≥ 1024px`（**平板直式**——寬達桌機門檻仍上下分，**不**走右欄） | **上：** 主視訊 16:9。**下：** dock + **成員／檔案／聊天** tab（預設成員）。**禁止**三欄並排 |
+| **橫向分欄** | `short-landscape` | `width > height` **且**（`height ≤ 560px` **或** `width < 1024px`） | 左大螢幕、右 dock + 三 tab（一次一區）。麥列在右欄頂。**涵蓋**手機橫屏（常 `width ≥ 1024` 但 `height ≤ 560`）與 split view／矮橫窗（`width < 1024` 且 `height > 560`） |
+| **寬屏／桌機** | `desktop` | `width ≥ 1024px` **且** `width > height`（橫向寬屏；已排除上兩列） | 左大螢幕；右欄：dock 頂、**上半檔案**、**下半 tab 成員／聊天**。`width ≥ 1440px` 檔案與成員／聊天並排。門牌小狀態在成員區 |
 
 **判定順序（硬，與 `roomShellMode()` 一致）：**
 
 ```text
-1. width > height 且 (height ≤ 560 或 width < 768) → short-landscape
-2. height ≥ width 且 width ≥ 768                  → portrait（平板直式）
-3. width ≥ 768 且 width > height                  → desktop
+1. width > height 且 (height ≤ 560 或 width < 1024) → short-landscape
+2. height ≥ width 且 width ≥ 1024                  → portrait（平板直式）
+3. width ≥ 1024 且 width > height                  → desktop
 4. 其餘                                           → portrait（手機直式）
 ```
 
@@ -341,14 +341,14 @@ Guest `/i/` 不經大廳；進主面須讀成「你在一間包廂」。可選�
 
 | 項 | 問題 | 定案 |
 | --- | --- | --- |
-| **中等橫屏死區** | 現況：`landscape`＋`height > 560`＋`width < 768` 誤落直式堆疊 | 併入 **橫向分欄**（上表 OR `width < 768`） |
-| **平板直式** | 現況：`width ≥ 768` 一律右欄，直式 iPad 右欄過擠 | **`height ≥ width` 且 `width ≥ 768` → 直式堆疊**（上表②） |
-| **手機橫屏** | 現況：僅 `height ≤ 560`；Pro 系橫向常 `width ≥ 768` | 保留 **`height ≤ 560` OR**；與上列 OR 並存 |
+| **中等橫屏死區** | 現況：`landscape`＋`height > 560`＋`width < 1024` 誤落直式堆疊 | 併入 **橫向分欄**（上表 OR `width < 1024`） |
+| **平板直式** | 現況：`width ≥ 1024` 一律右欄，直式 iPad Pro 右欄過擠 | **`height ≥ width` 且 `width ≥ 1024` → 直式堆疊**（上表②） |
+| **手機橫屏** | 現況：僅 `height ≤ 560`；Pro 系橫向常 `width ≥ 1024` | 保留 **`height ≤ 560` OR**；與上列 OR 並存 |
 | **TV HUD 極窄** | 廳態 HUD 單列不換行；~320px 槽寬時 seek 過窄 | `@container` 窄槽：隱藏次要 clock **或** transport 收成二級（仍 **禁止**整列換行） |
 | **檔案 filter 直式** | 私有／分享＋四類 filter 吃光下半高度 | 窄直式：**水平捲動** segmented **或**「篩選」收合；預設 tab 仍 **成員** |
 | **虛擬鍵盤** | `clientHeight` 驟變可能讓 `roomShellMode` 在邊界抖動 | 聊天 composer focus 期間可鎖 mode（`visualViewport`）；**不得**因此叫出 playground header |
 
-**實作同步（硬）：** 改斷點須同改 `goRoom.ts`（`roomShellMode`／`roomShortLandscape`）、`GoRoomSurface.svelte`（`room--*` 與 `@media`）、`styles.css`（`.site:has(.room)`）；`goRoom.test.ts` 補邊界 case。`560`／`768`／`1281` 常數與 CSS `48rem`／`80.0625rem` 保持單一來源註解。
+**實作同步（硬）：** 改斷點須同改 `goRoom.ts`（`roomShellMode`／`roomShortLandscape`）、`GoRoomSurface.svelte`（`room--*` 與 `@media`）、`styles.css`（`.site:has(.room)`）；`goRoom.test.ts` 補邊界 case。`560`／`1024`／`1441` 常數與 CSS `64rem`／`90rem` 保持單一來源註解。
 
 **頂列可收（硬）：** 對齊對弈（3s、下拉／peek）。請人在**成員區**；**結束／離開**在 **dock**（icon；`aria-label` 全名）。人數／大螢幕一句在**槽外狀態列**（**僅廳態**）。
 
@@ -1066,11 +1066,11 @@ session_play.end    { from: host }
    - 結束這一局：包廂還在；不要寫成散場。
    - 清空私有（若提供）：明示確認；**不是**散場。
 
-**手機橫式／橫向窄窗：** 廳態 **橫向分欄**（左大螢幕、右 dock + 三 tab）；廣告浮在大螢幕槽（沒訊號時）；頂緣拉出殼。高度不夠由使用者按劇院進滿窗，**不要**自動滿窗。split view 橫向（`width < 768`）亦走分欄，**不要**落回直式堆疊。見 §5.8。
+**手機橫式／橫向窄窗：** 廳態 **橫向分欄**（左大螢幕、右 dock + 三 tab）；廣告浮在大螢幕槽（沒訊號時）；頂緣拉出殼。高度不夠由使用者按劇院進滿窗，**不要**自動滿窗。split view 橫向（`width < 1024`）亦走分欄，**不要**落回直式堆疊。見 §5.8。
 
-**平板直式（`width ≥ 768` 且 `height ≥ width`）：** 維持 **直式堆疊**（上 16:9 + 下 tab），**不要**因寬度達門檻就改右欄。見 §5.8 表②。
+**平板直式（`width ≥ 1024` 且 `height ≥ width`）：** 維持 **直式堆疊**（上 16:9 + 下 tab），**不要**因寬度達門檻就改右欄。見 §5.8 表②。
 
-### 10.3 寬屏（橫向 `width ≥ 768px`）
+### 10.3 寬屏（橫向 `width ≥ 1024px`）
 
 **廳態：** 大螢幕左；右欄 dock + 檔案 + 成員／**聊天** tab（**僅** `width > height`；平板直式見 §10.2）。
 
@@ -1205,7 +1205,7 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 | 25 | 一條出站在場 live | `getUserMedia` XOR `getDisplayMedia`；可含影像＋聲音 |
 | 26 | 兩層螢幕 | 包廂大螢幕 ≠ 我這台。私下播／掛／下載不跟大螢幕互斥 |
 | 27 | 主持導播 | 僅主持指定大螢幕來源（**含別人掛的檔**／**主持私有**／peer／開局）。被指定者不是新主持。再指定＝切台 |
-| 28 | 殼面 | **主視訊區**＝`GoRoomTvSlot`（16:9；槽內無字）。廳態：**直式堆疊**（手機直式＋**平板直式** `height ≥ width` 且 `width ≥ 768`）；**橫向分欄**（`width > height` 且 `height ≤ 560` 或 `width < 768`）；**寬屏右欄**（`width ≥ 768` 且 `width > height`）。判定順序見 §5.8。**劇院態：** 隱藏控制面板 → **滿窗僅主視訊**（**不**顯示 dock／tab）；Esc／peek → 廳態。槽外狀態列**僅廳態**。RWD 斷點＝viewport；邊界精修見 §5.8.1 |
+| 28 | 殼面 | **主視訊區**＝`GoRoomTvSlot`（16:9；槽內無字）。廳態：**直式堆疊**（手機直式＋**平板直式** `height ≥ width` 且 `width ≥ 1024`）；**橫向分欄**（`width > height` 且 `height ≤ 560` 或 `width < 1024`）；**寬屏右欄**（`width ≥ 1024` 且 `width > height`）；控制欄內雙欄 **`width ≥ 1440`**。判定順序見 §5.8。**劇院態：** 隱藏控制面板 → **滿窗僅主視訊**（**不**顯示 dock／tab）；Esc／peek → 廳態。槽外狀態列**僅廳態**。RWD 斷點＝viewport；邊界精修見 §5.8.1 |
 | 29 | 頂列 | 包廂主面 **可 overlay 收起**（約 3s；對齊對弈）。請人／結束不只活在頂列。consent／錯誤面不收 |
 | 30 | 開局 | 契約凍：重用進門 PC；`session_play`；主持選遊戲＋指定或自動入座；未入座觀戰；不鑄 compose、不改 Guest 網址。第一刀不做局中換席。**第一刀已手測**（落地見 [PG-GO-ROOM-PLAY-PLAN.md](./PG-GO-ROOM-PLAY-PLAN.md)） |
 | 31 | 檔上大螢幕 | **`file { owner, id, scope? }`＝持檔端渲染 → 節目 RTP**。`scope: "private"`＝Host OPFS。呈現型別影→音→圖遞增；**現況影／音／圖**；doc／任意 MIME 不承諾。傳輸模型不變 |
@@ -1361,4 +1361,4 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 | 2026-08-22 | **音檔大螢幕 player（契約）：** 推播音樂／音檔 → 全場 audio player 面；僅主持 transport（seek／快轉／倒帶）；音量本機；面內依音量／節奏跳動（本機節目音 Analyser）。§5.7.1／§10.5／Phase **2h**／凍結 **#34** |
 | 2026-08-22 | **2h 實作：** `goRoomAudioPlayer`（face 判定＋Analyser levels）；`GoRoomTvSlot` audio player 面（bars＋碟片）；`remoteProgramKind` 進 UI store；本機推音設 `ownerDecodeKind`；HUD transport 仍僅 host-file |
 | 2026-08-22 | **2h 修：訪客有動畫無聲：** `createMediaStreamSource` 會帶走 `<video>` 可聽路徑；改 `Analyser→Gain→destination`，音量走 GainNode；audio face 時 `<video>` 保持 muted |
-| 2026-08-22 | **2d+ RWD 邊界精修（實作）：** `roomLandscapeRail`／`roomTabletPortrait`；`GoRoomSurface` 橫向分欄 CSS 改 class 驅動；窄直式檔案 filter 水平捲動；TV HUD 窄槽藏總長；composer focus 鎖 shell mode |
+| 2026-08-22 | **2d+ 斷點上調：** 大螢幕｜右欄 `768→1024`（`64rem`）；控制欄內雙欄 `1280→1440`（`90rem`）；§5.8／凍結 **#28** |

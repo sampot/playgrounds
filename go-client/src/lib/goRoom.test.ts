@@ -59,6 +59,7 @@ import {
   roomRemoteSinkVisible,
   roomShortLandscape,
   roomChromeHideable,
+  roomInBooth,
   roomChromePeekInsetEndPx,
   roomChromeShouldHold,
   GO_ROOM_CINEMA_ENTER,
@@ -109,6 +110,7 @@ import {
   roomShellShowPane,
   roomShellTabPanes,
   roomShellViewportBox,
+  ROOM_SHELL_DESKTOP_MIN_PX,
   ROOM_SHELL_WIDE_MIN_PX,
   roomStageStatus,
   roomTvBindStream,
@@ -1250,8 +1252,10 @@ describe("roomShortLandscape", () => {
     expect(roomShortLandscape({ widthPx: 667, heightPx: 375 })).toBe(true);
   });
 
-  it("uses side rail for medium landscape under the desktop width", () => {
+  it("uses side rail for landscape under the desktop width", () => {
     expect(roomShortLandscape({ widthPx: 740, heightPx: 600 })).toBe(true);
+    expect(roomShortLandscape({ widthPx: 900, heightPx: 700 })).toBe(true);
+    expect(roomShortLandscape({ widthPx: 1023, heightPx: 768 })).toBe(true);
   });
 
   it("stays stacked on phone portrait and laptop height", () => {
@@ -1297,15 +1301,26 @@ describe("roomShellMode", () => {
   it("keeps tablet portrait stacked even at the desktop width", () => {
     expect(roomShellMode({ widthPx: 768, heightPx: 1024 })).toBe("portrait");
     expect(roomShellMode({ widthPx: 834, heightPx: 1194 })).toBe("portrait");
+    expect(roomShellMode({ widthPx: 1024, heightPx: 1366 })).toBe("portrait");
     expect(roomShellFilesPinned("portrait")).toBe(false);
   });
 
-  it("uses the desktop right rail on landscape at or above 768px", () => {
+  it("uses landscape rail between phone landscape and desktop width", () => {
+    expect(roomShellMode({ widthPx: 900, heightPx: 700 })).toBe(
+      "short-landscape"
+    );
+    expect(roomShellMode({ widthPx: 1023, heightPx: 768 })).toBe(
+      "short-landscape"
+    );
+  });
+
+  it("uses the desktop right rail on landscape at or above 1024px", () => {
+    expect(ROOM_SHELL_DESKTOP_MIN_PX).toBe(1024);
     expect(roomShellMode({ widthPx: 1024, heightPx: 768 })).toBe("desktop");
     expect(roomShellPanesConcurrent("desktop")).toBe(false);
     expect(roomShellFilesPinned("desktop")).toBe(true);
     expect(roomShellTabPanes("desktop")).toEqual(["members", "chat"]);
-    expect(ROOM_SHELL_WIDE_MIN_PX).toBe(1281);
+    expect(ROOM_SHELL_WIDE_MIN_PX).toBe(1441);
   });
 
   it("pins files on the desktop rail and tabs members with chat", () => {
@@ -1399,6 +1414,32 @@ describe("roomChromePeekInsetEndPx", () => {
         railLeftPx: 1120,
       })
     ).toBe(320);
+  });
+});
+
+describe("roomInBooth", () => {
+  it("keeps the host out of the booth shell after logout even if phase is still open", () => {
+    expect(
+      roomInBooth({ role: "host", loggedIn: false, phase: "open" })
+    ).toBe(false);
+    expect(
+      roomInBooth({ role: "host", loggedIn: true, phase: "open" })
+    ).toBe(true);
+    expect(
+      roomInBooth({ role: "host", loggedIn: true, phase: "idle" })
+    ).toBe(true);
+    expect(
+      roomInBooth({ role: "host", loggedIn: false, phase: "idle" })
+    ).toBe(false);
+  });
+
+  it("tracks guest readiness independently of field login", () => {
+    expect(
+      roomInBooth({ role: "guest", loggedIn: false, phase: "ready" })
+    ).toBe(true);
+    expect(
+      roomInBooth({ role: "guest", loggedIn: false, phase: "connecting" })
+    ).toBe(false);
   });
 });
 

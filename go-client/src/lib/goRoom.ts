@@ -40,10 +40,10 @@ export const GO_ROOM_TEXT_SILENCED_HINT = "你已被暫時禁言";
 export const ROOM_SHORT_LANDSCAPE_MAX_HEIGHT_PX = 560;
 export const ROOM_SHORT_LANDSCAPE_MQ = `(orientation: landscape) and (max-height: ${ROOM_SHORT_LANDSCAPE_MAX_HEIGHT_PX}px)`;
 
-/** 48rem — desktop TV + right rail. Keep in sync with CSS min-width. */
-export const ROOM_SHELL_DESKTOP_MIN_PX = 768;
-/** >1280px — wide control: files | members/chat. Keep in sync with CSS. */
-export const ROOM_SHELL_WIDE_MIN_PX = 1281;
+/** 64rem — desktop TV + right rail. Keep in sync with CSS min-width. */
+export const ROOM_SHELL_DESKTOP_MIN_PX = 1024;
+/** >1440px — wide control: files | members/chat. Keep in sync with CSS. */
+export const ROOM_SHELL_WIDE_MIN_PX = 1441;
 
 export type RoomShellMode =
   | "portrait"
@@ -183,6 +183,29 @@ export function roomChromePeekInsetEndPx(opts: {
   if (opts.mode !== "short-landscape" && opts.mode !== "desktop") return 0;
   if (opts.railLeftPx <= 0) return 0;
   return Math.max(0, Math.round(opts.viewportWidthPx - opts.railLeftPx));
+}
+
+/** Host is inside the booth shell only while signed in. */
+export function roomHostInBooth(opts: {
+  loggedIn: boolean;
+  phase: RoomUiPhase;
+}): boolean {
+  return opts.loggedIn && (opts.phase === "open" || opts.phase === "idle");
+}
+
+/** Guest booth surface tracks WebRTC ready, not field login. */
+export function roomGuestInBooth(phase: RoomUiPhase): boolean {
+  return phase === "ready";
+}
+
+export function roomInBooth(opts: {
+  role: "host" | "guest";
+  loggedIn: boolean;
+  phase: RoomUiPhase;
+}): boolean {
+  return opts.role === "guest"
+    ? roomGuestInBooth(opts.phase)
+    : roomHostInBooth(opts);
 }
 
 /** Overlay chrome auto-hide only on the live booth main surface. */

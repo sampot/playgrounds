@@ -16,6 +16,10 @@ export default defineConfig({
       "@data": path.resolve(root, "src/data"),
       "@utils": path.resolve(root, "src/utils"),
       "@pg": path.resolve(root, "src/components/playgrounds"),
+      "$app/navigation": path.resolve(
+        root,
+        "go-client/src/test/stubs/app-navigation.ts"
+      ),
     },
   },
   test: {

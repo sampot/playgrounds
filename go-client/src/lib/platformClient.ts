@@ -1,3 +1,5 @@
+import { replaceState } from "$app/navigation";
+
 /**
  * Platform API origin (DEC-047／050). Always the official API host —
  * no Vite dev proxy, even in local dev. Override via `VITE_PLATFORM_API_ORIGIN`
@@ -277,11 +279,7 @@ export function clearPgProvisionHashFromLocation(): void {
   const { pathname, search, hash } = window.location;
   if (!hash.includes(`${PG_PROVISION_HASH_KEY}=`)) return;
   try {
-    window.history.replaceState(
-      window.history.state,
-      "",
-      `${pathname}${search}`
-    );
+    replaceState(`${pathname}${search}`, {});
   } catch {
     /* ignore */
   }

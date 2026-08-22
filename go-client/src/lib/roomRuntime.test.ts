@@ -121,6 +121,15 @@ describe("roomRuntime", () => {
     expect(fixtures.startLoop).not.toHaveBeenCalled();
   });
 
+  it("logout reset lands on idle instead of ended", async () => {
+    const { createRoomRuntime } = await import("./roomRuntime");
+    const rt = createRoomRuntime();
+    await rt.openBooth();
+    await rt.close({ landOn: "idle" });
+    expect(rt.getStatus().phase).toBe("idle");
+    expect(rt.getStatus().message).toBe("");
+  });
+
   it("mints a live door only when asked to invite", async () => {
     const { createRoomRuntime } = await import("./roomRuntime");
     const rt = createRoomRuntime();

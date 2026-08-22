@@ -74,6 +74,7 @@
     roomGuestHostName,
     roomGuestStatusLine,
     roomHostDisplayName,
+    roomInBooth,
     playerDisplayName,
     roomTvStatusGate,
     roomHostMemberMenu,
@@ -507,9 +508,7 @@
   });
 
   const inBooth = $derived(
-    role === "guest"
-      ? phase === "ready"
-      : phase === "open" || (loggedIn && phase === "idle")
+    roomInBooth({ role, loggedIn, phase })
   );
   /** Logged-out／connecting／ended: full-width TV, not the in-booth rail split. */
   const shellModeLive = $derived(
@@ -3448,7 +3447,7 @@
     -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;
   }
-  @media (min-width: 48rem) {
+  @media (min-width: 64rem) {
     .room--portrait:not(.room--cinema) .file-filters,
     .room--portrait:not(.room--cinema) .file-filters-row {
       flex-wrap: wrap;
@@ -3718,7 +3717,7 @@
   .confirm-actions .pixel-btn {
     min-height: 44px;
   }
-  @media (min-width: 48rem) {
+  @media (min-width: 64rem) {
     .room--desktop:not(.room--cinema) {
       display: grid;
       grid-template-columns: minmax(0, 1fr) 22rem;
@@ -3806,8 +3805,8 @@
       grid-area: lower;
     }
   }
-  /* Wide hall (>1280px): control panel splits files | members/chat. */
-  @media (min-width: 80.0625rem) {
+  /* Wide hall (≥1440px): control panel splits files | members/chat. */
+  @media (min-width: 90rem) {
     .room--desktop:not(.room--cinema) {
       grid-template-columns: minmax(0, 1fr) minmax(36rem, 44rem);
     }

@@ -304,10 +304,95 @@ describe("goAuth.initFromLocation / refreshProfile (session keep)", () => {
   const originalFetch = globalThis.fetch;
 
   afterEach(() => {
+    goAuth.__resetInitForTests();
     goAuth.__setApiKeyForTests(null);
     goAuth.clear();
     if (originalFetch) globalThis.fetch = originalFetch;
     vi.unstubAllGlobals();
+  });
+
+  it("redeems #pg_provision even when a rotated session key is still in storage", async () => {
+    const storage = new Map<string, string>([
+      ["go_auth_api_key", "pg_sk_stale_rotated"],
+    ]);
+    vi.stubGlobal("sessionStorage", {
+      getItem: (k: string) => storage.get(k) ?? null,
+      setItem: (k: string, v: string) => {
+        storage.set(k, v);
+      },
+      removeItem: (k: string) => {
+        storage.delete(k);
+      },
+    });
+    vi.stubGlobal("window", {
+      location: {
+        hash: "#pg_provision=pg_pv_fresh",
+        search: "",
+        pathname: "/room",
+        href: "http://localhost:5174/room#pg_provision=pg_pv_fresh",
+      },
+      history: { replaceState: vi.fn() },
+    });
+    goAuth.__setApiKeyForTests("pg_sk_stale_rotated");
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/v1/field/provision/redeem")) {
+        return new Response(JSON.stringify({ api_key: "pg_sk_fresh" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      if (url.includes("/v1/field/me")) {
+        const auth = (init?.headers as Record<string, string> | undefined)
+          ?.Authorization;
+        expect(auth).toBe("Bearer pg_sk_fresh");
+        return new Response(
+          JSON.stringify({
+            user_id: "user_test",
+            role: "user",
+            github: null,
+            google: null,
+            line: { display_name: "Sam", avatar_url: null },
+            default_field_url: "http://localhost:5174",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      return new Response("{}", { status: 404 });
+    });
+
+    await goAuth.initFromLocation();
+
+    expect(goAuth.loggedIn).toBe(true);
+    expect(goAuth.getPlatformApiKeyForHostLoop()).toBe("pg_sk_fresh");
+    expect(storage.get("go_auth_api_key")).toBe("pg_sk_fresh");
+    expect(storage.has("go_auth_pending_provision")).toBe(false);
+  });
+
+  it("login clears stale session key before redirecting to dash", () => {
+    const storage = new Map<string, string>([
+      ["go_auth_api_key", "pg_sk_stale_rotated"],
+    ]);
+    vi.stubGlobal("sessionStorage", {
+      getItem: (k: string) => storage.get(k) ?? null,
+      setItem: (k: string, v: string) => {
+        storage.set(k, v);
+      },
+      removeItem: (k: string) => {
+        storage.delete(k);
+      },
+    });
+    goAuth.__setApiKeyForTests("pg_sk_stale_rotated");
+    const assign = vi.fn();
+    vi.stubGlobal("window", {
+      location: { pathname: "/room", search: "", assign },
+    });
+
+    goAuth.login();
+
+    expect(storage.has("go_auth_api_key")).toBe(false);
+    expect(goAuth.loggedIn).toBe(false);
+    expect(assign).toHaveBeenCalledOnce();
   });
 
   it("keeps same-tab login when /v1/field/me fails offline", async () => {

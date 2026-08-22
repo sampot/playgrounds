@@ -1064,8 +1064,15 @@ export function createRoomRuntime(opts?: {
     }
   }
 
-  async function close(opts?: { message?: string }): Promise<void> {
-    if (closing || status.phase === "ended") return;
+  async function close(opts?: {
+    message?: string;
+    /** Default `ended` (Host「結束」). `idle` for logout — back to login gate. */
+    landOn?: "idle" | "ended";
+  }): Promise<void> {
+    const landOn = opts?.landOn ?? "ended";
+    if (closing) return;
+    if (status.phase === "idle") return;
+    if (status.phase === "ended" && landOn === "ended") return;
     closing = true;
     clearInviteExpiryTimer();
     clearRoomInviteSession(inviteSession);
@@ -1106,8 +1113,9 @@ export function createRoomRuntime(opts?: {
       }
     }
     set({
-      phase: "ended",
-      message: opts?.message ?? "已結束這一間",
+      phase: landOn === "idle" ? "idle" : "ended",
+      message:
+        landOn === "idle" ? "" : opts?.message ?? "已結束這一間",
       error: null,
       inviteId: null,
       shortUrl: null,

@@ -120,7 +120,14 @@
 
   $effect(() => {
     if (!browser) return;
-    if (goAuth.loggedIn) void runtime.openBooth();
+    if (goAuth.loggedIn) {
+      void runtime.openBooth();
+      return;
+    }
+    const phase = status?.phase;
+    if (phase === "open" || phase === "error") {
+      void runtime.close({ landOn: "idle" });
+    }
   });
 
   $effect(() => {

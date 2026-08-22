@@ -32,6 +32,8 @@ import { BOSS_FLASH } from "./goBossWelcome";
 const PROFILE_STORAGE_KEY = "go_auth_profile";
 /** Session-scoped memory credential (cleared when the tab closes). */
 const API_KEY_STORAGE_KEY = "go_auth_api_key";
+/** Survives early hash strip (HMR / race) until redeem succeeds or hard-fails. */
+const PENDING_PROVISION_KEY = "go_auth_pending_provision";
 
 export type GoProfile = {
   user_id: string;
@@ -106,6 +108,44 @@ function writeSessionApiKey(key: string | null): void {
   }
 }
 
+function readPendingProvisionToken(): string | null {
+  if (typeof sessionStorage === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(PENDING_PROVISION_KEY);
+    return raw?.trim() ? raw.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+function writePendingProvisionToken(token: string | null): void {
+  if (typeof sessionStorage === "undefined") return;
+  try {
+    if (token) sessionStorage.setItem(PENDING_PROVISION_KEY, token);
+    else sessionStorage.removeItem(PENDING_PROVISION_KEY);
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+function resolveProvisionToken(): string | null {
+  if (typeof window === "undefined") return readPendingProvisionToken();
+  const parsed = parsePgProvisionFromLocation({
+    hash: window.location.hash,
+    search: window.location.search,
+  });
+  if (parsed?.token) {
+    writePendingProvisionToken(parsed.token);
+    return parsed.token;
+  }
+  return readPendingProvisionToken();
+}
+
+function isProvisionRedeemHardFailure(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /過期|已被使用|兌換登入確認|410/.test(msg);
+}
+
 function clearPageUrl(): string {
   if (typeof location === "undefined") return "/";
   return location.pathname + location.search;
@@ -129,6 +169,7 @@ class GoAuth {
    * Memory only — refreshed with profile; not written to localStorage.
    */
   #turnPrefer = false;
+  #initPromise: Promise<void> | null = null;
 
   constructor() {
     this.profile = readStoredProfile();
@@ -182,6 +223,10 @@ class GoAuth {
    */
   login(): void {
     if (typeof window === "undefined") return;
+    // Dash provision rotates the field API key; drop any stale tab credential
+    // so a return without `#pg_provision=` does not hit `/v1/field/me` with 401.
+    writePendingProvisionToken(null);
+    this.#clearApiKey();
     // Full-page redirect; record the current page so SSO returns to the same
     // game (not the go root). The provision deep link lands on `?return_to`.
     window.location.assign(
@@ -205,28 +250,35 @@ class GoAuth {
    */
   async initFromLocation(): Promise<void> {
     if (typeof window === "undefined") return;
-    if (this.busy) return;
-    const parsed = parsePgProvisionFromLocation({
-      hash: window.location.hash,
-      search: window.location.search,
-    });
-    if (parsed) {
-      clearPgProvisionHashFromLocation();
+    this.#initPromise ??= this.#initFromLocationOnce();
+    return this.#initPromise;
+  }
+
+  async #initFromLocationOnce(): Promise<void> {
+    const provisionToken = resolveProvisionToken();
+    if (provisionToken) {
+      // SSO provision rotates the server key; never redeem with a stale tab key.
+      this.#clearApiKey();
       this.busy = true;
       try {
-        const { api_key } = await redeemFieldProvision(parsed.token);
+        const { api_key } = await redeemFieldProvision(provisionToken);
+        writePendingProvisionToken(null);
+        clearPgProvisionHashFromLocation();
         // Redeem first; only then claim the memory credential (persisted to the
         // session so a same-tab refresh keeps login).
         this.#apiKey = api_key;
         writeSessionApiKey(api_key);
         this.loggedIn = true;
 
-        // Re-validate against `/v1/field/me`; on failure drop to stored profile.
         const me = await fetchFieldMe(api_key);
         this.#applyFieldMe(me);
 
         chromeSession.setFlash(BOSS_FLASH.loggedIn);
       } catch (err) {
+        if (isProvisionRedeemHardFailure(err)) {
+          writePendingProvisionToken(null);
+          clearPgProvisionHashFromLocation();
+        }
         if (this.#apiKey && !isFieldCredentialRejected(err)) {
           // Redeemed, but /me could not reach Platform (offline) — stay signed in.
           chromeSession.setFlash(BOSS_FLASH.loggedIn);
@@ -368,6 +420,12 @@ class GoAuth {
     this.#apiKey = key;
     this.loggedIn = Boolean(key);
     if (!key) this.#turnPrefer = false;
+  }
+
+  /** Test seam: allow repeated initFromLocation calls in vitest. */
+  __resetInitForTests(): void {
+    this.#initPromise = null;
+    this.busy = false;
   }
 
   /** Test seam: inject profile label for Host display name. */
