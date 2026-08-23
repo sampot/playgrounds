@@ -4,7 +4,7 @@
 
 > **權威決策：** [DECISIONS.md](./DECISIONS.md) **DEC-047**  
 > **實作計劃：** [PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)  
-> **相關：** DEC-004（敘事非產品）、DEC-005（Svelte 5 runes）、DEC-029（SecretStore＝**僅 BYOK**；**不含** Platform API key）、DEC-042（保留名 `api`／`dash`）、DEC-048（場網宿主 Kit；**不**取代本筆後台套件）、[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（點數／官方 TURN Draft）、[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)（場邀請 E2E＝五子棋）、[GLOSSARY.md](./GLOSSARY.md)、場殼 `PlaygroundsLayout`／`global.css`
+> **相關：** DEC-004（敘事非產品）、DEC-005（Svelte 5 runes）、DEC-029（SecretStore＝**僅 BYOK**；**不含** Platform API key）、DEC-042（保留名 `api`／`dash`）、DEC-048（場網宿主 Kit；**不**取代本筆後台套件）、[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（點數／官方 TURN Draft）、[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)（場邀請 E2E＝五子棋）、[PG-GO-ROOM-ENGINE-PLAN.md](./PG-GO-ROOM-ENGINE-PLAN.md)（常駐包廂 Dash §6.2.5；**未落地**）、[GLOSSARY.md](./GLOSSARY.md)、場殼 `PlaygroundsLayout`／`global.css`
 
 一句話：**`dash.samkuo.me` 是 Platform 帳號／通行證／註冊營運後台（SvelteKit 5）——Host **主要入口**；統一進入（**Social SSO 公開自助註冊**：首次成功即建帳）後依角色顯示（一般使用者不見營運）；主 CTA「**登入我的遊樂場**」輪替場用 API key 並經短命 **provision** 深鏈開啟預設場（預設 `play.samkuo.me`）；場殼兌換後將 key **僅存記憶體**（**不**進 SecretStore）；註冊使用者可設預設遊樂場網址、**連結／解除 Social SSO**（至少保留一個）、**刪除自己的帳戶**；admin 可選核發註冊邀請並**管理已註冊使用者**；後台持 **access token**；場邀請短網址仍由 SAM 經殼代理取得（非後台鑄）；**不做場內 SSO**。**
 
@@ -299,6 +299,25 @@
 | `GET` | `/v1/me/credits` | 回餘額（可含 `turn_hosted`／`turn_prefer`） |
 | `GET` | `/v1/me/credits/sessions` | 回依 session 彙總之扣點列表 |
 | `PATCH` | `/v1/me` | 可設 `{ turn_prefer: boolean }`（未開通資格 → 拒） |
+
+#### 6.2.5 常駐包廂（**後段**；見 [PG-GO-ROOM-ENGINE-PLAN.md](./PG-GO-ROOM-ENGINE-PLAN.md)）
+
+**職：** 讓已安裝 `pg-boothd` 的使用者從後台得知包廂是否在線，並一鍵「連回包廂」做遠端導播（Operator）。**不是**鑄場 Invite；**不是**第二個「登入我的遊樂場」。
+
+**可見性：** `user` 與 `admin` 皆可見（非營運專屬）。
+
+| 元素 | 規格 |
+| --- | --- |
+| 放置 | **遊樂場** tab；通行證區下方（或點數區上方）；窄螢幕堆疊 |
+| 資料來源 | `GET /v1/booth/anchors/active`（持 access token） |
+| **在線** | 顯示：裝置名（`deviceLabel`）、「N 人在」、大螢幕摘要（例：「臥室鏡頭」／「沒訊號」） |
+| **離線** | 「目前沒有常駐包廂」+ 說明如何取得 **`pg-boothd`**（**非**開源；連產品文件／安裝說明；**不**在 dash 內嵌安裝器、**不**連 GitHub 原始碼） |
+| 主 CTA（在線） | 「**連回包廂**」→ 開 `remoteUrl`（go `/room/remote?…`） |
+| 次動作 | 「結束常駐包廂」→ 頁內確認 → `DELETE /v1/booth/anchors/active` |
+| **裝置** | 子區：已綁定 `device_token` 列表；可「撤銷裝置」 |
+| 非目標 | Dash 內 WebRTC 預覽；常駐包廂設定編輯器 |
+
+**對讀者用語：** 「常駐包廂」「連回包廂」；勿寫 Engine／DO／daemon 當標題。
 
 ### 6.3 帳號（**全部已登入角色**）
 
@@ -618,3 +637,4 @@ SAM（現行 Agent／會議小品等）
 | 2026-08-16 | §6.2.4：`turn_prefer` 開啟＝session 邀請 **relay-only**（不嘗試直連）；對齊點數計劃 |
 | 2026-08-18 | §6.5 營運能力表預留 **布告（go）**（後段；見 [PG-GO-BULLETIN-PLAN.md](./PG-GO-BULLETIN-PLAN.md)） |
 | 2026-08-22 | **公開自助註冊：** SSO 首次 login 建帳；`/join` 邀請改選用；DEC-047 對齊 |
+| 2026-08-23 | **§6.2.5 常駐包廂（後段）：** Dash 遊樂場 tab 狀態卡＋「連回包廂」；見 [PG-GO-ROOM-ENGINE-PLAN.md](./PG-GO-ROOM-ENGINE-PLAN.md) |

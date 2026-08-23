@@ -1,6 +1,7 @@
 <script lang="ts">
   import { dash } from "$lib/dash.svelte";
   import { formatTime } from "$lib/api";
+  import DashBooth from "./DashBooth.svelte";
 
   let defaultFieldDraft = $state(
     dash.me?.default_field_url || "https://play.samkuo.me"
@@ -150,6 +151,8 @@
     >
   </div>
 </div>
+
+<DashBooth />
 
 <div class="panel">
   <h2>點數</h2>

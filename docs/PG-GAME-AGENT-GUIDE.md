@@ -1006,14 +1006,14 @@ export function readPgSurface(doc = document, loc = location) {
 - Guest 自動入座後，遊戲只：`getSeat`／同步 state、依 role 渲染、收發合法 `act`。  
 - 結束這一局（遊戲內或殼「結束這一局」）→ 卸局；**不要**假設會拆包廂 PeerConnection。
 
-### 8.6 與 GO-INVITE 的界線
+### 8.6 與 GO-INVITE 的界線（**2026-08-23 修訂**）
 
 | 路徑 | 用途 |
 | --- | --- |
-| **包廂 `session_play`** | 人已在包廂 → 大螢幕開局（本節快樂路徑） |
-| **GO-INVITE（`invite.compose`）** | **尚未**進包廂、為某一款掃碼拉人 |
+| **包廂 `invite.room` → `session_play`** | **所有連線遊戲**唯一快樂路徑：先請人進包廂，再大螢幕開局 |
+| ~~**GO-INVITE（`invite.compose`）**~~ | **Superseded**；API 可暫留，**新產品勿用** |
 
-任務寫「包廂連線」時：**不要**做 compose 邀請流當主 UX。`pg_surface=solo` 亦**不要**露 compose。
+任務寫「包廂連線」或「多人對弈」時：**只**做 `invite.room`＋`session_play`；**不要** compose。`pg_surface=solo` 亦**不要**露 compose。
 
 ### 8.7 連線局交付自檢（任務要求多人時另勾）
 

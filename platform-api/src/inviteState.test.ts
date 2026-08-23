@@ -397,3 +397,12 @@ describe("invite handshake queue", () => {
     if (!r.ok) expect(r.status).toBe(410);
   });
 });
+
+describe("inviteRoomSignalBlocked", () => {
+  it("blocks invite.room from Invite DO signal paths", async () => {
+    const { inviteRoomSignalBlocked } = await import("./inviteState.js");
+    expect(inviteRoomSignalBlocked("invite.room")).toBe(true);
+    expect(inviteRoomSignalBlocked("invite.compose")).toBe(false);
+    expect(inviteRoomSignalBlocked("signal.handshake")).toBe(false);
+  });
+});

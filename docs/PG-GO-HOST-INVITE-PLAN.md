@@ -1,15 +1,15 @@
 # Playgrounds 玩家主場鑄邀請（GO-INVITE）— 從遊戲中邀請對手對玩
 
-> **狀態：** Draft（2026-08-16）— GO-INVITE 實作落地（DEC-053 `env.HOST`）；Phase 5 手測進行中  
+> **狀態：** **Superseded（2026-08-23）**——**連線遊戲**產品路徑已統一為包廂 **`invite.room`**（見 [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)、[PG-GO-ROOM-PLAY-PLAN.md](./PG-GO-ROOM-PLAY-PLAN.md)）；`invite.compose` **不再**作為「從遊戲內拉人連線」的快樂路徑。下文保留 **2026-08-16** 實作敘事供遷移／相容對照；**新規格勿再延伸 compose 連線遊戲**。  
 > **權威決策：** 建議 [DECISIONS.md](./DECISIONS.md) **DEC-052**（§5.3 玩家主場互邀＝GO-INVITE；本文件實作之）  
-> **相關：** [PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md)（登入＋記憶體 field API key）、[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)（純玩版；玩家主場）、[PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)（包廂＝`invite.room`，**不是**本刀 compose）、[PG-GO-ROOM-PLAY-PLAN.md](./PG-GO-ROOM-PLAY-PLAN.md)（包廂內開局＝重用 peer；**勿混**）、[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)（五子棋 `gomoku.v1`；**作者面** Host 鑄邀請）、[PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)、[GLOSSARY.md](./GLOSSARY.md)  
+> **相關：** [PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md)（登入＋記憶體 field API key）、[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)（純玩版；玩家主場）、[PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)（包廂＝`invite.room`；**連線遊戲唯一門**）、[PG-GO-ROOM-PLAY-PLAN.md](./PG-GO-ROOM-PLAY-PLAN.md)（包廂內開局＝重用 peer）、[PG-GO-ROOM-ENGINE-PLAN.md](./PG-GO-ROOM-ENGINE-PLAN.md)（`play`／`go` 皆為 Booth Hub；Guest join §10.7）、[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)（五子棋 E2E；**歷史** compose 路徑）、[PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)、[GLOSSARY.md](./GLOSSARY.md)  
 > **載體 SAM：** 型錄 [`pg-gomoku`](../catalog/entries/pg-gomoku.yaml)（source [`sampot/pg-gomoku`](https://github.com/sampot/pg-gomoku)；`gomoku.v1`）
 
-一句話：**登入 go 的玩家（玩家主場，DEC-050）在遊戲中開一局、對另一位玩家發出邀請；對手開 `https://go.samkuo.me/i/<short_id>` 入座對弈。** play 與 go **都可**鑄邀請；go 以玩家記憶體 field API key 走 `invite.compose`，並以 `env.HOST`（`createGoHostBinding`）主持 session。
+一句話（**已廢止作產品路徑**）：~~登入 go 的玩家在遊戲中鑄 `invite.compose` 拉對手入座。~~ **現行：** 請人進**包廂**（`invite.room`）→ 進門後 **`session_play`** 開局；`play.samkuo.me` 與 `go.samkuo.me` **皆**對應 **Booth Hub**（Embedded Hub），**同一套**門牌與 Anchor 契約。
 
-> **產品路徑（2026-08）：** 連線對弈快樂路徑改為**包廂內** [`session_play`](./PG-GO-ROOM-PLAY-PLAN.md)（`pg_surface=room`）。go **`/s/<id>`**＝單機（`pg_surface=solo`）；`pg-gomoku` UI **不再**露出「邀請對弈」。本文件仍描述 `invite.compose`／`env.HOST` 能力（場殼／相容），**不是**五子棋玩家主場快樂路徑。
+> **產品路徑（2026-08-23 定案）：** **所有連線遊戲**只能走包廂：開 `/room`（或 play 場殼對等的 Booth Hub 面）→ 請人進來（`invite.room`）→ 大螢幕 **`session_play`**。`go` **`/s/<id>`**＝單機（`pg_surface=solo`）。**禁止**新產品面再鑄 `invite.compose` 拉人連線對弈。
 
-> **與作者面（場殼）的關係（不變）：** 場殼 play 仍是**作者 Host**；本刀把「Host 能力」**複製到 go 的玩家主場**——同一套 `invite.compose`＋`gomoku.v1`，但 Host＝已登入玩家、座落在 **go origin**。go **不**新增我的場／密鑰庫／後台／TURN 管理（見 §4 非目標）。
+> **與作者面（場殼）的關係（修訂）：** `play.samkuo.me` **亦**為該帳號的 **Booth Hub**（Embedded）；連線邀請改 **`invite.room`**，**不是** canvas 內 `invite.compose`。作者編輯／OPFS／型錄「一鍵開」語意不變；**連線對弈**改走包廂殼面與 `session_play`。
 
 ---
 
@@ -228,6 +228,7 @@ go 目前只有 Guest runtime（`guestRuntime.ts`）。玩家 A 開局須在 go 
 
 | 日期 | 變更 |
 | --- | --- |
+| 2026-08-23 | **Superseded：** 連線遊戲統一 `invite.room`＋`session_play`；`play`／`go` 皆 Booth Hub；Invite DO **保留** |
 | 2026-08-11 | 初版 Draft：GO-INVITE 化實（DEC-052 §5.3）；go 玩家以記憶體 field API key 走 `invite.compose`；go 側主持 `gomoku.v1` Host session；完成依據＝go A↔B 入座對弈至終局 |
 | 2026-08-19 | 劃清：包廂內開局不走本刀 compose（見 [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md) §5.9） |
 | 2026-08-21 | 交叉索引：包廂開局實作計劃 [PG-GO-ROOM-PLAY-PLAN.md](./PG-GO-ROOM-PLAY-PLAN.md) |

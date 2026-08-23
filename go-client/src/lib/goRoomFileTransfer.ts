@@ -21,9 +21,11 @@ import {
   pipeResponseToWritable,
 } from "./goRoomFileSave";
 import type { RoomFileWritable } from "./goRoomFileSave";
-import { GO_ROOM_HANG_FILES_ONLY } from "./goRoom";
+import { GO_ROOM_FILE_SW_REQUIRED, GO_ROOM_HANG_FILES_ONLY } from "./goRoom";
 import { createRoomPlaySink, type RoomPlaySink } from "./goRoomFilePlay";
 import {
+  ensureRoomFileSw as defaultEnsureRoomFileSw,
+  onRoomFileSwControllerChange,
   registerLocalRoomFile,
   unregisterLocalRoomFile,
   rejectRoomHttpTransfer,
@@ -189,6 +191,8 @@ export type RoomFileTransferDeps = {
   /** Register owned File for `/room-file/<id>` (no DC). */
   registerLocalFile?: (id: string, file: File) => void;
   unregisterLocalFile?: (id: string) => void;
+  /** Tests stub true; production waits for a controlling go SW. */
+  ensureRoomFileSw?: () => Promise<boolean>;
   /**
    * Admit failed for this SW-opened transfer — fail the HTTP body
    * (`reject-transfer` → SW).
@@ -308,6 +312,24 @@ export function createRoomFileTransfer(
     ((fileId: string, transferId: string, reason?: string) => {
       rejectRoomHttpTransfer(fileId, transferId, reason);
     });
+  const ensureSwReady = deps.ensureRoomFileSw ?? defaultEnsureRoomFileSw;
+
+  async function registerLocalInSw(id: string, file: File): Promise<boolean> {
+    const ready = await ensureSwReady();
+    if (!ready) return false;
+    registerLocal(id, file);
+    return true;
+  }
+
+  const stopSwResync = onRoomFileSwControllerChange(() => {
+    for (const [id, file] of outboundFiles) {
+      try {
+        registerLocal(id, file);
+      } catch {
+        /* ignore */
+      }
+    }
+  });
 
   function playInbounds(): Inbound[] {
     return [...inbounds.values()].filter((i) => i.purpose === "play");
@@ -559,10 +581,9 @@ export function createRoomFileTransfer(
     const id = newId();
     const mime = roomFileContentType(file.type, name) || undefined;
     outboundFiles.set(id, file);
-    try {
-      registerLocal(id, file);
-    } catch {
-      /* SW may be missing in tests without registerLocalFile dep */
+    if (!(await registerLocalInSw(id, file))) {
+      outboundFiles.delete(id);
+      return { ok: false, error: GO_ROOM_FILE_SW_REQUIRED };
     }
     entries = [
       ...entries,
@@ -904,9 +925,12 @@ export function createRoomFileTransfer(
       return { ok: false, error: GO_ROOM_HANG_FILES_ONLY };
     }
     if (entry.mine) {
-      if (!outboundFiles.get(id)) return { ok: false, error: "找不到這個檔" };
+      const local = outboundFiles.get(id);
+      if (!local) return { ok: false, error: "找不到這個檔" };
       revokePlayback();
-      await waitRoomPlaySw();
+      if (!(await registerLocalInSw(id, local))) {
+        return { ok: false, error: GO_ROOM_FILE_SW_REQUIRED };
+      }
       if (mode === "play") {
         playback = {
           id,
@@ -1646,6 +1670,7 @@ export function createRoomFileTransfer(
   }
 
   function dispose(): void {
+    stopSwResync();
     dcSched.abortAll();
     for (const cur of inbounds.values()) void cur.writable?.abort?.();
     inbounds.clear();

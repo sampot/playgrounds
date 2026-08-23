@@ -11,6 +11,7 @@ import {
   enqueueOffer,
   getAnswer,
   inviteOpen,
+  inviteRoomSignalBlocked,
   peekPending,
   putAnswer,
   registerJoin,
@@ -120,10 +121,14 @@ export class InviteDurableObject extends DurableObject {
           ownerUserId: rec.ownerUserId,
           joinId,
           inviteId: rec.inviteId,
+          kind: rec.kind,
         });
       }
 
       if (request.method === "POST" && path === "/signal/offer") {
+        if (inviteRoomSignalBlocked(rec.kind)) {
+          return json({ error: "use_booth_anchor" }, 400);
+        }
         const body = (await request.json()) as {
           joinCap: string;
           offerWire: string;
@@ -156,6 +161,9 @@ export class InviteDurableObject extends DurableObject {
       }
 
       if (request.method === "GET" && path === "/signal/pending") {
+        if (inviteRoomSignalBlocked(rec.kind)) {
+          return json({ error: "use_booth_anchor" }, 400);
+        }
         const ownerUserId = url.searchParams.get("ownerUserId") || "";
         const waitMs = Math.min(
           Number(url.searchParams.get("waitMs") || HANDSHAKE_WAIT_MS),

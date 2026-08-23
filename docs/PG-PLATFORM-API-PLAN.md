@@ -3,9 +3,9 @@
 > **狀態：** Phase 0 **完成**；Phase 1–4 **完成**（Signal／`#pg=`／後台／compose 場殼兌換）；Phase 5 **進行中**（GitHub＋Google SSO／access token／HOST 殼代理／**field provision＋記憶體通行證**已落地；MFA 未）  
 > **權威決策：** [DECISIONS.md](./DECISIONS.md) **DEC-047**  
 > **後台 UI 規格：** [PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md)  
-> **相關：** DEC-023（session 邀請＋完整 protocol）、DEC-025（`?open=`／放大畫布）、DEC-029（SecretStore＝**BYOK**；**不含** Platform API key）、DEC-042（場網／保留名 `api`）、DEC-045（Roster／薄 signaling）、DEC-046（型錄查詢）、DEC-050（純玩版 `go.samkuo.me`；短鏈 canonical）、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)、[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（點數／官方 TURN Draft）、[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)（代表性 E2E＝五子棋）、[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)、[GLOSSARY.md](./GLOSSARY.md)
+> **相關：** DEC-023（session 邀請＋完整 protocol）、DEC-025（`?open=`／放大畫布）、DEC-029（SecretStore＝**BYOK**；**不含** Platform API key）、DEC-042（場網／保留名 `api`）、DEC-045（Roster／薄 signaling）、DEC-046（型錄查詢）、DEC-050（純玩版 `go.samkuo.me`；短鏈 canonical）、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)、[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（點數／官方 TURN Draft）、[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)（代表性 E2E＝五子棋）、[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)、[PG-GO-ROOM-ENGINE-PLAN.md](./PG-GO-ROOM-ENGINE-PLAN.md)（包廂 BoothAnchor；Guest join §10.7 **規格已定**）、[GLOSSARY.md](./GLOSSARY.md)
 
-一句話：**獨立 Cloudflare Workers 上的 Platform API＋後台——以 Invite（一連結多人加入）＋短命 join capability 為中心；已有 PeerConnection 則重用；僅尚未連線時走 Ticket 路徑 signaling（加入者 offer、long-poll 等 answer、握手排隊）。Invite 預設 TTL＝5m（session 已開始後的初始動作，非預約）。近程 `invite.compose`（開 SAM、放大畫布、詢問入座）。短連結為 QR 預設。**Social SSO 公開自助註冊**（首次登入建帳；註冊邀請選用）；後台＝access token；**Host 入場＝dash「登入我的遊樂場」→ 短命 provision → 場殼記憶體持 API key（每帳號一把、每次輪替、∉ SecretStore）**。**
+一句話：**獨立 Cloudflare Workers 上的 Platform API＋後台——以 Invite（一連結多人加入）＋短命 join capability 為中心；**Invite Durable Object** 仍為門牌權威（short 鏈、metadata、`join_cap`、TTL）。**連線遊戲**統一 **`invite.room`（包廂）**；Guest roster 握手經 **BoothAnchor WSS**（**不**走 Invite DO long poll）。歷史 **`invite.compose`** 僅相容／遷移，**新產品勿用**。其餘 kind（`signal.handshake` 等）仍可走 Invite DO Ticket 路徑（加入者 offer、long-poll 等 answer、握手排隊）。Invite 預設 TTL＝5m。**Social SSO 公開自助註冊**（首次登入建帳；註冊邀請選用）；後台＝access token；**Host 入場＝dash「登入我的遊樂場」→ 短命 provision → 場殼記憶體持 API key（每帳號一把、每次輪替、∉ SecretStore）**。**
 
 ---
 
@@ -21,9 +21,9 @@
 - 部署於 **Cloudflare Workers**（**獨立**於場殼 Worker；建議 **`api.samkuo.me`**）。
 - 同部署提供 **HTTP API** 與 **後台管理 UI**。
 - **Invite**：一條短連結／深鏈；**多人可經同一連結加入**。
-- **Ticket 路徑 signaling**：邀請者**不**預產 offer；加入者提交 offer，**同一邏輯回合**等待 answer；邀請者**排隊串行**作答（同時僅一筆 handshake）。**若雙方已有 PeerConnection → 重用，不跑 signaling。**
-- 連上後 **Roster 可同時持有多 peer**（Platform 只負責串行發握手；見 DEC-045）。
-- 近程：`invite.compose`（SAM＋放大畫布＋完整 protocol＋consent）。
+- **Invite Durable Object（保留）：** short 鏈、`invite.room`／歷史 `invite.compose` metadata、`join_cap`、TTL、revoke；**包廂 Guest signal 不經此 DO**（改 BoothAnchor §10.7）。
+- **連線遊戲**＝`invite.room`（`play`／`go` 皆 Booth Hub）；包廂內 `session_play` 開局。
+- Ticket 路徑 signaling（long poll）：**僅** `signal.handshake`、歷史 `invite.compose` 等；**`invite.room` 禁用**。
 - **短連結** `/i/<short_id>`：正式支援；**邀請 QR 預設＠`go.samkuo.me`**（DEC-050）。
 - 身分：Social SSO 公開自助註冊（首次成功建帳）、不存密碼、可要求 MFA；後台 **access token**；每帳號 API key **1** 把（僅場殼**記憶體**；經 dash provision）。admin 可選核發註冊邀請。
 
@@ -85,7 +85,7 @@
 
 | 角色 | 能力 |
 | --- | --- |
-| **user**（後台：access token；場：記憶體有效 API key） | 後台「登入我的遊樂場」／撤銷／預設場；場殼鑄 Invite／`invite.compose`／signal |
+| **user**（後台：access token；場：記憶體有效 API key） | 後台「登入我的遊樂場」／撤銷／預設場；場殼 mint **`invite.room`**（包廂）；歷史 compose API **勿再**用於連線遊戲 |
 | **admin** | 同上＋選用 Platform 註冊邀請、停用使用者、營運（後台持 access token） |
 | **無帳號** | 僅能經 Invite 連結加入，不能鑄邀請、不能 provision |
 
@@ -103,7 +103,7 @@
 
 ## Invite 模型（一連結、多人）
 
-設計中心＝**Invite**（穩定短連結＋intent）；每次加入＝一次 **join**（短命 capability＋可選 handshake 槽）。
+設計中心＝**Invite**（穩定短連結＋intent）；每次加入＝一次 **join**（短命 capability＋可選 handshake 槽）。**實作：** **`InviteDurableObject`**（per invite）——**保留**；管 short 鏈、metadata、`join_cap`、TTL、revoke；**包廂 Guest WebRTC signal 不經此 DO**（BoothAnchor §10.7）。
 
 ### Invite（邏輯）
 
@@ -132,8 +132,8 @@
 | kind | 用途 | 階段 |
 | --- | --- | --- |
 | `signal.handshake` | 僅薄 O／A（Roster 連線） | P1–2 |
-| `invite.compose` | 開 SAM＋放大畫布＋可選 session＋可選 signal | P4 |
-| `invite.room` | go 包廂（無 SAM；文字／檔走 DataChannel；音視訊 RTP 預留 2+2） | 見 [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md) |
+| `invite.compose` | ~~開 SAM＋放大畫布＋session~~ | **Superseded**（連線遊戲）；API **暫留**相容；**新產品勿用** |
+| `invite.room` | **連線唯一門**：包廂（`play`／`go` Booth Hub）；文字／檔 DC；音視訊 2+2；開局＝`session_play` | 見 [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)；**Guest 握手經 BoothAnchor**（[ENGINE §10.7](./PG-GO-ROOM-ENGINE-PLAN.md)），**不**走 Invite DO signal long poll |
 | 其他 | 預留 | — |
 
 ### 深鏈與短連結
@@ -154,7 +154,9 @@
 
 ## Ticket 路徑 Signaling（角色對調＋排隊）
 
-**僅適用 Platform Invite／Ticket。** OOB（QR／文字／`#roster=`）仍為：發起者出 offer → 對方回 answer（DEC-045 既有 UX）。
+**僅適用 Platform Invite／Ticket 之 `invite.compose`／`signal.handshake` 等。** **`invite.room`（包廂）例外：** Guest roster 握手 **不**走本節 Invite DO long poll；改走 [BoothAnchor Guest join](./PG-GO-ROOM-ENGINE-PLAN.md#107-guest-joininviteroom-signal定案)（`POST /v1/booth/join/offer` + Engine WSS push）。Invite DO 對包廂仍負責 short 鏈、metadata、`join_cap`、TTL。
+
+**OOB**（QR／文字／`#roster=`）仍為：發起者出 offer → 對方回 answer（DEC-045 既有 UX）。
 
 ### 時序
 
@@ -211,7 +213,9 @@ Alice: dequeue Carol → …（下一筆 handshake）
 
 ---
 
-## Intent：`invite.compose`
+## Intent：`invite.compose`（**Superseded**）
+
+> **2026-08-23：** **連線遊戲**不再鑄 `invite.compose`；改 **`invite.room`** 請人進包廂 → **`session_play`**。本節保留歷史 intent 形狀與 Ticket 路徑說明，供遷移與舊鏈相容。**Invite DO 仍存**（見上）；新功能勿延伸 compose。
 
 ```text
 invite.compose v1
@@ -277,23 +281,73 @@ Auth：`Authorization: Bearer <access_token|api_key|join_cap|…>`（依端點�
 | `GET` | `/v1/shorts/:short_id` | 無 | 回 `{ secret, invite_id, … }`（go SPA 解短碼；過期／撤銷 410） |
 | `GET` | `/invites/:secret` | 公開持鏈或 key | 預覽 intent（可限流） |
 | `POST` | `/invites/:secret/joins` | 持鏈 | 開一次 join；回傳短命 `join_cap` |
-| `POST` | `/invites/:id/signal/offer` | join_cap | 寫入 offer；**long-poll** 直到 answer／超時／取消 |
-| `GET` | `/invites/:id/signal/pending` | **API key**（host／場殼） | 取隊列頭 pending offer（或 long-poll 等下一個） |
-| `PUT` | `/invites/:id/signal/answer` | **API key**（host／場殼） | 對當前頭寫 answer；喚醒對應 offer long-poll |
+| `POST` | `/invites/:id/signal/offer` | join_cap | 寫入 offer；**long-poll** 直到 answer／超時／取消（**`invite.room` 禁用** → `410 use_booth_anchor`） |
+| `GET` | `/invites/:id/signal/pending` | **API key**（host／場殼） | 取隊列頭 pending offer（或 long-poll 等下一個）（**`invite.room` 禁用**） |
+| `PUT` | `/invites/:id/signal/answer` | **API key**（host／場殼） | 對當前頭寫 answer；喚醒對應 offer long-poll（**`invite.room` 禁用**） |
 | `DELETE` | `/invites/:id` | **API key**（場殼） | 撤銷 Invite（短連結失效） |
 | `GET` | `/bulletins` | 無（公開；限流） | go 全站布告 active 列表（≤3；見 [PG-GO-BULLETIN-PLAN.md](./PG-GO-BULLETIN-PLAN.md)；**後段**） |
 | `GET` | `/admin/bulletins` | access token＋admin | 布告管理列表（含未開始／已下架；**後段**） |
 | `POST` | `/admin/bulletins` | access token＋admin | 建立布告（**後段**） |
 | `PATCH` | `/admin/bulletins/:id` | access token＋admin | 更新布告（bump `rev`；**後段**） |
 | `POST` | `/admin/bulletins/:id/archive` | access token＋admin | 下架布告（**後段**） |
+| `POST` | `/v1/booth/anchors` | API key **或** `device_token` | 註冊／更新 BoothAnchor；見 [PG-GO-ROOM-ENGINE-PLAN.md](./PG-GO-ROOM-ENGINE-PLAN.md) §10（**部分落地**） |
+| `DELETE` | `/v1/booth/anchors/active` | API key 或 `device_token` | 撤銷本人 active anchor |
+| `GET` | `/v1/booth/anchors/active` | access token 或 API key | 查詢常駐包廂狀態（Dash／go） |
+| `POST` | `/v1/booth/operator-caps` | access token | 換短命 Operator cap + `remoteUrl` |
+| `POST` | `/v1/booth/join/offer` | `join_cap` | Guest 包廂 roster 握手；見 ENGINE §10.7 |
+| `GET` | `/v1/booth/ws` | Upgrade：`anchorSecret` 或 `operatorCap` | BoothAnchor WebSocket（Engine／Operator） |
+| `POST` | `/v1/booth/devices` | access token | 核發 `device_token`（`pg-boothd login`；**未落地**） |
+| `GET` | `/v1/booth/devices` | access token | 列出已綁定裝置 |
+| `DELETE` | `/v1/booth/devices/:id` | access token | 撤銷裝置 token |
 
-錯誤：`401`／`403`／`404`／`408`／`410`／`429`；隊列滿可視情況 `503`＋稍後自動重試（仍排隊語意）。
+錯誤：`401`／`403`／`404`／`408`／`410`／`429`；隊列滿可視情況 `503`＋稍後自動重試（仍排隊語意）。BoothAnchor：`409`（已有 live Engine，須 `force`）／`503`（Engine WSS 未連上，Operator 可連但 degraded）。
 
-**Rate limit：** 每 IP／每 key／每 Invite 的 join 與 offer 嘗試；provision redeem 嚴格限流；可疊 CF WAF。
+**Rate limit：** 每 IP／每 key／每 Invite 的 join 與 offer 嘗試；provision redeem 嚴格限流；BoothAnchor `operator-caps` 每 user 限流；可疊 CF WAF。
 
-**信任域：** 後台帳號面＝**access token**；Host 交接＝**provision**；場 Invite／signal＝**API key**；join＝**join_cap**。四者勿混用用途。
+**信任域：** 後台帳號面＝**access token**；Host 交接＝**provision**；場 Invite／signal＝**API key**；join＝**join_cap**；BoothAnchor **Hub**＝**API key 或 `device_token`**；Operator＝**operatorCap**（由 access token 換發）；**Peer**＝**`peerCap`（Hub 本機；不經 Platform）**。**勿混用用途。**
 
 **廢止／過渡：** 後台 `POST /keys` 揭示明文供貼密鑰庫——改由 provision／redeem；過渡期可保留撤銷 `DELETE /keys`。
+
+---
+
+## BoothAnchor（包廂錨點；**部分落地**）
+
+**權威契約：** [PG-GO-ROOM-ENGINE-PLAN.md](./PG-GO-ROOM-ENGINE-PLAN.md) §10。
+
+**一句話：** 每 Platform 帳號至多一個 **BoothAnchor DO stub**（id＝`ownerUserId`）；**僅 Booth Hub Engine**（外部私有 **`pg-boothd` hub** 或 Embedded Hub）**必須**長連 WSS 註冊 live session；Dash／go Operator 經 **operatorCap** 連回**同一 Hub**；**Guest `invite.room` roster 握手**經 **`POST /v1/booth/join/offer`** 轉 Engine WSS（**不**經 Invite DO long poll；**無 fallback**）。中繼 `booth.*` 控制幀與 `anchor.signal`／`booth.join.*` 子幀；**不**中繼 RTP／檔 bytes、**不**參與 **Peer** `peerCap` 配對（Hub 本機）。**`pg-boothd` 實作不在本 repo。**
+
+### 與 Invite DO 的分工
+
+| | `InviteDurableObject` | `BoothAnchorDurableObject` |
+| --- | --- | --- |
+| 觸發 | 鑄 **`invite.room`**（門牌）；歷史 `invite.compose` **Superseded** | **Hub** 啟動／註冊 anchor（**包廂硬性前提**） |
+| 壽命 | Invite TTL（預設 5m） | **Hub** session（可數日） |
+| 客戶端 | Guest short／`join_cap`（**Invite DO**）；compose signal 僅相容 | **Hub** WSS + Operator WSS + Guest join HTTP |
+| 資料 | **`invite.room`：short 鏈、metadata、`join_cap`、TTL**（**保留**）；compose 隊列僅相容 | `booth.state.snapshot`、intent／**Guest join** 轉發 |
+| id | per invite | **per `ownerUserId`**（單 stub） |
+| 包廂 signal | **禁止** `signal/pending` long poll | **`booth.join.*` WSS push**（ENGINE §10.7） |
+
+### Worker 綁定（草案）
+
+`platform-api/wrangler.jsonc` 增：
+
+```jsonc
+"durable_objects": {
+  "bindings": [
+    { "name": "INVITES", "class_name": "InviteDurableObject" },
+    { "name": "BOOTH_ANCHORS", "class_name": "BoothAnchorDurableObject" }
+  ]
+}
+```
+
+`BoothAnchorDurableObject` 實作檔建議：`platform-api/src/boothAnchorDo.ts`（與 `inviteDo.ts` 並列）。
+
+### `device_token`
+
+- 由 `POST /v1/booth/devices` 核發；Bearer 用於 `POST /v1/booth/anchors`（**hub** `pg-boothd` 無瀏覽器記憶體 API key 時）。
+- **僅 hub**；Peer 行程**不**持有 `device_token`。
+- 權限子集：**不可** `invite.compose`；**可** `invite.room` + anchor 生命週期。
+- 與場殼 API key **獨立**（輪替 provision 不撤銷 device）。
 
 ---
 
@@ -335,6 +389,7 @@ Auth：`Authorization: Bearer <access_token|api_key|join_cap|…>`（依端點�
 | `#pg=`／`/i/` | Platform Invite | **一連結多人**；Ticket 路徑 **加入者 offer** |
 | `#pg_provision=` | Platform provision | Host 通行證交接（單次）；**≠** 場 Invite |
 | `/join/<token>` | Platform | 僅註冊 SSO |
+| go `/room/remote?…` | BoothAnchor `operatorCap` | 遠端 Operator 連回常駐包廂；見 [PG-GO-ROOM-ENGINE-PLAN.md](./PG-GO-ROOM-ENGINE-PLAN.md)（**未落地**） |
 
 ---
 
@@ -346,7 +401,7 @@ Auth：`Authorization: Bearer <access_token|api_key|join_cap|…>`（依端點�
 | **1. Signal MVP** | Invite＋排隊 O／A（加入者 offer）；API key；bootstrap；**TTL 5m** | 一人加入可跑通；二人排隊可串行 | **完成** |
 | **2. 深鏈＋短連結＋場殼** | `#pg=`／`/i/`；QR 短 URL；Roster 接上；**多 peer 並存** | 同一短連結兩人先後加入且雙方名冊可見 | **完成** |
 | **3. 後台** | API key UI；註冊邀請 claim；admin；`dash.samkuo.me`；品牌對齊場殼 | 使用者自助持 key | **完成**（claim；完整 SSO→P5） |
-| **4. invite.compose** | protocol＋開 SAM＋放大畫布＋consent | 掃短鏈可走到詢問入座 | **完成** |
+| **4. invite.compose** | protocol＋開 SAM＋放大畫布＋consent | 掃短鏈可走到詢問入座 | **Superseded**（連線改 `invite.room`）；API 暫留 |
 | **5.（可選）** | 完整 Social SSO（GitHub→Google）、MFA、用量、自架文件；**provision／記憶體通行證** | 見 [PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md) §9.2 | **進行中**（SSO／access token／HOST invite／**provision＋場殼記憶體**已落地；MFA 未） |
 
 ---
@@ -374,3 +429,6 @@ Auth：`Authorization: Bearer <access_token|api_key|join_cap|…>`（依端點�
 | 2026-08-18 | Kind 表加 **`invite.room`**（go 包廂；見 [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)） |
 | 2026-08-18 | `invite.room` 註：文字／檔走 DC；音視訊 RTP 預留在場＋節目 2+2 |
 | 2026-08-22 | **公開自助註冊：** SSO `login` 首次未綁定則建帳；註冊邀請改選用 |
+| 2026-08-23 | **`invite.compose` Superseded（連線遊戲）：** 統一 `invite.room`＋`session_play`；`play`／`go` 皆 Booth Hub；**Invite DO 保留**（門牌／`join_cap`／TTL） |
+| 2026-08-23 | **`invite.room` signal 改 BoothAnchor：** Guest join `POST /v1/booth/join/offer`；廢 Invite DO long poll（無 fallback）；見 ENGINE §10.7 |
+| 2026-08-23 | **BoothAnchor（部分落地）：** `/v1/booth/*`、`BoothAnchorDurableObject`、`device_token`；見 [PG-GO-ROOM-ENGINE-PLAN.md](./PG-GO-ROOM-ENGINE-PLAN.md) |

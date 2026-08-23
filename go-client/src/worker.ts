@@ -10,6 +10,14 @@ function isInvitePath(pathname: string): boolean {
   return pathname === "/i" || pathname.startsWith("/i/");
 }
 
+function isOperatorRemotePath(pathname: string): boolean {
+  return pathname === "/room/remote" || pathname.startsWith("/room/remote/");
+}
+
+function usesSpaFallback(pathname: string): boolean {
+  return isInvitePath(pathname) || isOperatorRemotePath(pathname);
+}
+
 function isRoomFilePath(pathname: string): boolean {
   return (
     pathname === "/room-file" ||
@@ -37,7 +45,7 @@ export default {
         headers: { "Cache-Control": "no-store" },
       });
     }
-    if (!isInvitePath(url.pathname)) {
+    if (!usesSpaFallback(url.pathname)) {
       return env.ASSETS.fetch(request);
     }
 

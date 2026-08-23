@@ -48,7 +48,7 @@
 | --- | --- | --- |
 | **本刀 room harness** | localhost 加速**真** `/room`＋`/i/`＋正式 Platform | 第二套邀請協定 |
 | **`/dev/room-xfer`** | 傳檔／SW／Range 壓力；BC 信令 | 包廂產品／Invite／開局驗收 |
-| **GO-INVITE** | `invite.compose` 拉遊戲 | 包廂門牌 |
+| **GO-INVITE／`invite.compose`** | **Superseded**；連線改包廂 `invite.room` | 包廂門牌 |
 | **`session_play`** | 包廂內開局（可建在本 harness 之上） | 本刀第一刀必做項 |
 
 ---
@@ -68,7 +68,7 @@
 
 | 角色 | 通行證 | 說明 |
 | --- | --- | --- |
-| **Host**（`/room`） | **需要** field API key | 才能 mint／answer loop |
+| **Host**（`/room`） | **需要** field API key | 才能 mint 門牌；Guest 握手經 Anchor WSS（ENGINE §10.7；**無** Invite DO answer loop） |
 | **Guest**（`/i/<short>`） | **不需要** | 包廂 Guest 本來就可不登入 |
 
 ### 5.3 多 tab 拓樸（硬）

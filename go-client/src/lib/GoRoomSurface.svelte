@@ -27,6 +27,7 @@
   import { getGoCatalogEntry } from "$lib/goCatalog";
   import type { GoLoadProgress } from "$lib/goLoadProgress";
   import { goAuth } from "$lib/goAuth.svelte";
+  import { readRemoteAnchorEnabled } from "$lib/boothAnchorBridge";
   import { roomAdClickAction } from "$lib/goAds";
   import { chromeSession } from "$lib/chromeSession.svelte";
   import {
@@ -125,6 +126,7 @@
     type RoomOccupantPeer,
     type RoomShellMode,
     type RoomShellPane,
+    type RoomSurfaceRole,
   } from "$lib/goRoom";
   import {
     catalogConsumes,
@@ -191,7 +193,7 @@
   type RoomUiPhase = "idle" | "open" | "ended" | "error" | "connecting" | "ready";
 
   type Props = {
-    role: "host" | "guest";
+    role: RoomSurfaceRole;
     phase: RoomUiPhase;
     message: string;
     error: string | null;
@@ -240,6 +242,14 @@
           | undefined
         >;
     onEndPlay?: () => void | Promise<void>;
+    onRemoteAnchorChange?: (enabled: boolean) => void | Promise<void>;
+    /** Operator remote shell — snapshot-driven TV + WebRTC program preview (§10.6). */
+    operatorTvOn?: boolean;
+    operatorTvLabel?: string | null;
+    operatorTvStream?: MediaStream | null;
+    operatorCanDirect?: boolean;
+    operatorRemoteLives?: { peerId: string; camera: boolean; mic: boolean }[];
+    onCastLive?: (peerId: string, name: string) => void | Promise<void>;
   };
 
   let {
@@ -272,10 +282,21 @@
     onStartPlay,
     onStartManualPlay,
     onEndPlay,
+    onRemoteAnchorChange,
+    operatorTvOn = false,
+    operatorTvLabel = null,
+    operatorTvStream = null,
+    operatorCanDirect = false,
+    operatorRemoteLives = [],
+    onCastLive,
   }: Props = $props();
+
+  const isOperator = $derived(role === "operator");
+  const isHostLike = $derived(role === "host" || role === "operator");
 
   let playPickerOpen = $state(false);
   let roomSettingsOpen = $state(false);
+  let remoteAnchorEnabled = $state(readRemoteAnchorEnabled());
   const playableGames = $derived(listRoomPlayableGames());
   const nativeFileCapture = htmlMediaCaptureStreamSupported();
   const playPickerOccupants = $derived.by(() => {
@@ -396,8 +417,10 @@
     roomOccupantRows({
       localPeerId: "local",
       localName: "我",
-      localLiveVideo: goRoomMedia.camera || goRoomMedia.display,
-      localLiveAudio: goRoomMedia.mic,
+      localLiveVideo: isOperator
+        ? false
+        : goRoomMedia.camera || goRoomMedia.display,
+      localLiveAudio: isOperator ? false : goRoomMedia.mic,
       others:
         occupantPeers.length > 0
           ? occupantPeers
@@ -405,11 +428,11 @@
               peerId: `name-${i}-${name}`,
               name,
             })),
-      remoteLives: goRoomMedia.remoteLives,
+      remoteLives: isOperator ? operatorRemoteLives : goRoomMedia.remoteLives,
     })
   );
   const hostPeerId = $derived(
-    role === "host" ? "local" : occupantPeers[0]?.peerId ?? null
+    isHostLike && !isOperator ? "local" : occupantPeers[0]?.peerId ?? null
   );
   const memberCards = $derived(
     roomMemberCardsSorted(
@@ -437,25 +460,31 @@
     return getGoCatalogEntry(id)?.title?.trim() || id;
   });
   const tvLabel = $derived(
-    roomTvLabel({
-      programName: goRoomMedia.programName,
-      remoteProgramName: goRoomMedia.remoteProgramName,
-      playName: playTvName,
-    })
+    isOperator
+      ? operatorTvLabel
+      : roomTvLabel({
+          programName: goRoomMedia.programName,
+          remoteProgramName: goRoomMedia.remoteProgramName,
+          playName: playTvName,
+        })
   );
   const tvStream = $derived(
-    roomTvBindStream({
-      programStream: goRoomMedia.programStream,
-      localProgramStream: goRoomMedia.localProgramStream,
-      programName: goRoomMedia.programName,
-      remoteProgramName: goRoomMedia.remoteProgramName,
-    })
+    isOperator
+      ? operatorTvStream
+      : roomTvBindStream({
+          programStream: goRoomMedia.programStream,
+          localProgramStream: goRoomMedia.localProgramStream,
+          programName: goRoomMedia.programName,
+          remoteProgramName: goRoomMedia.remoteProgramName,
+        })
   );
   const tvOn = $derived(
-    roomTvPictureOn({
-      programName: goRoomMedia.programName,
-      remoteProgramName: goRoomMedia.remoteProgramName,
-    })
+    isOperator
+      ? operatorTvOn
+      : roomTvPictureOn({
+          programName: goRoomMedia.programName,
+          remoteProgramName: goRoomMedia.remoteProgramName,
+        })
   );
   const loginGate = $derived(
     roomHostLoginGate({ role, loggedIn, phase, clientReady })
@@ -512,7 +541,11 @@
   });
 
   const inBooth = $derived(
-    roomInBooth({ role, loggedIn, phase })
+    roomInBooth({
+      role,
+      loggedIn: isOperator ? true : loggedIn,
+      phase,
+    })
   );
   /** Logged-out／connecting／ended: full-width TV, not the in-booth rail split. */
   const shellModeLive = $derived(
@@ -660,6 +693,9 @@
     if (phase === "connecting") return message || GO_ROOM_CONNECTING_TITLE;
     if (phase === "ended") return message || "這一間已結束";
     if (inBooth) {
+      if (isOperator) {
+        return message || (operatorCanDirect ? "遠端導播中" : "遠端檢視");
+      }
       if (role === "guest") {
         const hostName =
           playerDisplayName(playHostName, "") ||
@@ -686,7 +722,7 @@
   const statusOccupied = $derived(guestCount > 0);
 
   const showComposer = $derived(
-    inBooth && (role === "host" || connected)
+    inBooth && !isOperator && (role === "host" || connected)
   );
   const live = $derived(
     inBooth || phase === "connecting" || phase === "open"
@@ -1381,6 +1417,18 @@
 
   async function onPutLiveOnTv(peerId: string, name: string) {
     mediaError = "";
+    if (isOperator) {
+      if (!operatorCanDirect) {
+        mediaError = "家裡主持使用中，無法遠端切台";
+        return;
+      }
+      try {
+        await onCastLive?.(peerId, name);
+      } catch (e) {
+        mediaError = e instanceof Error ? e.message : String(e);
+      }
+      return;
+    }
     const out = await goRoomMedia.putLiveOnTv(peerId, name);
     if (!out.ok) mediaError = out.error;
   }
@@ -1390,10 +1438,16 @@
     action: RoomHostMenuAction
   ) {
     hostMenuPeerId = null;
-    const peerId = card.mine ? "local" : card.peerId;
+    const peerId = card.mine && !isOperator ? "local" : card.peerId;
     mediaError = "";
     if (action === "putOnTv") {
       await onPutLiveOnTv(peerId, card.name);
+      return;
+    }
+    if (isOperator) {
+      if (action === "kick" && !card.mine) {
+        kickTarget = { peerId: card.peerId, name: card.name };
+      }
       return;
     }
     if (action === "forceMute") {
@@ -1833,6 +1887,7 @@
           {/if}
         </svg>
       </button>
+      {#if !isOperator}
       <button
         type="button"
         class={["pixel-btn", "room-dock-btn", goRoomMedia.mic && "pixel-btn--primary"]
@@ -1903,6 +1958,7 @@
           </svg>
         </button>
       {/if}
+      {/if}
       {#if role === "host" && tvOn}
         <button
           type="button"
@@ -1943,8 +1999,8 @@
       <button
         type="button"
         class="pixel-btn pixel-btn--danger-outline room-dock-btn room-dock-btn--leave"
-        aria-label={role === "host" ? "結束" : "離開"}
-        title={role === "host" ? "結束" : "離開"}
+        aria-label={isHostLike ? "結束" : "離開"}
+        title={isHostLike ? "結束" : "離開"}
         onclick={() => askEnd()}
       >
         <svg class="dock-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -1999,17 +2055,19 @@
           {#if panesConcurrent}
             <p class="room-pane-title pixel-text">成員</p>
           {/if}
-          {#if role === "host"}
+          {#if isHostLike}
             <div class="door-row">
               <p class="muted door-row-label">{doorRow.label}</p>
               <button
                 type="button"
                 class="pixel-btn pixel-btn--primary door-row-action"
                 onclick={() => inviteInBooth()}
+                disabled={isOperator && !operatorCanDirect}
               >
                 {doorRow.action}
               </button>
             </div>
+            {#if !isOperator}
             {#if playLoadProgress}
               <div class="door-row">
                 <p class="muted door-row-label">{playLoadProgress.detail}</p>
@@ -2036,6 +2094,7 @@
                   玩遊戲
                 </button>
               </div>
+            {/if}
             {/if}
           {/if}
           {#if showHostChecklist}
@@ -2067,7 +2126,7 @@
                   {card}
                   selected={selectedPeerId === card.peerId}
                   putOnTv={
-                    role === "host"
+                    isHostLike && (!isOperator || operatorCanDirect)
                       ? roomHostMemberPutOnTv({
                           liveAudio: card.micOn,
                           liveVideo: card.cameraOn,
@@ -2075,14 +2134,24 @@
                         })
                       : null
                   }
-                  hostMenu={role === "host"
-                    ? roomHostMemberMenu({
-                        mine: card.mine,
-                        liveAudio: card.micOn,
-                        liveVideo: card.cameraOn,
-                        onAir: card.onAir,
-                      })
-                    : undefined}
+                  hostMenu={
+                    isOperator
+                      ? operatorCanDirect
+                        ? roomHostMemberMenu({
+                            mine: false,
+                            liveAudio: card.micOn,
+                            liveVideo: card.cameraOn,
+                            onAir: card.onAir,
+                          })
+                        : undefined
+                      : role === "host"
+                        ? roomHostMemberMenu({
+                            mine: card.mine,
+                            liveAudio: card.micOn,
+                            liveVideo: card.cameraOn,
+                            onAir: card.onAir,
+                          })
+                        : undefined}
                   hostMenuOpen={hostMenuPeerId === card.peerId}
                   onclick={() =>
                     (selectedPeerId =
@@ -2808,9 +2877,9 @@
         {:else if deleteFileId}
           {GO_ROOM_FILE_DELETE}？
         {:else if pendingAdHref}
-          {role === "host" ? "結束這一間並打開小品？" : "離開這一間並打開小品？"}
+          {isHostLike ? "結束這一間並打開小品？" : "離開這一間並打開小品？"}
         {:else}
-          {role === "host" ? "結束這一間？" : "離開這一間？"}
+          {isHostLike ? "結束這一間？" : "離開這一間？"}
         {/if}
       </h2>
       <p class="confirm-body">
@@ -2821,7 +2890,7 @@
         {:else if deleteFileId}
           {GO_ROOM_FILE_DELETE_CONFIRM}
         {:else}
-          {role === "host" ? GO_ROOM_END_CONFIRM_HOST : GO_ROOM_LEAVE_CONFIRM_GUEST}
+          {isHostLike ? GO_ROOM_END_CONFIRM_HOST : GO_ROOM_LEAVE_CONFIRM_GUEST}
         {/if}
       </p>
       <div class="confirm-actions">
@@ -2847,7 +2916,7 @@
           </button>
         {:else}
           <button type="button" class="pixel-btn pixel-btn--danger" onclick={() => void confirmEndNow()}>
-            {role === "host" ? "結束" : "離開"}
+            {isHostLike ? "結束" : "離開"}
           </button>
         {/if}
       </div>
@@ -2867,8 +2936,16 @@
     />
   {/if}
 
-  <GoRoomSettingsPanel bind:open={roomSettingsOpen} bind:tvSnowEnabled />
+  {#if role === "host"}
+  <GoRoomSettingsPanel
+    bind:open={roomSettingsOpen}
+    bind:tvSnowEnabled
+    bind:remoteAnchorEnabled
+    onRemoteAnchorChange={(enabled) => void onRemoteAnchorChange?.(enabled)}
+  />
+  {/if}
 
+  {#if role === "host"}
   <GoRoomPlayPicker
     bind:open={playPickerOpen}
     games={playableGames}
@@ -2897,6 +2974,7 @@
       };
     }}
   />
+  {/if}
 </div>
 
 <style>

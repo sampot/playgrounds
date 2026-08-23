@@ -6,6 +6,7 @@
 import {
   createJoin,
   fetchGuestTurnIceServers,
+  postBoothJoinOfferAndWaitAnswer,
   postOfferAndWaitAnswer,
   previewInvite,
   type InviteMeta,
@@ -1150,7 +1151,7 @@ export function createGuestRuntime() {
         attachRoomChannels();
       }
 
-      const answered = await postOfferAndWaitAnswer({
+      const answered = await postBoothJoinOfferAndWaitAnswer({
         inviteId: meta.inviteId,
         joinCap: join.join_cap,
         offerWire: result.wire,

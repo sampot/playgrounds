@@ -1,6 +1,9 @@
 <script lang="ts">
   import {
     GO_ROOM_SETTINGS_SECTION_DISPLAY,
+    GO_ROOM_SETTINGS_SECTION_REMOTE,
+    GO_ROOM_SETTINGS_REMOTE_ANCHOR_HINT,
+    GO_ROOM_SETTINGS_REMOTE_ANCHOR_LABEL,
     GO_ROOM_SETTINGS_TITLE,
     GO_ROOM_SETTINGS_TV_SNOW_HINT,
     GO_ROOM_SETTINGS_TV_SNOW_LABEL,
@@ -10,9 +13,13 @@
   let {
     open = $bindable(false),
     tvSnowEnabled = $bindable(true),
+    remoteAnchorEnabled = $bindable(false),
+    onRemoteAnchorChange,
   }: {
     open?: boolean;
     tvSnowEnabled?: boolean;
+    remoteAnchorEnabled?: boolean;
+    onRemoteAnchorChange?: (enabled: boolean) => void | Promise<void>;
   } = $props();
 
   let closeBtn = $state<HTMLButtonElement | null>(null);
@@ -107,6 +114,46 @@
               </span>
               <span class="sr-only">
                 {tvSnowEnabled ? "開啟" : "關閉"}
+              </span>
+            </button>
+          </li>
+        </ul>
+      </section>
+
+      <section class="room-settings-section" aria-labelledby="room-settings-remote">
+        <h3 id="room-settings-remote" class="room-settings-section-title">
+          {GO_ROOM_SETTINGS_SECTION_REMOTE}
+        </h3>
+        <ul class="room-settings-list">
+          <li class="room-setting-row">
+            <div class="room-setting-copy">
+              <p id="room-setting-remote-label" class="room-setting-label">
+                {GO_ROOM_SETTINGS_REMOTE_ANCHOR_LABEL}
+              </p>
+              <p class="room-setting-hint muted">{GO_ROOM_SETTINGS_REMOTE_ANCHOR_HINT}</p>
+            </div>
+            <button
+              type="button"
+              class={[
+                "room-setting-switch",
+                remoteAnchorEnabled && "room-setting-switch--on",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              role="switch"
+              aria-checked={remoteAnchorEnabled}
+              aria-labelledby="room-setting-remote-label"
+              onclick={() => {
+                const next = !remoteAnchorEnabled;
+                remoteAnchorEnabled = next;
+                void onRemoteAnchorChange?.(next);
+              }}
+            >
+              <span class="room-setting-switch-track" aria-hidden="true">
+                <span class="room-setting-switch-thumb"></span>
+              </span>
+              <span class="sr-only">
+                {remoteAnchorEnabled ? "開啟" : "關閉"}
               </span>
             </button>
           </li>

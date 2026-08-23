@@ -23,6 +23,10 @@
       {
         "name": "INVITES",
         "class_name": "InviteDurableObject"
+      },
+      {
+        "name": "BOOTH_ANCHORS",
+        "class_name": "BoothAnchorDurableObject"
       }
     ]
   },
@@ -30,6 +34,10 @@
     {
       "tag": "v1",
       "new_sqlite_classes": ["InviteDurableObject"]
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["BoothAnchorDurableObject"]
     }
   ],
   "routes": [

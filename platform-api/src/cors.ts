@@ -19,7 +19,15 @@ export function corsHeaders(req: Request): HeadersInit {
   return h;
 }
 
+/** WebSocket 101 must not be rebuilt — `new Response(...)` drops `webSocket`. */
+export function isWebSocketUpgradeResponse(res: Response): boolean {
+  return res.status === 101 || res.webSocket != null;
+}
+
 export function withCors(req: Request, res: Response): Response {
+  if (isWebSocketUpgradeResponse(res)) {
+    return res;
+  }
   const headers = new Headers(res.headers);
   for (const [k, v] of Object.entries(corsHeaders(req))) {
     headers.set(k, v);

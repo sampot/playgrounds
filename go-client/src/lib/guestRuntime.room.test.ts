@@ -5,6 +5,7 @@ const fixtures = vi.hoisted(() => ({
   preview: vi.fn(),
   createJoin: vi.fn(),
   postOffer: vi.fn(),
+  postBoothOffer: vi.fn(),
   fetchTurn: vi.fn(),
   createOffer: vi.fn(),
   applyAnswer: vi.fn(),
@@ -23,6 +24,7 @@ vi.mock("@pg/platform/platformClient", () => ({
   createJoin: fixtures.createJoin,
   fetchGuestTurnIceServers: fixtures.fetchTurn,
   postOfferAndWaitAnswer: fixtures.postOffer,
+  postBoothJoinOfferAndWaitAnswer: fixtures.postBoothOffer,
 }));
 
 vi.mock("./goCanvasSupport", () => ({
@@ -131,7 +133,7 @@ describe("guestRuntime invite.room", () => {
       opts.handlers?.onChannelOpen?.();
       return { session, wire: "offer-wire" };
     });
-    fixtures.postOffer.mockResolvedValue({ answer: "answer-wire" });
+    fixtures.postBoothOffer.mockResolvedValue({ answer: "answer-wire" });
     fixtures.applyAnswer.mockResolvedValue(undefined);
   });
 
@@ -295,7 +297,7 @@ describe("guestRuntime invite.room", () => {
         media: "none",
       })
     );
-    expect(fixtures.postOffer).toHaveBeenCalledTimes(1);
+    expect(fixtures.postBoothOffer).toHaveBeenCalledTimes(1);
   });
 
   it("ICE failure while connecting is a page error, not host-ended", async () => {
@@ -315,7 +317,7 @@ describe("guestRuntime invite.room", () => {
       };
     });
     let finishWait: ((value: { answer: string }) => void) | undefined;
-    fixtures.postOffer.mockImplementation(
+    fixtures.postBoothOffer.mockImplementation(
       () =>
         new Promise<{ answer: string }>((resolve) => {
           finishWait = resolve;

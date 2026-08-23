@@ -32,6 +32,7 @@ import {
 import {
   GO_ROOM_CAST_UNSUPPORTED,
   GO_ROOM_DISPLAY_PERM_DENIED,
+  GO_ROOM_FILE_SW_REQUIRED,
   GO_ROOM_MEDIA_PERM_DENIED,
   allowCanvasProgramCaptureFallback,
   goRoomCastCaptureError,
@@ -41,6 +42,7 @@ import {
   createPresenceAudioMixer,
   type PresenceAudioSource,
 } from "./goRoomPresenceAudioMix";
+import { ensureLocalRoomFileRegistered } from "./goRoomPlayBridge";
 import { roomFilePath } from "./goRoomPlayRegistry";
 
 export type RoomMediaPeer = {
@@ -243,6 +245,8 @@ export function createRoomMedia(opts: {
   getUserMedia?: (c: MediaStreamConstraints) => Promise<MediaStream>;
   getDisplayMedia?: (c?: DisplayMediaStreamOptions) => Promise<MediaStream>;
   captureProgram?: (file: File) => Promise<CapturedProgram | null>;
+  /** Tests stub true; production registers File into go SW before `/room-file/` decode. */
+  ensureLocalRoomFile?: (id: string, file: File) => Promise<boolean>;
   resolveLocalFile?: (id: string) => File | null;
   /** Async resolve for Host private OPFS ids (`pvt_…`). */
   resolvePrivateFile?: (id: string) => Promise<File | null>;
@@ -256,6 +260,9 @@ export function createRoomMedia(opts: {
     opts.getDisplayMedia ??
     ((c?: DisplayMediaStreamOptions) =>
       navigator.mediaDevices.getDisplayMedia(c ?? { video: true, audio: false }));
+  const ensureLocalRoomFile =
+    opts.ensureLocalRoomFile ??
+    ((id: string, file: File) => ensureLocalRoomFileRegistered(id, file));
   const listeners = new Set<(s: RoomMediaState) => void>();
   let camera: MediaStreamTrack | null = null;
   let mic: MediaStreamTrack | null = null;
@@ -931,6 +938,16 @@ export function createRoomMedia(opts: {
     fileId?: string,
     via: "http" | "blob" = localFileProgramCaptureMode(fileId)
   ): Promise<RoomMediaResult> {
+    if (via === "http" && fileId) {
+      const registered = await ensureLocalRoomFile(fileId, file);
+      if (!registered) {
+        if (!quiet) {
+          error = GO_ROOM_FILE_SW_REQUIRED;
+          emit();
+        }
+        return { ok: false, error: GO_ROOM_FILE_SW_REQUIRED };
+      }
+    }
     const capture =
       opts.captureProgram ??
       ((f: File) =>

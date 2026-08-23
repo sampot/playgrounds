@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   friendlyInviteError,
+  friendlyOperatorAckError,
+  friendlyOperatorError,
   friendlySamDownloadError,
   friendlySoloLoadError,
   isLikelyNetworkFailure,
@@ -79,9 +81,51 @@ describe("goFriendlyError", () => {
     );
   });
 
+  it("invite maps anchor_offline for room guests", () => {
+    const msg = friendlyInviteError(new Error("anchor_offline"), "連線失敗");
+    expect(msg).toContain("主持");
+    expect(msg).not.toMatch(/anchor_offline/i);
+  });
+
+  it("invite maps booth join timeout", () => {
+    const msg = friendlyInviteError(new Error("timeout"));
+    expect(msg).toContain("逾時");
+    expect(msg).not.toMatch(/timeout/i);
+  });
+
   it("missing index.html is softened", () => {
     const msg = friendlySoloLoadError(new Error("小品缺少 index.html"), "數獨");
     expect(msg).toContain("不完整");
     expect(msg).not.toMatch(/index\.html/i);
+  });
+
+  it("operator ws_failed is plain Chinese", () => {
+    const msg = friendlyOperatorError(new Error("ws_failed"));
+    expect(msg).toContain("連不上包廂");
+    expect(msg).not.toMatch(/ws_failed/i);
+  });
+
+  it("operator offline copy", () => {
+    vi.stubGlobal("navigator", { onLine: false });
+    const msg = friendlyOperatorError(new Error("ws_failed"));
+    expect(msg).toContain("沒有網路");
+    expect(msg).not.toMatch(/ws_failed/i);
+  });
+
+  it("operator cap unauthorized is softened", () => {
+    const msg = friendlyOperatorError(new Error("operator_cap_401"));
+    expect(msg).toContain("過期");
+    expect(msg).not.toMatch(/401|operator_cap/i);
+  });
+
+  it("operator remote_disabled is plain Chinese", () => {
+    const msg = friendlyOperatorError(new Error("remote_disabled"));
+    expect(msg).toContain("遠端連回");
+    expect(msg).not.toMatch(/remote_disabled/i);
+  });
+
+  it("operator ack maps not_director", () => {
+    expect(friendlyOperatorAckError("not_director")).toContain("檢視");
+    expect(friendlyOperatorAckError("not_director")).not.toMatch(/not_director/i);
   });
 });

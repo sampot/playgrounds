@@ -233,6 +233,7 @@
   onStartManualPlay={(catalogId, picks) =>
     runtime.startManualPlay(catalogId, picks)}
   onEndPlay={() => void runtime.endPlay()}
+  onRemoteAnchorChange={(enabled) => runtime.setRemoteAnchorEnabled(enabled)}
 />
 
 {#if devEnabled && !goAuth.loggedIn}

@@ -1,4 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
+
+vi.mock("./goRoomPlayBridge", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./goRoomPlayBridge")>();
+  return {
+    ...actual,
+    ensureLocalRoomFileRegistered: vi.fn(async () => true),
+  };
+});
+
 import { BOOTH_TRANSCEIVER_SLOTS } from "@pg/roster/rosterBoothMedia";
 import { SESSION_CAST_TYPE } from "@pg/roster/rosterSessionCast";
 import { SESSION_CAMERA_TYPE, SESSION_MIC_TYPE } from "@pg/roster/rosterSessionCamera";

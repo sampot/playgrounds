@@ -32,7 +32,6 @@ import {
 import { isSessionPlayMessage } from "@pg/roster/rosterSessionPlay";
 import type { SessionPlaySeat } from "@pg/roster/rosterSessionPlay";
 import { createRoomMeshBroker } from "./goRoomMeshBroker";
-import { startPlatformHostAnswerLoop } from "@pg/platform/platformHostLoop";
 import {
   buildInviteRoomIntent,
   INVITE_ROOM_KIND,
@@ -73,6 +72,7 @@ import {
   roomHostDisplayName,
   playerDisplayName,
   roomOccupantSummary,
+  roomTvBindStream,
   type RoomInviteDoor,
 } from "./goRoom";
 import {
@@ -85,6 +85,8 @@ import {
   writeRoomInviteSession,
   type RoomInviteSessionSnapshot,
 } from "./goRoomInviteSession";
+import { createBoothAnchorBridge } from "./boothAnchorBridge";
+import { createRoomGuestJoinAcceptor } from "./roomBoothJoinHost";
 
 export type RoomPhase = "idle" | "open" | "ended" | "error";
 
@@ -164,7 +166,6 @@ export function createRoomRuntime(opts?: {
     playCanvasGeneration: 0,
   };
   const listeners = new Set<Listener>();
-  let loop: ReturnType<typeof startPlatformHostAnswerLoop> | null = null;
   let inviteExpiryTimer: ReturnType<typeof setTimeout> | null = null;
   const slots: PeerSlot[] = [];
   let surfaceAttached = false;
@@ -193,6 +194,101 @@ export function createRoomRuntime(opts?: {
     localPeerId: () => localAgentId,
     hostPeerId: () => localAgentId,
     isBoothHost: () => true,
+  });
+
+  const operatorHooks = {
+    mintInvite: async (): Promise<void> => {
+      throw new Error("room_runtime_not_ready");
+    },
+    kickPeer: async (_peerId: string): Promise<void> => {
+      throw new Error("room_runtime_not_ready");
+    },
+    endBooth: async (): Promise<void> => {
+      throw new Error("room_runtime_not_ready");
+    },
+  };
+
+  function prepareGuestJoinHandlers(): {
+    handlers: RosterPeerHandlers;
+    attachSession: (sess: RosterPeerSession) => void;
+  } {
+    const slot: PeerSlot = {
+      peerId: null,
+      session: null,
+      displayName: null,
+    };
+    slots.push(slot);
+    return {
+      handlers: handlers(slot),
+      attachSession: (sess: RosterPeerSession) => {
+        slot.session = sess;
+        sess.pc.addEventListener("track", (ev) => {
+          goRoomMedia.onRemoteTrack(ev, sess.pc);
+          if (slot.peerId) void goRoomMedia.forwardFrom(slot.peerId);
+        });
+        refreshGuestSummary();
+        if (sess.getChannel()?.readyState === "open") {
+          set({
+            phase: "open",
+            error: null,
+            message: occupancyMessage(),
+          });
+        }
+      },
+    };
+  }
+
+  const acceptGuestJoinOffer = createRoomGuestJoinAcceptor({
+    localAgentId,
+    hostName,
+    prepareHandlers: prepareGuestJoinHandlers,
+  });
+
+  const anchorBridge = createBoothAnchorBridge({
+    getStatus: () => status,
+    getOwnerUserId: () => goAuth.profile?.user_id ?? null,
+    getApiKey: () => goAuth.getPlatformApiKeyForHostLoop(),
+    getCastSummary: () => {
+      if (goRoomMedia.tvSourcePeerId) {
+        const peer = status.occupantPeers.find(
+          (p) => p.peerId === goRoomMedia.tvSourcePeerId
+        );
+        return {
+          kind: "live" as const,
+          peerId: goRoomMedia.tvSourcePeerId,
+          label: peer?.name ?? goRoomMedia.remoteProgramName ?? undefined,
+        };
+      }
+      const program =
+        goRoomMedia.remoteProgramName?.trim() ||
+        goRoomMedia.programName?.trim() ||
+        null;
+      if (program) {
+        return { kind: "file" as const, name: program };
+      }
+      if (status.playCatalogId) {
+        return { kind: "play" as const, catalogId: status.playCatalogId };
+      }
+      return { kind: "idle" as const };
+    },
+    getRemoteLives: () => goRoomMedia.remoteLives,
+    onGuestJoinOffer: async (input) => acceptGuestJoinOffer(input.offerWire),
+    onOperatorCastLive: async (peerId, label) => {
+      const resolved =
+        peerId === "local" ? localAgentId : peerId;
+      const out = await goRoomMedia.putLiveOnTv(resolved, label);
+      if (!out.ok) throw new Error(out.error);
+    },
+    onOperatorMintInvite: () => operatorHooks.mintInvite(),
+    onOperatorKickPeer: (peerId) => operatorHooks.kickPeer(peerId),
+    onOperatorEndBooth: () => operatorHooks.endBooth(),
+    getTvProgramStream: () =>
+      roomTvBindStream({
+        programStream: goRoomMedia.programStream,
+        localProgramStream: goRoomMedia.localProgramStream,
+        programName: goRoomMedia.programName,
+        remoteProgramName: goRoomMedia.remoteProgramName,
+      }),
   });
 
   function clearPlayCanvas(): void {
@@ -264,6 +360,7 @@ export function createRoomRuntime(opts?: {
     });
     fanoutOccupancy();
     void goRoomMedia.refresh();
+    anchorBridge.publishSnapshot();
   }
 
   function occupancyRows(): { peerId: string; name: string }[] {
@@ -353,6 +450,10 @@ export function createRoomRuntime(opts?: {
           : Promise.resolve(null),
       ownerOf: (id) => goRoomFiles.listingOwner(id),
       fileMeta: (id) => goRoomFiles.listingMeta(id),
+      onTvProgramChange: () => {
+        anchorBridge.refreshProgram();
+        anchorBridge.publishSnapshot();
+      },
     });
   }
 
@@ -568,15 +669,12 @@ export function createRoomRuntime(opts?: {
       status.inviteDoor === "live" &&
       Boolean(status.inviteId) &&
       Boolean(status.shortUrl) &&
-      isInviteUnexpired(status.inviteExpiresAt) &&
-      Boolean(loop)
+      isInviteUnexpired(status.inviteExpiresAt)
     );
   }
 
   function expireDoor(inviteId: string): void {
     if (status.inviteId !== inviteId) return;
-    loop?.stop();
-    loop = null;
     const toRevoke = status.inviteId;
     clearRoomInviteSession(inviteSession);
     set({
@@ -608,48 +706,6 @@ export function createRoomRuntime(opts?: {
     writeRoomInviteSession(inviteSession, snap);
   }
 
-  function startAnswerLoop(inviteId: string, apiKey: string): void {
-    loop?.stop();
-    loop = startPlatformHostAnswerLoop({
-      inviteId,
-      apiKey,
-      useRelay: false,
-      media: "ready",
-      maxAnswers: 0,
-      localPresence: {
-        agentId: localAgentId,
-        name: hostName(),
-      },
-      prepareHandlers: () => {
-        const slot: PeerSlot = {
-          peerId: null,
-          session: null,
-          displayName: null,
-        };
-        slots.push(slot);
-        return {
-          handlers: handlers(slot),
-          attachSession: (sess: RosterPeerSession) => {
-            slot.session = sess;
-            sess.pc.addEventListener("track", (ev) => {
-              goRoomMedia.onRemoteTrack(ev, sess.pc);
-              if (slot.peerId) void goRoomMedia.forwardFrom(slot.peerId);
-            });
-            refreshGuestSummary();
-            if (sess.getChannel()?.readyState === "open") {
-              set({
-                phase: "open",
-                error: null,
-                message: occupancyMessage(),
-              });
-            }
-          },
-        };
-      },
-      onError: (msg) => set({ error: msg }),
-    });
-  }
-
   function restoreDoorFromSession(): void {
     const snap = readRoomInviteSession(inviteSession);
     if (!snap) return;
@@ -666,7 +722,6 @@ export function createRoomRuntime(opts?: {
       message: occupancyMessage(),
     });
     scheduleInviteExpiry(snap.inviteId, snap.expiresAt);
-    startAnswerLoop(snap.inviteId, apiKey);
   }
 
   async function mintInviteAndAnswer(): Promise<{
@@ -718,7 +773,7 @@ export function createRoomRuntime(opts?: {
         return null;
       }
       const previousId = status.inviteId;
-      loop?.stop();
+      await anchorBridge.onBoothOpen();
       ensureLocalSurface();
       set({
         phase: "open",
@@ -735,7 +790,6 @@ export function createRoomRuntime(opts?: {
         shortUrl: created.short_url,
         expiresAt,
       });
-      startAnswerLoop(created.invite_id, apiKey);
       if (previousId && previousId !== created.invite_id) {
         void goAuth.revokePlatformInvite(previousId);
       }
@@ -790,6 +844,7 @@ export function createRoomRuntime(opts?: {
         message: occupancyMessage(),
       });
       if (!doorIsLive()) restoreDoorFromSession();
+      void anchorBridge.onBoothOpen();
     } finally {
       opening = false;
     }
@@ -1074,10 +1129,9 @@ export function createRoomRuntime(opts?: {
     if (status.phase === "idle") return;
     if (status.phase === "ended" && landOn === "ended") return;
     closing = true;
+    await anchorBridge.stop();
     clearInviteExpiryTimer();
     clearRoomInviteSession(inviteSession);
-    loop?.stop();
-    loop = null;
     playBootstrapSeq += 1;
     if (playHost) {
       try {
@@ -1135,6 +1189,16 @@ export function createRoomRuntime(opts?: {
     closing = false;
   }
 
+  operatorHooks.mintInvite = async () => {
+    await mintInviteAndAnswer();
+  };
+  operatorHooks.kickPeer = async (peerId: string) => {
+    kickPeer(peerId);
+  };
+  operatorHooks.endBooth = async () => {
+    await close();
+  };
+
   return {
     subscribe(listener: Listener) {
       listeners.add(listener);
@@ -1156,6 +1220,8 @@ export function createRoomRuntime(opts?: {
     mintInviteAndAnswer,
     kickPeer,
     close,
+    setRemoteAnchorEnabled: (enabled: boolean) => anchorBridge.setEnabled(enabled),
+    getRemoteAnchorEnabled: () => anchorBridge.isEnabled(),
   };
 }
 

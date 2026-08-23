@@ -8,6 +8,11 @@ const config = {
     runes: true,
   },
   kit: {
+    paths: {
+      // Absolute `/_app/...` — nested routes like `/room/remote` must not resolve
+      // assets under `/room/_app/...` (SPA shell would return HTML → MIME error).
+      relative: false,
+    },
     adapter: adapter({
       pages: "build",
       assets: "build",

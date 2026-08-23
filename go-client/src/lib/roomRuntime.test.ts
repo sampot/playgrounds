@@ -1,15 +1,72 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const boothBridgeFixtures = vi.hoisted(() => ({
+  onGuestJoinOffer: null as
+    | ((
+        input: { joinId: string; inviteId: string; offerWire: string }
+      ) => Promise<string>)
+    | null,
+  onBoothOpen: vi.fn().mockResolvedValue(undefined),
+  preparedSlots: [] as Array<{
+    handlers: {
+      onChannelClose?: () => void;
+      onMessage?: (data: unknown) => void;
+    };
+    session: ReturnType<typeof mockSession>;
+  }>,
+}));
+
 const fixtures = vi.hoisted(() => ({
   mint: vi.fn(),
   apiKey: vi.fn(() => "pg_sk_test"),
   revoke: vi.fn(),
-  startLoop: vi.fn(() => ({ stop: vi.fn(), inviteId: "inv-room" })),
   chatAttach: vi.fn(),
   chatDetach: vi.fn(),
   chatSetBroadcast: vi.fn(),
   filesAttach: vi.fn(),
   filesDetach: vi.fn(),
+}));
+
+vi.mock("./boothAnchorBridge", () => ({
+  createBoothAnchorBridge: (ctx: {
+    onGuestJoinOffer: NonNullable<typeof boothBridgeFixtures.onGuestJoinOffer>;
+  }) => {
+    boothBridgeFixtures.onGuestJoinOffer = ctx.onGuestJoinOffer;
+    return {
+      isEnabled: () => false,
+      setEnabled: vi.fn(),
+      onBoothOpen: boothBridgeFixtures.onBoothOpen,
+      publishSnapshot: vi.fn(),
+      refreshProgram: vi.fn(),
+      stop: vi.fn().mockResolvedValue(undefined),
+    };
+  },
+  readRemoteAnchorEnabled: () => false,
+  writeRemoteAnchorEnabled: vi.fn(),
+  GO_ROOM_REMOTE_ANCHOR_KEY: "go_room_remote_anchor_v1",
+}));
+
+vi.mock("./roomBoothJoinHost", () => ({
+  createRoomGuestJoinAcceptor: (opts: {
+    prepareHandlers: () => {
+      handlers: {
+        onChannelClose?: () => void;
+        onMessage?: (data: unknown) => void;
+      };
+      attachSession: (s: ReturnType<typeof mockSession>) => void;
+    };
+  }) => {
+    return async (_offerWire: string) => {
+      const prepared = opts.prepareHandlers();
+      const session = mockSession();
+      prepared.attachSession(session);
+      boothBridgeFixtures.preparedSlots.push({
+        handlers: prepared.handlers,
+        session,
+      });
+      return "answer-wire";
+    };
+  },
 }));
 
 vi.mock("./goAuth.svelte", () => ({
@@ -22,9 +79,6 @@ vi.mock("./goAuth.svelte", () => ({
   },
 }));
 
-vi.mock("@pg/platform/platformHostLoop", () => ({
-  startPlatformHostAnswerLoop: fixtures.startLoop,
-}));
 
 vi.mock("./goSessionChat.svelte", () => ({
   goSessionChat: {
@@ -86,19 +140,30 @@ function mockSession() {
   };
 }
 
+let joinSeq = 0;
+
+async function joinGuests(count = 1): Promise<void> {
+  for (let i = 0; i < count; i++) {
+    await boothBridgeFixtures.onGuestJoinOffer!({
+      joinId: `j${joinSeq++}`,
+      inviteId: "inv-room",
+      offerWire: `offer-${joinSeq}`,
+    });
+  }
+}
+
 describe("roomRuntime", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    boothBridgeFixtures.preparedSlots = [];
+    joinSeq = 0;
+    boothBridgeFixtures.onBoothOpen.mockResolvedValue(undefined);
     fixtures.apiKey.mockReturnValue("pg_sk_test");
     fixtures.mint.mockResolvedValue({
       invite_id: "inv-room",
       short_url: "https://go.samkuo.me/i/abc123",
       expires_at: Date.now() + 5 * 60 * 1000,
     });
-    fixtures.startLoop.mockImplementation((opts: { inviteId: string }) => ({
-      stop: vi.fn(),
-      inviteId: opts.inviteId,
-    }));
   });
 
   it("opens the booth UI before anyone joins without minting a door", async () => {
@@ -118,7 +183,7 @@ describe("roomRuntime", () => {
     );
     expect(fixtures.filesAttach).toHaveBeenCalled();
     expect(fixtures.mint).not.toHaveBeenCalled();
-    expect(fixtures.startLoop).not.toHaveBeenCalled();
+    expect(boothBridgeFixtures.onBoothOpen).toHaveBeenCalled();
   });
 
   it("logout reset lands on idle instead of ended", async () => {
@@ -142,15 +207,7 @@ describe("roomRuntime", () => {
         transport: { roster: { signal: true } },
       }),
     });
-    expect(fixtures.startLoop).toHaveBeenCalledWith(
-      expect.objectContaining({
-        inviteId: "inv-room",
-        useRelay: false,
-        media: "ready",
-        maxAnswers: 0,
-        localPresence: expect.objectContaining({ name: "太郎" }),
-      })
-    );
+    expect(boothBridgeFixtures.onBoothOpen).toHaveBeenCalled();
     expect(rt.getStatus().inviteDoor).toBe("live");
     expect(rt.getStatus().shortUrl).toBe("https://go.samkuo.me/i/abc123");
   });
@@ -165,24 +222,13 @@ describe("roomRuntime", () => {
   });
 
   it("fans out to a second guest without ending the first connection", async () => {
-    let loopOpts: {
-      prepareHandlers: () => {
-        handlers: { onChannelClose?: () => void };
-        attachSession: (s: ReturnType<typeof mockSession>) => void;
-      };
-    } | null = null;
-    fixtures.startLoop.mockImplementation((opts: typeof loopOpts) => {
-      loopOpts = opts;
-      return { stop: vi.fn(), inviteId: "inv-room" };
-    });
     const { createRoomRuntime } = await import("./roomRuntime");
     const rt = createRoomRuntime();
     await rt.openBooth();
     await rt.mintInviteAndAnswer();
-    const a = mockSession();
-    const b = mockSession();
-    loopOpts!.prepareHandlers().attachSession(a);
-    loopOpts!.prepareHandlers().attachSession(b);
+    await joinGuests(2);
+    const a = boothBridgeFixtures.preparedSlots[0]!.session;
+    const b = boothBridgeFixtures.preparedSlots[1]!.session;
     expect(rt.getStatus().phase).toBe("open");
     expect(rt.getStatus().guestCount).toBe(2);
 
@@ -195,26 +241,13 @@ describe("roomRuntime", () => {
   });
 
   it("fans guest float emojis and drops guest delete", async () => {
-    let loopOpts: {
-      prepareHandlers: () => {
-        handlers: { onMessage: (data: unknown) => void };
-        attachSession: (s: ReturnType<typeof mockSession>) => void;
-      };
-    } | null = null;
-    fixtures.startLoop.mockImplementation((opts: typeof loopOpts) => {
-      loopOpts = opts;
-      return { stop: vi.fn(), inviteId: "inv-room" };
-    });
     const { createRoomRuntime } = await import("./roomRuntime");
     const rt = createRoomRuntime();
     await rt.openBooth();
     await rt.mintInviteAndAnswer();
-    const a = mockSession();
-    const b = mockSession();
-    const first = loopOpts!.prepareHandlers();
-    first.attachSession(a);
-    const second = loopOpts!.prepareHandlers();
-    second.attachSession(b);
+    await joinGuests(2);
+    const first = boothBridgeFixtures.preparedSlots[0]!;
+    const second = boothBridgeFixtures.preparedSlots[1]!;
     const float = {
       type: "session_chat_ctl",
       v: 1,
@@ -223,13 +256,13 @@ describe("roomRuntime", () => {
       id: "flt-1",
       emoji: "🎉",
     };
-    a.send.mockClear();
-    b.send.mockClear();
-    first.handlers.onMessage(float);
-    expect(b.send).toHaveBeenCalledWith(float);
-    expect(a.send).not.toHaveBeenCalledWith(float);
-    b.send.mockClear();
-    first.handlers.onMessage({
+    first.session.send.mockClear();
+    second.session.send.mockClear();
+    first.handlers.onMessage!(float);
+    expect(second.session.send).toHaveBeenCalledWith(float);
+    expect(first.session.send).not.toHaveBeenCalledWith(float);
+    second.session.send.mockClear();
+    first.handlers.onMessage!({
       type: "session_chat_ctl",
       v: 1,
       op: "delete",
@@ -237,64 +270,41 @@ describe("roomRuntime", () => {
       id: "del-1",
       targetId: "m1",
     });
-    expect(b.send).not.toHaveBeenCalled();
+    expect(second.session.send).not.toHaveBeenCalled();
   });
 
   it("does not close the booth when one guest leaves", async () => {
-    let loopOpts: {
-      prepareHandlers: () => {
-        handlers: { onChannelClose: () => void };
-        attachSession: (s: ReturnType<typeof mockSession>) => void;
-      };
-    } | null = null;
-    fixtures.startLoop.mockImplementation((opts: typeof loopOpts) => {
-      loopOpts = opts;
-      return { stop: vi.fn(), inviteId: "inv-room" };
-    });
     const { createRoomRuntime } = await import("./roomRuntime");
     const rt = createRoomRuntime();
     await rt.openBooth();
     await rt.mintInviteAndAnswer();
-    const first = loopOpts!.prepareHandlers();
-    first.attachSession(mockSession());
-    const second = loopOpts!.prepareHandlers();
-    second.attachSession(mockSession());
-    first.handlers.onChannelClose();
+    await joinGuests(2);
+    boothBridgeFixtures.preparedSlots[0]!.handlers.onChannelClose!();
     expect(rt.getStatus().phase).toBe("open");
     expect(rt.getStatus().guestCount).toBe(1);
   });
 
   it("introduces guests over session_mesh when a second guest joins", async () => {
-    let loopOpts: {
-      prepareHandlers: () => {
-        handlers: { onMessage: (data: unknown) => void };
-        attachSession: (s: ReturnType<typeof mockSession>) => void;
-      };
-    } | null = null;
-    fixtures.startLoop.mockImplementation((opts: typeof loopOpts) => {
-      loopOpts = opts;
-      return { stop: vi.fn(), inviteId: "inv-room" };
-    });
     const { createRoomRuntime } = await import("./roomRuntime");
     const rt = createRoomRuntime();
     await rt.openBooth();
     await rt.mintInviteAndAnswer();
-    const a = mockSession();
-    const b = mockSession();
-    const first = loopOpts!.prepareHandlers();
-    first.attachSession(a);
-    first.handlers.onMessage({
+    await joinGuests(1);
+    const first = boothBridgeFixtures.preparedSlots[0]!;
+    first.handlers.onMessage!({
       type: "presence",
       agentId: "g-a",
       name: "甲",
     });
-    const second = loopOpts!.prepareHandlers();
-    second.attachSession(b);
-    second.handlers.onMessage({
+    await joinGuests(1);
+    const second = boothBridgeFixtures.preparedSlots[1]!;
+    second.handlers.onMessage!({
       type: "presence",
       agentId: "g-b",
       name: "乙",
     });
+    const a = first.session;
+    const b = second.session;
     expect(b.send).toHaveBeenCalledWith(
       expect.objectContaining({
         type: "session_mesh",
@@ -310,7 +320,7 @@ describe("roomRuntime", () => {
       })
     );
 
-    first.handlers.onMessage({
+    first.handlers.onMessage!({
       type: "session_mesh",
       v: 1,
       op: "offer",
@@ -330,39 +340,26 @@ describe("roomRuntime", () => {
   });
 
   it("fans out occupancy so guests see the third person, not only the Host", async () => {
-    let loopOpts: {
-      prepareHandlers: () => {
-        handlers: {
-          onMessage: (data: unknown) => void;
-          onChannelClose: () => void;
-        };
-        attachSession: (s: ReturnType<typeof mockSession>) => void;
-      };
-    } | null = null;
-    fixtures.startLoop.mockImplementation((opts: typeof loopOpts) => {
-      loopOpts = opts;
-      return { stop: vi.fn(), inviteId: "inv-room" };
-    });
     const { createRoomRuntime } = await import("./roomRuntime");
     const rt = createRoomRuntime();
     await rt.openBooth();
     await rt.mintInviteAndAnswer();
-    const a = mockSession();
-    const b = mockSession();
-    const first = loopOpts!.prepareHandlers();
-    first.attachSession(a);
-    first.handlers.onMessage({
+    await joinGuests(1);
+    const first = boothBridgeFixtures.preparedSlots[0]!;
+    first.handlers.onMessage!({
       type: "presence",
       agentId: "g-a",
       name: "甲",
     });
-    const second = loopOpts!.prepareHandlers();
-    second.attachSession(b);
-    second.handlers.onMessage({
+    await joinGuests(1);
+    const second = boothBridgeFixtures.preparedSlots[1]!;
+    second.handlers.onMessage!({
       type: "presence",
       agentId: "g-b",
       name: "乙",
     });
+    const a = first.session;
+    const b = second.session;
     const occupancyOf = (sess: ReturnType<typeof mockSession>) =>
       sess.send.mock.calls
         .map((c) => c[0] as { type?: string; occupants?: unknown[] })
@@ -379,7 +376,7 @@ describe("roomRuntime", () => {
     expect(lastB?.occupants).toEqual(lastA?.occupants);
 
     a.send.mockClear();
-    first.handlers.onChannelClose();
+    first.handlers.onChannelClose!();
     const afterLeave = occupancyOf(b).at(-1);
     expect(afterLeave?.occupants).toHaveLength(2);
     expect(afterLeave?.occupants).toEqual(
@@ -395,39 +392,26 @@ describe("roomRuntime", () => {
   });
 
   it("kicks one guest without ending the booth", async () => {
-    let loopOpts: {
-      prepareHandlers: () => {
-        handlers: {
-          onMessage: (data: unknown) => void;
-          onChannelClose: () => void;
-        };
-        attachSession: (s: ReturnType<typeof mockSession>) => void;
-      };
-    } | null = null;
-    fixtures.startLoop.mockImplementation((opts: typeof loopOpts) => {
-      loopOpts = opts;
-      return { stop: vi.fn(), inviteId: "inv-room" };
-    });
     const { createRoomRuntime } = await import("./roomRuntime");
     const rt = createRoomRuntime();
     await rt.openBooth();
     await rt.mintInviteAndAnswer();
-    const a = mockSession();
-    const b = mockSession();
-    const first = loopOpts!.prepareHandlers();
-    first.attachSession(a);
-    first.handlers.onMessage({
+    await joinGuests(1);
+    const first = boothBridgeFixtures.preparedSlots[0]!;
+    first.handlers.onMessage!({
       type: "presence",
       agentId: "g-a",
       name: "甲",
     });
-    const second = loopOpts!.prepareHandlers();
-    second.attachSession(b);
-    second.handlers.onMessage({
+    await joinGuests(1);
+    const second = boothBridgeFixtures.preparedSlots[1]!;
+    second.handlers.onMessage!({
       type: "presence",
       agentId: "g-b",
       name: "乙",
     });
+    const a = first.session;
+    const b = second.session;
     expect(rt.kickPeer("g-a")).toBe(true);
     expect(a.send).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -456,7 +440,6 @@ describe("roomRuntime", () => {
     await expect(rt.mintInviteAndAnswer()).rejects.toMatchObject({
       code: "not_provisioned",
     });
-    expect(fixtures.startLoop).not.toHaveBeenCalled();
     expect(rt.getStatus().phase).not.toBe("open");
   });
 
@@ -485,11 +468,6 @@ describe("roomRuntime", () => {
   it("expires the door without closing the booth or sharing the old URL", async () => {
     vi.useFakeTimers();
     try {
-      const stop = vi.fn();
-      fixtures.startLoop.mockImplementation((opts: { inviteId: string }) => ({
-        stop,
-        inviteId: opts.inviteId,
-      }));
       fixtures.mint.mockResolvedValue({
         invite_id: "inv-room",
         short_url: "https://go.samkuo.me/i/abc123",
@@ -504,7 +482,6 @@ describe("roomRuntime", () => {
       expect(rt.getStatus().inviteDoor).toBe("expired");
       expect(rt.getStatus().shortUrl).toBeNull();
       expect(rt.getStatus().message).toBe("");
-      expect(stop).toHaveBeenCalled();
       expect(fixtures.revoke).toHaveBeenCalledWith("inv-room");
     } finally {
       vi.useRealTimers();
@@ -535,7 +512,7 @@ describe("roomRuntime", () => {
       await first.openBooth();
       await first.mintInviteAndAnswer();
       expect(store.getItem("pg_go_room_invite_door")).toContain("inv-room");
-      expect(fixtures.startLoop).toHaveBeenCalledTimes(1);
+      expect(boothBridgeFixtures.onBoothOpen).toHaveBeenCalled();
 
       const second = createRoomRuntime({ inviteSession: store });
       await second.openBooth();
@@ -544,7 +521,7 @@ describe("roomRuntime", () => {
         "https://go.samkuo.me/i/abc123"
       );
       expect(second.getStatus().inviteExpiresAt).toBe(expiresAt);
-      expect(fixtures.startLoop).toHaveBeenCalledTimes(2);
+      expect(boothBridgeFixtures.onBoothOpen.mock.calls.length).toBeGreaterThanOrEqual(2);
       expect(fixtures.mint).toHaveBeenCalledTimes(1);
 
       await vi.advanceTimersByTimeAsync(5_500);
@@ -557,32 +534,19 @@ describe("roomRuntime", () => {
   });
 
   it("offerPlay fans out session_play on existing peers without minting compose", async () => {
-    let loopOpts: {
-      prepareHandlers: () => {
-        handlers: {
-          onChannelOpen: () => void;
-          onMessage: (data: unknown) => void;
-        };
-        attachSession: (s: ReturnType<typeof mockSession>) => void;
-      };
-    } | null = null;
-    fixtures.startLoop.mockImplementation((opts: typeof loopOpts) => {
-      loopOpts = opts;
-      return { stop: vi.fn(), inviteId: "inv-room" };
-    });
     const { createRoomRuntime } = await import("./roomRuntime");
     const { goRoomMedia } = await import("./goRoomMedia.svelte");
     const rt = createRoomRuntime();
     await rt.openBooth();
     await rt.mintInviteAndAnswer();
-    const a = mockSession();
-    const b = mockSession();
-    const first = loopOpts!.prepareHandlers();
-    first.attachSession(a);
-    first.handlers.onChannelOpen();
-    const second = loopOpts!.prepareHandlers();
-    second.attachSession(b);
-    second.handlers.onChannelOpen();
+    await joinGuests(1);
+    const first = boothBridgeFixtures.preparedSlots[0]!;
+    first.handlers.onChannelOpen!();
+    await joinGuests(1);
+    const second = boothBridgeFixtures.preparedSlots[1]!;
+    second.handlers.onChannelOpen!();
+    const a = first.session;
+    const b = second.session;
 
     a.send.mockClear();
     b.send.mockClear();
@@ -614,11 +578,11 @@ describe("roomRuntime", () => {
     );
     expect(rt.getPlayState().phase).toBe("loading");
 
-    const late = mockSession();
-    const third = loopOpts!.prepareHandlers();
-    third.attachSession(late);
+    await joinGuests(1);
+    const third = boothBridgeFixtures.preparedSlots[2]!;
+    const late = third.session;
     late.send.mockClear();
-    third.handlers.onChannelOpen();
+    third.handlers.onChannelOpen!();
     expect(late.send).toHaveBeenCalledWith(
       expect.objectContaining({
         type: "session_play",
@@ -637,30 +601,20 @@ describe("roomRuntime", () => {
   });
 
   it("startManualPlay offers with Host picks; short seats do not offer", async () => {
-    let loopOpts: {
-      prepareHandlers: () => {
-        handlers: { onMessage: (data: unknown) => void };
-        attachSession: (s: ReturnType<typeof mockSession>) => void;
-      };
-    } | null = null;
-    fixtures.startLoop.mockImplementation((opts: typeof loopOpts) => {
-      loopOpts = opts;
-      return { stop: vi.fn(), inviteId: "inv-room" };
-    });
     const { createRoomRuntime } = await import("./roomRuntime");
     const { chromeSession } = await import("./chromeSession.svelte");
     const rt = createRoomRuntime();
     await rt.openBooth();
     await rt.mintInviteAndAnswer();
-    const a = mockSession();
-    const first = loopOpts!.prepareHandlers();
-    first.attachSession(a);
-    first.handlers.onChannelOpen();
-    first.handlers.onMessage({
+    await joinGuests(1);
+    const first = boothBridgeFixtures.preparedSlots[0]!;
+    first.handlers.onChannelOpen!();
+    first.handlers.onMessage!({
       type: "presence",
       agentId: "g-a",
       name: "甲",
     });
+    const a = first.session;
     const hostId = rt.getStatus().localPeerId;
 
     a.send.mockClear();
@@ -695,29 +649,18 @@ describe("roomRuntime", () => {
   });
 
   it("ignores session_play forged by a guest", async () => {
-    let loopOpts: {
-      prepareHandlers: () => {
-        handlers: { onMessage: (data: unknown) => void };
-        attachSession: (s: ReturnType<typeof mockSession>) => void;
-      };
-    } | null = null;
-    fixtures.startLoop.mockImplementation((opts: typeof loopOpts) => {
-      loopOpts = opts;
-      return { stop: vi.fn(), inviteId: "inv-room" };
-    });
     const { createRoomRuntime } = await import("./roomRuntime");
     const rt = createRoomRuntime();
     await rt.openBooth();
     await rt.mintInviteAndAnswer();
-    const a = mockSession();
-    const b = mockSession();
-    const first = loopOpts!.prepareHandlers();
-    first.attachSession(a);
-    const second = loopOpts!.prepareHandlers();
-    second.attachSession(b);
+    await joinGuests(2);
+    const first = boothBridgeFixtures.preparedSlots[0]!;
+    const second = boothBridgeFixtures.preparedSlots[1]!;
+    const a = first.session;
+    const b = second.session;
     a.send.mockClear();
     b.send.mockClear();
-    first.handlers.onMessage({
+    first.handlers.onMessage!({
       type: "session_play",
       v: 1,
       op: "offer",

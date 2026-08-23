@@ -157,3 +157,8 @@ export function getAnswer(
 export function revokeInvite(rec: InviteRecord): void {
   rec.revoked = true;
 }
+
+/** `invite.room` Guest join uses BoothAnchor, not Invite DO signal queue. */
+export function inviteRoomSignalBlocked(kind: string): boolean {
+  return kind === "invite.room";
+}

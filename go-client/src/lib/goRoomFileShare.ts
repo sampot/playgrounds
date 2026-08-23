@@ -2,6 +2,8 @@
  * 包廂分享區：多媒體卡片、篩選、權限、大螢幕播放中標記。
  */
 
+import type { RoomSurfaceRole } from "./goRoom";
+
 export const GO_ROOM_FILE_PREVIEW = "預覽";
 export const GO_ROOM_FILE_CAST = "推播至大螢幕";
 export const GO_ROOM_FILE_CASTING = "推送中…";
@@ -178,7 +180,7 @@ export type RoomFileMenuItem = {
 
 /** Overflow menu for a share-catalog row (member-card「更多」pattern). */
 export function roomFileShareMenu(opts: {
-  role: "host" | "guest";
+  role: RoomSurfaceRole;
   mine: boolean;
   kind: FileShareKind;
   previewLabel?: string;

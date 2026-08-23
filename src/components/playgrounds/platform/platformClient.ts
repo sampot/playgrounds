@@ -165,6 +165,55 @@ export async function createJoin(
 /**
  * Joiner: submit offer and wait for host answer (auto re-poll on 408).
  */
+export async function postBoothJoinOfferAndWaitAnswer(opts: {
+  inviteId: string;
+  joinCap: string;
+  offerWire: string;
+  waitMs?: number;
+  maxAttempts?: number;
+  signal?: AbortSignal;
+  origin?: string;
+}): Promise<{ answer: string; join_id: string }> {
+  const origin = opts.origin ?? platformApiOrigin();
+  const maxAttempts = opts.maxAttempts ?? 12;
+  for (let i = 0; i < maxAttempts; i++) {
+    if (opts.signal?.aborted) throw new Error("aborted");
+    const res = await fetch(`${origin}/v1/booth/join/offer`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${opts.joinCap}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        inviteId: opts.inviteId,
+        offerWire: opts.offerWire,
+        waitMs: opts.waitMs,
+      }),
+      signal: opts.signal,
+    });
+    const text = await res.text();
+    let data: {
+      answer?: string;
+      join_id?: string;
+      error?: string;
+    } = {};
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      /* ignore */
+    }
+    if (res.ok && data.answer) {
+      return { answer: data.answer, join_id: data.join_id || "" };
+    }
+    if (res.status === 408) continue;
+    throw Object.assign(new Error(data.error || `http_${res.status}`), {
+      status: res.status,
+      data,
+    });
+  }
+  throw Object.assign(new Error("timeout"), { status: 408 });
+}
+
 export async function postOfferAndWaitAnswer(opts: {
   inviteId: string;
   joinCap: string;

@@ -97,12 +97,14 @@ import {
   inviteShortUrlOrigin,
 } from "./ids.js";
 import { InviteDurableObject } from "./inviteDo.js";
+import { routeBooth, BoothAnchorDurableObject } from "./boothRoutes.js";
 
-export { InviteDurableObject };
+export { InviteDurableObject, BoothAnchorDurableObject };
 
 export type Env = {
   STORE: KVNamespace;
   INVITES: DurableObjectNamespace;
+  BOOTH_ANCHORS: DurableObjectNamespace;
   ASSETS?: Fetcher;
   ADMIN_BOOTSTRAP_TOKEN?: string;
   GITHUB_CLIENT_ID?: string;
@@ -419,9 +421,18 @@ async function route(
 ): Promise<Response> {
   const { pathname } = url;
 
-  // Play analytics (public batch write + admin read).
+  // Analytics routes (early exit).
   const analyticsRes = await routeAnalytics(request, env, url);
   if (analyticsRes) return analyticsRes;
+
+  const boothRes = await routeBooth(request, env, url, {
+    json,
+    requireApiKey,
+    requireAccessToken,
+    parseBearer,
+    inviteStub: (inviteId) => inviteStub(env, inviteId),
+  });
+  if (boothRes) return boothRes;
 
   // Short link → pure-play client (DEC-050)
   const shortMatch = /^\/i\/([A-Za-z0-9_-]+)$/.exec(pathname);

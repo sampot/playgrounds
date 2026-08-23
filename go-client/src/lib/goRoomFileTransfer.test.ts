@@ -1,4 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
+
+vi.mock("./goRoomPlayBridge", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./goRoomPlayBridge")>();
+  return {
+    ...actual,
+    ensureRoomFileSw: vi.fn(async () => true),
+    onRoomFileSwControllerChange: vi.fn(() => () => {}),
+  };
+});
+
 import {
   SESSION_FILE_MAX_BYTES,
   SESSION_FILE_TYPE,
@@ -13,7 +23,7 @@ import {
   parseRoomFilePath,
   parseRoomFilePurpose,
 } from "./goRoomPlayRegistry";
-import { GO_ROOM_HANG_FILES_ONLY } from "./goRoom";
+import { GO_ROOM_FILE_SW_REQUIRED, GO_ROOM_HANG_FILES_ONLY } from "./goRoom";
 import type { RoomFileWritable } from "./goRoomFileSave";
 
 function fileOf(name: string, bytes: number, type = "text/plain"): File {
@@ -252,6 +262,19 @@ describe("createRoomFileTransfer", () => {
     });
     expect((await xfer.shareLocalFile(fileOf("b.txt", 2))).ok).toBe(true);
     expect(xfer.getState().entries).toHaveLength(2);
+  });
+
+  it("rejects share when Service Worker is not ready", async () => {
+    const xfer = createRoomFileTransfer({
+      localAgentId: "host-1",
+      localName: "太郎",
+      sendJson: () => {},
+      sendBinary: () => {},
+      ensureRoomFileSw: async () => false,
+    });
+    const out = await xfer.shareLocalFile(fileOf("note.txt", 4));
+    expect(out).toEqual({ ok: false, error: GO_ROOM_FILE_SW_REQUIRED });
+    expect(xfer.getState().entries).toHaveLength(0);
   });
 
   it("infers video/mp4 when the picker File has an empty type", async () => {

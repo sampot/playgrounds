@@ -198,11 +198,16 @@ export function roomGuestInBooth(phase: RoomUiPhase): boolean {
   return phase === "ready";
 }
 
+export type RoomSurfaceRole = "host" | "guest" | "operator";
+
 export function roomInBooth(opts: {
-  role: "host" | "guest";
+  role: RoomSurfaceRole;
   loggedIn: boolean;
   phase: RoomUiPhase;
 }): boolean {
+  if (opts.role === "operator") {
+    return opts.phase === "open";
+  }
   return opts.role === "guest"
     ? roomGuestInBooth(opts.phase)
     : roomHostInBooth(opts);
@@ -210,7 +215,7 @@ export function roomInBooth(opts: {
 
 /** Overlay chrome auto-hide only on the live booth main surface. */
 export function roomChromeHideable(opts: {
-  role: "host" | "guest";
+  role: RoomSurfaceRole;
   phase: RoomUiPhase;
   loggedIn: boolean;
   inBooth: boolean;
@@ -304,7 +309,7 @@ export function roomShowAdSlot(opts: {
  * route chunks finish downloading.
  */
 export function roomHostLoginGate(opts: {
-  role: "host" | "guest";
+  role: RoomSurfaceRole;
   loggedIn: boolean;
   phase: RoomUiPhase;
   clientReady: boolean;
@@ -417,8 +422,8 @@ export const GO_ROOM_TV_HINT_HOST =
   "片子在檔案區掛上後按放到大螢幕上。鏡頭在成員區指定。";
 export const GO_ROOM_TV_HINT_GUEST = "大螢幕畫面由主持指定。點全螢幕可放大。";
 
-export function roomTvHintCopy(role: "host" | "guest"): string {
-  return role === "host" ? GO_ROOM_TV_HINT_HOST : GO_ROOM_TV_HINT_GUEST;
+export function roomTvHintCopy(role: RoomSurfaceRole): string {
+  return role === "guest" ? GO_ROOM_TV_HINT_GUEST : GO_ROOM_TV_HINT_HOST;
 }
 
 /** One-time members-pane hint while the booth TV is still idle. */
@@ -451,6 +456,10 @@ export const GO_ROOM_SETTINGS_SECTION_DISPLAY = "大螢幕";
 export const GO_ROOM_SETTINGS_TV_SNOW_LABEL = "沒訊號雪花";
 export const GO_ROOM_SETTINGS_TV_SNOW_HINT =
   "大螢幕沒有節目時顯示電視雪花效果。只影響你這台裝置。";
+export const GO_ROOM_SETTINGS_SECTION_REMOTE = "遠端連回";
+export const GO_ROOM_SETTINGS_REMOTE_ANCHOR_LABEL = "允許遠端連回包廂";
+export const GO_ROOM_SETTINGS_REMOTE_ANCHOR_HINT =
+  "開啟後，可從後台「連回包廂」遠端導播。訪客進門不受影響；關閉時仍保持此分頁開啟以接待來賓。";
 
 /** Host preference: animated idle snow on the booth TV (default on). */
 export function roomTvSnowEnabled(
@@ -490,7 +499,7 @@ export type RoomHostChecklistProgress = {
 
 /** Host members-pane checklist while the booth TV is still idle. */
 export function roomHostChecklistEligible(opts: {
-  role: "host" | "guest";
+  role: RoomSurfaceRole;
   phase: RoomUiPhase;
   tvOn: boolean;
   playActive: boolean;
@@ -600,6 +609,9 @@ export const GO_ROOM_MIC_STOP_LISTEN = "停止收聽";
 export const GO_ROOM_CAST_WATCH = "播放";
 export const GO_ROOM_CAST_STOP_WATCH = "停止播放";
 export const GO_ROOM_HANG_FILES_ONLY = "只能掛檔，不掛資料夾";
+/** `/room-file/` needs a controlling go SW — refresh if this appears after deploy. */
+export const GO_ROOM_FILE_SW_REQUIRED =
+  "頁面尚未就緒。請重新整理後再掛檔或推播。";
 export const GO_ROOM_CAST_UNSUPPORTED =
   "播不了這份檔。請改用電腦再掛一次，或改下載。";
 export const GO_ROOM_CAST_SOURCE_UNSUPPORTED =
@@ -742,14 +754,14 @@ export type RoomTvHudKind = "none" | "host-file" | "watch";
 /** Host directs the file clock; volume stays on each local sink. */
 export function roomTvHudKind(opts: {
   tvOn: boolean;
-  role?: "host" | "guest";
+  role?: RoomSurfaceRole;
   fileTransport?: boolean;
   /** Catalog file on the TV (host may not hold the File). */
   fileOnTv?: boolean;
 }): RoomTvHudKind {
   if (!opts.tvOn) return "none";
   if (
-    opts.role === "host" &&
+    opts.role !== "guest" &&
     (opts.fileTransport || opts.fileOnTv)
   ) {
     return "host-file";

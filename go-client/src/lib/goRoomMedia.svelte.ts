@@ -83,9 +83,11 @@ class GoRoomMedia {
     resolvePrivateFile?: (id: string) => Promise<File | null>;
     ownerOf?: (id: string) => string | null;
     fileMeta?: (id: string) => { name: string; kind: "audio" | "video" } | null;
+    onTvProgramChange?: () => void;
   }): void {
     this.detach();
     this.#media = createRoomMedia(opts);
+    let tvSig = "";
     this.#unsub = this.#media.subscribe((s) => {
       this.camera = s.camera;
       this.mic = s.mic;
@@ -115,6 +117,19 @@ class GoRoomMedia {
       this.streamingFileId = s.streamingFileId;
       this.castingFileId = s.castingFileId;
       this.programScope = s.programScope;
+      const nextTvSig = [
+        s.programStream?.id ?? "",
+        s.localProgramStream?.id ?? "",
+        s.programName ?? "",
+        s.remoteProgramName ?? "",
+        s.tvSourcePeerId ?? "",
+        s.remoteProgramKind ?? "",
+        s.watchingProgram ? "1" : "0",
+      ].join("|");
+      if (nextTvSig !== tvSig) {
+        tvSig = nextTvSig;
+        opts.onTvProgramChange?.();
+      }
     });
   }
 

@@ -5,7 +5,7 @@
 > **權威決策：** 建議 [DECISIONS.md](./DECISIONS.md) **DEC-050**（Proposed）／**DEC-053**（UI 只走 `/api/...`；shell/runtime 走 env binding）  
 > **相關：** [PG-GO-SAM-MANIFEST-PLAN.md](./PG-GO-SAM-MANIFEST-PLAN.md)（遊戲 `sam-manifest.json`；廢 Trees 列檔）、[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)（五子棋 E2E；Invite Guest 主路徑）、[PG-CATALOG-UX-PLAN.md](./PG-CATALOG-UX-PLAN.md)（型錄「分享」→ go）、[PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)、[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（官方 TURN；Guest 經 `join_cap`）、[PG-ROSTER-PLAN.md](./PG-ROSTER-PLAN.md)、[PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md)（go 登入＋Header profile；玩家主場；DEC-052）、[PG-GO-BOSS-FLASH-PLAN.md](./PG-GO-BOSS-FLASH-PLAN.md)（老闆歡迎氣泡）、[PG-GO-UX-POLISH-PLAN.md](./PG-GO-UX-POLISH-PLAN.md)（玩家 UX 打磨 Draft）、[PG-GO-SESSION-CHAT-PLAN.md](./PG-GO-SESSION-CHAT-PLAN.md)（同 session 輕量聊天 Draft）、[PG-GO-ADS-PLAN.md](./PG-GO-ADS-PLAN.md)、[PG-GO-BULLETIN-PLAN.md](./PG-GO-BULLETIN-PLAN.md)（全遊樂場布告 Draft）、[PG-GO-SHOP-LOBBY-PLAN.md](./PG-GO-SHOP-LOBBY-PLAN.md)（遊樂場大廳 Lobby／室內 canvas Draft）、[PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)（包廂 `/room`；Invite 一般用途隔間 Draft）、DEC-004／009／023／025／042／045／047／048、[GLOSSARY.md](./GLOSSARY.md)
 
-一句話：**玩家主場**——獨立於場殼的純玩客戶端＠`go.samkuo.me`（作者主場＝`play.samkuo.me`，兩 UI 共用同一份型錄）：同時只跑一個 SAM、無編輯環境、不依賴持久 OPFS；啟動不限 Invite（型錄 id 傳閱與 Invite 短鏈並列）；傳閱網址 `/s/<catalog_id>`（內嵌 catalog）；`/s/` game 可換片；可安裝／造訪後離線／本機分數；Header「更多」＝本機溢流（已下載／分層清除）≠ 僅推薦；Invite `/i/`＝臨時 session（不能離線、不換片、無本機選單）；**登入（DEC-052）＝玩家身分；後續玩家主場互邀（GO-INVITE）**。
+一句話：**玩家主場**——獨立於場殼的純玩客戶端＠`go.samkuo.me`（作者主場＝`play.samkuo.me`，兩 UI 共用同一份型錄；**連線時兩者皆為 Booth Hub**，見 [PG-GO-ROOM-ENGINE-PLAN.md](./PG-GO-ROOM-ENGINE-PLAN.md)）：同時只跑一個 SAM、無編輯環境、不依賴持久 OPFS；啟動不限 Invite（型錄 id 傳閱與 Invite 短鏈並列）；傳閱網址 `/s/<catalog_id>`（內嵌 catalog）；`/s/` game 可換片；可安裝／造訪後離線／本機分數；Header「更多」＝本機溢流（已下載／分層清除）≠ 僅推薦；Invite `/i/`＝**包廂** `invite.room`（不能離線、不換片、無本機選單；連線遊戲在包廂內 `session_play`）；**登入（DEC-052）＝玩家身分**。**GO-INVITE（`invite.compose`）已廢止**作連線遊戲路徑。
 
 ---
 
@@ -28,9 +28,9 @@
   1. **Invite／session：** `https://go.samkuo.me/i/<short_id>`（QR／Host 邀請 modal 只出這個）——**臨時生命週期**（TTL／撤銷／Host session）；**先天不能離線**。
   2. **型錄傳閱／單機純玩：** `https://go.samkuo.me/s/<catalog_id>`（型錄列「分享」、go Header「分享」只出這個）——可重訪；見 §6.5 可安裝／造訪後離線／本機分數；§6.6「更多」本機溢流。
 - **不包含編輯環境**；不依賴持久 OPFS；掃碼／傳閱受限情境為快樂路徑。
-- Host 仍在場殼（預設 `play.samkuo.me`）鑄邀請、開 session、作答；資料面仍只走 WebRTC（DEC-045／047）。
+- **連線邀請**（請人一起玩）＝**包廂** `invite.room`：`play`／`go` 皆為 **Booth Hub**；Guest 握手經 **BoothAnchor WSS**（ENGINE §10.7）；**Invite DO** 仍管 short 鏈／`join_cap`／TTL。資料面只走 WebRTC（DEC-045／047）。
 - 型錄「一鍵開」仍進**場殼編輯面**（`/?open=`，無 `view=canvas`）——與「分享」刻意分流。
-- Invite 首驗收鎖 [PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)：`invite.compose`／五子棋 `gomoku.v1`（經 go 短鏈進場）。
+- 連線對弈驗收鎖 [PG-GO-ROOM-PLAY-PLAN.md](./PG-GO-ROOM-PLAY-PLAN.md)：包廂 `invite.room` → `session_play`／五子棋 `gomoku.v1`（**不是** `invite.compose`）。
 
 ---
 
@@ -39,7 +39,7 @@
 - 把場殼改成「無 OPFS 也能完整 IDE」。
 - 在純玩版提供 Files／編輯器／匯入匯出／SecretStore／「看原始碼」當主 CTA。
 - Guest 註冊、場內 SSO、provision、點數／dash UI 當主故事——go 的登入是**既存 Platform 使用者的通行證**（DEC-052），非新帳號系統。
-- **作者面** author Invite／provision 管理／TURN／後台——go **不**做作者 session 權威；但 go **支援玩家主場互邀**（GO-INVITE，後續階段；見 §6.2／auth plan §5.3）。
+- **作者面** provision 管理／TURN／後台——go **不**做作者編輯環境；**連線遊戲**改走包廂（`invite.room`），**不**再走 GO-INVITE `invite.compose`（見 [PG-GO-HOST-INVITE-PLAN.md](./PG-GO-HOST-INVITE-PLAN.md) Superseded）。
 - 通用縮址；以 `/i/` 或 Platform short map 服務非 Invite URL。
 - **以 `source`／完整 Git URL／`?open=` 當 go 傳閱主形**（只認型錄 `id`；見 §5.4）。
 - 在 go 上複製完整型錄 UX（搜尋／filter／貨架）；換片僅 §5.6；「已下載」不是第二型錄。
@@ -57,8 +57,8 @@
 
 | 面 | Origin | 誰用 | 職責 |
 | --- | --- | --- | --- |
-| **場殼** | `play.samkuo.me`（及任意場） | **作者**（Host） | OPFS、編輯、author 鑄 Invite、session 權威、作答；型錄「一鍵開」 |
-| **純玩版（玩家主場）** | **`go.samkuo.me`** | **玩家** | `/i/` 入座；`/s/` 單機＋game 換片；登入（DEC-052）＝身分；**後續**玩家主場互邀（GO-INVITE）；Header 傳閱；「更多」本機溢流（僅 `/`／`/s/`） |
+| **場殼** | `play.samkuo.me`（及任意場） | **作者**（Host） | OPFS、編輯、型錄「一鍵開」；**連線**＝Embedded **Booth Hub**＋`invite.room`（見 ROOM／ENGINE） |
+| **純玩版（玩家主場）** | **`go.samkuo.me`** | **玩家** | `/room` 包廂；`/i/` 入座（`invite.room`）；`/s/` 單機＋game 換片；登入（DEC-052）＝身分；Header 傳閱；「更多」本機溢流（僅 `/`／`/s/`） |
 | **Platform API** | `api.samkuo.me` | 雙方間接 | Invite／short map／signal／TURN cred；**不當**邀人 QR 主面；**不**管型錄 `/s/` |
 | **dash** | `dash.samkuo.me` | Host 帳號 | provision；**不**鑄場 Invite |
 

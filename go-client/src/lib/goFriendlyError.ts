@@ -149,6 +149,16 @@ export function friendlySoloLoadError(
 
 /** Invite resolve／join network failures. */
 export function friendlyInviteError(err: unknown, prefix?: string): string {
+  const raw = errText(err);
+  const lower = raw.toLowerCase();
+
+  if (lower === "anchor_offline" || lower.includes("anchor_offline")) {
+    return "主持暫時不在線上。請稍後再試，或請主持確認包廂還開著。";
+  }
+  if (lower === "timeout" || lower.includes("timeout")) {
+    return "進門逾時。主持可能忙碌中，請稍後再試。";
+  }
+
   if (isLikelyOffline()) {
     return "現在沒有網路，無法加入。邀請需要連線才能進入這一場。";
   }
@@ -159,7 +169,6 @@ export function friendlyInviteError(err: unknown, prefix?: string): string {
     return "暫時連不上邀請服務。請確認網路後再試一次。";
   }
 
-  const raw = errText(err);
   // Already-friendly invite domain errors (no HTTP noise).
   if (
     isSafeUserCopy(raw) &&
@@ -171,6 +180,68 @@ export function friendlyInviteError(err: unknown, prefix?: string): string {
     return prefix ? `${prefix}，請稍後再試。` : "暫時無法加入，請稍後再試。";
   }
   return prefix ? `${prefix}：${raw}` : raw;
+}
+
+/** Booth operator remote connect failures. */
+export function friendlyOperatorError(err: unknown): string {
+  if (isLikelyOffline()) {
+    return "現在沒有網路，無法連回包廂。請連線後再試。";
+  }
+
+  const raw = errText(err);
+  const lower = raw.toLowerCase();
+
+  if (
+    lower === "ws_failed" ||
+    lower === "ws_missing" ||
+    /websocket|wss?:/i.test(raw)
+  ) {
+    return "暫時連不上包廂。請確認網路後，從後台重新「連回包廂」。";
+  }
+
+  if (
+    lower === "unauthorized" ||
+    /^operator_cap_/.test(lower) ||
+    /^anchor_/.test(lower) ||
+    /invalid.*cap|cap.*expired/i.test(lower)
+  ) {
+    return "連結已過期或無效。請從後台重新「連回包廂」。";
+  }
+
+  if (lower === "remote_disabled" || /remote_disabled/.test(lower)) {
+    return "主持已關閉遠端連回。請在家裡包廂設定中開啟後再試。";
+  }
+
+  if (isLikelyRateLimited(err)) {
+    return "現在連線的人有點多，請稍後再試一次。";
+  }
+
+  if (isLikelyNetworkFailure(err)) {
+    return "暫時連不上包廂。請確認網路後再試一次。";
+  }
+
+  if (isSafeUserCopy(raw) && /包廂|連回|導播|離線|後台/.test(raw)) {
+    return raw;
+  }
+
+  if (looksTechnical(raw) || !isSafeUserCopy(raw)) {
+    return "暫時無法連回包廂，請稍後再試。";
+  }
+
+  return raw;
+}
+
+/** Operator intent ack errors (booth.ack error codes). */
+export function friendlyOperatorAckError(code?: string | null): string {
+  const c = code?.trim().toLowerCase() ?? "";
+  if (!c) return "操作失敗，請再試一次。";
+  if (c === "not_director") {
+    return "目前僅能檢視，無法操作（家裡主持使用中）";
+  }
+  if (c === "invalid_intent") return "無法執行此操作";
+  if (c === "missing_peer") return "找不到這位來賓";
+  if (isSafeUserCopy(code ?? "")) return code!.trim();
+  return "操作失敗，請再試一次。";
 }
 
 /** Invite path: SAM source download (not the same as solo offline cache). */

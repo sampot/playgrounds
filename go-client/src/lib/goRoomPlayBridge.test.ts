@@ -137,3 +137,41 @@ describe("listenRoomTransferEnd", () => {
     stop();
   });
 });
+
+describe("ensureLocalRoomFileRegistered", () => {
+  const posted: unknown[] = [];
+
+  beforeEach(() => {
+    posted.length = 0;
+    Object.defineProperty(navigator, "serviceWorker", {
+      configurable: true,
+      value: {
+        controller: {
+          postMessage: (msg: unknown) => posted.push(msg),
+        },
+        register: vi.fn(async () => ({})),
+        ready: Promise.resolve({}),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      },
+    });
+  });
+
+  it("waits for SW then posts register-local", async () => {
+    const { ensureLocalRoomFileRegistered } = await import("./goRoomPlayBridge");
+    const file = new File([new Uint8Array([1])], "clip.mp4", {
+      type: "video/mp4",
+    });
+    await expect(ensureLocalRoomFileRegistered("sf-abc", file)).resolves.toBe(
+      true
+    );
+    expect(posted).toEqual([
+      {
+        type: ROOM_PLAY_MSG,
+        op: "register-local",
+        id: "sf-abc",
+        file,
+      },
+    ]);
+  });
+});

@@ -2,7 +2,7 @@
 
 > **狀態：** Draft（2026-08-22）— **契約從屬** [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md) §5.9／凍結 #30／Phase **3**；**Phase 0–5 第一刀手測完成**（`pg-gomoku`；觀戰 harness；**redpick** 四席＋觀戰名稱／牌背＋`deal→end` domain）  
 > **權威決策：** 從屬 [DECISIONS.md](./DECISIONS.md) **DEC-050**（純玩版）、**DEC-045**（已有可用 PeerConnection → **重用**，禁止 Platform renegotiation）、**DEC-047**（Platform Invite）；**不另開 DEC**  
-> **相關：** [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)（包廂產品契約／媒體／傳檔——**本文件只寫開局落地**）、[PG-GO-HOST-INVITE-PLAN.md](./PG-GO-HOST-INVITE-PLAN.md)（GO-INVITE＝`invite.compose`；**勿混**）、[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)（五子棋 `gomoku.v1`）、[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)、[PG-GO-ROOM-DEV-HARNESS-PLAN.md](./PG-GO-ROOM-DEV-HARNESS-PLAN.md)（localhost／Agent 多 tab；開局 E2E 可建其上）、[PG-GO-SESSION-CHAT-PLAN.md](./PG-GO-SESSION-CHAT-PLAN.md)（局內 overlay——**勿混**）、`.cursor/rules/no-native-dialogs.mdc`、`.cursor/rules/mobile-first-ux.mdc`、[GLOSSARY.md](./GLOSSARY.md)  
+> **相關：** [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)（包廂產品契約／媒體／傳檔——**本文件只寫開局落地**）、[PG-GO-HOST-INVITE-PLAN.md](./PG-GO-HOST-INVITE-PLAN.md)（GO-INVITE **Superseded**）、[PG-INVITE-E2E-MVP.md](./PG-INVITE-E2E-MVP.md)（五子棋 `gomoku.v1`；歷史 compose E2E）、[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)、[PG-GO-ROOM-DEV-HARNESS-PLAN.md](./PG-GO-ROOM-DEV-HARNESS-PLAN.md)（localhost／Agent 多 tab；開局 E2E 可建其上）、[PG-GO-SESSION-CHAT-PLAN.md](./PG-GO-SESSION-CHAT-PLAN.md)（局內 overlay——**勿混**）、`.cursor/rules/no-native-dialogs.mdc`、`.cursor/rules/mobile-first-ux.mdc`、[GLOSSARY.md](./GLOSSARY.md)  
 > **載體 SAM：** 型錄 [`pg-gomoku`](../catalog/entries/pg-gomoku.yaml)（`gomoku.v1`；roles＝`host`＋`player`）；[`pg-redpick`](../catalog/entries/pg-redpick.yaml)（`redpick.v1`；roles＝`host`＋`p2`＋`p3`＋`p4`）
 
 一句話：包廂進門已連（Guest↔Host PC）→ 主持用 **`session_play`** 在**同一條連線**上開 SAM 局；大螢幕槽掛畫布；入座席走既有 `avatar_relay`；**不鑄** `invite.compose`、**不改** Guest `/i/`、**零** Platform 第二輪 O／A。終局可「結束這一局」而包廂還在。
@@ -12,7 +12,7 @@
 ## 1. 動機
 
 - 包廂已能請人進來一起看大螢幕、開口、傳檔；下一步自然是**在這間裡開一局**，而不是散場再掃遊戲 QR。
-- GO-INVITE（[`invite.compose`](./PG-GO-HOST-INVITE-PLAN.md)）服務「還沒進包廂、為某一款拉人」——人已在包廂時再鑄 compose＝多餘握手、拆「這一間」語意、Guest 網址被逼換。
+- **`invite.compose`／GO-INVITE 已廢**作連線路徑——人還沒進包廂時應先請人進**包廂**（`invite.room`），再 `session_play` 開局；另鑄 compose＝多餘握手、拆「這一間」語意。
 - DEC-045／047：**已有可用 PeerConnection → 重用**。包廂進門那次 Platform 握手就是唯一回合；開局只在既有 DC 上加控制面。
 - 用主持畫面 `captureStream` 冒充「一起玩」＝看片，別人沒有操作權——契約否決（ROOM §5.9／#21）。
 
@@ -47,12 +47,12 @@
 
 | 流 | 是 | 不是 |
 | --- | --- | --- |
-| **本刀 `session_play`** | 包廂已連 → 重用 PC → 大螢幕掛 SAM | GO-INVITE；局內 overlay |
-| **GO-INVITE** | 還沒進包廂、鑄 compose 拉人 | 包廂內開局快樂路徑 |
+| **本刀 `session_play`** | 包廂已連 → 重用 PC → 大螢幕掛 SAM | 已廢 GO-INVITE／`invite.compose`；局內 overlay |
+| **GO-INVITE／`invite.compose`** | **Superseded**（2026-08-23） | 現行：先 `invite.room` 進包廂，再本刀開局 |
 | **`session_cast`** | 片子／圖／音／live 節目 RTP | 開局控制面 |
 | **`session_chat`** | 文字（包廂三區或局內 overlay） | 開局／入座 |
 
-產品用語：讀者「玩遊戲」「結束這一局」；**不要**把包廂開局叫「邀請對弈」（那是 GO-INVITE）。
+產品用語：讀者「玩遊戲」「結束這一局」；**不要**把包廂開局叫「邀請對弈」（那是已廢 GO-INVITE）。
 
 ---
 
@@ -264,6 +264,7 @@ session_play.end    { from: host }
 
 | 日期 | 變更 |
 | --- | --- |
+| 2026-08-23 | **GO-INVITE Superseded：** 連線只 `invite.room`→`session_play`；動機／切界表修訂 |
 | 2026-08-21 | 初版 Draft：自 ROOM §5.9／Phase 3 抽出實作計劃；`session_play`＋重用進門 PC；與 GO-INVITE 切界；階段 0–5（實作延後） |
 | 2026-08-21 | **Phase 1 落地：** `rosterSessionPlay`＋`goRoomPlaySeats`；**Phase 2 初刀：** `goRoomSessionPlay`、Host `offerPlay`／`endPlay` fanout、晚進門 snapshot、Guest apply；主面仍不露 CTA |
 | 2026-08-21 | **Phase 2–4 續：** Host `attachExistingPeer`／合成 invite；`goRoomPlayBootstrap`；TV 槽 iframe；成員區「玩五子棋」；Guest load＋auto-accept |

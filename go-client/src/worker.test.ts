@@ -2,6 +2,22 @@ import { describe, expect, it, vi } from "vitest";
 import worker from "./worker";
 
 describe("go static asset router", () => {
+  it("serves SvelteKit 200.html for operator remote shell", async () => {
+    const fetch = vi.fn(async (request: Request) => {
+      return new Response(new URL(request.url).pathname);
+    });
+
+    const response = await worker.fetch(
+      new Request("https://go.samkuo.me/room/remote?cap=pg_op_test", {
+        headers: { accept: "text/html" },
+      }),
+      { ASSETS: { fetch } }
+    );
+
+    expect(await response.text()).toBe("/200");
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
   it("serves SvelteKit 200.html for dynamic invite routes", async () => {
     const fetch = vi.fn(async (request: Request) => {
       return new Response(new URL(request.url).pathname);

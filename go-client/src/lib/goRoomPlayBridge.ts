@@ -303,6 +303,54 @@ export function registerLocalRoomFile(id: string, file: File): void {
   });
 }
 
+/**
+ * SW must be controlling before register-local; re-call before every local
+ * `/room-file/` HTTP (cast／play／download) so a SW update cannot 404.
+ */
+export async function ensureLocalRoomFileRegistered(
+  id: string,
+  file: File,
+  opts?: {
+    timeoutMs?: number;
+    register?: (id: string, file: File) => void;
+  }
+): Promise<boolean> {
+  const ready = await ensureRoomFileSw(opts?.timeoutMs ?? 4000);
+  if (!ready) return false;
+  const reg = opts?.register ?? registerLocalRoomFile;
+  reg(id, file);
+  return true;
+}
+
+const roomFileSwResyncHooks = new Set<() => void>();
+let roomFileSwResyncListening = false;
+
+function ensureRoomFileSwResyncListener(): void {
+  if (roomFileSwResyncListening) return;
+  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
+    return;
+  }
+  roomFileSwResyncListening = true;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    for (const hook of roomFileSwResyncHooks) {
+      try {
+        hook();
+      } catch {
+        /* ignore */
+      }
+    }
+  });
+}
+
+/** Re-register local Files after SW install／update clears in-memory registry. */
+export function onRoomFileSwControllerChange(fn: () => void): () => void {
+  ensureRoomFileSwResyncListener();
+  roomFileSwResyncHooks.add(fn);
+  return () => {
+    roomFileSwResyncHooks.delete(fn);
+  };
+}
+
 export function unregisterLocalRoomFile(id: string): void {
   notifyRoomPlaySw({
     type: ROOM_PLAY_MSG,

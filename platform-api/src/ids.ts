@@ -59,6 +59,18 @@ export function joinCapPlaintext(): string {
   return `pg_jc_${randomId(20)}`;
 }
 
+/** BoothAnchor Engine WSS credential (hub only). */
+export function anchorSecretPlaintext(): string {
+  return `pg_ba_${randomId(24)}`;
+}
+
+/** Short-lived Operator Shell cap (DEC-051 E2). */
+export function operatorCapPlaintext(): string {
+  return `pg_op_${randomId(24)}`;
+}
+
+export const OPERATOR_CAP_TTL_MS = 5 * 60 * 1000;
+
 /** Default dashboard access token TTL (7d). */
 export const ACCESS_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
