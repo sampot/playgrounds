@@ -44,6 +44,20 @@ export async function registerBoothAnchor(input: {
   return data;
 }
 
+export async function registerBoothAnchorWithForceRetry(input: {
+  apiKey: string;
+  boothSessionId: string;
+  deviceLabel?: string;
+}): Promise<RegisterBoothAnchorResult> {
+  try {
+    return await registerBoothAnchor(input);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg !== "anchor_session_active") throw e;
+    return registerBoothAnchor({ ...input, force: true });
+  }
+}
+
 export async function revokeBoothAnchor(apiKey: string): Promise<void> {
   const origin = platformApiOrigin();
   const res = await fetch(`${origin}/v1/booth/anchors/active`, {
@@ -133,6 +147,7 @@ export type BoothAnchorHost = {
 };
 
 const KEEPALIVE_MS = 45_000;
+const OPERATOR_HELLO_WAIT_MS = 20_000;
 
 function wsUrlWithSecret(base: string, anchorSecret: string): string {
   const url = new URL(base, platformApiOrigin());
@@ -310,7 +325,7 @@ export function createBoothAnchorHost(
   return {
     async start() {
       stopped = false;
-      const reg = await registerBoothAnchor({
+      const reg = await registerBoothAnchorWithForceRetry({
         apiKey: opts.apiKey,
         boothSessionId: opts.boothSessionId,
         deviceLabel: opts.deviceLabel,
@@ -402,88 +417,138 @@ export function createBoothOperatorClient(opts: {
   onSignal?: (frame: AnchorSignalFrame) => void;
 }): BoothOperatorClient {
   let ws: WebSocket | null = null;
+  let onMessage: ((event: MessageEvent) => void) | null = null;
 
   function send(frame: Record<string, unknown>): void {
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
     ws.send(JSON.stringify({ v: 1, shellId: opts.shellId, ...frame }));
   }
 
+  function dispatchFrame(frame: BoothEnvelope): void {
+    if (frame.type === "booth.state.snapshot") {
+      opts.onSnapshot(frame as unknown as BoothStateSnapshot);
+    }
+    if (frame.type === "booth.hello.ok") {
+      opts.onHelloOk?.({
+        sessionId:
+          typeof frame.sessionId === "string" ? frame.sessionId : undefined,
+        director:
+          frame.director &&
+          typeof frame.director === "object" &&
+          typeof (frame.director as { shellId?: string }).shellId === "string"
+            ? (frame.director as { shellId: string; role: string })
+            : undefined,
+      });
+    }
+    if (frame.type === "booth.event.director.changed") {
+      const d = frame.director;
+      if (
+        d &&
+        typeof d === "object" &&
+        typeof (d as { shellId?: string }).shellId === "string"
+      ) {
+        opts.onDirectorChanged?.(d as { shellId: string; role: string });
+      } else {
+        opts.onDirectorChanged?.(null);
+      }
+    }
+    if (frame.type === "booth.ack") {
+      opts.onAck?.(
+        typeof frame.id === "string" ? frame.id : undefined,
+        frame.ok === true,
+        typeof frame.error === "string" ? frame.error : undefined
+      );
+    }
+    if (frame.type === "booth.event.engine.offline") {
+      opts.onEngineOffline?.();
+    }
+    if (frame.type === "booth.event.remote.disabled") {
+      opts.onRemoteDisabled?.();
+    }
+    if (isAnchorSignalFrame(frame)) {
+      opts.onSignal?.(frame);
+    }
+  }
+
+  function parseFrame(event: MessageEvent): BoothEnvelope | null {
+    const text = typeof event.data === "string" ? event.data : "";
+    try {
+      const frame = JSON.parse(text) as BoothEnvelope;
+      return frame?.type ? frame : null;
+    } catch {
+      return null;
+    }
+  }
+
   return {
     async connect() {
+      if (ws) return;
       ws = new WebSocket(operatorWsUrl(opts.operatorCap));
+
+      let finishHello: (() => void) | null = null;
+      let failHello: ((err: Error) => void) | null = null;
+      const helloReady = new Promise<void>((resolve, reject) => {
+        finishHello = resolve;
+        failHello = reject;
+      });
+
+      const settleHello = (err?: Error) => {
+        if (!finishHello && !failHello) return;
+        const done = finishHello;
+        const fail = failHello;
+        finishHello = null;
+        failHello = null;
+        if (err) fail?.(err);
+        else done?.();
+      };
+
+      onMessage = (event: MessageEvent) => {
+        const frame = parseFrame(event);
+        if (!frame) return;
+        dispatchFrame(frame);
+        if (frame.type === "booth.hello.ok") settleHello();
+        if (frame.type === "booth.event.remote.disabled") {
+          settleHello(new Error("remote_disabled"));
+        }
+        if (frame.type === "booth.event.engine.offline") {
+          settleHello(new Error("engine_offline"));
+        }
+      };
+      ws.addEventListener("message", onMessage);
+
       await new Promise<void>((resolve, reject) => {
         const sock = ws;
         if (!sock) return reject(new Error("ws_missing"));
-        sock.addEventListener(
-          "open",
-          () => {
-            send({
-              type: "booth.hello",
-              role: "operator",
-              subscribe: ["members", "cast", "director", "engineHealth"],
-            });
-            resolve();
-          },
-          { once: true }
-        );
-        sock.addEventListener("error", () => reject(new Error("ws_failed")), {
-          once: true,
-        });
+        const onOpen = () => {
+          send({
+            type: "booth.hello",
+            role: "operator",
+            subscribe: ["members", "cast", "director", "engineHealth"],
+          });
+          resolve();
+        };
+        const onError = () => reject(new Error("ws_failed"));
+        const onClose = () => reject(new Error("ws_closed"));
+        sock.addEventListener("open", onOpen, { once: true });
+        sock.addEventListener("error", onError, { once: true });
+        sock.addEventListener("close", onClose, { once: true });
       });
-      ws.addEventListener("message", (event) => {
-        const text = typeof event.data === "string" ? event.data : "";
-        try {
-          const frame = JSON.parse(text) as BoothEnvelope;
-          if (frame.type === "booth.state.snapshot") {
-            opts.onSnapshot(frame as unknown as BoothStateSnapshot);
-          }
-          if (frame.type === "booth.hello.ok") {
-            opts.onHelloOk?.({
-              sessionId:
-                typeof frame.sessionId === "string" ? frame.sessionId : undefined,
-              director:
-                frame.director &&
-                typeof frame.director === "object" &&
-                typeof (frame.director as { shellId?: string }).shellId ===
-                  "string"
-                  ? (frame.director as { shellId: string; role: string })
-                  : undefined,
-            });
-          }
-          if (frame.type === "booth.event.director.changed") {
-            const d = frame.director;
-            if (
-              d &&
-              typeof d === "object" &&
-              typeof (d as { shellId?: string }).shellId === "string"
-            ) {
-              opts.onDirectorChanged?.(d as { shellId: string; role: string });
-            } else {
-              opts.onDirectorChanged?.(null);
-            }
-          }
-          if (frame.type === "booth.ack") {
-            opts.onAck?.(
-              typeof frame.id === "string" ? frame.id : undefined,
-              frame.ok === true,
-              typeof frame.error === "string" ? frame.error : undefined
-            );
-          }
-          if (frame.type === "booth.event.engine.offline") {
-            opts.onEngineOffline?.();
-          }
-          if (frame.type === "booth.event.remote.disabled") {
-            opts.onRemoteDisabled?.();
-          }
-          if (isAnchorSignalFrame(frame)) {
-            opts.onSignal?.(frame);
-          }
-        } catch {
-          /* ignore */
-        }
-      });
+
+      const helloTimer = setTimeout(() => {
+        settleHello(new Error("operator_hello_timeout"));
+      }, OPERATOR_HELLO_WAIT_MS);
+
+      try {
+        await helloReady;
+      } finally {
+        clearTimeout(helloTimer);
+      }
     },
     disconnect() {
+      if (ws && onMessage) {
+        ws.removeEventListener("message", onMessage);
+        onMessage = null;
+      }
       if (ws) {
         try {
           ws.close();

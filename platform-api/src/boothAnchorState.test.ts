@@ -8,6 +8,7 @@ import {
   ensureAnchorRecord,
   enginePresence,
   markEngineSocket,
+  canMintOperatorCap,
   publicAnchorStatus,
   registerAnchorSession,
   revokeAnchor,
@@ -80,6 +81,24 @@ describe("boothAnchorState", () => {
     clearEngineSocket(rec, "ws-1", 1000);
     expect(enginePresence(rec, 1000 + BOOTH_ENGINE_GRACE_MS - 1)).toBe("degraded");
     expect(enginePresence(rec, 1000 + BOOTH_ENGINE_GRACE_MS)).toBe("offline");
+  });
+
+  it("allows operator cap only when engine socket is live", () => {
+    const rec = createEmptyAnchorRecord("u1");
+    registerAnchorSession({
+      rec,
+      boothSessionId: "sess-a",
+      anchorSecretHash: "hash-a",
+      now: 0,
+    });
+    markEngineSocket(rec, "ws-1", 0);
+    expect(canMintOperatorCap(publicAnchorStatus(rec, 0))).toBe(true);
+
+    clearEngineSocket(rec, "ws-1", 1000);
+    const degraded = publicAnchorStatus(rec, 1000 + 1000);
+    expect(degraded.presence).toBe("degraded");
+    expect(degraded.online).toBe(true);
+    expect(canMintOperatorCap(degraded)).toBe(false);
   });
 
   it("engine presence heartbeat updates guest count only", () => {

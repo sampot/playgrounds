@@ -14,11 +14,13 @@
     open = $bindable(false),
     tvSnowEnabled = $bindable(true),
     remoteAnchorEnabled = $bindable(false),
+    showRemoteAnchor = true,
     onRemoteAnchorChange,
   }: {
     open?: boolean;
     tvSnowEnabled?: boolean;
     remoteAnchorEnabled?: boolean;
+    showRemoteAnchor?: boolean;
     onRemoteAnchorChange?: (enabled: boolean) => void | Promise<void>;
   } = $props();
 
@@ -100,12 +102,12 @@
               type="button"
               class={[
                 "room-setting-switch",
-                tvSnowEnabled && "room-setting-switch--on",
+                !tvSnowEnabled && "room-setting-switch--on",
               ]
                 .filter(Boolean)
                 .join(" ")}
               role="switch"
-              aria-checked={tvSnowEnabled}
+              aria-checked={!tvSnowEnabled}
               aria-labelledby="room-setting-snow-label"
               onclick={() => setSnow(!tvSnowEnabled)}
             >
@@ -113,13 +115,14 @@
                 <span class="room-setting-switch-thumb"></span>
               </span>
               <span class="sr-only">
-                {tvSnowEnabled ? "開啟" : "關閉"}
+                {!tvSnowEnabled ? "開啟" : "關閉"}
               </span>
             </button>
           </li>
         </ul>
       </section>
 
+      {#if showRemoteAnchor}
       <section class="room-settings-section" aria-labelledby="room-settings-remote">
         <h3 id="room-settings-remote" class="room-settings-section-title">
           {GO_ROOM_SETTINGS_SECTION_REMOTE}
@@ -159,6 +162,7 @@
           </li>
         </ul>
       </section>
+      {/if}
     </div>
   </div>
 {/if}

@@ -238,6 +238,19 @@ export class BoothAnchorDurableObject extends DurableObject {
     const frame = parseBoothMessage(text);
     if (!frame) return;
 
+    if (
+      role === "operator" &&
+      frame.type === "booth.hello" &&
+      !this.getEngineSocket()
+    ) {
+      wsSend(ws, {
+        type: "booth.event.engine.offline",
+        v: 1,
+        ts: Date.now(),
+      });
+      return;
+    }
+
     const rec = await this.load();
     const out = handleBoothAnchorWsFrame({
       role,

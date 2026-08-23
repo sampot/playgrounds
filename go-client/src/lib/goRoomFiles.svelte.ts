@@ -100,6 +100,21 @@ class GoRoomFiles {
     this.playback = null;
   }
 
+  /** Operator Shell: read-only share catalog from booth snapshot. */
+  setMirrorEntries(entries: RoomFileEntry[]): void {
+    if (this.#xfer) return;
+    this.entries = entries;
+    this.busy = false;
+    this.playback = null;
+  }
+
+  clearMirrorEntries(): void {
+    if (this.#xfer) return;
+    this.entries = [];
+    this.busy = false;
+    this.playback = null;
+  }
+
   shareLocalFile(file: File) {
     return (
       this.#xfer?.shareLocalFile(file) ??

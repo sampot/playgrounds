@@ -49,6 +49,15 @@ describe("boothSnapshotUi", () => {
     ]);
   });
 
+  it("derives play catalog from cast summary", () => {
+    const ui = boothSnapshotToUi(
+      snap({
+        cast: { kind: "play", catalogId: "pg-knife" },
+      })
+    );
+    expect(ui.playCatalogId).toBe("pg-knife");
+  });
+
   it("derives TV label from cast summary", () => {
     expect(boothCastTvOn({ kind: "idle" })).toBe(false);
     expect(boothCastTvOn({ kind: "live", label: "鏡頭" })).toBe(true);

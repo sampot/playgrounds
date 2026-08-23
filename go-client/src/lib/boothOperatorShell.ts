@@ -7,6 +7,13 @@ import type { RoomInviteDoor } from "./goRoom";
 import { boothSnapshotToUi } from "./boothSnapshotUi";
 import { createBoothOperatorRtc } from "./boothOperatorRtc";
 import { createBoothOperatorClient } from "./boothPlatform";
+import {
+  attachOperatorSurface,
+  detachOperatorSurface,
+  mirrorOperatorShareFiles,
+  syncOperatorChatTail,
+} from "./boothOperatorSurface";
+import type { GoLoadProgress } from "./goLoadProgress";
 
 export type OperatorShellPhase = "idle" | "connecting" | "open" | "error";
 
@@ -21,6 +28,10 @@ export type OperatorShellStatus = {
   occupantPeers: { peerId: string; name: string }[];
   occupantNames: string[];
   peerName: string | null;
+  hostPeerId: string | null;
+  hostDisplayName: string | null;
+  playCatalogId: string | null;
+  playLoadProgress: GoLoadProgress | null;
   tvOn: boolean;
   tvLabel: string | null;
   canDirect: boolean;
@@ -44,6 +55,10 @@ function emptyStatus(): OperatorShellStatus {
     occupantPeers: [],
     occupantNames: [],
     peerName: null,
+    hostPeerId: null,
+    hostDisplayName: null,
+    playCatalogId: null,
+    playLoadProgress: null,
     tvOn: false,
     tvLabel: null,
     canDirect: false,
@@ -68,6 +83,7 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
   let client: ReturnType<typeof createBoothOperatorClient> | null = null;
   let operatorRtc: ReturnType<typeof createBoothOperatorRtc> | null = null;
   let director: { shellId: string; role: string } | null = null;
+  let surfaceAttached = false;
   const listeners = new Set<Listener>();
 
   function emit(): void {
@@ -80,9 +96,21 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
     emit();
   }
 
+  function ensureSurface(): void {
+    if (surfaceAttached) return;
+    surfaceAttached = true;
+    attachOperatorSurface({
+      shellId,
+      sendIntent: sendIntent,
+    });
+  }
+
   function applySnapshot(snapshot: BoothStateSnapshot): void {
     const ui = boothSnapshotToUi(snapshot);
     const canDirect = operatorCanDirect({ director, shellId });
+    ensureSurface();
+    syncOperatorChatTail(snapshot.chatTail);
+    mirrorOperatorShareFiles(snapshot.shareFiles);
     set({
       phase: "open",
       message: canDirect ? "遠端導播中" : "遠端檢視（家裡主持使用中）",
@@ -90,11 +118,16 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
       guestCount: ui.guestCount,
       inviteDoor: ui.inviteDoor,
       shortUrl: ui.shortUrl,
+      inviteExpiresAt: ui.inviteExpiresAt,
       occupantPeers: ui.occupantPeers,
       occupantNames: ui.occupantNames,
       peerName: ui.occupantNames[0] ?? null,
+      hostPeerId: ui.hostPeerId,
+      hostDisplayName: ui.hostDisplayName,
+      playCatalogId: ui.playCatalogId,
       tvOn: ui.tvOn,
       tvLabel: ui.tvLabel,
+      tvStream: ui.tvOn ? status.tvStream : null,
       remoteLives: ui.remoteLives,
       canDirect,
       directorRole: canDirect ? "operator" : director ? "viewer" : null,
@@ -204,6 +237,10 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
       operatorRtc?.stop();
       operatorRtc = null;
       director = null;
+      if (surfaceAttached) {
+        detachOperatorSurface();
+        surfaceAttached = false;
+      }
       status = emptyStatus();
       emit();
     },
@@ -217,6 +254,23 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
         payload: { kind: "live", peerId, label },
       });
     },
+    putFileOnTv(fileId: string, scope: "share" | "private" = "share"): void {
+      sendIntent({
+        type: "booth.intent.cast.offer",
+        v: 1,
+        payload: { kind: "file", id: fileId, scope },
+      });
+    },
+    stopTv(): void {
+      sendIntent({ type: "booth.intent.cast.unoffer", v: 1 });
+    },
+    haltLive(peerId: string, layer: "audio" | "video"): void {
+      sendIntent({
+        type: "booth.intent.live.halt",
+        v: 1,
+        payload: { peerId, layer },
+      });
+    },
     kickPeer(peerId: string): void {
       sendIntent({
         type: "booth.intent.ejectPeer",
@@ -226,6 +280,35 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
     },
     endBooth(): void {
       sendIntent({ type: "booth.intent.end", v: 1 });
+    },
+    async startAutoPlay(catalogId: string): Promise<
+      | { ok: true }
+      | { ok: false; reason: string; missingRoles?: string[] }
+    > {
+      sendIntent({
+        type: "booth.intent.play.start",
+        v: 1,
+        payload: { catalogId, mode: "auto" },
+      });
+      return { ok: true };
+    },
+    async startManualPlay(
+      catalogId: string,
+      picks: { role: string; peerId: string }[]
+    ): Promise<
+      | { ok: true }
+      | { ok: false; reason: string; missingRoles?: string[] }
+    > {
+      sendIntent({
+        type: "booth.intent.play.start",
+        v: 1,
+        payload: { catalogId, mode: "manual", seats: picks },
+      });
+      return { ok: true };
+    },
+    async endPlay(): Promise<{ ok: true } | { ok: false; reason: string }> {
+      sendIntent({ type: "booth.intent.play.end", v: 1 });
+      return { ok: true };
     },
   };
 }

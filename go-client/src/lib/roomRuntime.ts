@@ -206,6 +206,33 @@ export function createRoomRuntime(opts?: {
     endBooth: async (): Promise<void> => {
       throw new Error("room_runtime_not_ready");
     },
+    stopTv: async (): Promise<void> => {
+      throw new Error("room_runtime_not_ready");
+    },
+    castFile: async (
+      _fileId: string,
+      _scope?: "share" | "private"
+    ): Promise<void> => {
+      throw new Error("room_runtime_not_ready");
+    },
+    haltLive: async (
+      _peerId: string,
+      _layer: "audio" | "video"
+    ): Promise<void> => {
+      throw new Error("room_runtime_not_ready");
+    },
+    startAutoPlay: async (_catalogId: string) => {
+      throw new Error("room_runtime_not_ready");
+    },
+    startManualPlay: async (
+      _catalogId: string,
+      _picks: { role: string; peerId: string }[]
+    ) => {
+      throw new Error("room_runtime_not_ready");
+    },
+    endPlay: async () => {
+      throw new Error("room_runtime_not_ready");
+    },
   };
 
   function prepareGuestJoinHandlers(): {
@@ -248,6 +275,7 @@ export function createRoomRuntime(opts?: {
     getStatus: () => status,
     getOwnerUserId: () => goAuth.profile?.user_id ?? null,
     getApiKey: () => goAuth.getPlatformApiKeyForHostLoop(),
+    getHostPeerId: () => localAgentId,
     getCastSummary: () => {
       if (goRoomMedia.tvSourcePeerId) {
         const peer = status.occupantPeers.find(
@@ -279,9 +307,33 @@ export function createRoomRuntime(opts?: {
       const out = await goRoomMedia.putLiveOnTv(resolved, label);
       if (!out.ok) throw new Error(out.error);
     },
+    onOperatorCastFile: async (fileId, scope) => {
+      const out =
+        scope === "private"
+          ? await goRoomMedia.startPrivateProgram(fileId)
+          : await goRoomMedia.startListedProgram(fileId);
+      if (!out.ok) throw new Error(out.error);
+    },
+    onOperatorStopTv: async () => {
+      await goRoomMedia.stopProgram();
+    },
+    onOperatorHaltLive: async (peerId, layer) => {
+      const resolved =
+        peerId === "local" ? localAgentId : peerId;
+      const out = await goRoomMedia.haltLive(resolved, layer);
+      if (!out.ok) throw new Error(out.error);
+    },
     onOperatorMintInvite: () => operatorHooks.mintInvite(),
     onOperatorKickPeer: (peerId) => operatorHooks.kickPeer(peerId),
     onOperatorEndBooth: () => operatorHooks.endBooth(),
+    onOperatorStartAutoPlay: (catalogId) => operatorHooks.startAutoPlay(catalogId),
+    onOperatorStartManualPlay: (catalogId, picks) =>
+      operatorHooks.startManualPlay(catalogId, picks),
+    onOperatorEndPlay: () => operatorHooks.endPlay(),
+    fanoutChat: (msg) => {
+      broadcastSessionChat(liveSessions(), msg);
+      goSessionChat.onIncoming(msg);
+    },
     getTvProgramStream: () =>
       roomTvBindStream({
         programStream: goRoomMedia.programStream,
@@ -773,7 +825,6 @@ export function createRoomRuntime(opts?: {
         return null;
       }
       const previousId = status.inviteId;
-      await anchorBridge.onBoothOpen();
       ensureLocalSurface();
       set({
         phase: "open",
@@ -784,6 +835,7 @@ export function createRoomRuntime(opts?: {
         error: null,
         message: occupancyMessage(),
       });
+      await anchorBridge.onBoothOpen();
       scheduleInviteExpiry(created.invite_id, expiresAt);
       persistDoor({
         inviteId: created.invite_id,
@@ -844,7 +896,7 @@ export function createRoomRuntime(opts?: {
         message: occupancyMessage(),
       });
       if (!doorIsLive()) restoreDoorFromSession();
-      void anchorBridge.onBoothOpen();
+      await anchorBridge.onBoothOpen();
     } finally {
       opening = false;
     }
@@ -1198,6 +1250,25 @@ export function createRoomRuntime(opts?: {
   operatorHooks.endBooth = async () => {
     await close();
   };
+  operatorHooks.stopTv = async () => {
+    await goRoomMedia.stopProgram();
+  };
+  operatorHooks.castFile = async (fileId, scope) => {
+    const out =
+      scope === "private"
+        ? await goRoomMedia.startPrivateProgram(fileId)
+        : await goRoomMedia.startListedProgram(fileId);
+    if (!out.ok) throw new Error(out.error);
+  };
+  operatorHooks.haltLive = async (peerId, layer) => {
+    const resolved = peerId === "local" ? localAgentId : peerId;
+    const out = await goRoomMedia.haltLive(resolved, layer);
+    if (!out.ok) throw new Error(out.error);
+  };
+  operatorHooks.startAutoPlay = (catalogId) => startAutoPlay(catalogId);
+  operatorHooks.startManualPlay = (catalogId, picks) =>
+    startManualPlay(catalogId, picks);
+  operatorHooks.endPlay = () => endPlay();
 
   return {
     subscribe(listener: Listener) {

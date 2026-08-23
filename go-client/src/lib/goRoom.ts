@@ -453,9 +453,9 @@ export function markRoomTvHintSeen(
 export const GO_ROOM_TV_SNOW_STORAGE = "go-room-tv-snow-v1";
 export const GO_ROOM_SETTINGS_TITLE = "包廂設定";
 export const GO_ROOM_SETTINGS_SECTION_DISPLAY = "大螢幕";
-export const GO_ROOM_SETTINGS_TV_SNOW_LABEL = "沒訊號雪花";
+export const GO_ROOM_SETTINGS_TV_SNOW_LABEL = "關閉沒訊號雪花";
 export const GO_ROOM_SETTINGS_TV_SNOW_HINT =
-  "大螢幕沒有節目時顯示電視雪花效果。只影響你這台裝置。";
+  "開啟後，大螢幕沒有節目時改為純黑待機（不顯示雪花）。只影響你這台裝置。";
 export const GO_ROOM_SETTINGS_SECTION_REMOTE = "遠端連回";
 export const GO_ROOM_SETTINGS_REMOTE_ANCHOR_LABEL = "允許遠端連回包廂";
 export const GO_ROOM_SETTINGS_REMOTE_ANCHOR_HINT =
@@ -506,7 +506,7 @@ export function roomHostChecklistEligible(opts: {
   dismissed: boolean;
 }): boolean {
   if (opts.dismissed) return false;
-  if (opts.role !== "host") return false;
+  if (opts.role !== "host" && opts.role !== "operator") return false;
   if (opts.phase !== "open") return false;
   if (opts.tvOn || opts.playActive) return false;
   return true;

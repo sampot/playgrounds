@@ -6,6 +6,10 @@ import {
   sha256Hex,
 } from "./ids.js";
 import { BoothAnchorDurableObject } from "./boothAnchorDo.js";
+import {
+  canMintOperatorCap,
+  type BoothPresence,
+} from "./boothAnchorState.js";
 
 export { BoothAnchorDurableObject };
 
@@ -259,9 +263,18 @@ export async function routeBooth(
     const statusRes = await stub.fetch("https://booth/status");
     const status = (await statusRes.json()) as {
       online?: boolean;
+      presence?: BoothPresence;
       boothSessionId?: string;
     };
-    if (!status.online) {
+    if (
+      !canMintOperatorCap({
+        online: Boolean(status.online),
+        presence: status.presence ?? "offline",
+      })
+    ) {
+      if (status.presence === "degraded") {
+        return json({ error: "anchor_degraded" }, 503);
+      }
       return json({ error: "no_active_anchor" }, 404);
     }
     if (

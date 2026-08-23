@@ -94,15 +94,26 @@
     guestCount={status.guestCount}
     occupantNames={status.occupantNames}
     occupantPeers={status.occupantPeers}
-    operatorTvOn={status.tvOn || Boolean(status.tvStream)}
+    playCatalogId={status.playCatalogId}
+    playLoadProgress={status.playLoadProgress}
+    playLocalPeerId={status.hostPeerId}
+    playHostName={status.hostDisplayName}
+    operatorTvOn={status.tvOn}
     operatorTvLabel={status.tvLabel}
-    operatorTvStream={status.tvStream}
+    operatorTvStream={status.tvOn ? status.tvStream : null}
     operatorCanDirect={status.canDirect}
     operatorRemoteLives={status.remoteLives}
     onInvite={() => remoteShell?.mintInvite()}
     onEnd={() => remoteShell?.endBooth()}
     onKick={(peerId) => remoteShell?.kickPeer(peerId)}
     onCastLive={(peerId, name) => remoteShell?.putLiveOnTv(peerId, name)}
+    onOperatorCastFile={(fileId) => remoteShell?.putFileOnTv(fileId)}
+    onOperatorStopTv={() => remoteShell?.stopTv()}
+    onOperatorHaltLive={(peerId, layer) => remoteShell?.haltLive(peerId, layer)}
+    onStartPlay={(catalogId) => remoteShell?.startAutoPlay(catalogId)}
+    onStartManualPlay={(catalogId, picks) =>
+      remoteShell?.startManualPlay(catalogId, picks)}
+    onEndPlay={() => void remoteShell?.endPlay()}
   />
 {/if}
 

@@ -250,6 +250,12 @@
     operatorCanDirect?: boolean;
     operatorRemoteLives?: { peerId: string; camera: boolean; mic: boolean }[];
     onCastLive?: (peerId: string, name: string) => void | Promise<void>;
+    onOperatorCastFile?: (fileId: string) => void | Promise<void>;
+    onOperatorStopTv?: () => void | Promise<void>;
+    onOperatorHaltLive?: (
+      peerId: string,
+      layer: "audio" | "video"
+    ) => void | Promise<void>;
   };
 
   let {
@@ -289,10 +295,14 @@
     operatorCanDirect = false,
     operatorRemoteLives = [],
     onCastLive,
+    onOperatorCastFile,
+    onOperatorStopTv,
+    onOperatorHaltLive,
   }: Props = $props();
 
   const isOperator = $derived(role === "operator");
   const isHostLike = $derived(role === "host" || role === "operator");
+  const operatorWriteLocked = $derived(isOperator && !operatorCanDirect);
 
   let playPickerOpen = $state(false);
   let roomSettingsOpen = $state(false);
@@ -383,7 +393,11 @@
   const localSilenced = $derived(
     goSessionChat.isPeerSilenced(goSessionChat.localAgentId ?? "")
   );
-  const canSpeak = $derived(role === "host" || (!textLocked && !localSilenced));
+  const canSpeak = $derived(
+    role === "host" ||
+      (isOperator && operatorCanDirect) ||
+      (!textLocked && !localSilenced)
+  );
   const composerHint = $derived(
     !canSpeak
       ? localSilenced
@@ -432,7 +446,8 @@
     })
   );
   const hostPeerId = $derived(
-    isHostLike && !isOperator ? "local" : occupantPeers[0]?.peerId ?? null
+    playLocalPeerId?.trim() ||
+      (isHostLike && !isOperator ? "local" : occupantPeers[0]?.peerId ?? null)
   );
   const memberCards = $derived(
     roomMemberCardsSorted(
@@ -470,7 +485,9 @@
   );
   const tvStream = $derived(
     isOperator
-      ? operatorTvStream
+      ? operatorTvOn
+        ? operatorTvStream
+        : null
       : roomTvBindStream({
           programStream: goRoomMedia.programStream,
           localProgramStream: goRoomMedia.localProgramStream,
@@ -610,7 +627,7 @@
     })
   );
 
-  const tvIdleSnow = $derived(role === "host" ? tvSnowEnabled : true);
+  const tvIdleSnow = $derived(isHostLike ? tvSnowEnabled : true);
   const showTvHint = $derived(
     role === "guest" &&
       showMembers &&
@@ -722,7 +739,10 @@
   const statusOccupied = $derived(guestCount > 0);
 
   const showComposer = $derived(
-    inBooth && !isOperator && (role === "host" || connected)
+    inBooth &&
+      (role === "host" ||
+        connected ||
+        (isOperator && phase === "open"))
   );
   const live = $derived(
     inBooth || phase === "connecting" || phase === "open"
@@ -1171,6 +1191,10 @@
   async function shareFiles(list: FileList | File[]): Promise<void> {
     const picked = Array.from(list);
     if (picked.length === 0) return;
+    if (isOperator) {
+      fileError = "請在包廂分頁上傳檔案";
+      return;
+    }
     fileError = "";
     shareHang = { done: 0, total: picked.length };
     for (const file of picked) {
@@ -1382,12 +1406,36 @@
 
   async function onPutOnTv(id: string) {
     mediaError = "";
+    if (isOperator) {
+      if (!operatorCanDirect) {
+        mediaError = "家裡主持使用中，無法遠端切台";
+        return;
+      }
+      try {
+        await onOperatorCastFile?.(id);
+      } catch (e) {
+        mediaError = e instanceof Error ? e.message : String(e);
+      }
+      return;
+    }
     const out = await goRoomMedia.startListedProgram(id);
     if (!out.ok) mediaError = out.error;
   }
 
   async function onPutPrivateOnTv(id: string) {
     mediaError = "";
+    if (isOperator) {
+      if (!operatorCanDirect) {
+        mediaError = "家裡主持使用中，無法遠端切台";
+        return;
+      }
+      try {
+        await onOperatorCastFile?.(id);
+      } catch (e) {
+        mediaError = e instanceof Error ? e.message : String(e);
+      }
+      return;
+    }
     const out = await goRoomMedia.startPrivateProgram(id);
     if (!out.ok) mediaError = out.error;
   }
@@ -1447,6 +1495,27 @@
     if (isOperator) {
       if (action === "kick" && !card.mine) {
         kickTarget = { peerId: card.peerId, name: card.name };
+        return;
+      }
+      if (!operatorCanDirect) {
+        mediaError = "家裡主持使用中，無法遠端操作";
+        return;
+      }
+      if (action === "forceMute") {
+        try {
+          await onOperatorHaltLive?.(card.peerId, "audio");
+        } catch (e) {
+          mediaError = e instanceof Error ? e.message : String(e);
+        }
+        return;
+      }
+      if (action === "forceCameraOff") {
+        try {
+          await onOperatorHaltLive?.(card.peerId, "video");
+        } catch (e) {
+          mediaError = e instanceof Error ? e.message : String(e);
+        }
+        return;
       }
       return;
     }
@@ -1467,6 +1536,18 @@
 
   async function onStopTv() {
     mediaError = "";
+    if (isOperator) {
+      if (!operatorCanDirect) {
+        mediaError = "家裡主持使用中，無法遠端切台";
+        return;
+      }
+      try {
+        await onOperatorStopTv?.();
+      } catch (e) {
+        mediaError = e instanceof Error ? e.message : String(e);
+      }
+      return;
+    }
     await goRoomMedia.stopProgram();
   }
 
@@ -1507,7 +1588,7 @@
     deleteFileId = null;
     if (!id) return;
     clearPendingBrowserSave(id);
-    goRoomFiles.unshare(id, { host: role === "host" });
+    goRoomFiles.unshare(id, { host: isHostLike && !isOperator });
     if (previewId === id) closePreview();
   }
 
@@ -1714,7 +1795,7 @@
         {tvStream}
         hudOpen={tvHudOpen}
         hudKind={tvHudKind}
-        isHost={role === "host"}
+        isHost={isHostLike}
         slotFullscreen={tvSlotFullscreen}
         restore={roomTvHudRestore({
           slotFullscreen: tvSlotFullscreen,
@@ -1799,7 +1880,7 @@
             <p id="room-status-gate-title" class="room-tv-gate-title pixel-text err">
               {error || "無法開始"}
             </p>
-            {#if role === "host"}
+            {#if isHostLike}
               <button
                 type="button"
                 class="pixel-btn pixel-btn--primary room-tv-gate-btn"
@@ -1813,7 +1894,7 @@
               {message || "這一間已結束"}
             </p>
             <div class="room-tv-gate-actions">
-              {#if role === "host" && loggedIn}
+              {#if isHostLike && loggedIn && !isOperator}
                 <button
                   type="button"
                   class="pixel-btn pixel-btn--primary room-tv-gate-btn"
@@ -1959,12 +2040,13 @@
         </button>
       {/if}
       {/if}
-      {#if role === "host" && tvOn}
+      {#if isHostLike && tvOn}
         <button
           type="button"
           class="pixel-btn room-dock-btn"
           aria-label={GO_ROOM_TV_OFF_BTN}
           title={GO_ROOM_TV_OFF_BTN}
+          disabled={operatorWriteLocked}
           onclick={() => void onStopTv()}
         >
           <svg class="dock-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -1977,7 +2059,7 @@
       {/if}
       </div>
       <div class="room-dock-group room-dock-group--end" role="group" aria-label="設定與離開">
-      {#if role === "host"}
+      {#if isHostLike}
         <button
           type="button"
           class={["pixel-btn", "room-dock-btn", roomSettingsOpen && "pixel-btn--primary"]
@@ -2062,12 +2144,11 @@
                 type="button"
                 class="pixel-btn pixel-btn--primary door-row-action"
                 onclick={() => inviteInBooth()}
-                disabled={isOperator && !operatorCanDirect}
+                disabled={operatorWriteLocked}
               >
                 {doorRow.action}
               </button>
             </div>
-            {#if !isOperator}
             {#if playLoadProgress}
               <div class="door-row">
                 <p class="muted door-row-label">{playLoadProgress.detail}</p>
@@ -2078,6 +2159,7 @@
                 <button
                   type="button"
                   class="pixel-btn door-row-action"
+                  disabled={operatorWriteLocked}
                   onclick={() => void onEndPlay?.()}
                 >
                   結束這一局
@@ -2089,12 +2171,12 @@
                 <button
                   type="button"
                   class="pixel-btn pixel-btn--primary door-row-action"
+                  disabled={operatorWriteLocked}
                   onclick={() => (playPickerOpen = true)}
                 >
                   玩遊戲
                 </button>
               </div>
-            {/if}
             {/if}
           {/if}
           {#if showHostChecklist}
@@ -2135,23 +2217,14 @@
                       : null
                   }
                   hostMenu={
-                    isOperator
-                      ? operatorCanDirect
-                        ? roomHostMemberMenu({
-                            mine: false,
-                            liveAudio: card.micOn,
-                            liveVideo: card.cameraOn,
-                            onAir: card.onAir,
-                          })
-                        : undefined
-                      : role === "host"
-                        ? roomHostMemberMenu({
-                            mine: card.mine,
-                            liveAudio: card.micOn,
-                            liveVideo: card.cameraOn,
-                            onAir: card.onAir,
-                          })
-                        : undefined}
+                    isHostLike && (!isOperator || operatorCanDirect)
+                      ? roomHostMemberMenu({
+                          mine: card.mine && !isOperator,
+                          liveAudio: card.micOn,
+                          liveVideo: card.cameraOn,
+                          onAir: card.onAir,
+                        })
+                      : undefined}
                   hostMenuOpen={hostMenuPeerId === card.peerId}
                   onclick={() =>
                     (selectedPeerId =
@@ -2178,7 +2251,7 @@
                 </p>
               {/if}
               <div class="file-actions">
-                {#if role === "host"}
+                {#if isHostLike}
                   <p class="muted">
                     {#if selectedPerson.liveVideo || selectedPerson.liveAudio}
                       放到大螢幕上在成員卡上；其餘在更多。
@@ -2575,10 +2648,11 @@
                           </button>
                         {/each}
                       </div>
-                      {#if role === "host"}
+                      {#if isHostLike}
                         <button
                           type="button"
                           class="pixel-btn"
+                          disabled={operatorWriteLocked}
                           onclick={() => {
                             goSessionChat.captionMessage(m.id);
                             menuMsgId = null;
@@ -2589,6 +2663,7 @@
                         <button
                           type="button"
                           class="pixel-btn"
+                          disabled={operatorWriteLocked}
                           onclick={() => {
                             goSessionChat.deleteMessage(m.id);
                             menuMsgId = null;
@@ -2666,7 +2741,7 @@
               </ul>
             {/if}
             <div class="composer-row">
-              {#if role === "host"}
+              {#if isHostLike}
                 <button
                   type="button"
                   class={[
@@ -2679,6 +2754,7 @@
                   aria-label={textLocked ? GO_ROOM_TEXT_UNLOCK : GO_ROOM_TEXT_LOCK}
                   aria-pressed={textLocked}
                   title={textLocked ? GO_ROOM_TEXT_UNLOCK : GO_ROOM_TEXT_LOCK}
+                  disabled={operatorWriteLocked}
                   onclick={() => goSessionChat.setTextLocked(!textLocked)}
                 >
                   <svg class="dock-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -2936,16 +3012,17 @@
     />
   {/if}
 
-  {#if role === "host"}
+  {#if isHostLike}
   <GoRoomSettingsPanel
     bind:open={roomSettingsOpen}
     bind:tvSnowEnabled
     bind:remoteAnchorEnabled
+    showRemoteAnchor={!isOperator}
     onRemoteAnchorChange={(enabled) => void onRemoteAnchorChange?.(enabled)}
   />
   {/if}
 
-  {#if role === "host"}
+  {#if isHostLike}
   <GoRoomPlayPicker
     bind:open={playPickerOpen}
     games={playableGames}

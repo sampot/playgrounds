@@ -131,18 +131,20 @@ export function enginePresence(
   return "offline";
 }
 
-export function publicAnchorStatus(
-  rec: BoothAnchorRecord,
-  now: number,
-  graceMs = BOOTH_ENGINE_GRACE_MS
-): {
+export type PublicAnchorStatus = {
   online: boolean;
   presence: BoothPresence;
   boothSessionId?: string;
   snapshot?: Record<string, unknown> | null;
   deviceLabel?: string | null;
   guestCount?: number;
-} {
+};
+
+export function publicAnchorStatus(
+  rec: BoothAnchorRecord,
+  now: number,
+  graceMs = BOOTH_ENGINE_GRACE_MS
+): PublicAnchorStatus {
   const presence = enginePresence(rec, now, graceMs);
   const online = presence === "online" || presence === "degraded";
   if (!online || !rec.boothSessionId) {
@@ -156,6 +158,11 @@ export function publicAnchorStatus(
     deviceLabel: rec.deviceLabel,
     guestCount: rec.guestCount,
   };
+}
+
+/** Operator remote requires a live Engine WSS, not grace-period degraded. */
+export function canMintOperatorCap(status: PublicAnchorStatus): boolean {
+  return status.online && status.presence === "online";
 }
 
 export function verifyAnchorSecretHash(

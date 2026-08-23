@@ -1,6 +1,14 @@
 import type { BoothEnvelope, BoothStateSnapshot } from "@pg/roster/boothChannel";
+import {
+  broadcastSessionChat,
+  isSessionChatMessage,
+} from "@pg/roster/rosterSessionChat";
+import { isSessionChatCtlMessage } from "@pg/roster/rosterSessionChatCtl";
 import { createBoothAnchorHost, type BoothAnchorHost } from "./boothPlatform";
-import { roomTvBindStream } from "./goRoom";
+import { roomHostDisplayName, roomTvBindStream } from "./goRoom";
+import { goAuth } from "./goAuth.svelte";
+import { goRoomFiles } from "./goRoomFiles.svelte";
+import { goSessionChat } from "./goSessionChat.svelte";
 import type { RoomStatus } from "./roomRuntime";
 
 export const GO_ROOM_REMOTE_ANCHOR_KEY = "go_room_remote_anchor_v1";
@@ -28,6 +36,7 @@ export function createBoothAnchorBridge(ctx: {
   getStatus: () => RoomStatus;
   getOwnerUserId: () => string | null;
   getApiKey: () => string | null;
+  getHostPeerId: () => string;
   getCastSummary?: () => BoothStateSnapshot["cast"];
   getRemoteLives?: () => Array<{
     peerId: string;
@@ -40,10 +49,34 @@ export function createBoothAnchorBridge(ctx: {
     offerWire: string;
   }) => Promise<string>;
   onOperatorCastLive: (peerId: string, label?: string) => Promise<void>;
+  onOperatorCastFile: (
+    fileId: string,
+    scope?: "share" | "private"
+  ) => Promise<void>;
+  onOperatorStopTv: () => Promise<void>;
+  onOperatorHaltLive: (
+    peerId: string,
+    layer: "audio" | "video"
+  ) => Promise<void>;
   onOperatorMintInvite: () => Promise<void>;
   onOperatorKickPeer: (peerId: string) => Promise<void>;
   onOperatorEndBooth: () => Promise<void>;
+  onOperatorStartAutoPlay: (catalogId: string) => Promise<{
+    ok: boolean;
+    reason?: string;
+    missingRoles?: string[];
+  }>;
+  onOperatorStartManualPlay: (
+    catalogId: string,
+    picks: { role: string; peerId: string }[]
+  ) => Promise<{
+    ok: boolean;
+    reason?: string;
+    missingRoles?: string[];
+  }>;
+  onOperatorEndPlay: () => Promise<{ ok: boolean; reason?: string }>;
   getTvProgramStream?: () => MediaStream | null;
+  fanoutChat?: (msg: unknown) => void;
 }): BoothAnchorBridge {
   const boothSessionId = crypto.randomUUID();
   let enabled = readRemoteAnchorEnabled();
@@ -59,30 +92,63 @@ export function createBoothAnchorBridge(ctx: {
           ? "expired"
           : "none";
     const lives = ctx.getRemoteLives?.() ?? [];
+    const hostPeerId = ctx.getHostPeerId();
+    const hostName = roomHostDisplayName(goAuth.profile);
+    const shareEntries = goRoomFiles.catalogItems().map((item) => {
+      const listed = goRoomFiles.entries.find((e) => e.id === item.id);
+      return {
+        id: item.id,
+        name: item.name,
+        size: item.size,
+        mime: listed?.mime,
+        status:
+          listed?.status === "ready" ||
+          listed?.status === "receiving" ||
+          listed?.status === "error"
+            ? listed.status
+            : ("ready" as const),
+      };
+    });
+    const chatTail = goSessionChat.messages
+      .slice(-40)
+      .map((chat) => ({ ...chat }));
     return {
       sessionId: boothSessionId,
       ownerUserId: ctx.getOwnerUserId() ?? "",
       engineMode: "embedded",
-      members: s.occupantPeers.map((p) => {
-        const live = lives.find((l) => l.peerId === p.peerId);
-        return {
-          peerId: p.peerId,
-          displayName: p.name,
-          kind: "guest" as const,
-          isHost: false,
-          live: live
-            ? {
-                camera: live.camera,
-                mic: live.mic,
-                display: false,
-              }
-            : undefined,
-        };
-      }),
+      hostPeerId,
+      hostDisplayName: hostName,
+      members: [
+        {
+          peerId: hostPeerId,
+          displayName: hostName,
+          kind: "operator",
+          isHost: true,
+        },
+        ...s.occupantPeers.map((p) => {
+          const live = lives.find((l) => l.peerId === p.peerId);
+          return {
+            peerId: p.peerId,
+            displayName: p.name,
+            kind: "guest" as const,
+            isHost: false,
+            live: live
+              ? {
+                  camera: live.camera,
+                  mic: live.mic,
+                  display: false,
+                }
+              : undefined,
+          };
+        }),
+      ],
       cast: ctx.getCastSummary?.(),
       inviteGate,
       inviteShortUrl: s.shortUrl ?? undefined,
-      shareFileCount: 0,
+      inviteExpiresAt: s.inviteExpiresAt ?? undefined,
+      shareFileCount: shareEntries.length,
+      shareFiles: shareEntries,
+      chatTail,
       guestCount: s.guestCount,
       anchor: host ? "online" : "registering",
     };
@@ -99,10 +165,34 @@ export function createBoothAnchorBridge(ctx: {
         peerId?: string;
         kind?: string;
         label?: string;
+        id?: string;
+        scope?: "share" | "private";
       };
       if (payload?.kind === "live" && payload.peerId) {
         await ctx.onOperatorCastLive(payload.peerId, payload.label);
+        return;
       }
+      if (payload?.kind === "file" && payload.id) {
+        await ctx.onOperatorCastFile(payload.id, payload.scope);
+        return;
+      }
+      throw new Error("invalid_cast_offer");
+    }
+    if (frame.type === "booth.intent.cast.unoffer") {
+      await ctx.onOperatorStopTv();
+      return;
+    }
+    if (frame.type === "booth.intent.live.halt") {
+      const payload = frame.payload as {
+        peerId?: string;
+        layer?: "audio" | "video";
+      };
+      const peerId = payload?.peerId?.trim();
+      const layer = payload?.layer;
+      if (!peerId || (layer !== "audio" && layer !== "video")) {
+        throw new Error("invalid_halt");
+      }
+      await ctx.onOperatorHaltLive(peerId, layer);
       return;
     }
     if (frame.type === "booth.intent.invite.mint") {
@@ -119,10 +209,55 @@ export function createBoothAnchorBridge(ctx: {
       await ctx.onOperatorEndBooth();
       return;
     }
+    if (frame.type === "booth.intent.play.start") {
+      const payload = frame.payload as {
+        catalogId?: string;
+        mode?: "auto" | "manual";
+        seats?: { role: string; peerId: string }[];
+      };
+      const catalogId = payload?.catalogId?.trim();
+      if (!catalogId) throw new Error("missing_catalog");
+      if (payload?.mode === "manual") {
+        const out = await ctx.onOperatorStartManualPlay(
+          catalogId,
+          payload.seats ?? []
+        );
+        if (!out.ok) throw new Error(out.reason ?? "play_start_failed");
+        return;
+      }
+      const out = await ctx.onOperatorStartAutoPlay(catalogId);
+      if (!out.ok) throw new Error(out.reason ?? "play_start_failed");
+      return;
+    }
+    if (frame.type === "booth.intent.play.end") {
+      const out = await ctx.onOperatorEndPlay();
+      if (!out.ok) throw new Error(out.reason ?? "play_end_failed");
+      return;
+    }
+    if (frame.type === "booth.intent.chat.send") {
+      const payload = frame.payload as { message?: unknown };
+      const msg = payload?.message;
+      if (!isSessionChatMessage(msg) && !isSessionChatCtlMessage(msg)) {
+        throw new Error("invalid_chat");
+      }
+      if (ctx.fanoutChat) {
+        ctx.fanoutChat(msg);
+        return;
+      }
+      throw new Error("chat_unavailable");
+    }
     throw new Error("unsupported_intent");
   }
 
+  async function stopHost(): Promise<void> {
+    if (host) {
+      await host.stop();
+      host = null;
+    }
+  }
+
   async function ensureStarted(): Promise<void> {
+    if (!enabled) return;
     if (ctx.getStatus().phase !== "open") return;
     const key = ctx.getApiKey();
     if (!key) return;
@@ -167,7 +302,11 @@ export function createBoothAnchorBridge(ctx: {
     async setEnabled(next: boolean) {
       enabled = next;
       writeRemoteAnchorEnabled(next);
-      if (next) await ensureStarted();
+      if (next) {
+        await ensureStarted();
+      } else {
+        await stopHost();
+      }
     },
     onBoothOpen() {
       return ensureStarted();
@@ -179,10 +318,7 @@ export function createBoothAnchorBridge(ctx: {
       host?.refreshProgram();
     },
     async stop() {
-      if (host) {
-        await host.stop();
-        host = null;
-      }
+      await stopHost();
     },
   };
 }

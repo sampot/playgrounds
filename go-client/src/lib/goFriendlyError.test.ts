@@ -124,6 +124,12 @@ describe("goFriendlyError", () => {
     expect(msg).not.toMatch(/remote_disabled/i);
   });
 
+  it("operator engine_offline is plain Chinese", () => {
+    const msg = friendlyOperatorError(new Error("engine_offline"));
+    expect(msg).toContain("包廂");
+    expect(msg).not.toMatch(/engine_offline/i);
+  });
+
   it("operator ack maps not_director", () => {
     expect(friendlyOperatorAckError("not_director")).toContain("檢視");
     expect(friendlyOperatorAckError("not_director")).not.toMatch(/not_director/i);

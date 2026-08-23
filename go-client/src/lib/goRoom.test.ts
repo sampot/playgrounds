@@ -1785,8 +1785,8 @@ describe("roomTvSnow", () => {
     expect(roomTvSnowEnabled(storage)).toBe(false);
     setRoomTvSnowEnabled(true, storage);
     expect(roomTvSnowEnabled(storage)).toBe(true);
-    expect(GO_ROOM_SETTINGS_TV_SNOW_LABEL).toContain("雪花");
-    expect(GO_ROOM_SETTINGS_TV_SNOW_HINT).toContain("裝置");
+    expect(GO_ROOM_SETTINGS_TV_SNOW_LABEL).toContain("關閉");
+    expect(GO_ROOM_SETTINGS_TV_SNOW_HINT).toContain("純黑");
   });
 });
 

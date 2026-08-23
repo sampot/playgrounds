@@ -81,7 +81,7 @@ vi.mock("./goAuth.svelte", () => ({
 
 
 vi.mock("./goSessionChat.svelte", () => ({
-  goSessionChat: {
+    goSessionChat: {
     attach: fixtures.chatAttach,
     detach: fixtures.chatDetach,
     setUiPhase: vi.fn(),
@@ -89,17 +89,20 @@ vi.mock("./goSessionChat.svelte", () => ({
     setBroadcast: fixtures.chatSetBroadcast,
     onIncoming: vi.fn(),
     connected: false,
+    feed: [],
   },
 }));
 
 vi.mock("./goRoomFiles.svelte", () => ({
-  goRoomFiles: {
+    goRoomFiles: {
     attach: fixtures.filesAttach,
     detach: fixtures.filesDetach,
     onControl: vi.fn(),
     onBinary: vi.fn(),
     catalogItems: () => [],
+    entries: [],
     listingOwner: () => null,
+    listingMeta: () => null,
     forgetOwner: () => [],
   },
 }));

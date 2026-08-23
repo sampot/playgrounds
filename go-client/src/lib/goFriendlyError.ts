@@ -212,6 +212,15 @@ export function friendlyOperatorError(err: unknown): string {
     return "主持已關閉遠端連回。請在家裡包廂設定中開啟後再試。";
   }
 
+  if (
+    lower === "engine_offline" ||
+    lower === "operator_hello_timeout" ||
+    /engine_offline/.test(lower) ||
+    /operator_hello_timeout/.test(lower)
+  ) {
+    return "家裡包廂未連線。請確認包廂分頁仍開啟、保持作用中，且已開啟「允許遠端連回包廂」。";
+  }
+
   if (isLikelyRateLimited(err)) {
     return "現在連線的人有點多，請稍後再試一次。";
   }

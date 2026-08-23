@@ -5,8 +5,12 @@ export type BoothSnapshotUi = {
   guestCount: number;
   inviteDoor: RoomInviteDoor;
   shortUrl: string | null;
+  inviteExpiresAt: number | null;
+  hostPeerId: string | null;
+  hostDisplayName: string | null;
   occupantPeers: { peerId: string; name: string }[];
   occupantNames: string[];
+  playCatalogId: string | null;
   tvOn: boolean;
   tvLabel: string | null;
   remoteLives: { peerId: string; camera: boolean; mic: boolean }[];
@@ -41,17 +45,31 @@ export function boothCastTvOn(cast: BoothStateSnapshot["cast"] | undefined): boo
 }
 
 export function boothSnapshotToUi(snapshot: BoothStateSnapshot): BoothSnapshotUi {
-  const occupantPeers = snapshot.members.map((m) => ({
+  const guestMembers = snapshot.members.filter((m) => !m.isHost);
+  const hostMember = snapshot.members.find((m) => m.isHost);
+  const occupantPeers = guestMembers.map((m) => ({
     peerId: m.peerId,
     name: m.displayName,
   }));
   const cast = snapshot.cast;
+  const playCatalogId =
+    cast?.kind === "play" && typeof cast.catalogId === "string"
+      ? cast.catalogId
+      : null;
   return {
     guestCount: snapshot.guestCount,
     inviteDoor: boothInviteDoor(snapshot.inviteGate),
     shortUrl: snapshot.inviteShortUrl ?? null,
+    inviteExpiresAt:
+      typeof snapshot.inviteExpiresAt === "number"
+        ? snapshot.inviteExpiresAt
+        : null,
+    hostPeerId: snapshot.hostPeerId ?? hostMember?.peerId ?? null,
+    hostDisplayName:
+      snapshot.hostDisplayName ?? hostMember?.displayName ?? null,
     occupantPeers,
     occupantNames: occupantPeers.map((p) => p.name),
+    playCatalogId,
     tvOn: boothCastTvOn(cast),
     tvLabel: boothCastTvLabel(cast),
     remoteLives: snapshot.members

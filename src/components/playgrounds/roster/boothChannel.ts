@@ -24,11 +24,21 @@ export type BoothErrorCode =
 
 export type BoothMemberKind = "guest" | "peer" | "operator";
 
+export type BoothShareFileSummary = {
+  id: string;
+  name: string;
+  size: number;
+  mime?: string;
+  status: "ready" | "receiving" | "error";
+};
+
 export type BoothStateSnapshot = {
   sessionId: string;
   ownerUserId: string;
   engineMode: "embedded" | "daemon";
   deviceLabel?: string;
+  hostPeerId?: string;
+  hostDisplayName?: string;
   members: Array<{
     peerId: string;
     displayName: string;
@@ -41,7 +51,10 @@ export type BoothStateSnapshot = {
   } & Record<string, unknown>;
   inviteGate: "none" | "live" | "expired";
   inviteShortUrl?: string;
+  inviteExpiresAt?: number;
   shareFileCount: number;
+  shareFiles?: BoothShareFileSummary[];
+  chatTail?: Array<Record<string, unknown>>;
   guestCount: number;
   anchor: "offline" | "registering" | "online" | "degraded";
   director?: { shellId: string; role: "host" | "operator" };

@@ -55,7 +55,11 @@
         error?: string;
       };
       if (!res.ok || !data.remoteUrl) {
-        dash.flash(data.error ?? "無法連回包廂", "err");
+        const msg =
+          data.error === "anchor_degraded"
+            ? "家裡包廂連線不穩，請確認包廂分頁仍開啟後再試"
+            : (data.error ?? "無法連回包廂");
+        dash.flash(msg, "err");
         return;
       }
       window.open(data.remoteUrl, "_blank", "noopener,noreferrer");
@@ -137,7 +141,7 @@
       <button
         type="button"
         class="pixel-btn pixel-btn--primary"
-        disabled={busy}
+        disabled={busy || presence === "degraded"}
         onclick={() => void connectRemote()}
       >
         連回包廂
