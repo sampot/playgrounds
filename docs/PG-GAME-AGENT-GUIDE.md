@@ -1,6 +1,6 @@
 # Playgrounds 遊戲開發指南（Coding Agent）
 
-> **狀態：** Draft（2026-08-17；修訂：2026-08-21 §8 包廂連線；既有 §2.5／§3.8／§3.6／§3.7／§1.1／§3.5／§2.4）  
+> **狀態：** Draft（2026-08-17；修訂：2026-08-23 §3.9 Canvas 舞台適配；既有 §8／§2.5／§3.8／§3.6／§3.7／§1.1／§3.5／§2.4）  
 > **讀者：** Coding agent（次要：人類作者）  
 > **範圍：** 獨立 `pg-*` 遊戲 repo；產物須能在 **go 純玩**（`https://go.samkuo.me/s/<id>`）與 **play 畫布**同契約執行；**多人連線**僅走包廂（§8）。  
 > **自足：** 開發遊戲時**只讀本檔**即可；不必讀宿主其它 SPEC／PLAN／源碼。上架型錄、改殼、加新 lib id **不在**本檔範圍。宿主下載協定細節見 [PG-GO-SAM-MANIFEST-PLAN.md](./PG-GO-SAM-MANIFEST-PLAN.md)（維護者；agent 以本檔 §2.5 為準即可）。包廂開局宿主落地見 [PG-GO-ROOM-PLAY-PLAN.md](./PG-GO-ROOM-PLAY-PLAN.md)（維護者；agent 以本檔 §8 為準即可）。  
@@ -84,7 +84,7 @@ cd pg-<name>
 - 把 matchmaking／WebRTC 塞進 `PG.libs.load`  
 - 在 `pg_surface=room` 再鑄「邀請對弈」／compose 掃碼當開局主路徑（人已在包廂）
 
-**平台義務（遊戲必須履行；多數是文件級硬規則，不是新 `PG.*`）：** 存檔走 `PG.kv`、錯誤頁內提示、生命週期暫停（§3.5）、輸入歸零（§3.2）、mobile-first、玩中 chrome 收合（§3.6）、直橫／桌面視口可玩（§3.7）、採納適用的業界共識並避開否決項（§3.8）；連線局另守 §8。
+**平台義務（遊戲必須履行；多數是文件級硬規則，不是新 `PG.*`）：** 存檔走 `PG.kv`、錯誤頁內提示、生命週期暫停（§3.5）、輸入歸零（§3.2）、mobile-first、玩中 chrome 收合（§3.6）、直橫／桌面視口可玩（§3.7）、採納適用的業界共識並避開否決項（§3.8）；主舞台為 `<canvas>` 時另守 §3.9；連線局另守 §8。
 
 ---
 
@@ -216,7 +216,7 @@ go 純玩（與日後型錄 game 下載主路徑）**只**依此清單向 GitHub
 - 可點控件熱區盡量 **≥44×44 CSS px**。
 - 佈局用 flex／stack；CSS 預設＝手機，用 `@media (min-width: …)` 加寬，不要反過來只靠 `max-width` 補丁。
 - go 頂列 chrome 可能出現／自動收合：HUD 勿假設「永遠全螢幕無邊」；優先 `100dvh`、留安全邊距。
-- **同時**支援手機與桌面、直式與橫式——見 §3.7；勿只做「直式長頁 + 桌面略加寬」。
+- **同時**支援手機與桌面、直式與橫式——見 §3.7；勿只做「直式長頁 + 桌面略加寬」。主舞台為全畫面 `<canvas>` 時見 **§3.9**。
 - **玩中**勿把開局設定／大標題／說明整頁常駐——見 §3.6。
 
 ### 3.2 行動觸控操控（虛擬搖桿／方向）
@@ -303,7 +303,8 @@ manager.on("end", () => {
 6. **美術／音效有實際用上**，且署名齊（§9）。  
 7. **生命週期（§3.5）**——背景／隱藏時不繼續吃輸入、不無意義燒 CPU／音訊。  
 8. **chrome 收合（§3.6）**——`playing` 時隱藏開局設定／大標題／常駐說明；相位切換改變可見 DOM，非只改文案。  
-9. **視口（§3.7）**——手機與桌面、直式與橫式皆可玩；短高橫式有重組，非僅加寬。
+9. **視口（§3.7）**——手機與桌面、直式與橫式皆可玩；短高橫式有重組，非僅加寬。  
+10. **Canvas 舞台（§3.9，若適用）**——主畫面用 `<canvas>` 時：邏輯座標固定、contain 縮放、DPR 正確、指標反算、旋轉只重算 layout。
 
 ### 3.5 生命週期（Suspend／Resume）
 
@@ -399,7 +400,7 @@ window.addEventListener("pagehide", suspend);
 
 - **禁止**以「請改直／請改橫」全屏擋玩；**禁止**依賴螢幕方向 lock。  
 - 旋轉／`resize`：**只重算 layout**，**不要**重置局況或清進度。  
-- 固定比例舞台：`aspect-ratio` + 在剩餘區 **contain**（`max-width`／`max-height: 100%`），避免固定 px 高度在短視口溢出或把操作頂出畫面。  
+- 固定比例舞台：`aspect-ratio` + 在剩餘區 **contain**（`max-width`／`max-height: 100%`），避免固定 px 高度在短視口溢出或把操作頂出畫面。主舞台為 `<canvas>` 時的程式契約見 **§3.9**。  
 - 方形盤面：邊長 ≈ `min(可用寬, 可用高) − chrome`。  
 - go 頂列玩中可能自動收合：用 `100dvh` + `env(safe-area-inset-*)`；左右邊緣中段留給殼把手（§3.2）。
 
@@ -419,13 +420,13 @@ window.addEventListener("pagehide", suspend);
 
 ### 3.8 業界共識（適用於本專案）
 
-以下為 HTML5／行動 Web 遊戲常見最佳實務中，**與 go／play iframe、直橫皆可玩、無外連 CDN** 相容、應採納的項目。細節實作仍以 §3.1–§3.7 為準；本節補「為什麼這樣做」的業界對齊，**不是**另開一套互相衝突的規範。
+以下為 HTML5／行動 Web 遊戲常見最佳實務中，**與 go／play iframe、直橫皆可玩、無外連 CDN** 相容、應採納的項目。細節實作仍以 §3.1–§3.9 為準；本節補「為什麼這樣做」的業界對齊，**不是**另開一套互相衝突的規範。
 
 #### 採用
 
 | 主題 | 準則 |
 | --- | --- |
-| **邏輯解析度** | 玩法用固定邏輯座標（或固定設計比例），視覺以 contain／必要時 letterbox 塞進視口；避免為每種螢幕重算世界單位 |
+| **邏輯解析度** | 玩法用固定邏輯座標（或固定設計比例），視覺以 contain／必要時 letterbox 塞進視口；避免為每種螢幕重算世界單位。主舞台為 `<canvas>` 時見 **§3.9** |
 | **裝置像素比** | 畫面需夠銳，但宜 **cap DPR（約 1.5–2）**，避免高 DPI 手機填四倍像素拖垮效能 |
 | **動態視口** | 用 `dvh`（或等價）與 `env(safe-area-inset-*)` 因應行動瀏覽器頂／底列伸縮；手測位址列展開與收合 |
 | **resize** | 轉向與視窗變化只重排 layout；可對 resize 做短 debounce（約 100–200ms），避免過渡期狂重算 |
@@ -447,7 +448,221 @@ window.addEventListener("pagehide", suspend);
 | 假設真正 Fullscreen API 為快樂路徑 | **勿**當必備；iPhone 限制多，殼已有頂列 chrome |
 | 為遊戲全面禁止頁面縮放當唯一防誤觸 | 優先玩法區 `touch-action: none`＋Pointer；勿犧牲可及性做整頁禁縮放 |
 
-產品特有約束（玩中 chrome 收合、單頁相位、殼／遊戲責任、`PG.libs`／`PG.kv`）以本檔其餘章節為準；外來教學若與上表「不要照抄」衝突，**以本檔為準**。
+產品特有約束（玩中 chrome 收合、單頁相位、殼／遊戲責任、`PG.libs`／`PG.kv`）以本檔其餘章節為準；外來教學若與上表「不要照抄」衝突，**以本檔為準**。純 Canvas 舞台的具體程式骨架見 §3.9。
+
+### 3.9 Canvas 舞台適配（純 2D `<canvas>`）
+
+主畫面（或主舞台）以 **HTML Canvas 2D** 繪製時，須把**邏輯座標**、**CSS 顯示尺寸**、**backing store 像素**分開處理。視口矩陣與旋轉語意仍守 §3.7；本節給 agent **可直接照抄的實作契約**。
+
+#### 適用範圍
+
+| 情況 | 作法 |
+| --- | --- |
+| 主舞台＝`<canvas>`（射擊、平台、像素風、簡易 2D） | **本節**（vanilla 2D API） |
+| `load("phaser")`／`load("pixi")` | 用引擎 **Scale／Resolution**（Phaser `scale`、Pixi `resize`）；**勿**再手寫一套與引擎衝突的 `canvas.width` 邏輯 |
+| 棋盤／牌桌／格子＝DOM 或 CSS Grid | CSS＋§3.7 即可；**不必**本節 |
+| Canvas 只當小圖示／QR／離屏緩衝 | 固定 px 可；主舞台仍須本節 |
+
+#### 三層尺寸（硬）
+
+```text
+邏輯世界（固定，例 320×240）  ← 碰撞、繪圖、存檔座標一律用這層
+    ↓ scale（contain 等比）
+CSS 顯示（例 390×293 px）     ← style.width／height；getBoundingClientRect
+    ↓ × dpr（cap 約 1.5–2，見 §3.8）
+Backing store（例 780×586）    ← canvas.width／height 屬性
+```
+
+**禁止**只靠 CSS `width:100%` 拉伸 `<canvas>` 卻不更新 `canvas.width`／`height`——會糊、座標錯、點擊偏移。
+
+#### 縮放策略（擇一為主）
+
+| 模式 | 公式要點 | 適用 |
+| --- | --- | --- |
+| **contain**（預設） | `scale = min(capW/worldW, capH/worldH)`；可能 letterbox | 固定比例舞台、像素風 |
+| **方形舞台** | 邊長 `≈ min(可用寬, 可用高) − chrome` | 棋類、對稱盤 |
+| **cover** | `scale = max(capW/worldW, capH/worldH)`；可能裁切 | 全屏背景；須記錄 offset |
+| **stretch** | 非等比拉滿 | **禁止**當預設（圓變橢圓） |
+
+矮橫視口（§3.7 短高橫式）須同時傳入**可用寬與高**做雙向 contain，勿只依容器寬度算高。
+
+#### 參考實作（可整段放進 `layout.js` 或 `app.js`）
+
+```js
+/** 固定邏輯世界尺寸——玩法只讀這組數字 */
+export const WORLD = { width: 320, height: 240 };
+
+/** cap DPR，避免 3× 手機填九倍像素 */
+export function cappedDpr(max = 2) {
+  const raw = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+  return Math.min(Math.max(1, raw), max);
+}
+
+/**
+ * 把世界 contain 進容器；containerHeight 省略時只依寬（仍 preserve aspect）。
+ * 回傳 scale 供繪圖與指標反算。
+ */
+export function computeCanvasLayout(containerWidth, containerHeight, dpr = 1) {
+  const aspect = WORLD.height / WORLD.width;
+  const capW = Math.max(1, containerWidth || 1);
+  let cssWidth = capW;
+  let cssHeight = Math.round(cssWidth * aspect);
+
+  if (containerHeight != null && containerHeight > 0) {
+    const capH = Math.max(1, containerHeight);
+    if (cssHeight > capH) {
+      cssHeight = capH;
+      cssWidth = Math.round(cssHeight / aspect);
+    }
+  }
+
+  cssWidth = Math.max(1, cssWidth);
+  cssHeight = Math.max(1, Math.round(cssWidth * aspect));
+  const scale = cssWidth / WORLD.width;
+  return {
+    cssWidth,
+    cssHeight,
+    dpr: Math.max(1, dpr),
+    scale,
+  };
+}
+
+/** 寫入 canvas 三層尺寸 */
+export function applyCanvasLayout(canvas, layout) {
+  canvas.width = Math.round(layout.cssWidth * layout.dpr);
+  canvas.height = Math.round(layout.cssHeight * layout.dpr);
+  canvas.style.width = `${layout.cssWidth}px`;
+  canvas.style.height = `${layout.cssHeight}px`;
+}
+
+/** 繪圖前：世界座標繪製，DPR＋scale 一次處理 */
+export function setWorldTransform(ctx, layout) {
+  const s = layout.dpr * layout.scale;
+  ctx.setTransform(s, 0, 0, s, 0, 0);
+}
+
+/** Pointer → 世界座標（content box，不含 border） */
+export function pointerToWorld(pointer, canvas, world = WORLD) {
+  const rect = canvas.getBoundingClientRect();
+  const x = pointer.clientX - rect.left - canvas.clientLeft;
+  const y = pointer.clientY - rect.top - canvas.clientTop;
+  const w = canvas.clientWidth;
+  const h = canvas.clientHeight;
+  if (w <= 0 || h <= 0) return null;
+  return {
+    x: (x / w) * world.width,
+    y: (y / h) * world.height,
+  };
+}
+```
+
+遊戲迴圈內：
+
+```js
+function paint(ctx, layout) {
+  ctx.save();
+  ctx.imageSmoothingEnabled = false; // 像素風；平滑 2D 可 true
+  setWorldTransform(ctx, layout);
+  // 以下全部用 WORLD 座標：fillRect(0, 0, WORLD.width, WORLD.height) …
+  ctx.restore();
+}
+```
+
+#### 版面與 resize（硬）
+
+1. **外殼**用 flex／grid 吃掉剩餘空間；舞台容器 `flex:1; min-height:0`（短視口才縮得下）。  
+2. **`ResizeObserver`** 觀察舞台**容器**（優於只聽 `window.resize`）；鍵盤彈起、iframe 縮放、旋轉都會觸發。  
+3. 回呼內：`layout = computeCanvasLayout(el.clientWidth, el.clientHeight, cappedDpr())` → `applyCanvasLayout(canvas, layout)` → 重繪。**不要**重置局況。  
+4. 可對 resize **debounce 100–200ms**，避免旋轉過渡期狂算。  
+5. 玩法區 canvas：`touch-action: none`（§3.2）。
+
+接線範例（`ResizeObserver`＋可選 debounce）：
+
+```js
+let layout = null;
+let resizeTimer = 0;
+
+function applyLayout() {
+  const wrap = document.querySelector(".stage-wrap");
+  const canvas = document.querySelector(".stage-wrap canvas");
+  if (!wrap || !canvas) return;
+  layout = computeCanvasLayout(
+    wrap.clientWidth,
+    wrap.clientHeight,
+    cappedDpr()
+  );
+  applyCanvasLayout(canvas, layout);
+  paint(canvas.getContext("2d"), layout);
+}
+
+function scheduleLayout() {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(applyLayout, 150);
+}
+
+const ro = new ResizeObserver(scheduleLayout);
+ro.observe(document.querySelector(".stage-wrap"));
+applyLayout(); // 初載
+```
+
+#### CSS 外殼（建議）
+
+```css
+#game {
+  width: 100%;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+.stage-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stage-wrap canvas {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  /* 實際寬高由 JS applyCanvasLayout 設定 */
+}
+```
+
+`index.html` 須有 viewport meta（§2.4）。HUD／按鈕優先用 **DOM** 疊在舞台外或上下欄（§3.6 收合）；勿把整片 UI 畫進 canvas 再靠放大字。
+
+#### Phaser／Pixi 簡記
+
+已 `load("phaser")` 時：
+
+- 用 Phaser **Scale Manager**（例 `Phaser.Scale.FIT`／`RESIZE`＋固定 `width`／`height` 遊戲尺寸），讓引擎處理 DPR 與 letterbox。  
+- 指標用場景座標或 `camera.getWorldPoint`，**勿**再對主 canvas 手寫 `pointerToWorld` 與引擎搶 transform。  
+- `pagehide`／隱藏時 `scene.pause`＋銷毀慣例仍守 §3.5。
+
+#### 否決（常見 agent 錯誤）
+
+| 錯誤 | 後果 |
+| --- | --- |
+| 開局寫死 `canvas.width = 800` 永不更新 | 大螢幕糊、小螢幕裁切或橫向捲動 |
+| 只改 CSS 尺寸不改 backing store | 模糊、點擊錯位 |
+| 旋轉／resize 時 `resetGame()` | 違反 §3.7 |
+| 用 `innerWidth` 當世界寬度重算實體位置 | 換機即壞；應固定 WORLD＋scale |
+| 每幀改 `canvas.width` | 效能差、閃爍 |
+| 主舞台 stretch 填滿 | 比例失真 |
+| 高 DPI 不 cap DPR | 發熱、掉幀 |
+
+#### 驗收（手測，疊加 §3.7 四視口）
+
+- [ ] 四視口下舞台完整可見、無主 chrome 橫向捲動  
+- [ ] 直↔橫旋轉：畫面重排、**局況不變**、點擊仍準  
+- [ ] 視覺銳利（DPR 有套、像素風未糊成漸層）  
+- [ ] `playing` 時舞台佔 §3.6 垂直預算主體；虛擬鍵在 safe-area 內（§3.2）
+
+純函式 `computeCanvasLayout`／`pointerToWorld` 建議寫進 `tests/layout.test.js`（Vitest），用固定輸入斷言 `scale` 與座標。
 
 ---
 
@@ -604,10 +819,12 @@ const PIXI = await PG.libs.load("pixi");             // ESM
 ```text
 桌遊／牌／消消／數獨／問答／簡易 DOM 或 2D canvas
   → vanilla（不要 load）
+  → 主舞台為全畫面 <canvas> 時：§3.9（邏輯座標＋contain＋DPR）
 
 需要完整 2D 場景／精靈／相機／tilemap
   → load("phaser")
   → 優先用 Phaser 內建 Arcade／tween／簡易音，勿無故再疊 Matter+Howler+Tone
+  → 縮放用 Phaser Scale Manager，勿與 §3.9 手寫邏輯衝突
 
 只要輕量渲染
   → pixi；不要與 phaser 雙載
@@ -884,10 +1101,11 @@ npx vitest run
 22. 只做直式長頁＋`min-width` 略加寬，短高橫式無法玩或需「請旋轉」（違反 §3.7）  
 23. 旋轉螢幕重置整局，或固定 px 畫布在矮視口溢出／擋操作  
 24. 照抄「請旋轉」／orientation lock／依賴 Fullscreen 當唯一可玩條件（違反 §3.8）  
-25. 無 `sam-manifest.json`，或 `files` 漏列執行期資源／改檔不 bump `rev`（違反 §2.5）  
-26. 把 `/s/<id>` 做成多人連線快樂路徑，或在包廂 `room` 面再鑄 compose／掃第二張邀請（違反 §8）  
-27. 連線局讓訪客改發牌／先手／再來一局等設定，或 `functions.js` 不拒非主持設定 `act`（違反 §8.3）  
-28. 連線局主持／訪客／觀戰同一套設定控件，或角色切換只改文案不改 DOM（違反 §8.4）
+25. 主舞台 `<canvas>` 只靠 CSS 拉伸、或寫死 `canvas.width`／`height` 不隨容器更新；resize 重置局況；指標未反算世界座標（違反 §3.9）  
+26. 無 `sam-manifest.json`，或 `files` 漏列執行期資源／改檔不 bump `rev`（違反 §2.5）  
+27. 把 `/s/<id>` 做成多人連線快樂路徑，或在包廂 `room` 面再鑄 compose／掃第二張邀請（違反 §8）  
+28. 連線局讓訪客改發牌／先手／再來一局等設定，或 `functions.js` 不拒非主持設定 `act`（違反 §8.3）  
+29. 連線局主持／訪客／觀戰同一套設定控件，或角色切換只改文案不改 DOM（違反 §8.4）
 
 ---
 
@@ -905,6 +1123,7 @@ npx vitest run
 - [ ] §3.6：`playing` 收合 setup／大標題／常駐說明；結束用薄結果＋再來；非只改按鈕文案  
 - [ ] §3.7：直／橫＋手機／桌面四態可玩；短高橫式有重組；旋轉不重置局  
 - [ ] §3.8：採納適用業界項（邏輯解析度／DPR cap／Pointer＋熱區／背景暫停等）；未用請旋轉／orientation lock  
+- [ ] （主舞台為 `<canvas>`）§3.9：三層尺寸正確、contain、ResizeObserver、指標反算、旋轉不重置局  
 - [ ] 需持續移動時符合 §3.2（類比／拖曳／離散擇一；非唯小 D-pad；Pointer＋歸零）  
 - [ ] §3.5 生命週期：hidden／pagehide 時輸入歸零＋暫停迴圈／音訊；引擎有銷毀慣例  
 - [ ] 平台錯誤（KV 等）頁內提示，可降級續玩  
@@ -937,4 +1156,4 @@ npx vitest run
 
 ## 14. 給維護者的註腳（agent 可略）
 
-本檔內容摘自宿主契約（UI SDK、`PG.libs`、遊戲交付約束、UX／生命週期／畫面相位／視口硬規則、適用的業界 Web 遊戲共識、主機 SDK 責任借鑑、包廂 `session_play`／`pg_surface`）。若與殼上實際 `sdk.js`／`pin.json`／包廂行為衝突，以殼運行為準，並應回修本檔附表版本。Agent 開發遊戲時仍以本檔為唯一必讀。
+本檔內容摘自宿主契約（UI SDK、`PG.libs`、遊戲交付約束、UX／生命週期／畫面相位／視口硬規則、Canvas 舞台適配、適用的業界 Web 遊戲共識、主機 SDK 責任借鑑、包廂 `session_play`／`pg_surface`）。若與殼上實際 `sdk.js`／`pin.json`／包廂行為衝突，以殼運行為準，並應回修本檔附表版本。Agent 開發遊戲時仍以本檔為唯一必讀。
