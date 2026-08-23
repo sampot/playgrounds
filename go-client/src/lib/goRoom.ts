@@ -1,5 +1,6 @@
 /** Shared 包廂 copy and chat hints (Host＋Guest). */
 
+import type { BoothMemberKind } from "@pg/roster/boothChannel";
 import { SESSION_CHAT_HOST_DISPLAY_NAME } from "@pg/roster/rosterSessionChat";
 
 const EMAIL_LIKE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
@@ -855,9 +856,27 @@ export function roomStageStatus(opts: {
   return `${people} · ${tv}`;
 }
 
+export const GO_ROOM_MEMBER_KIND_GUEST = "訪客";
+export const GO_ROOM_MEMBER_KIND_PEER = "裝置";
+export const GO_ROOM_MEMBER_KIND_OPERATOR = "遠端";
+export const GO_ROOM_INVITE_REVOKE = "撤回邀請";
+export const GO_ROOM_INVITE_REVOKE_CONFIRM =
+  "撤回後舊連結會失效。已在場的人不受影響。";
+
+/** Badge for snapshot member kind (host uses GO_ROOM_ROLE_HOST separately). */
+export function roomMemberKindLabel(
+  kind: BoothMemberKind | undefined
+): string | null {
+  if (!kind || kind === "host") return null;
+  if (kind === "guest") return GO_ROOM_MEMBER_KIND_GUEST;
+  if (kind === "peer") return GO_ROOM_MEMBER_KIND_PEER;
+  return GO_ROOM_MEMBER_KIND_OPERATOR;
+}
+
 export type RoomOccupantPeer = {
   peerId: string;
   name: string;
+  kind?: BoothMemberKind;
 };
 
 /**
@@ -897,6 +916,7 @@ export type RoomOccupant = {
   mine: boolean;
   liveVideo: boolean;
   liveAudio: boolean;
+  memberKind?: BoothMemberKind;
 };
 
 /** In-booth roster: live camera／mic sit on the person, not in the share catalog. */
@@ -929,6 +949,7 @@ export function roomOccupantRows(opts: {
           mine: false,
           liveVideo: Boolean(live?.camera),
           liveAudio: Boolean(live?.mic),
+          memberKind: o.kind,
         };
       }),
   ];
@@ -956,6 +977,7 @@ export type RoomMemberCardView = {
   handRaised: boolean;
   /** Guest↔Guest mesh DataChannel open with local peer. */
   directLink: boolean;
+  kindLabel: string | null;
 };
 
 /** First visible grapheme for a letter avatar when there is no photo. */
@@ -1028,6 +1050,7 @@ export function roomMemberCard(opts: {
     onAir,
     handRaised: Boolean(opts.handRaised),
     directLink: Boolean(opts.directLink) && !opts.occupant.mine,
+    kindLabel: roomMemberKindLabel(opts.occupant.memberKind),
   };
 }
 

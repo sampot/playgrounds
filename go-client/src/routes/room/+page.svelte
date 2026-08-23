@@ -220,6 +220,7 @@
   occupantPeers={status?.occupantPeers ?? []}
   onLogin={() => goAuth.login()}
   onInvite={() => void mint()}
+  onRevokeInvite={() => void runtime.revokeInviteAndAnswer()}
   onEnd={() => runtime.close()}
   onKick={(peerId) => runtime.kickPeer(peerId)}
   onReissue={() => void runtime.openBooth({ afterEnd: true })}

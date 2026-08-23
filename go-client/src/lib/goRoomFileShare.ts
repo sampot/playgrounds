@@ -225,9 +225,18 @@ export function roomFileShareMenu(opts: {
 /** Overflow menu for a host private-library row. */
 export function roomFilePrivateMenu(opts: {
   kind: FileShareKind;
+  /** Operator remote hub — offer download from Hub storage. */
+  remoteHub?: boolean;
 }): RoomFileMenuItem[] {
   const acts = roomFilePrivateActions(opts);
   const items: RoomFileMenuItem[] = [];
+  if (opts.remoteHub) {
+    items.push({
+      action: "download",
+      label: GO_ROOM_FILE_DOWNLOAD,
+      enabled: true,
+    });
+  }
   if (acts.cast) {
     items.push({
       action: "cast",

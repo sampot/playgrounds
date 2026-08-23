@@ -215,6 +215,18 @@ describe("roomRuntime", () => {
     expect(rt.getStatus().shortUrl).toBe("https://go.samkuo.me/i/abc123");
   });
 
+  it("revokes the live door without minting a new invite", async () => {
+    const { createRoomRuntime } = await import("./roomRuntime");
+    const rt = createRoomRuntime();
+    await rt.openBooth();
+    await rt.mintInviteAndAnswer();
+    await rt.revokeInviteAndAnswer();
+    expect(rt.getStatus().inviteDoor).toBe("expired");
+    expect(rt.getStatus().shortUrl).toBeNull();
+    expect(fixtures.revoke).toHaveBeenCalledWith("inv-room");
+    expect(fixtures.mint).toHaveBeenCalledTimes(1);
+  });
+
   it("does not remint while the door is still live", async () => {
     const { createRoomRuntime } = await import("./roomRuntime");
     const rt = createRoomRuntime();

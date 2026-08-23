@@ -86,6 +86,10 @@ import {
   type RoomInviteSessionSnapshot,
 } from "./goRoomInviteSession";
 import { createBoothAnchorBridge } from "./boothAnchorBridge";
+import {
+  applyBoothCastStateToMedia,
+  boothCastSummaryFromProgram,
+} from "./boothCastState";
 import { createRoomGuestJoinAcceptor } from "./roomBoothJoinHost";
 
 export type RoomPhase = "idle" | "open" | "ended" | "error";
@@ -167,6 +171,15 @@ export function createRoomRuntime(opts?: {
   };
   const listeners = new Set<Listener>();
   let inviteExpiryTimer: ReturnType<typeof setTimeout> | null = null;
+  let castClockPublishTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function scheduleCastSnapshot(): void {
+    if (castClockPublishTimer) return;
+    castClockPublishTimer = setTimeout(() => {
+      castClockPublishTimer = null;
+      anchorBridge.publishSnapshot();
+    }, 400);
+  }
   const slots: PeerSlot[] = [];
   let surfaceAttached = false;
   let closing = false;
@@ -198,6 +211,15 @@ export function createRoomRuntime(opts?: {
 
   const operatorHooks = {
     mintInvite: async (): Promise<void> => {
+      throw new Error("room_runtime_not_ready");
+    },
+    revokeInvite: async (): Promise<void> => {
+      throw new Error("room_runtime_not_ready");
+    },
+    castState: async (_payload: {
+      paused?: boolean;
+      t?: number;
+    }): Promise<void> => {
       throw new Error("room_runtime_not_ready");
     },
     kickPeer: async (_peerId: string): Promise<void> => {
@@ -287,13 +309,15 @@ export function createRoomRuntime(opts?: {
           label: peer?.name ?? goRoomMedia.remoteProgramName ?? undefined,
         };
       }
-      const program =
-        goRoomMedia.remoteProgramName?.trim() ||
-        goRoomMedia.programName?.trim() ||
-        null;
-      if (program) {
-        return { kind: "file" as const, name: program };
-      }
+      const fileCast = boothCastSummaryFromProgram({
+        programName: goRoomMedia.programName,
+        remoteProgramName: goRoomMedia.remoteProgramName,
+        programTransport: goRoomMedia.programTransport,
+        programPaused: goRoomMedia.programPaused,
+        programTime: goRoomMedia.programTime,
+        programDuration: goRoomMedia.programDuration,
+      });
+      if (fileCast && fileCast.kind === "file") return fileCast;
       if (status.playCatalogId) {
         return { kind: "play" as const, catalogId: status.playCatalogId };
       }
@@ -324,6 +348,8 @@ export function createRoomRuntime(opts?: {
       if (!out.ok) throw new Error(out.error);
     },
     onOperatorMintInvite: () => operatorHooks.mintInvite(),
+    onOperatorRevokeInvite: () => operatorHooks.revokeInvite(),
+    onOperatorCastState: (payload) => operatorHooks.castState(payload),
     onOperatorKickPeer: (peerId) => operatorHooks.kickPeer(peerId),
     onOperatorEndBooth: () => operatorHooks.endBooth(),
     onOperatorStartAutoPlay: (catalogId) => operatorHooks.startAutoPlay(catalogId),
@@ -506,6 +532,7 @@ export function createRoomRuntime(opts?: {
         anchorBridge.refreshProgram();
         anchorBridge.publishSnapshot();
       },
+      onProgramClock: scheduleCastSnapshot,
     });
   }
 
@@ -723,6 +750,17 @@ export function createRoomRuntime(opts?: {
       Boolean(status.shortUrl) &&
       isInviteUnexpired(status.inviteExpiresAt)
     );
+  }
+
+  function revokeInviteDoor(): void {
+    const inviteId = status.inviteId;
+    if (!inviteId) return;
+    expireDoor(inviteId);
+  }
+
+  async function revokeInviteAndAnswer(): Promise<void> {
+    revokeInviteDoor();
+    anchorBridge.publishSnapshot();
   }
 
   function expireDoor(inviteId: string): void {
@@ -1244,6 +1282,14 @@ export function createRoomRuntime(opts?: {
   operatorHooks.mintInvite = async () => {
     await mintInviteAndAnswer();
   };
+  operatorHooks.revokeInvite = async () => {
+    revokeInviteDoor();
+    anchorBridge.publishSnapshot();
+  };
+  operatorHooks.castState = async (payload) => {
+    applyBoothCastStateToMedia(goRoomMedia, payload);
+    anchorBridge.publishSnapshot();
+  };
   operatorHooks.kickPeer = async (peerId: string) => {
     kickPeer(peerId);
   };
@@ -1289,6 +1335,7 @@ export function createRoomRuntime(opts?: {
     endPlay,
     openBooth,
     mintInviteAndAnswer,
+    revokeInviteAndAnswer,
     kickPeer,
     close,
     setRemoteAnchorEnabled: (enabled: boolean) => anchorBridge.setEnabled(enabled),

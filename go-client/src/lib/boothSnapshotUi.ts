@@ -1,5 +1,7 @@
-import type { BoothStateSnapshot } from "@pg/roster/boothChannel";
+import type { BoothStateSnapshot, BoothMemberKind } from "@pg/roster/boothChannel";
 import type { RoomInviteDoor } from "./goRoom";
+
+export { boothCastProgramClock, type BoothCastProgramClock } from "./boothCastState";
 
 export type BoothSnapshotUi = {
   guestCount: number;
@@ -8,12 +10,13 @@ export type BoothSnapshotUi = {
   inviteExpiresAt: number | null;
   hostPeerId: string | null;
   hostDisplayName: string | null;
-  occupantPeers: { peerId: string; name: string }[];
+  occupantPeers: { peerId: string; name: string; kind: BoothMemberKind }[];
   occupantNames: string[];
   playCatalogId: string | null;
   tvOn: boolean;
   tvLabel: string | null;
   remoteLives: { peerId: string; camera: boolean; mic: boolean }[];
+  anchor: BoothStateSnapshot["anchor"];
 };
 
 export function boothInviteDoor(
@@ -44,12 +47,22 @@ export function boothCastTvOn(cast: BoothStateSnapshot["cast"] | undefined): boo
   return Boolean(cast && cast.kind !== "idle");
 }
 
+export function boothAnchorStatusLabel(
+  anchor: BoothStateSnapshot["anchor"]
+): string | null {
+  if (anchor === "online") return null;
+  if (anchor === "registering") return "包廂引擎連線中…";
+  if (anchor === "degraded") return "包廂連線不穩定";
+  return "家裡包廂已離線";
+}
+
 export function boothSnapshotToUi(snapshot: BoothStateSnapshot): BoothSnapshotUi {
   const guestMembers = snapshot.members.filter((m) => !m.isHost);
   const hostMember = snapshot.members.find((m) => m.isHost);
   const occupantPeers = guestMembers.map((m) => ({
     peerId: m.peerId,
     name: m.displayName,
+    kind: m.kind,
   }));
   const cast = snapshot.cast;
   const playCatalogId =
@@ -79,5 +92,6 @@ export function boothSnapshotToUi(snapshot: BoothStateSnapshot): BoothSnapshotUi
         camera: Boolean(m.live?.camera),
         mic: Boolean(m.live?.mic),
       })),
+    anchor: snapshot.anchor,
   };
 }

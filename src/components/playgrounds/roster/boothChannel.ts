@@ -10,6 +10,7 @@ export type BoothSubscribeScope =
   | "cast"
   | "inviteGate"
   | "shareFiles"
+  | "privateFiles"
   | "chatTail"
   | "engineHealth"
   | "director";
@@ -20,17 +21,24 @@ export type BoothErrorCode =
   | "session_ended"
   | "invalid_intent"
   | "invite_gate"
-  | "cast_rejected";
+  | "cast_rejected"
+  | "not_owner"
+  | "private_not_found"
+  | "transfer_rejected";
 
-export type BoothMemberKind = "guest" | "peer" | "operator";
+export type BoothMemberKind = "host" | "guest" | "peer" | "operator";
 
-export type BoothShareFileSummary = {
+/** Share or private library entry metadata (bytes via Owner file channel or local FS). */
+export type BoothFileSummary = {
   id: string;
   name: string;
   size: number;
   mime?: string;
   status: "ready" | "receiving" | "error";
 };
+
+/** @deprecated Use BoothFileSummary */
+export type BoothShareFileSummary = BoothFileSummary;
 
 export type BoothStateSnapshot = {
   sessionId: string;
@@ -53,7 +61,9 @@ export type BoothStateSnapshot = {
   inviteShortUrl?: string;
   inviteExpiresAt?: number;
   shareFileCount: number;
-  shareFiles?: BoothShareFileSummary[];
+  shareFiles?: BoothFileSummary[];
+  privateFileCount?: number;
+  privateFiles?: BoothFileSummary[];
   chatTail?: Array<Record<string, unknown>>;
   guestCount: number;
   anchor: "offline" | "registering" | "online" | "degraded";
@@ -67,6 +77,23 @@ export type BoothEnvelope = {
   ts?: number;
   [key: string]: unknown;
 };
+
+export type BoothOwnerChunk = {
+  type: "booth.owner.chunk";
+  v: typeof BOOTH_CHANNEL_VERSION;
+  transferId: string;
+  seq: number;
+  eof?: boolean;
+};
+
+export function isBoothOwnerChunk(raw: unknown): raw is BoothOwnerChunk {
+  if (!isBoothEnvelope(raw)) return false;
+  return (
+    raw.type === "booth.owner.chunk" &&
+    typeof raw.transferId === "string" &&
+    typeof raw.seq === "number"
+  );
+}
 
 export type AnchorSignalFrame = {
   type: "anchor.signal";

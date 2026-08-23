@@ -135,10 +135,13 @@
         <span class="member-live">{GO_ROOM_ON_AIR}</span>
       {/if}
     </span>
-    {#if card.host || card.presenter}
+    {#if card.host || card.presenter || card.kindLabel}
       <span class="member-roles">
         {#if card.host}
           <span class="member-role member-role--host">{GO_ROOM_ROLE_HOST}</span>
+        {/if}
+        {#if card.kindLabel}
+          <span class="member-role member-role--kind">{card.kindLabel}</span>
         {/if}
         {#if card.presenter}
           <span class="member-role member-role--presenter">{GO_ROOM_ROLE_PRESENTER}</span>
@@ -426,6 +429,9 @@
   }
   .member-role--presenter {
     background: color-mix(in oklab, rgb(var(--accent)) 28%, rgb(var(--card)));
+  }
+  .member-role--kind {
+    background: color-mix(in oklab, rgb(var(--ink)) 8%, rgb(var(--card)));
   }
   .member-media {
     display: flex;

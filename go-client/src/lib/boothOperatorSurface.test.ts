@@ -15,7 +15,16 @@ vi.mock("./goSessionChat.svelte", () => ({
 vi.mock("./goRoomFiles.svelte", () => ({
   goRoomFiles: {
     setMirrorEntries: vi.fn(),
-    clearMirrorEntries: vi.fn(),
+    attachOperatorMirror: vi.fn(),
+    clearOperatorMirror: vi.fn(),
+  },
+}));
+
+vi.mock("./goRoomPrivateFiles.svelte", () => ({
+  goRoomPrivateFiles: {
+    attachOperatorMirror: vi.fn(),
+    clearMirror: vi.fn(),
+    setMirrorEntries: vi.fn(),
   },
 }));
 

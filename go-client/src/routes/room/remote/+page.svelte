@@ -78,6 +78,9 @@
     <p role="alert">請從後台「連回包廂」開啟此頁，或使用有效連結。</p>
   </main>
 {:else if status}
+  {#if status.anchorHint}
+    <p class="remote-anchor-hint" role="status">{status.anchorHint}</p>
+  {/if}
   {#if status.lastAck}
     <p class="remote-ack muted" role="status">{status.lastAck}</p>
   {/if}
@@ -102,14 +105,21 @@
     operatorTvLabel={status.tvLabel}
     operatorTvStream={status.tvOn ? status.tvStream : null}
     operatorCanDirect={status.canDirect}
+    operatorProgramTransport={status.programTransport}
+    operatorProgramPaused={status.programPaused}
+    operatorProgramTime={status.programTime}
+    operatorProgramDuration={status.programDuration}
     operatorRemoteLives={status.remoteLives}
     onInvite={() => remoteShell?.mintInvite()}
+    onRevokeInvite={() => remoteShell?.revokeInvite()}
     onEnd={() => remoteShell?.endBooth()}
     onKick={(peerId) => remoteShell?.kickPeer(peerId)}
     onCastLive={(peerId, name) => remoteShell?.putLiveOnTv(peerId, name)}
-    onOperatorCastFile={(fileId) => remoteShell?.putFileOnTv(fileId)}
+    onOperatorCastFile={(fileId, scope) =>
+      remoteShell?.putFileOnTv(fileId, scope ?? "share")}
     onOperatorStopTv={() => remoteShell?.stopTv()}
     onOperatorHaltLive={(peerId, layer) => remoteShell?.haltLive(peerId, layer)}
+    onOperatorCastState={(payload) => remoteShell?.sendCastState(payload)}
     onStartPlay={(catalogId) => remoteShell?.startAutoPlay(catalogId)}
     onStartManualPlay={(catalogId, picks) =>
       remoteShell?.startManualPlay(catalogId, picks)}
@@ -122,6 +132,12 @@
     max-width: 28rem;
     margin: 0 auto;
     padding: 1.5rem 1rem;
+  }
+  .remote-anchor-hint {
+    text-align: center;
+    font-size: 0.85rem;
+    margin: 0.5rem 0 0;
+    color: rgb(var(--accent, 180 80 40));
   }
   .remote-ack {
     text-align: center;

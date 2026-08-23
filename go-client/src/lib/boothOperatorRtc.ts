@@ -12,6 +12,7 @@ import {
   buildRosterRtcConfiguration,
   reserveBoothMediaTransceivers,
 } from "@pg/roster/rosterPeer";
+import { BOOTH_OWNER_DC_LABEL } from "./boothOwnerFileWire";
 
 export type OperatorRtcSend = (frame: AnchorSignalFrame) => void;
 
@@ -84,6 +85,7 @@ function createOperatorIceQueue(getPc: () => RTCPeerConnection | null) {
 export function createBoothOperatorRtc(opts: {
   sendSignal: OperatorRtcSend;
   onProgramStream: (stream: MediaStream | null) => void;
+  onOwnerChannel?: (dc: RTCDataChannel) => void;
 }) {
   let pc: RTCPeerConnection | null = null;
   let programStream: MediaStream | null = null;
@@ -113,6 +115,9 @@ export function createBoothOperatorRtc(opts: {
     emitProgram();
     reserveBoothMediaTransceivers(pc);
     applyBoothVideoCodecPreferences(pc);
+
+    const ownerDc = pc.createDataChannel(BOOTH_OWNER_DC_LABEL, { ordered: true });
+    ownerDc.onopen = () => opts.onOwnerChannel?.(ownerDc);
 
     pc.ontrack = (ev) => {
       const idx = pc?.getTransceivers().indexOf(ev.transceiver) ?? -1;
@@ -180,6 +185,7 @@ export function createBoothOperatorRtc(opts: {
 export function createBoothEngineOperatorRtc(opts: {
   sendSignal: OperatorRtcSend;
   getTvStream: () => MediaStream | null;
+  onOwnerChannel?: (dc: RTCDataChannel) => void;
 }) {
   let pc: RTCPeerConnection | null = null;
   const iceQueue = createOperatorIceQueue(() => pc);
@@ -203,6 +209,12 @@ export function createBoothEngineOperatorRtc(opts: {
       ensureBoothTransceiversSendrecv(pc);
       applyBoothVideoCodecPreferences(pc);
       await attachProgramTracks();
+
+      pc.ondatachannel = (ev) => {
+        if (ev.channel.label === BOOTH_OWNER_DC_LABEL) {
+          opts.onOwnerChannel?.(ev.channel);
+        }
+      };
 
       pc.onicecandidate = (ev) => {
         const serialized = serializeOperatorRtcCandidate(ev.candidate);

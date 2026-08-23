@@ -5,10 +5,17 @@ import {
 } from "@pg/roster/rosterSessionChat";
 import { isSessionChatCtlMessage } from "@pg/roster/rosterSessionChatCtl";
 import { createBoothAnchorHost, type BoothAnchorHost } from "./boothPlatform";
+import { createBoothOwnerFileHost } from "./boothOwnerFileChannel";
+import {
+  applyBoothCastStateToMedia,
+  parseBoothCastStatePayload,
+} from "./boothCastState";
 import { roomHostDisplayName, roomTvBindStream } from "./goRoom";
 import { goAuth } from "./goAuth.svelte";
 import { goRoomFiles } from "./goRoomFiles.svelte";
+import { goRoomPrivateFiles } from "./goRoomPrivateFiles.svelte";
 import { goSessionChat } from "./goSessionChat.svelte";
+import { newRoomPrivateFileId } from "./goRoomPrivateOpfs";
 import type { RoomStatus } from "./roomRuntime";
 
 export const GO_ROOM_REMOTE_ANCHOR_KEY = "go_room_remote_anchor_v1";
@@ -59,6 +66,11 @@ export function createBoothAnchorBridge(ctx: {
     layer: "audio" | "video"
   ) => Promise<void>;
   onOperatorMintInvite: () => Promise<void>;
+  onOperatorRevokeInvite: () => Promise<void>;
+  onOperatorCastState: (payload: {
+    paused?: boolean;
+    t?: number;
+  }) => Promise<void>;
   onOperatorKickPeer: (peerId: string) => Promise<void>;
   onOperatorEndBooth: () => Promise<void>;
   onOperatorStartAutoPlay: (catalogId: string) => Promise<{
@@ -82,6 +94,44 @@ export function createBoothAnchorBridge(ctx: {
   let enabled = readRemoteAnchorEnabled();
   let host: BoothAnchorHost | null = null;
   let starting: Promise<void> | null = null;
+  let ownerDc: RTCDataChannel | null = null;
+  let ownerFileHost: ReturnType<typeof createBoothOwnerFileHost> | null = null;
+
+  function ensureOwnerFileHost(): ReturnType<typeof createBoothOwnerFileHost> {
+    ownerFileHost ??= createBoothOwnerFileHost({
+      newPrivateId: () => newRoomPrivateFileId(),
+      importPrivateFile: async (file) => {
+        const err = await goRoomPrivateFiles.importFiles([file]);
+        if (err) return { ok: false as const, error: err };
+        host?.publishSnapshot();
+        return { ok: true as const };
+      },
+      exportPrivateFile: (id) => goRoomPrivateFiles.getFile(id),
+      importShareFile: async (file) => {
+        const result = await goRoomFiles.shareLocalFile(file);
+        if (!result.ok) return { ok: false as const, error: result.error };
+        host?.publishSnapshot();
+        return { ok: true as const, id: result.id };
+      },
+      exportShareFile: async (id) => goRoomFiles.localFile(id),
+      send: (text) => {
+        if (ownerDc?.readyState === "open") ownerDc.send(text);
+      },
+    });
+    return ownerFileHost;
+  }
+
+  function bindOwnerDataChannel(dc: RTCDataChannel): void {
+    ownerDc = dc;
+    const hostFile = ensureOwnerFileHost();
+    dc.onmessage = (ev) => {
+      const text = typeof ev.data === "string" ? ev.data : "";
+      if (text) hostFile.handleMessage(text);
+    };
+    dc.onclose = () => {
+      if (ownerDc === dc) ownerDc = null;
+    };
+  }
 
   function buildSnapshot(): BoothStateSnapshot {
     const s = ctx.getStatus();
@@ -112,6 +162,13 @@ export function createBoothAnchorBridge(ctx: {
     const chatTail = goSessionChat.messages
       .slice(-40)
       .map((chat) => ({ ...chat }));
+    const privateEntries = goRoomPrivateFiles.entries.map((entry) => ({
+      id: entry.id,
+      name: entry.name,
+      size: entry.size,
+      mime: entry.mime,
+      status: "ready" as const,
+    }));
     return {
       sessionId: boothSessionId,
       ownerUserId: ctx.getOwnerUserId() ?? "",
@@ -122,7 +179,7 @@ export function createBoothAnchorBridge(ctx: {
         {
           peerId: hostPeerId,
           displayName: hostName,
-          kind: "operator",
+          kind: "host",
           isHost: true,
         },
         ...s.occupantPeers.map((p) => {
@@ -148,6 +205,8 @@ export function createBoothAnchorBridge(ctx: {
       inviteExpiresAt: s.inviteExpiresAt ?? undefined,
       shareFileCount: shareEntries.length,
       shareFiles: shareEntries,
+      privateFileCount: privateEntries.length,
+      privateFiles: privateEntries,
       chatTail,
       guestCount: s.guestCount,
       anchor: host ? "online" : "registering",
@@ -159,7 +218,9 @@ export function createBoothAnchorBridge(ctx: {
     return document.hasFocus();
   }
 
-  async function handleOperatorIntent(frame: BoothEnvelope): Promise<void> {
+  async function handleOperatorIntent(
+    frame: BoothEnvelope
+  ): Promise<Record<string, unknown> | void> {
     if (frame.type === "booth.intent.cast.offer") {
       const payload = frame.payload as {
         peerId?: string;
@@ -182,6 +243,13 @@ export function createBoothAnchorBridge(ctx: {
       await ctx.onOperatorStopTv();
       return;
     }
+    if (frame.type === "booth.intent.cast.state") {
+      const payload = parseBoothCastStatePayload(frame.payload);
+      if (!payload) throw new Error("invalid_intent");
+      await ctx.onOperatorCastState(payload);
+      host?.publishSnapshot();
+      return;
+    }
     if (frame.type === "booth.intent.live.halt") {
       const payload = frame.payload as {
         peerId?: string;
@@ -197,6 +265,11 @@ export function createBoothAnchorBridge(ctx: {
     }
     if (frame.type === "booth.intent.invite.mint") {
       await ctx.onOperatorMintInvite();
+      return;
+    }
+    if (frame.type === "booth.intent.invite.revoke") {
+      await ctx.onOperatorRevokeInvite();
+      host?.publishSnapshot();
       return;
     }
     if (frame.type === "booth.intent.ejectPeer") {
@@ -246,10 +319,86 @@ export function createBoothAnchorBridge(ctx: {
       }
       throw new Error("chat_unavailable");
     }
+    if (frame.type === "booth.intent.private.import") {
+      const payload = frame.payload as {
+        name?: string;
+        size?: number;
+        mime?: string;
+      };
+      const name = payload?.name?.trim();
+      const size = payload?.size;
+      if (!name || typeof size !== "number" || size < 0) {
+        throw new Error("invalid_intent");
+      }
+      return ensureOwnerFileHost().beginPrivateUpload({
+        name,
+        size,
+        mime: payload?.mime,
+      });
+    }
+    if (frame.type === "booth.intent.private.remove") {
+      const id = (frame.payload as { id?: string })?.id?.trim();
+      if (!id) throw new Error("private_not_found");
+      await goRoomPrivateFiles.remove(id);
+      host?.publishSnapshot();
+      return;
+    }
+    if (frame.type === "booth.intent.private.fetch") {
+      const id = (frame.payload as { id?: string })?.id?.trim();
+      if (!id) throw new Error("private_not_found");
+      const ack = await ensureOwnerFileHost().preparePrivateDownload(id);
+      void ensureOwnerFileHost().streamDownload(ack.transferId!);
+      return ack;
+    }
+    if (frame.type === "booth.intent.private.mountToShare") {
+      const id = (frame.payload as { id?: string })?.id?.trim();
+      if (!id) throw new Error("private_not_found");
+      const file = await goRoomPrivateFiles.getFile(id);
+      if (!file) throw new Error("private_not_found");
+      const result = await goRoomFiles.shareLocalFile(file);
+      if (!result.ok) throw new Error(result.error);
+      host?.publishSnapshot();
+      return;
+    }
+    if (frame.type === "booth.intent.share.import") {
+      const payload = frame.payload as {
+        name?: string;
+        size?: number;
+        mime?: string;
+      };
+      const name = payload?.name?.trim();
+      const size = payload?.size;
+      if (!name || typeof size !== "number" || size < 0) {
+        throw new Error("invalid_intent");
+      }
+      return ensureOwnerFileHost().beginShareUpload({
+        name,
+        size,
+        mime: payload?.mime,
+      });
+    }
+    if (frame.type === "booth.intent.share.unshare") {
+      const id = (frame.payload as { id?: string })?.id?.trim();
+      if (!id || !goRoomFiles.unshare(id, { host: true })) {
+        throw new Error("share_not_found");
+      }
+      host?.publishSnapshot();
+      return;
+    }
+    if (frame.type === "booth.intent.share.fetch") {
+      const id = (frame.payload as { id?: string })?.id?.trim();
+      if (!id) throw new Error("share_not_found");
+      const ack = await ensureOwnerFileHost().prepareShareDownload(id);
+      void ensureOwnerFileHost().streamDownload(ack.transferId!);
+      return ack;
+    }
     throw new Error("unsupported_intent");
   }
 
   async function stopHost(): Promise<void> {
+    ownerDc = null;
+    ownerFileHost?.reset();
+    ownerFileHost = null;
     if (host) {
       await host.stop();
       host = null;
@@ -275,6 +424,7 @@ export function createBoothAnchorBridge(ctx: {
           onGuestJoinOffer: (input) => ctx.onGuestJoinOffer(input),
           remoteOperatorEnabled: () => enabled,
           getTvProgramStream: ctx.getTvProgramStream,
+          onOwnerDataChannel: bindOwnerDataChannel,
         },
         {
           apiKey: key,

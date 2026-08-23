@@ -1,5 +1,5 @@
 /**
- * Operator Shell ↔ GoRoomSurface bridges (chat timeline, share-file mirror).
+ * Operator Shell ↔ GoRoomSurface bridges (chat timeline, share/private mirrors).
  */
 
 import {
@@ -8,17 +8,33 @@ import {
 } from "./goRoom";
 import { goAuth } from "./goAuth.svelte";
 import { goRoomFiles } from "./goRoomFiles.svelte";
+import { goRoomPrivateFiles } from "./goRoomPrivateFiles.svelte";
 import { goSessionChat } from "./goSessionChat.svelte";
-import type { BoothShareFileSummary } from "@pg/roster/boothChannel";
+import type { BoothFileSummary } from "@pg/roster/boothChannel";
 import { isSessionChatMessage } from "@pg/roster/rosterSessionChat";
 import { isSessionChatCtlMessage } from "@pg/roster/rosterSessionChatCtl";
 import type { BoothEnvelope } from "@pg/roster/boothChannel";
 
 export type OperatorChatSend = (frame: BoothEnvelope) => void;
 
+export type OperatorPrivateHandlers = {
+  importFiles: (files: File[]) => Promise<string | null>;
+  remove: (id: string) => Promise<void>;
+  mountToShare: (id: string) => Promise<string | null>;
+  download: (id: string) => Promise<string | null>;
+};
+
+export type OperatorShareHandlers = {
+  importFiles: (files: File[]) => Promise<string | null>;
+  unshare: (id: string) => Promise<string | null>;
+  download: (id: string) => Promise<string | null>;
+};
+
 export function attachOperatorSurface(opts: {
   shellId: string;
   sendIntent: OperatorChatSend;
+  privateHandlers?: OperatorPrivateHandlers;
+  shareHandlers?: OperatorShareHandlers;
 }): void {
   const hostName =
     roomHostDisplayName(goAuth.profile)?.trim() || "主持";
@@ -41,11 +57,24 @@ export function attachOperatorSurface(opts: {
     quickReplies: [...GO_ROOM_QUICK_REPLIES],
   });
   goSessionChat.setUiPhase("active");
+
+  if (opts.privateHandlers) {
+    goRoomPrivateFiles.attachOperatorMirror({
+      importFiles: opts.privateHandlers.importFiles,
+      remove: opts.privateHandlers.remove,
+      mountToShare: opts.privateHandlers.mountToShare,
+      download: opts.privateHandlers.download,
+    });
+  }
+  if (opts.shareHandlers) {
+    goRoomFiles.attachOperatorMirror(opts.shareHandlers);
+  }
 }
 
 export function detachOperatorSurface(): void {
   goSessionChat.detach();
-  goRoomFiles.clearMirrorEntries();
+  goRoomFiles.clearOperatorMirror();
+  goRoomPrivateFiles.clearMirror();
 }
 
 export function syncOperatorChatTail(
@@ -64,7 +93,7 @@ export function syncOperatorChatTail(
 }
 
 export function mirrorOperatorShareFiles(
-  files: BoothShareFileSummary[] | undefined
+  files: BoothFileSummary[] | undefined
 ): void {
   goRoomFiles.setMirrorEntries(
     (files ?? []).map((f) => ({
@@ -72,11 +101,32 @@ export function mirrorOperatorShareFiles(
       name: f.name,
       size: f.size,
       mime: f.mime,
-      status: f.status,
+      status:
+        f.status === "ready"
+          ? ("listed" as const)
+          : f.status === "receiving"
+            ? ("transferring" as const)
+            : f.status === "error"
+              ? ("error" as const)
+              : ("listed" as const),
       received: f.status === "ready" ? f.size : 0,
       ownerId: "engine",
       ownerName: "包廂",
-      local: false,
+      mine: true,
+    }))
+  );
+}
+
+export function mirrorOperatorPrivateFiles(
+  files: BoothFileSummary[] | undefined
+): void {
+  goRoomPrivateFiles.setMirrorEntries(
+    (files ?? []).map((f) => ({
+      id: f.id,
+      name: f.name,
+      size: f.size,
+      mime: f.mime ?? "application/octet-stream",
+      createdAt: 0,
     }))
   );
 }

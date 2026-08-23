@@ -129,7 +129,9 @@ export type BoothAnchorHostHandlers = {
   getSnapshot: () => BoothStateSnapshot;
   localHostClaimsDirector: () => boolean;
   remoteOperatorEnabled?: () => boolean;
-  onOperatorIntent: (frame: BoothEnvelope) => Promise<void>;
+  onOperatorIntent: (
+    frame: BoothEnvelope
+  ) => Promise<Record<string, unknown> | void>;
   onGuestJoinOffer: (input: {
     joinId: string;
     inviteId: string;
@@ -137,6 +139,7 @@ export type BoothAnchorHostHandlers = {
   }) => Promise<string>;
   /** TV program stream for Operator WebRTC preview (§10.6). */
   getTvProgramStream?: () => MediaStream | null;
+  onOwnerDataChannel?: (dc: RTCDataChannel) => void;
 };
 
 export type BoothAnchorHost = {
@@ -177,6 +180,7 @@ export function createBoothAnchorHost(
     engineRtc ??= createBoothEngineOperatorRtc({
       sendSignal: (frame) => send(frame),
       getTvStream: handlers.getTvProgramStream!,
+      onOwnerChannel: (dc) => handlers.onOwnerDataChannel?.(dc),
     });
     return engineRtc;
   }
@@ -273,8 +277,13 @@ export function createBoothAnchorHost(
         return;
       }
       try {
-        await handlers.onOperatorIntent(frame);
-        send({ type: "booth.ack", id: frame.id, ok: true });
+        const ackPayload = await handlers.onOperatorIntent(frame);
+        send({
+          type: "booth.ack",
+          id: frame.id,
+          ok: true,
+          ...(ackPayload ? { payload: ackPayload } : {}),
+        });
         pushSnapshotIfOperators();
       } catch {
         send({
@@ -406,7 +415,12 @@ export function createBoothOperatorClient(opts: {
   operatorCap: string;
   shellId: string;
   onSnapshot: (snap: BoothStateSnapshot) => void;
-  onAck?: (id: string | undefined, ok: boolean, error?: string) => void;
+  onAck?: (
+    id: string | undefined,
+    ok: boolean,
+    error?: string,
+    payload?: Record<string, unknown>
+  ) => void;
   onHelloOk?: (hello: {
     sessionId?: string;
     director?: { shellId: string; role: string };
@@ -453,10 +467,15 @@ export function createBoothOperatorClient(opts: {
       }
     }
     if (frame.type === "booth.ack") {
+      const payload =
+        frame.payload && typeof frame.payload === "object"
+          ? (frame.payload as Record<string, unknown>)
+          : undefined;
       opts.onAck?.(
         typeof frame.id === "string" ? frame.id : undefined,
         frame.ok === true,
-        typeof frame.error === "string" ? frame.error : undefined
+        typeof frame.error === "string" ? frame.error : undefined,
+        payload
       );
     }
     if (frame.type === "booth.event.engine.offline") {
@@ -523,7 +542,15 @@ export function createBoothOperatorClient(opts: {
           send({
             type: "booth.hello",
             role: "operator",
-            subscribe: ["members", "cast", "director", "engineHealth"],
+            subscribe: [
+              "members",
+              "cast",
+              "director",
+              "engineHealth",
+              "shareFiles",
+              "privateFiles",
+              "chatTail",
+            ],
           });
           resolve();
         };

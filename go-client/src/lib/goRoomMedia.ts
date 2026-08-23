@@ -252,6 +252,7 @@ export function createRoomMedia(opts: {
   resolvePrivateFile?: (id: string) => Promise<File | null>;
   ownerOf?: (id: string) => string | null;
   fileMeta?: (id: string) => { name: string; kind: "audio" | "video" } | null;
+  onProgramClock?: () => void;
 }): RoomMedia {
   const getUserMedia =
     opts.getUserMedia ??
@@ -417,6 +418,7 @@ export function createRoomMedia(opts: {
         name: programName ?? undefined,
       })
     );
+    opts.onProgramClock?.();
   }
 
   function sendProgramControl(partial: {
@@ -466,6 +468,7 @@ export function createRoomMedia(opts: {
     ) {
       void thisForwardFrom(remoteProgramFrom);
     }
+    opts.onProgramClock?.();
     emit();
   }
 

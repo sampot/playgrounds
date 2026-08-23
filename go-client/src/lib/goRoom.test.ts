@@ -50,6 +50,9 @@ import {
   roomHostMemberPutOnTv,
   roomMemberAvatarInitial,
   roomMemberCard,
+  roomMemberKindLabel,
+  GO_ROOM_MEMBER_KIND_GUEST,
+  GO_ROOM_MEMBER_KIND_PEER,
   roomMemberCardsSorted,
   roomMemberOnAir,
   roomMemberShowsDirectLink,
@@ -558,9 +561,35 @@ function memberStub(
     onAir: false,
     handRaised: false,
     directLink: false,
+    kindLabel: null,
     ...patch,
   };
 }
+
+describe("roomMemberKindLabel", () => {
+  it("maps snapshot kinds to compact roster badges", () => {
+    expect(roomMemberKindLabel("host")).toBeNull();
+    expect(roomMemberKindLabel("guest")).toBe(GO_ROOM_MEMBER_KIND_GUEST);
+    expect(roomMemberKindLabel("peer")).toBe(GO_ROOM_MEMBER_KIND_PEER);
+    expect(roomMemberKindLabel("operator")).toBe("遠端");
+  });
+
+  it("shows guest kind on member cards when provided", () => {
+    expect(
+      roomMemberCard({
+        occupant: {
+          peerId: "g-a",
+          name: "小明",
+          mine: false,
+          liveVideo: false,
+          liveAudio: false,
+          memberKind: "guest",
+        },
+        hostPeerId: "local",
+      }).kindLabel
+    ).toBe(GO_ROOM_MEMBER_KIND_GUEST);
+  });
+});
 
 describe("roomMemberCardsSorted", () => {
   it("orders host, on-stage LIVE, 舉手, speaking, then name", () => {

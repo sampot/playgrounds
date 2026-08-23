@@ -23,6 +23,10 @@ class GoRoomFiles {
   #attachGen = 0;
   #pendingControl: unknown[] = [];
   #pendingBinary: ArrayBuffer[] = [];
+  #operatorMirror = false;
+  #remoteShareImport: ((files: File[]) => Promise<string | null>) | null = null;
+  #remoteUnshare: ((id: string) => Promise<string | null>) | null = null;
+  #remoteDownload: ((id: string) => Promise<string | null>) | null = null;
 
   attach(opts: {
     localAgentId: string;
@@ -100,6 +104,30 @@ class GoRoomFiles {
     this.playback = null;
   }
 
+  /** Operator Shell: share catalog from booth snapshot + remote handlers. */
+  attachOperatorMirror(opts: {
+    importFiles: (files: File[]) => Promise<string | null>;
+    unshare: (id: string) => Promise<string | null>;
+    download: (id: string) => Promise<string | null>;
+  }): void {
+    this.#operatorMirror = true;
+    this.#remoteShareImport = opts.importFiles;
+    this.#remoteUnshare = opts.unshare;
+    this.#remoteDownload = opts.download;
+  }
+
+  clearOperatorMirror(): void {
+    this.#operatorMirror = false;
+    this.#remoteShareImport = null;
+    this.#remoteUnshare = null;
+    this.#remoteDownload = null;
+    if (!this.#xfer) {
+      this.entries = [];
+      this.busy = false;
+      this.playback = null;
+    }
+  }
+
   /** Operator Shell: read-only share catalog from booth snapshot. */
   setMirrorEntries(entries: RoomFileEntry[]): void {
     if (this.#xfer) return;
@@ -115,7 +143,33 @@ class GoRoomFiles {
     this.playback = null;
   }
 
+  async unshareRemote(id: string): Promise<string | null> {
+    if (!this.#operatorMirror || !this.#remoteUnshare) return "尚未就緒";
+    this.busy = true;
+    try {
+      return await this.#remoteUnshare(id);
+    } finally {
+      this.busy = false;
+    }
+  }
+
+  async downloadRemote(id: string): Promise<string | null> {
+    if (!this.#operatorMirror || !this.#remoteDownload) return "尚未就緒";
+    return this.#remoteDownload(id);
+  }
+
   shareLocalFile(file: File) {
+    if (this.#operatorMirror && this.#remoteShareImport) {
+      this.busy = true;
+      return this.#remoteShareImport([file])
+        .then((err) => {
+          if (err) return { ok: false as const, error: err };
+          return { ok: true as const };
+        })
+        .finally(() => {
+          this.busy = false;
+        });
+    }
     return (
       this.#xfer?.shareLocalFile(file) ??
       Promise.resolve({ ok: false as const, error: "尚未連線" })

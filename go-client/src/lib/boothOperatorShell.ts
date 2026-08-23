@@ -3,16 +3,27 @@ import {
   friendlyOperatorError,
 } from "./goFriendlyError";
 import type { BoothEnvelope, BoothStateSnapshot } from "@pg/roster/boothChannel";
-import type { RoomInviteDoor } from "./goRoom";
-import { boothSnapshotToUi } from "./boothSnapshotUi";
+import type { RoomInviteDoor, RoomOccupantPeer } from "./goRoom";
+import {
+  boothSnapshotToUi,
+  boothAnchorStatusLabel,
+  boothCastProgramClock,
+} from "./boothSnapshotUi";
 import { createBoothOperatorRtc } from "./boothOperatorRtc";
 import { createBoothOperatorClient } from "./boothPlatform";
 import {
+  createBoothOwnerFileClient,
+  type OwnerFileAckPayload,
+} from "./boothOwnerFileChannel";
+import {
   attachOperatorSurface,
   detachOperatorSurface,
+  mirrorOperatorPrivateFiles,
   mirrorOperatorShareFiles,
   syncOperatorChatTail,
 } from "./boothOperatorSurface";
+import { goRoomPrivateFiles } from "./goRoomPrivateFiles.svelte";
+import { goRoomFiles } from "./goRoomFiles.svelte";
 import type { GoLoadProgress } from "./goLoadProgress";
 
 export type OperatorShellPhase = "idle" | "connecting" | "open" | "error";
@@ -25,7 +36,7 @@ export type OperatorShellStatus = {
   inviteDoor: RoomInviteDoor;
   shortUrl: string | null;
   inviteExpiresAt: number | null;
-  occupantPeers: { peerId: string; name: string }[];
+  occupantPeers: RoomOccupantPeer[];
   occupantNames: string[];
   peerName: string | null;
   hostPeerId: string | null;
@@ -39,9 +50,17 @@ export type OperatorShellStatus = {
   remoteLives: { peerId: string; camera: boolean; mic: boolean }[];
   lastAck: string | null;
   tvStream: MediaStream | null;
+  anchor: BoothStateSnapshot["anchor"];
+  anchorHint: string | null;
+  programTransport: boolean;
+  programPaused: boolean;
+  programTime: number;
+  programDuration: number;
 };
 
 type Listener = (s: OperatorShellStatus) => void;
+
+const ACK_WAIT_MS = 45_000;
 
 function emptyStatus(): OperatorShellStatus {
   return {
@@ -66,6 +85,12 @@ function emptyStatus(): OperatorShellStatus {
     remoteLives: [],
     lastAck: null,
     tvStream: null,
+    anchor: "registering",
+    anchorHint: null,
+    programTransport: false,
+    programPaused: true,
+    programTime: 0,
+    programDuration: 0,
   };
 }
 
@@ -82,9 +107,20 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
   let status = emptyStatus();
   let client: ReturnType<typeof createBoothOperatorClient> | null = null;
   let operatorRtc: ReturnType<typeof createBoothOperatorRtc> | null = null;
+  let ownerFileClient: ReturnType<typeof createBoothOwnerFileClient> | null =
+    null;
+  let ownerDc: RTCDataChannel | null = null;
   let director: { shellId: string; role: string } | null = null;
   let surfaceAttached = false;
   const listeners = new Set<Listener>();
+  const pendingAcks = new Map<
+    string,
+    {
+      resolve: (payload?: OwnerFileAckPayload) => void;
+      reject: (err: Error) => void;
+      timer: ReturnType<typeof setTimeout>;
+    }
+  >();
 
   function emit(): void {
     const snap = { ...status };
@@ -96,21 +132,209 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
     emit();
   }
 
+  function sendIntent(frame: BoothEnvelope): void {
+    if (!client) return;
+    client.sendIntent({
+      ...frame,
+      v: 1,
+      shellId,
+      id: frame.id ?? crypto.randomUUID(),
+    });
+  }
+
+  function waitForAck(id: string): Promise<OwnerFileAckPayload | undefined> {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        pendingAcks.delete(id);
+        reject(new Error("ack_timeout"));
+      }, ACK_WAIT_MS);
+      pendingAcks.set(id, { resolve, reject, timer });
+    });
+  }
+
+  async function sendIntentForAck(
+    frame: BoothEnvelope
+  ): Promise<OwnerFileAckPayload | undefined> {
+    const id = frame.id ?? crypto.randomUUID();
+    const wait = waitForAck(id);
+    sendIntent({ ...frame, id });
+    return wait;
+  }
+
+  function ensureOwnerFileClient(): ReturnType<
+    typeof createBoothOwnerFileClient
+  > | null {
+    if (!ownerDc || ownerDc.readyState !== "open") return null;
+    ownerFileClient ??= createBoothOwnerFileClient({
+      send: (text) => ownerDc?.send(text),
+    });
+    return ownerFileClient;
+  }
+
+  async function importPrivateFiles(
+    files: File[]
+  ): Promise<string | null> {
+    const owner = ensureOwnerFileClient();
+    if (!owner) return "遠端檔案通道尚未就緒";
+    for (const file of files) {
+      try {
+        const ack = await sendIntentForAck({
+          type: "booth.intent.private.import",
+          v: 1,
+          payload: {
+            name: file.name,
+            size: file.size,
+            mime: file.type || undefined,
+          },
+        });
+        if (!ack?.transferId) return "無法上傳到包廂";
+        await owner.upload(ack.transferId, file);
+      } catch (e) {
+        return e instanceof Error ? e.message : String(e);
+      }
+    }
+    return null;
+  }
+
+  async function removePrivate(id: string): Promise<void> {
+    await sendIntentForAck({
+      type: "booth.intent.private.remove",
+      v: 1,
+      payload: { id },
+    });
+  }
+
+  async function mountPrivateToShare(id: string): Promise<string | null> {
+    try {
+      await sendIntentForAck({
+        type: "booth.intent.private.mountToShare",
+        v: 1,
+        payload: { id },
+      });
+      return null;
+    } catch (e) {
+      return e instanceof Error ? e.message : String(e);
+    }
+  }
+
+  async function downloadPrivate(id: string): Promise<string | null> {
+    const owner = ensureOwnerFileClient();
+    if (!owner) return "遠端檔案通道尚未就緒";
+    try {
+      const ack = await sendIntentForAck({
+        type: "booth.intent.private.fetch",
+        v: 1,
+        payload: { id },
+      });
+      if (!ack?.transferId) return "無法從包廂下載";
+      const blob = await owner.receive(ack.transferId);
+      const name =
+        goRoomPrivateFiles.entries.find((e) => e.id === id)?.name ?? "download";
+      if (typeof document === "undefined") return null;
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = name;
+      anchor.rel = "noopener";
+      anchor.click();
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      return null;
+    } catch (e) {
+      return e instanceof Error ? e.message : String(e);
+    }
+  }
+
+  async function importShareFiles(files: File[]): Promise<string | null> {
+    const owner = ensureOwnerFileClient();
+    if (!owner) return "遠端檔案通道尚未就緒";
+    for (const file of files) {
+      try {
+        const ack = await sendIntentForAck({
+          type: "booth.intent.share.import",
+          v: 1,
+          payload: {
+            name: file.name,
+            size: file.size,
+            mime: file.type || undefined,
+          },
+        });
+        if (!ack?.transferId) return "無法上傳到包廂";
+        await owner.upload(ack.transferId, file);
+      } catch (e) {
+        return e instanceof Error ? e.message : String(e);
+      }
+    }
+    return null;
+  }
+
+  async function unshareShare(id: string): Promise<string | null> {
+    try {
+      await sendIntentForAck({
+        type: "booth.intent.share.unshare",
+        v: 1,
+        payload: { id },
+      });
+      return null;
+    } catch (e) {
+      return e instanceof Error ? e.message : String(e);
+    }
+  }
+
+  async function downloadShare(id: string): Promise<string | null> {
+    const owner = ensureOwnerFileClient();
+    if (!owner) return "遠端檔案通道尚未就緒";
+    try {
+      const ack = await sendIntentForAck({
+        type: "booth.intent.share.fetch",
+        v: 1,
+        payload: { id },
+      });
+      if (!ack?.transferId) return "無法從包廂下載";
+      const blob = await owner.receive(ack.transferId);
+      const name =
+        goRoomFiles.entries.find((e) => e.id === id)?.name ?? "download";
+      if (typeof document === "undefined") return null;
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = name;
+      anchor.rel = "noopener";
+      anchor.click();
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      return null;
+    } catch (e) {
+      return e instanceof Error ? e.message : String(e);
+    }
+  }
+
   function ensureSurface(): void {
     if (surfaceAttached) return;
     surfaceAttached = true;
     attachOperatorSurface({
       shellId,
-      sendIntent: sendIntent,
+      sendIntent,
+      privateHandlers: {
+        importFiles: importPrivateFiles,
+        remove: removePrivate,
+        mountToShare: mountPrivateToShare,
+        download: downloadPrivate,
+      },
+      shareHandlers: {
+        importFiles: importShareFiles,
+        unshare: unshareShare,
+        download: downloadShare,
+      },
     });
   }
 
   function applySnapshot(snapshot: BoothStateSnapshot): void {
     const ui = boothSnapshotToUi(snapshot);
     const canDirect = operatorCanDirect({ director, shellId });
+    const programClock = boothCastProgramClock(snapshot.cast);
     ensureSurface();
     syncOperatorChatTail(snapshot.chatTail);
     mirrorOperatorShareFiles(snapshot.shareFiles);
+    mirrorOperatorPrivateFiles(snapshot.privateFiles);
     set({
       phase: "open",
       message: canDirect ? "遠端導播中" : "遠端檢視（家裡主持使用中）",
@@ -131,16 +355,12 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
       remoteLives: ui.remoteLives,
       canDirect,
       directorRole: canDirect ? "operator" : director ? "viewer" : null,
-    });
-  }
-
-  function sendIntent(frame: BoothEnvelope): void {
-    if (!client) return;
-    client.sendIntent({
-      ...frame,
-      v: 1,
-      shellId,
-      id: frame.id ?? crypto.randomUUID(),
+      anchor: snapshot.anchor,
+      anchorHint: boothAnchorStatusLabel(snapshot.anchor),
+      programTransport: programClock.transport,
+      programPaused: programClock.paused,
+      programTime: programClock.time,
+      programDuration: programClock.duration,
     });
   }
 
@@ -170,7 +390,21 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
         operatorCap: opts.operatorCap,
         shellId,
         onSnapshot: applySnapshot,
-        onAck: (_id, ok, err) => {
+        onAck: (id, ok, err, payload) => {
+          if (id) {
+            const pending = pendingAcks.get(id);
+            if (pending) {
+              clearTimeout(pending.timer);
+              pendingAcks.delete(id);
+              if (ok) {
+                pending.resolve(payload as OwnerFileAckPayload | undefined);
+              } else {
+                pending.reject(
+                  new Error(err ?? friendlyOperatorAckError(err))
+                );
+              }
+            }
+          }
           set({
             lastAck: ok ? "已送出" : friendlyOperatorAckError(err),
           });
@@ -218,6 +452,21 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
         onProgramStream: (stream) => {
           set({ tvStream: stream });
         },
+        onOwnerChannel: (dc) => {
+          ownerDc = dc;
+          ownerFileClient = null;
+          dc.onmessage = (ev) => {
+            const text = typeof ev.data === "string" ? ev.data : "";
+            if (!text) return;
+            ensureOwnerFileClient()?.handleMessage(text);
+          };
+          dc.onclose = () => {
+            if (ownerDc === dc) {
+              ownerDc = null;
+              ownerFileClient = null;
+            }
+          };
+        },
       });
       operatorRtc = rtc;
       try {
@@ -232,10 +481,17 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
       }
     },
     disconnect(): void {
+      for (const pending of pendingAcks.values()) {
+        clearTimeout(pending.timer);
+        pending.reject(new Error("disconnected"));
+      }
+      pendingAcks.clear();
       client?.disconnect();
       client = null;
       operatorRtc?.stop();
       operatorRtc = null;
+      ownerDc = null;
+      ownerFileClient = null;
       director = null;
       if (surfaceAttached) {
         detachOperatorSurface();
@@ -246,6 +502,16 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
     },
     mintInvite(): void {
       sendIntent({ type: "booth.intent.invite.mint", v: 1 });
+    },
+    revokeInvite(): void {
+      sendIntent({ type: "booth.intent.invite.revoke", v: 1 });
+    },
+    sendCastState(payload: { paused?: boolean; t?: number }): void {
+      sendIntent({
+        type: "booth.intent.cast.state",
+        v: 1,
+        payload,
+      });
     },
     putLiveOnTv(peerId: string, label?: string): void {
       sendIntent({
@@ -281,6 +547,12 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
     endBooth(): void {
       sendIntent({ type: "booth.intent.end", v: 1 });
     },
+    importPrivateFiles,
+    removePrivate,
+    mountPrivateToShare,
+    importShareFiles,
+    unshareShare,
+    downloadShare,
     async startAutoPlay(catalogId: string): Promise<
       | { ok: true }
       | { ok: false; reason: string; missingRoles?: string[] }

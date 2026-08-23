@@ -146,6 +146,8 @@
     GO_ROOM_FILE_ZONE_LABEL,
     GO_ROOM_PRIVATE_DELETE,
     GO_ROOM_PRIVATE_DELETE_CONFIRM,
+    GO_ROOM_INVITE_REVOKE,
+    GO_ROOM_INVITE_REVOKE_CONFIRM,
     GO_ROOM_PRIVATE_DROP,
     GO_ROOM_PRIVATE_UNSUPPORTED_HINT,
     ROOM_FILE_PREVIEW_VIDEO_PRELOAD,
@@ -209,6 +211,7 @@
     directPeerIds?: string[];
     onLogin?: () => void;
     onInvite?: () => void;
+    onRevokeInvite?: () => void;
     onEnd?: () => void | Promise<void>;
     onReissue?: () => void;
     onKick?: (peerId: string) => void;
@@ -248,9 +251,20 @@
     operatorTvLabel?: string | null;
     operatorTvStream?: MediaStream | null;
     operatorCanDirect?: boolean;
+    operatorProgramTransport?: boolean;
+    operatorProgramPaused?: boolean;
+    operatorProgramTime?: number;
+    operatorProgramDuration?: number;
     operatorRemoteLives?: { peerId: string; camera: boolean; mic: boolean }[];
     onCastLive?: (peerId: string, name: string) => void | Promise<void>;
-    onOperatorCastFile?: (fileId: string) => void | Promise<void>;
+    onOperatorCastState?: (payload: {
+      paused?: boolean;
+      t?: number;
+    }) => void;
+    onOperatorCastFile?: (
+      fileId: string,
+      scope?: "share" | "private"
+    ) => void | Promise<void>;
     onOperatorStopTv?: () => void | Promise<void>;
     onOperatorHaltLive?: (
       peerId: string,
@@ -274,6 +288,7 @@
     directPeerIds = [],
     onLogin,
     onInvite,
+    onRevokeInvite,
     onEnd,
     onReissue,
     onKick,
@@ -293,8 +308,13 @@
     operatorTvLabel = null,
     operatorTvStream = null,
     operatorCanDirect = false,
+    operatorProgramTransport = false,
+    operatorProgramPaused = true,
+    operatorProgramTime = 0,
+    operatorProgramDuration = 0,
     operatorRemoteLives = [],
     onCastLive,
+    onOperatorCastState,
     onOperatorCastFile,
     onOperatorStopTv,
     onOperatorHaltLive,
@@ -354,6 +374,7 @@
   let previewOpen = $state(false);
   let previewId = $state<string | null>(null);
   let deleteFileId = $state<string | null>(null);
+  let inviteRevokePending = $state(false);
   let now = $state(Date.now());
   let pane = $state<RoomShellPane>(roomShellDefaultPane());
   let composerInputEl = $state<HTMLInputElement | null>(null);
@@ -419,7 +440,7 @@
       roomFileShareMatches(fileFilter, fileShareKind({ mime: f.mime, name: f.name }))
     )
   );
-  const showPrivateZone = $derived(role === "host");
+  const showPrivateZone = $derived(role === "host" || role === "operator");
   const sharePct = $derived(roomFileShareProgress(shareHang.done, shareHang.total));
   const previewFile = $derived(files.find((f) => f.id === previewId) ?? null);
   const previewKind = $derived(
@@ -522,12 +543,26 @@
       }
     };
   });
+  const programPaused = $derived(
+    isOperator ? operatorProgramPaused : goRoomMedia.programPaused
+  );
+  const programTime = $derived(
+    isOperator ? operatorProgramTime : goRoomMedia.programTime
+  );
+  const programDuration = $derived(
+    isOperator ? operatorProgramDuration : goRoomMedia.programDuration
+  );
+  const programTransport = $derived(
+    isOperator ? operatorProgramTransport : goRoomMedia.programTransport
+  );
   const tvHudKind = $derived(
     roomTvHudKind({
       tvOn,
       role,
-      fileTransport: goRoomMedia.programTransport,
-      fileOnTv: Boolean(goRoomMedia.streamingFileId),
+      fileTransport: programTransport,
+      fileOnTv: isOperator
+        ? programTransport
+        : Boolean(goRoomMedia.streamingFileId),
     })
   );
   const selectedPerson = $derived(
@@ -799,7 +834,8 @@
         playPickerOpen ||
         Boolean(kickTarget) ||
         Boolean(deleteFileId) ||
-        Boolean(privatePendingDelete),
+        Boolean(privatePendingDelete) ||
+        inviteRevokePending,
       // 包廂設定：勿 pin／拉出 playground header（對齊 composer、卡片更多選單）。
     });
     return () => {
@@ -1010,7 +1046,11 @@
     const el = confirmDialog;
     if (!el) return;
     if (
-      (confirmEnd || kickTarget || deleteFileId || privatePendingDelete) &&
+      (confirmEnd ||
+        kickTarget ||
+        deleteFileId ||
+        privatePendingDelete ||
+        inviteRevokePending) &&
       !el.open
     ) {
       el.showModal();
@@ -1020,6 +1060,7 @@
       !kickTarget &&
       !deleteFileId &&
       !privatePendingDelete &&
+      !inviteRevokePending &&
       el.open
     ) {
       el.close();
@@ -1191,10 +1232,6 @@
   async function shareFiles(list: FileList | File[]): Promise<void> {
     const picked = Array.from(list);
     if (picked.length === 0) return;
-    if (isOperator) {
-      fileError = "請在包廂分頁上傳檔案";
-      return;
-    }
     fileError = "";
     shareHang = { done: 0, total: picked.length };
     for (const file of picked) {
@@ -1228,6 +1265,11 @@
   async function onDownload(id: string) {
     fileError = "";
     fileHint = "";
+    if (isOperator) {
+      const err = await goRoomFiles.downloadRemote(id);
+      if (err) fileError = err;
+      return;
+    }
     const ready = pendingBrowserSaves.get(id);
     if (ready) {
       /**
@@ -1430,7 +1472,7 @@
         return;
       }
       try {
-        await onOperatorCastFile?.(id);
+        await onOperatorCastFile?.(id, "private");
       } catch (e) {
         mediaError = e instanceof Error ? e.message : String(e);
       }
@@ -1442,6 +1484,15 @@
 
   async function onMountPrivateToShare(id: string) {
     fileError = "";
+    if (isOperator) {
+      const err = await goRoomPrivateFiles.mountToShare(id);
+      if (err) {
+        fileError = err;
+        return;
+      }
+      fileZone = "share";
+      return;
+    }
     const file = await goRoomPrivateFiles.getFile(id);
     if (!file) {
       fileError = "找不到這個私有檔";
@@ -1588,7 +1639,13 @@
     deleteFileId = null;
     if (!id) return;
     clearPendingBrowserSave(id);
-    goRoomFiles.unshare(id, { host: isHostLike && !isOperator });
+    if (isOperator) {
+      void goRoomFiles.unshareRemote(id).then((err) => {
+        if (err) fileError = err;
+      });
+    } else {
+      goRoomFiles.unshare(id, { host: isHostLike && !isOperator });
+    }
     if (previewId === id) closePreview();
   }
 
@@ -1596,11 +1653,21 @@
     askDeleteFile(id);
   }
 
+  function askRevokeInvite() {
+    inviteRevokePending = true;
+  }
+
+  function confirmRevokeInviteNow() {
+    inviteRevokePending = false;
+    onRevokeInvite?.();
+  }
+
   function dismissConfirm() {
     confirmEnd = false;
     kickTarget = null;
     deleteFileId = null;
     privatePendingDelete = null;
+    inviteRevokePending = false;
     pendingAdHref = null;
   }
 
@@ -1764,6 +1831,13 @@
       void onMountPrivateToShare(id);
       return;
     }
+    if (action === "download") {
+      fileError = "";
+      void goRoomPrivateFiles.downloadRemote(id).then((err) => {
+        if (err) fileError = err;
+      });
+      return;
+    }
     if (action === "remove") {
       privatePendingDelete = id;
     }
@@ -1801,9 +1875,9 @@
           slotFullscreen: tvSlotFullscreen,
           cinema,
         })}
-        paused={goRoomMedia.programPaused}
-        currentTime={goRoomMedia.programTime}
-        duration={goRoomMedia.programDuration}
+        paused={programPaused}
+        currentTime={programTime}
+        duration={programDuration}
         ownerDecodeKind={goRoomMedia.ownerDecodeKind}
         remoteProgramKind={goRoomMedia.remoteProgramKind}
         {playCanvasUrl}
@@ -1812,11 +1886,26 @@
         bind:videoEl={tvVideoEl}
         bind:slotEl={tvSlotEl}
         onToggle={onTvHit}
-        onPlayPause={() =>
-          goRoomMedia.programPaused
-            ? goRoomMedia.playProgram()
-            : goRoomMedia.pauseProgram()}
-        onSeek={(seconds) => goRoomMedia.seekProgram(seconds)}
+        onPlayPause={() => {
+          if (isOperator) {
+            if (!operatorCanDirect) return;
+            onOperatorCastState?.({
+              paused: !programPaused,
+              t: programTime,
+            });
+            return;
+          }
+          if (programPaused) goRoomMedia.playProgram();
+          else goRoomMedia.pauseProgram();
+        }}
+        onSeek={(seconds) => {
+          if (isOperator) {
+            if (!operatorCanDirect) return;
+            onOperatorCastState?.({ paused: programPaused, t: seconds });
+            return;
+          }
+          goRoomMedia.seekProgram(seconds);
+        }}
         onFullscreen={() => void onTvFullscreen()}
         onPower={() => void onStopTv()}
         floats={stageFloats}
@@ -2148,6 +2237,16 @@
               >
                 {doorRow.action}
               </button>
+              {#if door === "live" && onRevokeInvite}
+                <button
+                  type="button"
+                  class="pixel-btn door-row-action"
+                  onclick={() => askRevokeInvite()}
+                  disabled={operatorWriteLocked}
+                >
+                  {GO_ROOM_INVITE_REVOKE}
+                </button>
+              {/if}
             </div>
             {#if playLoadProgress}
               <div class="door-row">
@@ -2409,7 +2508,7 @@
                     fileId={f.id}
                     name={f.name}
                     {kind}
-                    meta={`${formatSize(f.size)} · 僅這台`}
+                    meta={`${formatSize(f.size)} · ${isOperator ? "包廂" : "僅這台"}`}
                     castHint={roomFileTvCastSourceHint({
                       kind,
                       mine: true,
@@ -2417,7 +2516,7 @@
                     })}
                     {onAir}
                     {liveBadge}
-                    menu={roomFilePrivateMenu({ kind })}
+                    menu={roomFilePrivateMenu({ kind, remoteHub: isOperator })}
                     menuOpen={fileMenuId === f.id}
                     onMenuToggle={() => toggleFileMenu(f.id)}
                     onAction={(action) => onPrivateFileAction(f.id, action)}
@@ -2460,8 +2559,8 @@
                         (f.mine ? "我" : f.ownerName.slice(0, 1) || "?"),
                     }}
                     menu={roomFileShareMenu({
-                      role,
-                      mine: f.mine,
+                      role: isOperator ? "host" : role,
+                      mine: isOperator ? true : f.mine,
                       kind,
                       previewLabel: roomFileShareOpenLabel(kind),
                       previewEnabled: !(
@@ -2950,6 +3049,8 @@
           {GO_ROOM_KICK}？
         {:else if privatePendingDelete}
           {GO_ROOM_PRIVATE_DELETE}？
+        {:else if inviteRevokePending}
+          {GO_ROOM_INVITE_REVOKE}？
         {:else if deleteFileId}
           {GO_ROOM_FILE_DELETE}？
         {:else if pendingAdHref}
@@ -2963,6 +3064,8 @@
           {GO_ROOM_KICK_CONFIRM}
         {:else if privatePendingDelete}
           {GO_ROOM_PRIVATE_DELETE_CONFIRM}
+        {:else if inviteRevokePending}
+          {GO_ROOM_INVITE_REVOKE_CONFIRM}
         {:else if deleteFileId}
           {GO_ROOM_FILE_DELETE_CONFIRM}
         {:else}
@@ -2985,6 +3088,14 @@
             }}
           >
             {GO_ROOM_PRIVATE_DELETE}
+          </button>
+        {:else if inviteRevokePending}
+          <button
+            type="button"
+            class="pixel-btn pixel-btn--danger"
+            onclick={() => confirmRevokeInviteNow()}
+          >
+            {GO_ROOM_INVITE_REVOKE}
           </button>
         {:else if deleteFileId}
           <button type="button" class="pixel-btn pixel-btn--danger" onclick={() => confirmDeleteFile()}>

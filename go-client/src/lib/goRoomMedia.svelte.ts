@@ -84,6 +84,7 @@ class GoRoomMedia {
     ownerOf?: (id: string) => string | null;
     fileMeta?: (id: string) => { name: string; kind: "audio" | "video" } | null;
     onTvProgramChange?: () => void;
+    onProgramClock?: () => void;
   }): void {
     this.detach();
     this.#media = createRoomMedia(opts);

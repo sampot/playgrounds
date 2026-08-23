@@ -182,6 +182,14 @@ describe("roomFilePrivateMenu", () => {
       },
     ]);
   });
+
+  it("lists download for remote operator hub rows", () => {
+    expect(roomFilePrivateMenu({ kind: "doc", remoteHub: true })).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ action: "download", label: GO_ROOM_FILE_DOWNLOAD }),
+      ])
+    );
+  });
 });
 
 describe("roomFileShareActions", () => {
