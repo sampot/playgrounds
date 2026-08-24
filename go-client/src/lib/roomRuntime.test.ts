@@ -91,6 +91,27 @@ vi.mock("./roomBoothJoinHost", () => ({
       return "answer-wire";
     };
   },
+  createRoomPeerJoinAcceptor: (opts: {
+    prepareHandlers: (label?: string) => {
+      handlers: {
+        onChannelClose?: () => void;
+        onMessage?: (data: unknown) => void;
+      };
+      attachSession: (s: ReturnType<typeof mockSession>) => void;
+      peerId: string;
+    };
+  }) => {
+    return async (_offerWire: string, label?: string) => {
+      const prepared = opts.prepareHandlers(label);
+      const session = mockSession();
+      prepared.attachSession(session);
+      boothBridgeFixtures.preparedSlots.push({
+        handlers: prepared.handlers,
+        session,
+      });
+      return { answerWire: "answer-wire", peerId: prepared.peerId };
+    };
+  },
 }));
 
 vi.mock("./goAuth.svelte", () => ({

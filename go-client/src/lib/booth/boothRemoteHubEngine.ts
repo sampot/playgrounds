@@ -143,6 +143,14 @@ export function createRemoteBoothHubEngine(opts: {
       return noopMediaSurface;
     },
 
+    validatePeerCap() {
+      return false;
+    },
+
+    async acceptPeerOffer() {
+      return { error: "invalid_intent" as const };
+    },
+
     async shutdown(_reason) {
       if (ended) return;
       const ch = channel;

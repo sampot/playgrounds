@@ -184,6 +184,45 @@ describe("createEmbeddedBoothHubEngine", () => {
     expect(again.payload?.peerCapId).not.toBe(peerCapId);
   });
 
+  it("validatePeerCap and acceptPeerOffer delegate to handler", async () => {
+    const acceptPeerOffer = vi.fn(async () => ({
+      answerWire: "answer-wire",
+      peerId: "peer-1",
+    }));
+    const engine = createEmbeddedBoothHubEngine({
+      ownerUserId: () => "owner",
+      buildSnapshot: () => ({
+        sessionId: engine.sessionId,
+        ownerUserId: "owner",
+        engineMode: "embedded",
+        hostPeerId: "host",
+        hostDisplayName: "Host",
+        members: [],
+        inviteGate: "none",
+        shareFileCount: 0,
+        privateFileCount: 0,
+        guestCount: 0,
+        anchor: "offline",
+      }),
+      handlers,
+      acceptPeerOffer,
+      localHostClaimsDirector: () => true,
+    });
+    engine.registerShell({ shellId: "host-local", role: "host" });
+
+    const minted = await engine.dispatch(
+      { type: "peer.mint", label: "cam" },
+      { shellId: "host-local", role: "host" }
+    );
+    const cap = String(minted.payload?.peerCap);
+    expect(engine.validatePeerCap(cap)).toBe(true);
+    expect(engine.validatePeerCap("bad")).toBe(false);
+
+    const accepted = await engine.acceptPeerOffer("offer", "cam");
+    expect(accepted).toEqual({ answerWire: "answer-wire", peerId: "peer-1" });
+    expect(acceptPeerOffer).toHaveBeenCalledWith("offer", "cam");
+  });
+
   it("shutdown ends session and rejects further intents", async () => {
     const onEnded = vi.fn();
     const engine = createEmbeddedBoothHubEngine({

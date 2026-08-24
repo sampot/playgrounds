@@ -92,7 +92,8 @@ import {
   applyBoothCastStateToMedia,
   boothCastSummaryFromProgram,
 } from "./boothCastState";
-import { createRoomGuestJoinAcceptor } from "./roomBoothJoinHost";
+import { createRoomGuestJoinAcceptor, createRoomPeerJoinAcceptor } from "./roomBoothJoinHost";
+import { registerEmbeddedPeerSignalHost } from "./booth/boothPeerSignal";
 import {
   operatorDisplayNameForShell,
   operatorPeerIdForShell,
@@ -147,6 +148,10 @@ export type RoomStatus = {
   /** `embedded` = in-page hub; `local-daemon` = browser shell on pg-boothd control channel. */
   boothAttachment: "embedded" | "local-daemon";
   localDaemon: BoothLocalEngineStatus | null;
+  /** Active monitoring peer join link (director mint). */
+  peerJoinUrl: string | null;
+  peerCapId: string | null;
+  peerCapExpiresAt: number | null;
 };
 
 type Listener = (s: RoomStatus) => void;
@@ -157,7 +162,7 @@ type PeerSlot = {
   displayName: string | null;
   lost?: boolean;
   fileRouted?: boolean;
-  kind: "guest" | "operator";
+  kind: "guest" | "operator" | "peer";
   shellId?: string;
 };
 
@@ -203,6 +208,9 @@ export function createRoomRuntime(opts?: {
     playCanvasGeneration: 0,
     boothAttachment: "embedded",
     localDaemon: null,
+    peerJoinUrl: null,
+    peerCapId: null,
+    peerCapExpiresAt: null,
   };
   let localDaemonEngine: ReturnType<typeof createLocalDaemonHubEngine> | null =
     null;
@@ -219,6 +227,8 @@ export function createRoomRuntime(opts?: {
   }
   const slots: PeerSlot[] = [];
   const operatorSlots: PeerSlot[] = [];
+  const peerSlots: PeerSlot[] = [];
+  let disposePeerSignal: (() => void) | null = null;
   let surfaceAttached = false;
   let closing = false;
   let opening = false;
@@ -357,11 +367,56 @@ export function createRoomRuntime(opts?: {
     };
   }
 
+  function preparePeerJoinHandlers(label?: string): {
+    handlers: RosterPeerHandlers;
+    attachSession: (sess: RosterPeerSession) => void;
+    peerId: string;
+  } {
+    const suffix = label?.trim() || "peer";
+    const peerId = `${localAgentId}-${crypto.randomUUID().replace(/-/g, "").slice(0, 8)}`;
+    const slot: PeerSlot = {
+      peerId,
+      session: null,
+      displayName: suffix,
+      kind: "peer",
+    };
+    peerSlots.push(slot);
+    return {
+      handlers: handlers(slot),
+      attachSession: (sess: RosterPeerSession) => {
+        slot.session = sess;
+        sess.pc.addEventListener("track", (ev) => {
+          goRoomMedia.onRemoteTrack(ev, sess.pc);
+          if (slot.peerId) void goRoomMedia.forwardFrom(slot.peerId);
+        });
+        refreshGuestSummary();
+      },
+      peerId,
+    };
+  }
+
   const acceptGuestJoinOffer = createRoomGuestJoinAcceptor({
     localAgentId,
     hostName,
     prepareHandlers: prepareGuestJoinHandlers,
   });
+
+  const acceptPeerJoinOffer = createRoomPeerJoinAcceptor({
+    localAgentId,
+    hostName,
+    prepareHandlers: preparePeerJoinHandlers,
+  });
+
+  function ensurePeerSignalHost(): void {
+    if (disposePeerSignal) return;
+    const engine = hubRef.engine ?? hubEngine;
+    if (engine.mode !== "embedded") return;
+    disposePeerSignal = registerEmbeddedPeerSignalHost({
+      getHubSessionId: () => engine.sessionId,
+      validatePeerCap: (cap) => engine.validatePeerCap(cap),
+      acceptPeerOffer: acceptPeerJoinOffer,
+    });
+  }
 
   const hubRef: { engine: BoothHubEngine | null } = { engine: null };
 
@@ -528,6 +583,9 @@ export function createRoomRuntime(opts?: {
     for (const s of operatorSlots) {
       if (!s.lost && s.session) out.push(s.session);
     }
+    for (const s of peerSlots) {
+      if (!s.lost && s.session) out.push(s.session);
+    }
     return out;
   }
 
@@ -536,7 +594,7 @@ export function createRoomRuntime(opts?: {
   }
 
   function allPeerSlots(): PeerSlot[] {
-    return [...slots, ...operatorSlots];
+    return [...slots, ...operatorSlots, ...peerSlots];
   }
 
   function otherSessions(except: PeerSlot): RosterPeerSession[] {
@@ -546,7 +604,8 @@ export function createRoomRuntime(opts?: {
   function refreshGuestSummary(): void {
     const liveGuests = slots.filter((s) => !s.lost && s.session);
     const liveOps = operatorSlots.filter((s) => !s.lost && s.session);
-    const live = [...liveGuests, ...liveOps];
+    const livePeers = peerSlots.filter((s) => !s.lost && s.session);
+    const live = [...liveGuests, ...liveOps, ...livePeers];
     const names = live
       .map((s) => s.displayName?.trim())
       .filter((n): n is string => Boolean(n));
@@ -556,12 +615,18 @@ export function createRoomRuntime(opts?: {
         peerId: s.peerId as string,
         name: playerDisplayName(
           s.displayName,
-          s.kind === "operator" ? "遠端" : "訪客"
+          s.kind === "operator"
+            ? "遠端"
+            : s.kind === "peer"
+              ? "監控"
+              : "訪客"
         ),
         kind:
           s.kind === "operator"
             ? ("operator" as const)
-            : ("guest" as const),
+            : s.kind === "peer"
+              ? ("peer" as const)
+              : ("guest" as const),
       }));
     set({
       guestCount: liveGuests.length,
@@ -734,7 +799,8 @@ export function createRoomRuntime(opts?: {
     if (!id || id === "local") return false;
     const slot =
       slots.find((s) => !s.lost && s.peerId === id && s.session) ??
-      operatorSlots.find((s) => !s.lost && s.peerId === id && s.session);
+      operatorSlots.find((s) => !s.lost && s.peerId === id && s.session) ??
+      peerSlots.find((s) => !s.lost && s.peerId === id && s.session);
     if (!slot?.session) return false;
     if (slot.kind === "guest") {
       try {
@@ -1142,6 +1208,7 @@ export function createRoomRuntime(opts?: {
         });
       });
       await anchorBridge.onBoothOpen();
+      ensurePeerSignalHost();
     } finally {
       opening = false;
     }
@@ -1503,6 +1570,18 @@ export function createRoomRuntime(opts?: {
       slot.session = null;
     }
     slots.length = 0;
+    for (const slot of peerSlots) {
+      slot.lost = true;
+      try {
+        slot.session?.close();
+      } catch {
+        /* ignore */
+      }
+      slot.session = null;
+    }
+    peerSlots.length = 0;
+    disposePeerSignal?.();
+    disposePeerSignal = null;
     const inviteId = status.inviteId;
     if (inviteId) {
       try {
@@ -1530,6 +1609,9 @@ export function createRoomRuntime(opts?: {
       playCanvasSrcdoc: null,
       playCanvasMode: null,
       playCanvasGeneration: 0,
+      peerJoinUrl: null,
+      peerCapId: null,
+      peerCapExpiresAt: null,
     });
     closing = false;
   }
@@ -1539,6 +1621,7 @@ export function createRoomRuntime(opts?: {
     buildSnapshot: buildHubSnapshot,
     localHostClaimsDirector: localHostPageClaimsDirector,
     onDirectorChanged: () => anchorBridge.publishSnapshot(),
+    acceptPeerOffer: acceptPeerJoinOffer,
     handlers: {
       inviteMint: async () => {
         const out = await mintInviteAndAnswerInner();
@@ -1651,6 +1734,8 @@ export function createRoomRuntime(opts?: {
       });
       await anchorBridge.setEnabled(false);
       applyDaemonSnapshot(snapshot);
+      disposePeerSignal?.();
+      disposePeerSignal = null;
       set({
         boothAttachment: "local-daemon",
         message: "已連回本機常駐包廂",
@@ -1676,6 +1761,7 @@ export function createRoomRuntime(opts?: {
     if (readRemoteAnchorEnabled()) {
       await anchorBridge.setEnabled(true);
     }
+    ensurePeerSignalHost();
   }
 
   async function close(opts?: {
@@ -1708,6 +1794,45 @@ export function createRoomRuntime(opts?: {
     if (opts?.landOn === "idle" && status.phase === "ended") {
       set({ phase: "idle", message: "" });
     }
+  }
+
+  async function mintPeerCap(label?: string): Promise<{
+    peerCap: string;
+    joinUrl: string;
+    peerCapId: string;
+    expiresAt: number;
+  } | null> {
+    const ack = await hubRef.engine!.dispatch(
+      { type: "peer.mint", label },
+      embeddedHostShellContext()
+    );
+    if (!ack.ok || !ack.payload) return null;
+    const peerCap = String(ack.payload.peerCap ?? "");
+    const joinUrl = String(ack.payload.joinUrl ?? "");
+    const peerCapId = String(ack.payload.peerCapId ?? "");
+    const expiresAt = Number(ack.payload.expiresAt ?? 0);
+    set({
+      peerJoinUrl: joinUrl || null,
+      peerCapId: peerCapId || null,
+      peerCapExpiresAt: expiresAt || null,
+    });
+    return { peerCap, joinUrl, peerCapId, expiresAt };
+  }
+
+  async function revokePeerCap(): Promise<boolean> {
+    const peerCapId = status.peerCapId;
+    if (!peerCapId) return false;
+    const ack = await hubRef.engine!.dispatch(
+      { type: "peer.revoke", peerCapId },
+      embeddedHostShellContext()
+    );
+    if (!ack.ok) return false;
+    set({
+      peerJoinUrl: null,
+      peerCapId: null,
+      peerCapExpiresAt: null,
+    });
+    return true;
   }
 
   operatorHooks.mintInvite = async () => {
@@ -1767,6 +1892,8 @@ export function createRoomRuntime(opts?: {
     openBooth,
     mintInviteAndAnswer,
     revokeInviteAndAnswer,
+    mintPeerCap,
+    revokePeerCap,
     kickPeer,
     close,
     getShellClient: (): BoothShellClient => shellClient,

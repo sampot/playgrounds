@@ -19,6 +19,7 @@
     type GoRoomDevHandle,
   } from "$lib/goRoomDev";
   import GoRoomDevKeyPanel from "$lib/GoRoomDevKeyPanel.svelte";
+  import GoRoomPeerCapPanel from "$lib/GoRoomPeerCapPanel.svelte";
   import {
     GO_ROOM_DESCRIPTION,
     GO_ROOM_DOCUMENT_TITLE,
@@ -206,6 +207,19 @@
     {peerCount}
     inviteDoor={status?.inviteDoor ?? "none"}
     doorUrl={status?.shortUrl ?? null}
+  />
+{/if}
+
+{#if goAuth.loggedIn && status?.phase === "open"}
+  <GoRoomPeerCapPanel
+    joinUrl={status?.peerJoinUrl ?? null}
+    expiresAt={status?.peerCapExpiresAt ?? null}
+    onMint={async (peerLabel) => {
+      await runtime.mintPeerCap(peerLabel);
+    }}
+    onRevoke={async () => {
+      await runtime.revokePeerCap();
+    }}
   />
 {/if}
 

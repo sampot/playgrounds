@@ -9,6 +9,7 @@ import {
   buildLocalEngineEndpoints,
   type BoothLocalEngineEndpoints,
 } from "./boothLocalEngine";
+import { joinEmbeddedHubViaSignal } from "./boothPeerSignal";
 
 export type BoothPeerJoinResult = {
   session: RosterPeerSession;
@@ -23,6 +24,8 @@ export type BoothPeerClient = {
 export function createBoothPeerClient(opts: {
   peerCap: string;
   hubBaseUrl?: string;
+  embeddedHubSessionId?: string;
+  embeddedSignalTimeoutMs?: number;
   endpoints?: BoothLocalEngineEndpoints;
   label?: string;
   localPresence: { agentId: string; name: string };
@@ -51,6 +54,33 @@ export function createBoothPeerClient(opts: {
     async join() {
       if (stopped) throw new Error("peer_stopped");
       const { wire: offerWire, session } = await createOfferWire();
+
+      if (opts.embeddedHubSessionId?.trim()) {
+        try {
+          const embedded = await joinEmbeddedHubViaSignal({
+            peerCap: opts.peerCap,
+            hubSessionId: opts.embeddedHubSessionId.trim(),
+            offerWire,
+            label: opts.label,
+            timeoutMs: opts.embeddedSignalTimeoutMs,
+          });
+          await applyRosterAnswer(session, embedded.answerWire);
+          return {
+            session,
+            peerId:
+              embedded.peerId?.trim() || opts.localPresence.agentId,
+          };
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          if (
+            msg !== "embedded_signal_timeout" &&
+            msg !== "embedded_signal_unavailable"
+          ) {
+            throw e;
+          }
+        }
+      }
+
       const res = await fetchFn(signalUrl, {
         method: "POST",
         headers: {
@@ -84,4 +114,16 @@ export function createBoothPeerClient(opts: {
       stopped = true;
     },
   };
+}
+
+/** Convenience: join embedded or daemon hub as peer. */
+export async function joinBoothAsPeer(
+  opts: Parameters<typeof createBoothPeerClient>[0]
+): Promise<BoothPeerJoinResult> {
+  const client = createBoothPeerClient(opts);
+  try {
+    return await client.join();
+  } finally {
+    client.stop();
+  }
 }

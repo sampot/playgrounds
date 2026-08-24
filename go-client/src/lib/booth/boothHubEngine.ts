@@ -115,6 +115,17 @@ export interface BoothHubEngine {
 
   getMediaSurface(): BoothMediaSurface;
 
+  /** Validate an active peerCap (embedded hub only). */
+  validatePeerCap(cap: string): boolean;
+
+  /** Accept peer WebRTC offer (embedded hub only). */
+  acceptPeerOffer(
+    offerWire: string,
+    label?: string
+  ): Promise<
+    { answerWire: string; peerId: string } | { error: BoothErrorCode }
+  >;
+
   shutdown(reason?: "user" | "replace"): Promise<void>;
 }
 
@@ -157,6 +168,10 @@ export function createEmbeddedBoothHubEngine(opts: {
   ownerUserId: () => string | null;
   buildSnapshot: () => BoothStateSnapshot;
   handlers: BoothHubEngineHandlers;
+  acceptPeerOffer?: (
+    offerWire: string,
+    label?: string
+  ) => Promise<{ answerWire: string; peerId: string }>;
   localHostClaimsDirector?: () => boolean;
   getMediaSurface?: () => BoothMediaSurface;
   onDirectorChanged?: (director: BoothDirectorLock | null) => void;
@@ -219,6 +234,13 @@ export function createEmbeddedBoothHubEngine(opts: {
       localHostClaimsDirector: localHostClaimsDirector(),
       role: shell.role,
     });
+  }
+
+  function peerCapValid(cap: string): boolean {
+    if (!activePeerCap || activePeerCap.revoked) return false;
+    if (activePeerCap.peerCap !== cap.trim()) return false;
+    if (Date.now() > activePeerCap.expiresAt) return false;
+    return true;
   }
 
   async function dispatch(
@@ -419,6 +441,29 @@ export function createEmbeddedBoothHubEngine(opts: {
 
     getMediaSurface() {
       return opts.getMediaSurface?.() ?? noopMediaSurface;
+    },
+
+    validatePeerCap(cap) {
+      return peerCapValid(cap);
+    },
+
+    async acceptPeerOffer(offerWire, label) {
+      if (ended) return { error: "session_ended" };
+      if (
+        !activePeerCap ||
+        activePeerCap.revoked ||
+        Date.now() > activePeerCap.expiresAt
+      ) {
+        return { error: "peer_gone" };
+      }
+      if (!opts.acceptPeerOffer) {
+        return { error: "invalid_intent" };
+      }
+      try {
+        return await opts.acceptPeerOffer(offerWire, label);
+      } catch {
+        return { error: "invalid_intent" };
+      }
     },
 
     async shutdown(_reason) {
