@@ -89,6 +89,14 @@ export function createBoothAnchorBridge(ctx: {
   onOperatorEndPlay: () => Promise<{ ok: boolean; reason?: string }>;
   getTvProgramStream?: () => MediaStream | null;
   fanoutChat?: (msg: unknown) => void;
+  getLocalPresence?: () => { agentId: string; name: string };
+  prepareOperatorRoster?: (
+    shellId: string
+  ) => import("@pg/roster/rosterPeer").RosterPeerHandlers;
+  onOperatorSession?: (input: {
+    shellId: string;
+    session: import("@pg/roster/rosterPeer").RosterPeerSession;
+  }) => void;
 }): BoothAnchorBridge {
   const boothSessionId = crypto.randomUUID();
   let enabled = readRemoteAnchorEnabled();
@@ -184,10 +192,14 @@ export function createBoothAnchorBridge(ctx: {
         },
         ...s.occupantPeers.map((p) => {
           const live = lives.find((l) => l.peerId === p.peerId);
+          const kind =
+            p.kind === "operator" || p.kind === "peer" || p.kind === "guest"
+              ? p.kind
+              : "guest";
           return {
             peerId: p.peerId,
             displayName: p.name,
-            kind: "guest" as const,
+            kind,
             isHost: false,
             live: live
               ? {
@@ -425,6 +437,13 @@ export function createBoothAnchorBridge(ctx: {
           remoteOperatorEnabled: () => enabled,
           getTvProgramStream: ctx.getTvProgramStream,
           onOwnerDataChannel: bindOwnerDataChannel,
+          getLocalPresence: () =>
+            ctx.getLocalPresence?.() ?? {
+              agentId: ctx.getHostPeerId(),
+              name: roomHostDisplayName(goAuth.profile),
+            },
+          prepareOperatorRoster: ctx.prepareOperatorRoster,
+          onOperatorSession: ctx.onOperatorSession,
         },
         {
           apiKey: key,

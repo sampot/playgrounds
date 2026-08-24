@@ -7,6 +7,11 @@ const clientOpts: {
 } = {};
 
 let onProgramStream: ((stream: MediaStream | null) => void) | undefined;
+let capturedRtcOpts: {
+  localPresence?: { agentId: string; name: string };
+  sendRoster?: (data: unknown) => void;
+  getPc?: () => RTCPeerConnection | null;
+} | undefined;
 
 vi.mock("./boothPlatform", () => ({
   createBoothOperatorClient: vi.fn((opts: typeof clientOpts) => {
@@ -21,12 +26,18 @@ vi.mock("./boothPlatform", () => ({
 }));
 
 vi.mock("./boothOperatorRtc", () => ({
-  createBoothOperatorRtc: vi.fn((opts: { onProgramStream: (stream: MediaStream | null) => void }) => {
+  createBoothOperatorRtc: vi.fn((opts: {
+    onProgramStream: (stream: MediaStream | null) => void;
+    localPresence?: { agentId: string; name: string };
+  }) => {
     onProgramStream = opts.onProgramStream;
+    capturedRtcOpts = opts;
     return {
       start: vi.fn(),
       stop: vi.fn(),
       handleSignal: vi.fn(),
+      getPc: () => null,
+      sendRoster: vi.fn(),
     };
   }),
 }));
@@ -57,6 +68,7 @@ describe("createBoothOperatorShell", () => {
     delete clientOpts.onRemoteDisabled;
     delete clientOpts.onSnapshot;
     onProgramStream = undefined;
+    capturedRtcOpts = undefined;
   });
 
   it("surfaces remote disabled as plain-language error", async () => {
@@ -95,5 +107,36 @@ describe("createBoothOperatorShell", () => {
     });
     expect(shell.getStatus().tvOn).toBe(false);
     expect(shell.getStatus().tvStream).toBeNull();
+  });
+
+  it("passes operator roster localPresence to WebRTC", async () => {
+    const { createBoothOperatorShell } = await import("./boothOperatorShell");
+    const shell = createBoothOperatorShell({ operatorCap: "cap-test" });
+    await shell.connect();
+    const shellId = shell.getShellId();
+    expect(capturedRtcOpts?.localPresence).toEqual({
+      agentId: `op-${shellId}`,
+      name: expect.any(String),
+    });
+    expect(shell.getOperatorPeerId()).toBe(`op-${shellId}`);
+  });
+
+  it("toggleCamera updates local presence state", async () => {
+    vi.stubGlobal("navigator", {
+      mediaDevices: {
+        getUserMedia: vi.fn().mockResolvedValue({
+          getVideoTracks: () => [{ kind: "video", stop: vi.fn() }],
+          getAudioTracks: () => [],
+        }),
+      },
+    });
+    const { createBoothOperatorShell } = await import("./boothOperatorShell");
+    const shell = createBoothOperatorShell({ operatorCap: "cap-test" });
+    await shell.connect();
+    const err = await shell.toggleCamera();
+    expect(err).toBeNull();
+    expect(shell.getStatus().localCamera).toBe(true);
+    await shell.toggleCamera();
+    expect(shell.getStatus().localCamera).toBe(false);
   });
 });

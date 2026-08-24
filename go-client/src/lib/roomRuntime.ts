@@ -91,6 +91,10 @@ import {
   boothCastSummaryFromProgram,
 } from "./boothCastState";
 import { createRoomGuestJoinAcceptor } from "./roomBoothJoinHost";
+import {
+  operatorDisplayNameForShell,
+  operatorPeerIdForShell,
+} from "./roomOperatorSlot";
 
 export type RoomPhase = "idle" | "open" | "ended" | "error";
 
@@ -126,6 +130,8 @@ type PeerSlot = {
   displayName: string | null;
   lost?: boolean;
   fileRouted?: boolean;
+  kind: "guest" | "operator";
+  shellId?: string;
 };
 
 function sendBinary(session: RosterPeerSession | null, buf: ArrayBuffer): void {
@@ -181,6 +187,7 @@ export function createRoomRuntime(opts?: {
     }, 400);
   }
   const slots: PeerSlot[] = [];
+  const operatorSlots: PeerSlot[] = [];
   let surfaceAttached = false;
   let closing = false;
   let opening = false;
@@ -265,6 +272,7 @@ export function createRoomRuntime(opts?: {
       peerId: null,
       session: null,
       displayName: null,
+      kind: "guest",
     };
     slots.push(slot);
     return {
@@ -283,6 +291,36 @@ export function createRoomRuntime(opts?: {
             message: occupancyMessage(),
           });
         }
+      },
+    };
+  }
+
+  function prepareOperatorSlot(shellId: string): {
+    handlers: RosterPeerHandlers;
+    attachSession: (sess: RosterPeerSession) => void;
+  } {
+    let slot = operatorSlots.find((s) => s.shellId === shellId);
+    if (!slot) {
+      slot = {
+        peerId: operatorPeerIdForShell(shellId),
+        session: null,
+        displayName: operatorDisplayNameForShell(shellId),
+        kind: "operator",
+        shellId,
+      };
+      operatorSlots.push(slot);
+    }
+    return {
+      handlers: operatorHandlers(slot),
+      attachSession: (sess: RosterPeerSession) => {
+        slot!.session = sess;
+        slot!.peerId = slot!.peerId ?? operatorPeerIdForShell(shellId);
+        sess.pc.addEventListener("track", (ev) => {
+          goRoomMedia.onRemoteTrack(ev, sess.pc);
+          if (slot!.peerId) void goRoomMedia.forwardFrom(slot!.peerId);
+        });
+        syncPlayHostPeer(slot!);
+        refreshGuestSummary();
       },
     };
   }
@@ -367,6 +405,14 @@ export function createRoomRuntime(opts?: {
         programName: goRoomMedia.programName,
         remoteProgramName: goRoomMedia.remoteProgramName,
       }),
+    getLocalPresence: () => ({
+      agentId: localAgentId,
+      name: hostName(),
+    }),
+    prepareOperatorRoster: (shellId) => prepareOperatorSlot(shellId).handlers,
+    onOperatorSession: ({ shellId, session }) => {
+      prepareOperatorSlot(shellId).attachSession(session);
+    },
   });
 
   function clearPlayCanvas(): void {
@@ -407,11 +453,18 @@ export function createRoomRuntime(opts?: {
     for (const s of slots) {
       if (!s.lost && s.session) out.push(s.session);
     }
+    for (const s of operatorSlots) {
+      if (!s.lost && s.session) out.push(s.session);
+    }
     return out;
   }
 
   function liveGuestCount(): number {
-    return liveSessions().length;
+    return slots.filter((s) => !s.lost && s.session).length;
+  }
+
+  function allPeerSlots(): PeerSlot[] {
+    return [...slots, ...operatorSlots];
   }
 
   function otherSessions(except: PeerSlot): RosterPeerSession[] {
@@ -419,22 +472,31 @@ export function createRoomRuntime(opts?: {
   }
 
   function refreshGuestSummary(): void {
-    const live = slots.filter((s) => !s.lost && s.session);
+    const liveGuests = slots.filter((s) => !s.lost && s.session);
+    const liveOps = operatorSlots.filter((s) => !s.lost && s.session);
+    const live = [...liveGuests, ...liveOps];
     const names = live
       .map((s) => s.displayName?.trim())
       .filter((n): n is string => Boolean(n));
     const occupantPeers = live
       .filter((s) => Boolean(s.peerId))
       .map((s) => ({
-        peerId: s.peerId,
-        name: playerDisplayName(s.displayName, "訪客"),
+        peerId: s.peerId as string,
+        name: playerDisplayName(
+          s.displayName,
+          s.kind === "operator" ? "遠端" : "訪客"
+        ),
+        kind:
+          s.kind === "operator"
+            ? ("operator" as const)
+            : ("guest" as const),
       }));
     set({
-      guestCount: live.length,
+      guestCount: liveGuests.length,
       peerName: names[0] ?? null,
       occupantNames: names,
       occupantPeers,
-      message: roomOccupantSummary({ guestCount: live.length }),
+      message: roomOccupantSummary({ guestCount: liveGuests.length }),
     });
     fanoutOccupancy();
     void goRoomMedia.refresh();
@@ -504,7 +566,7 @@ export function createRoomRuntime(opts?: {
       localAgentId,
       occupantCount: () => liveGuestCount() + 1,
       peers: () =>
-        slots
+        allPeerSlots()
           .filter((s) => !s.lost && s.session)
           .map((s) => ({
             peerId: s.peerId || "",
@@ -558,8 +620,10 @@ export function createRoomRuntime(opts?: {
   function dropPeer(slot: PeerSlot): void {
     if (slot.lost) return;
     slot.lost = true;
-    if (slot.peerId && fileHub) fileHub.removePeer(slot.peerId);
-    if (GO_ROOM_MESH_ENABLED && slot.peerId) meshBroker.removePeer(slot.peerId);
+    if (slot.kind === "guest") {
+      if (slot.peerId && fileHub) fileHub.removePeer(slot.peerId);
+      if (GO_ROOM_MESH_ENABLED && slot.peerId) meshBroker.removePeer(slot.peerId);
+    }
     if (slot.peerId && playHost) playHost.detachExistingPeer(slot.peerId);
     const sess = slot.session;
     slot.session = null;
@@ -573,21 +637,29 @@ export function createRoomRuntime(opts?: {
     refreshGuestSummary();
   }
 
+  function operatorHandlers(slot: PeerSlot): RosterPeerHandlers {
+    return handlers(slot);
+  }
+
   function kickPeer(peerId: string): boolean {
     const id = peerId?.trim();
     if (!id || id === "local") return false;
-    const slot = slots.find((s) => !s.lost && s.peerId === id && s.session);
+    const slot =
+      slots.find((s) => !s.lost && s.peerId === id && s.session) ??
+      operatorSlots.find((s) => !s.lost && s.peerId === id && s.session);
     if (!slot?.session) return false;
-    try {
-      slot.session.send(
-        buildSessionBoothMessage({
-          op: "kick",
-          from: localAgentId,
-          to: id,
-        })
-      );
-    } catch {
-      /* still drop */
+    if (slot.kind === "guest") {
+      try {
+        slot.session.send(
+          buildSessionBoothMessage({
+            op: "kick",
+            from: localAgentId,
+            to: id,
+          })
+        );
+      } catch {
+        /* still drop */
+      }
     }
     dropPeer(slot);
     return true;
@@ -608,14 +680,16 @@ export function createRoomRuntime(opts?: {
         if (isPresenceMessage(data)) {
           slot.peerId = data.agentId;
           slot.displayName = data.name;
-          routeFilePeer(slot);
-          if (GO_ROOM_MESH_ENABLED) {
-            meshBroker.addPeer(data.agentId);
-            meshBroker.introduce(data.agentId);
+          if (slot.kind === "guest") {
+            routeFilePeer(slot);
+            if (GO_ROOM_MESH_ENABLED) {
+              meshBroker.addPeer(data.agentId);
+              meshBroker.introduce(data.agentId);
+            }
           }
           syncPlayHostPeer(slot);
           refreshGuestSummary();
-            } else if (isSessionChatMessage(data)) {
+        } else if (isSessionChatMessage(data)) {
           const toast = goSessionChat.onIncoming(data);
           if (toast) chromeSession.setFlash(toast, 2800);
           broadcastSessionChat(otherSessions(slot), data);
@@ -630,6 +704,7 @@ export function createRoomRuntime(opts?: {
             }
           }
         } else if (isSessionFileControl(data)) {
+          if (slot.kind !== "guest") return;
           if (!slot.peerId && data.owner) slot.peerId = data.owner;
           if (!slot.peerId && data.from) slot.peerId = data.from;
           routeFilePeer(slot);
@@ -637,7 +712,8 @@ export function createRoomRuntime(opts?: {
         } else if (
           GO_ROOM_MESH_ENABLED &&
           isSessionMeshMessage(data) &&
-          slot.peerId
+          slot.peerId &&
+          slot.kind === "guest"
         ) {
           meshBroker.forward(slot.peerId, data);
         } else if (
@@ -666,6 +742,7 @@ export function createRoomRuntime(opts?: {
         }
       },
       onBinary: (buf) => {
+        if (slot.kind !== "guest") return;
         if (slot.peerId && fileHub) fileHub.onPeerBinary(slot.peerId, buf);
       },
       onChannelOpen: () => {

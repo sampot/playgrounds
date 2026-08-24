@@ -1,6 +1,6 @@
 # Playgrounds 純玩版：包廂引擎／殼／常駐 daemon（`pg-boothd`）
 
-> **狀態：** Draft（2026-08-23，**第六刀**）— 契約草案；Anchor／Operator **部分落地**；**Operator＝Remote Owner Shell**（§6.1、§7.6）與 Hub 私有片庫遠端讀寫**規格已定、實作未落地**；**Guest join 經 Anchor WSS**（§10.7）**規格已定、實作未落地**；從屬並**修訂** [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)  
+> **狀態：** Draft（2026-08-24，**第七刀**）— 契約草案；Anchor／Operator **部分落地**；**Operator＝owner 認證的 Roster 節點**（§6、§6.2；**第七刀**修訂）＋ Remote Owner Shell（§6.1、§7.6）與 Hub 私有片庫遠端讀寫**規格已定、實作未落地**；**Guest join 經 Anchor WSS**（§10.7）**規格已定、實作未落地**；從屬並**修訂** [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)  
 > **`pg-boothd`：** 於**獨立私有 repo** 開發；**非**開源產品；**不在**本 repo（`playgrounds`）落地實作——本文件只定義與 go／Platform 的**契約邊界**  
 > **權威決策：** 從屬 [DECISIONS.md](./DECISIONS.md) **DEC-050**（純玩版）、**DEC-045**（Roster／薄 signaling）、**DEC-047**（Platform Invite／Dash）；對齊 **DEC-024**（headless runtime 分層敘事）  
 > **相關：** [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)（包廂產品契約；wire `session_*`）、[PG-GO-ROOM-PLAY-PLAN.md](./PG-GO-ROOM-PLAY-PLAN.md)（開局；daemon 第一版**非目標**）、[PG-GO-ROOM-RECORD-PLAN.md](./PG-GO-ROOM-RECORD-PLAN.md)（多路 live 錄影；Hub 私有片庫；**未落地**）、[PG-GO-ROOM-DEV-HARNESS-PLAN.md](./PG-GO-ROOM-DEV-HARNESS-PLAN.md)（localhost harness；**勿**當產品契約）、[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)、[PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md)、[PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)、[PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md)、[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（包廂 Operator TURN fallback）、[PG-BACKEND-RUNTIME-SPEC.md](./PG-BACKEND-RUNTIME-SPEC.md)（殼↔Runtime 通道類比）、`.cursor/rules/no-native-dialogs.mdc`、`.cursor/rules/mobile-first-ux.mdc`、[GLOSSARY.md](./GLOSSARY.md)
@@ -38,7 +38,7 @@
 - **單帳號單 Hub（硬）：** 同時最多一個 live Hub session（**`play` 與 `go` 各 origin 各一 Hub**；同一 Platform 帳號在兩 origin 仍各守單 Hub 語意）。
 - **媒體原則不變：** 節目／在場 RTP 仍 Hub 星狀；檔 bytes 仍 mesh 直連優先；Platform **不** SFU、**不**錄製、**不**雲存正文／bytes。
 - **監控 MVP：** 家裡 Hub 常駐；舊手機跑 **Peer** 掛鏡頭；外出 Dash → Operator 切台；家裡**可無**瀏覽器分頁。
-- **Operator＝Remote Owner Shell（硬）：** 外出 `/room/remote` 是**同一帳號**遠端操作**同一間 Hub**——不只切台／監控，亦含 **Hub 私有片庫讀寫**（像掛在家裡的 private drive；§6.1、§7.6）。**不是** Guest；**不是**把 bytes 存到 Platform。
+- **Operator＝owner 認證的 Roster 節點（硬）：** 外出 `/room/remote` 在拓樸上與 Guest／Peer **同為 Hub 的 leaf 節點**（`snapshot.members` 中 `kind: "operator"`；§6.2）。差別在 **進門認證**（`operatorCap`＋帳號 owner）與 **預設能力**（Owner 片庫、可持 `director`），**不是**另一種 Hub。**不走** `/i/` 門牌；**不是**把 bytes 存到 Platform。單機快樂路徑＝**一條 Operator 連線**同時導播、開鏡頭／麥、入座開局（§8.1c）；第二台裝置仍可用 Guest 門牌（§8.4）。
 
 ---
 
@@ -47,7 +47,7 @@
 - 雲端 SFU、把 RTP／檔案 bytes 經 Platform／R2 中繼（錨點 DO **只**控制面）。
 - 永久房號、「我的包廂 3 號」、**獨立雲端片庫**或把 Hub 私有片庫**同步複製**到 Platform／R2（Operator **遠端讀寫 Hub 本機儲存**＝Owner 通道；見 §7.6；**不是**雲同步產品）。
 - 多路視訊合成監視牆（仍**單主畫面切台**；見 ROOM §3）。
-- 把 Operator 做成 Guest 門牌的另一種掃碼（Operator **不走** `/i/` Guest 契約）。
+- 把 Operator **進門**做成 Guest 門牌的另一種掃碼（Operator **不走** `/i/`／`join_cap`；**拓樸上**仍是 Hub leaf 節點，見 §6.2）。
 - 使用者自備 TURN（DEC-045／047 否決）。
 - **`pg-boothd` 第一版** 大螢幕 SAM 開局（`session_play`）；不阻塞監控 MVP。
 - 把 Peer Engine 做成另一種 Platform `invite.kind`（Peer **只**認 Hub 本機 `peerCap`）。
@@ -70,7 +70,8 @@
 | **`pg-boothd`** | **獨立私有 repo** 的 Rust 常駐二進位；hub／`peer` 子命令；**非**開源；本 repo **只**定契約 |
 | **`peerCap`** | Hub 本機核發、Peer 進房憑證；**不**經 Platform Invite DO |
 | **BoothAnchor**（錨點） | Platform `BoothAnchorDO` + **Hub** 長連 WSS；**Guest join signal 中繼**（§10.7） |
-| **Operator**（遠端操作者） | 帳號擁有者的 **Remote Owner Shell**；遠端連回 **Hub**；可導播、可讀寫 **Hub 私有片庫**（§6.1）；**不是** Guest／Peer |
+| **Operator**（遠端節點） | 帳號擁有者的 **owner 認證 Roster 節點**＋ **Remote Owner Shell** UI；Hub leaf（`kind: "operator"`）；`operatorCap` 進門；可導播、可 presence、可讀寫 **Hub 私有片庫**（§6.1）；**進門路徑**與 Guest／`peerCap` Peer 不同（§6.2） |
+| **Roster 節點**（Hub leaf） | 連上 Hub 的**客戶端節點**（瀏覽器分頁、daemon peer 行程）；各佔一 `peerId`；在 `members` 列出。含 Guest／Peer／Operator；**不含** Hub 本體 |
 | **Owner Shell** | **主持 Shell** 或 **Operator Shell**——同一 `ownerUserId` 的 UI；私有片庫操作權歸 Owner，不歸 Guest |
 | **Owner file channel** | Operator／本地 Shell ↔ **Hub** 的檔案 bytes 通道（§7.6）；**不**經 BoothAnchor DO、**不**經 Guest mesh |
 | **boothSessionId** | 本場 **Hub** session 的 UUID；**不是**永久房號 |
@@ -173,34 +174,47 @@
 
 ## 6. 角色與權限
 
-| 角色 | 連線方式 | 導播（cast） | 收看大螢幕 | Hub 私有片庫 | 備註 |
+**拓樸（硬）：** 包廂媒體星狀中心是 **Hub Engine**（唯一權威）。每個瀏覽器分頁、daemon 行程連上 Hub 後都是 **Roster 節點**（Hub leaf）——各佔一 `peerId`、一條（或多條）WebRTC 連線、一張成員卡。**權限不由「是不是 Guest」單一標籤決定**，而由 **進門認證**＋**能力授予**（§6.2）決定。
+
+| 層級 | 實體 | 在 `members`？ | 備註 |
+| --- | --- | --- | --- |
+| **Hub** | Booth Hub Engine | — | 星狀中心；cast 執行；**唯一**連 Platform |
+| **Shell（無獨立 peerId）** | Embedded 同頁 UI／Daemon 本地 `/room` 連 `localhost` | 否（或合併 host peer） | 送 `booth.*` intent；**不是** leaf 節點時不另開 roster PC |
+| **Roster 節點** | Guest／Peer／Operator | ✅ | 見 §6.2 |
+
+| Roster `kind` | 連線方式 | 預設導播 | 收看大螢幕 | Hub 私有片庫 | 備註 |
 | --- | --- | --- | --- | --- | --- |
-| **Hub Engine** | — | 執行 | 產出 program | 權威儲存 | **唯一**連 Platform |
-| **主持 Shell** | Control Channel → Hub（本地或 Embedded） | ✅ | ✅ | ✅ 讀寫 | 與 Operator 互斥導播鎖（§7.4） |
-| **Operator Shell** | Anchor DO + Control Channel + WebRTC → Hub | ✅（持 director 時） | ✅ | ✅ 讀寫 | **Remote Owner Shell**（§6.1）；**不是** Guest／Peer |
-| **Guest** | 門牌 short／join_cap + 握手經 **BoothAnchor**（§10.7） | ❌ | ✅（房級節目） | ❌ | 瀏覽器 `/i/`；ROOM §5.4 不變 |
-| **Peer Engine** | Hub `peerCap` → Hub | ❌ | ✅（房級節目） | ❌ | headless 來源；**不**連 Platform |
+| **Guest** | 門牌 short／`join_cap` + 握手經 **BoothAnchor**（§10.7） | ❌ | ✅（房級節目） | ❌ | `/i/`；可匿名；**含**擁有者自己的第二台裝置（§8.4） |
+| **Peer** | Hub `peerCap` → Hub | ❌ | ✅（房級節目） | ❌ | headless；**不**連 Platform |
+| **Operator** | `operatorCap` + Anchor + Operator WebRTC（§10.6） | ✅（持 `director` 時） | ✅ | ✅ 讀寫 | owner 認證 leaf；**出現在成員列表**（§6.2） |
+
+| Shell 角色 | 連線方式 | 導播 | 收看 | 私有片庫 | 備註 |
+| --- | --- | --- | --- | --- | --- |
+| **主持 Shell** | Control Channel → Hub（本地或 Embedded） | ✅ | ✅ | ✅ 讀寫 | 與 Operator 互斥 `director`（§7.4） |
+| **Operator Shell** | 同上（遠端 `operatorCap`） | ✅（持 `director` 時） | ✅ | ✅ 讀寫 | UI 殼；背後 Roster 節點 `kind: operator` |
 
 **硬：**
 
-- Guest **不能**因登入而變 Operator；Operator **不能**用再開 `/room` 冒充（走 `/room/remote` 或 Dash 深鏈）。
-- **私有片庫權威在 Hub**（Embedded OPFS 或 daemon 目錄）；Operator 讀寫的是 **Hub 上那份**，不是在外出手機再開一份 OPFS。
-- Guest **永遠**看不到私有列、**不能**經 `session_file`／`/room-file` 要私有 bytes（ROOM §5.5.1 不變）。
-- 監控正式路徑＝**Peer Engine**（掛鏡頭、被切上大螢幕）；臨時仍可用瀏覽器 Guest。
-- 外出手機＝**Operator Shell**（連回包廂）；監控切台只是應用情境之一，**不是** Operator 的唯一定義。
+- **進門路徑分離：** Guest **不能**用 `operatorCap` 冒充 Operator；Operator **不能**用再開 `/room` Embedded 冒充 Hub；Operator **不走** `/i/` 門牌。
+- **拓樸一致：** Operator 與 Guest **同為** Hub leaf；文件與 UI 用 `kind` 標**進門路徑與預設能力**，**不是**「Operator 不是節點」。
+- **私有片庫權威在 Hub**；Operator 讀寫的是 **Hub 上那份**，不是在外出手機再開一份 OPFS。
+- Guest **永遠**看不到私有列、**不能**經 `session_file`／`/room-file` 要私有 bytes（ROOM §5.5.1）；**除非**日後 `director` **委任**（§6.2）——委任**不**含私有片庫。
+- 監控正式路徑＝**Peer Engine**（掛鏡頭）；臨時仍可用瀏覽器 Guest。
+- **單機 Owner** 預設 **Operator 一條連線**（看＋說＋控）；Guest 門牌留給**他人**或**第二裝置**（§8.1c、§8.4）。
 
-### 6.1 Remote Owner Shell（Operator 能力矩陣）
+### 6.1 Owner Shell 能力矩陣（主持 Shell／Operator Shell／對照 Guest）
 
-**一句話：** Operator 與本地 `/room` **主持 Shell** 服務**同一擁有者**、**同一 Hub**；差別在連線路徑（`operatorCap` + Anchor）與導播鎖（§7.4）。**不是**「特權版 Guest」。
+**一句話：** **主持 Shell** 與 **Operator Shell** 服務**同一 `ownerUserId`**、**同一 Hub**；差別在連線路徑（本地 Control Channel vs `operatorCap` + Anchor）與 `director` 鎖（§7.4）。**Operator 對應的 Roster 節點**（`kind: operator`）與 Guest **同級 leaf**，並具 **Owner 預設能力**＋可發 **presence**（§6.2）。
 
-| 能力 | 主持 Shell | Operator Shell | Guest |
+| 能力 | 主持 Shell | Operator Shell／節點 | Guest 節點 |
 | --- | --- | --- | --- |
+| 在 `members` 列出 | 視 Embedded 是否另開 host peer | ✅ `kind: operator` | ✅ `kind: guest` |
 | 看大螢幕 program | ✅ | ✅ | ✅（房級） |
-| 切台／cast（需 director） | ✅ | ✅ | ❌ |
-| 請人／撤門牌（需 director） | ✅ | ✅ | ❌ |
-| `peerCap` mint／revoke（需 director） | ✅ | ✅ | ❌ |
-| 踢人／halt live（需 director） | ✅ | ✅ | ❌ |
-| 結束包廂（需 director＋確認） | ✅ | ✅ | ❌ |
+| 切台／cast（需 `director`） | ✅ | ✅ | ❌（預設）；可 **委任**（§6.2） |
+| 請人／撤門牌（需 `director`） | ✅ | ✅ | ❌（預設）；可 **委任** |
+| `peerCap` mint／revoke（需 `director`） | ✅ | ✅ | ❌ |
+| 踢人／halt live（需 `director`） | ✅ | ✅ | ❌（預設）；moderation 標 `from`＝director peer |
+| 結束包廂（需 `director`＋確認） | ✅ | ✅ | ❌ |
 | **列出 Hub 私有片庫** | ✅ | ✅ | ❌ |
 | **上傳→Hub 私有** | ✅ | ✅ | ❌ |
 | **從 Hub 私有下載** | ✅ | ✅ | ❌ |
@@ -208,8 +222,9 @@
 | 私有→掛到分享 | ✅ | ✅ | ❌ |
 | 私有 cast（`scope: private`） | ✅ | ✅（intent） | ❌ |
 | 管理分享目錄（掛／撤） | ✅ | ✅ | 僅掛自己的檔 |
-| 開鏡頭／麥當來源 | ✅ | ❌ | ✅ |
+| 開鏡頭／麥當來源（`session_camera`／`session_mic`） | ✅ | ✅ | ✅ |
 | Guest↔Guest mesh 檔直連 | ❌（Hub） | ❌ | ✅ |
+| `session_play` 入座 | 主持指定席 | 主持指定席；**自身 operator `peerId` 可入座** | 可被指定席 |
 
 **導播鎖 vs Owner 片庫（硬）：**
 
@@ -218,8 +233,62 @@
 | `booth.intent.cast.*`、`end`、`ejectPeer`、`invite.*`、`peer.*`、`live.halt` | **是** |
 | `booth.intent.private.*`、`share.*`（Owner 管理分享目錄）、`chat.send` | **否**（仍須 `operatorCap`／本地 Shell 認證） |
 | Owner file channel 上傳／下載 | **否** |
+| `session_camera`／`session_mic`（Operator 節點 presence） | **否**（仍須有效 Operator PC） |
 
-**viewer 模式**（本地 host Shell 持 director）：Operator **仍可**讀寫私有片庫、看大螢幕；**不可** cast／踢人／結束包廂。
+**viewer 模式**（本地 host Shell 持 `director`）：Operator **仍可**讀寫私有片庫、看大螢幕、開 presence；**不可** cast／踢人／結束包廂。
+
+### 6.2 Roster 節點與能力模型（第七刀；硬）
+
+**一句話：** 每個連上 Hub 的客戶端分頁／行程＝**一個 Roster 節點**（一 `peerId`）。`kind`＝**進門憑證與預設能力**的標籤，**不是**能力上限的牢籠。
+
+#### 6.2.1 節點類型
+
+| `members.kind` | 典型實體 | 進門憑證 | Platform |
+| --- | --- | --- | --- |
+| `guest` | 瀏覽器 `/i/` | `join_cap`＋門牌 | 門牌 mint（Invite DO）；握手經 Anchor（§10.7） |
+| `peer` | `pg-boothd peer`、舊手機鏡頭 | `peerCap` | ❌ |
+| `operator` | go `/room/remote`、Dash 深鏈 | `operatorCap` | `operatorCap` mint；WebRTC 經 Anchor（§10.6） |
+
+**硬：**
+
+- **同帳號可多節點：** 擁有者同時有 Operator 節點（外出手機）與 Guest 節點（第二台掃門牌）＝**兩 `peerId`**——預期故事，不是 bug。產品預設鼓勵 **單機一條 Operator**（§8.1c）。
+- **Guest 含自己的裝置：** 門牌從未排除「同一人第二台」；與 Operator **並存**時兩者皆在成員列表。
+- Operator 節點在 UI 標示為「遠端」／owner（對齊 `roomMemberKindLabel("operator")`）；**不是**隱藏後台通道。
+
+#### 6.2.2 能力維度（與 `kind` 分離）
+
+| 能力 | 授予方式 | 典型持有者 |
+| --- | --- | --- |
+| **presence** | 節點自行 `session_camera`／`session_mic` | Guest、Peer、Operator、主持 host peer |
+| **收看 program** | 進門即房級 | 所有 Roster 節點 |
+| **owner** | `operatorCap`／`shellLocalToken`／Embedded 同帳號 | Operator 節點、主持 Shell |
+| **director** | `director` 鎖（§7.4）；一次一 Shell | 主持 Shell 或 Operator Shell |
+| **mesh** | Guest `session_mesh` 直連 | Guest（預設）；Operator **不** mesh |
+| **delegate**（委任；**未落地**） | 持 `director` 者 `booth.intent.delegate.grant` 給特定 `peerId` | 指定 Guest 可 cast／開局等；**不含**私有片庫 |
+
+**操作權不是「Guest 就不能」：** 預設 Guest **無** `director`／**無** owner；**持鎖或委任後**可執行對應 intent。對齊視訊會議「主持人交棒」——須**明示委任**（§6.2.3），禁止匿名門牌 Guest 預設全權。
+
+#### 6.2.3 導播委任（草案；未落地）
+
+| 項 | 規格 |
+| --- | --- |
+| **動機** | 主持暫時讓某 Guest 切台／開局；或雙人協作導播 |
+| **wire（草案）** | `booth.intent.delegate.grant` `{ peerId, caps: ("cast" \| "invite" \| "play")[], ttlSec? }`；`booth.intent.delegate.revoke`；`booth.event.delegate.changed` |
+| **硬** | **不可**委任 `private.*`／Owner file channel；**不可**委任 `end`；過期自動 revoke |
+| **與 `director` 鎖** | 委任**不**取代 `director` 鎖；持鎖者仍可搶回／revoke |
+
+#### 6.2.4 Operator 節點的媒體與 wire
+
+| 通道 | Operator 節點 |
+| --- | --- |
+| **program RTP** | Operator WebRTC PC（§10.6）；收大螢幕 |
+| **presence RTP** | 同一 PC；`session_camera`／`session_mic`（與 Guest **同 wire**；ROOM §9.7） |
+| **`session_*` DC** | 同一 PC roster DC：`session_chat`、`session_play` 入座等 |
+| **`booth.*` intent** | Control Channel（Anchor WSS 或本地）；cast／片庫等 |
+| **Owner file bytes** | 同一 PC `booth.owner` DC（§7.6） |
+| **Platform** | **不**載 RTP／檔 bytes |
+
+**硬：** Operator **不**為了開鏡頭再開第二條 Guest 門牌連線；單機「連回家」＝**一個 Operator 節點**完成看、說、控。
 
 ---
 
@@ -233,9 +302,9 @@
 | Daemon 本地 Shell | `ws://127.0.0.1:<port>/booth/control` 或 unix socket | `shellLocalToken`（daemon 啟動時印出／寫入 `~/.pg-booth/shell.token`） |
 | 遠端 Operator | **經 BoothAnchor DO** 中繼 `booth.*` 幀 | `operatorCap`（§9） |
 
-遠端 Operator 的**媒體**不走 DO：Operator ↔ Hub 另建 **WebRTC Operator peer**（§10.6）；**檔案 bytes** 走 **Owner file channel**（§7.6，同一 PC 上的 DataChannel）。
+遠端 Operator 的**媒體**不走 DO：Operator ↔ Hub 另建 **WebRTC Operator 節點**（§10.6；**Roster leaf**）；**檔案 bytes** 走 **Owner file channel**（§7.6，同一 PC 上的 DataChannel）。**presence**（鏡頭／麥）走同一 PC 的 `session_camera`／`session_mic`（§6.2.4），**不**要求再開 Guest 門牌。
 
-**硬：** Control Channel **只**承載 `booth.*` 與 Operator signal 子幀（§10.6）；**不**承載 Guest／Peer `session_*`、**不**承載 RTP、**不**承載檔案 bytes（bytes 走 §7.6）。
+**硬：** Control Channel **只**承載 `booth.*` 與 Operator signal 子幀（§10.6）；**不**經 Anchor WSS 轉發 Guest／Peer／Operator 的 `session_*`、**不**承載 RTP、**不**承載檔案 bytes（bytes 走 §7.6）。`session_*` 在 **Operator／Guest／Peer 各自的 roster WebRTC PC** 上（Operator 與 Guest **同級 leaf**，§6.2）。
 
 ### 7.2 訊息封包
 
@@ -269,6 +338,8 @@ type BoothEnvelope = {
 | `booth.intent.chat.send` | `{ message }` — 對齊 `session_chat`（Hub fanout） |
 | `booth.intent.play.start` | 對齊 `session_play` 開局（ROOM §5.9；daemon D1 可延後） |
 | `booth.intent.play.end` | `{ }` |
+| `booth.intent.delegate.grant` | `{ peerId, caps: ("cast" \| "invite" \| "play")[], ttlSec? }` — 委任導播子能力；**未落地**；§6.2.3 |
+| `booth.intent.delegate.revoke` | `{ peerId }` 或 `{ grantId }` — **未落地** |
 | `booth.intent.private.remove` | `{ id }` — 刪 Hub 私有片庫檔；僅 Owner Shell |
 | `booth.intent.private.import` | `{ name, size, mime? }` → ack `{ transferId, id }`；bytes 經 §7.6 |
 | `booth.intent.private.fetch` | `{ id }` → ack `{ transferId }`；Hub 經 §7.6 下傳 |
@@ -287,6 +358,7 @@ type BoothEnvelope = {
 | `booth.state.snapshot` | 全量（§7.5） |
 | `booth.state.patch` | JSON Patch 或欄位增量（實作二選一；語意：只更新訂閱 scope） |
 | `booth.event.director.changed` | 導播鎖易手 |
+| `booth.event.delegate.changed` | 委任清單變更（**未落地**；§6.2.3） |
 | `booth.event.engine.offline` | Anchor 將標 offline（grace 內可恢復） |
 | `booth.error` | `{ code, message }` |
 
@@ -433,6 +505,18 @@ type BoothOwnerChunk = {
 7. 關 Operator：片庫留在 Hub；不是雲端備份，是「連回自己家硬碟」
 ```
 
+### 8.1c 遠端照看／單機 Owner（Operator 一條連線）——快樂路徑
+
+```text
+1. 家裡：Daemon Hub + 父母端 Peer（舊手機鏡頭；被動、不必會操作 UI）
+2. 外出：Dash「連回包廂」→ 單一 Operator 節點（/room/remote）
+3. 同一連線：看父母 Peer 鏡頭（cast 或 presence 預覽）、開自己的鏡頭／麥、切台、開局並入座
+4. 父母家大螢幕：Operator cast 兒女畫面或棋盤到 program
+5. **不必**同時再開 /i/ Guest 分頁（除非第二裝置或他人進門）
+```
+
+**硬：** 產品入口「連回家」預設 **Operator 節點**；Guest 門牌保留給**他人**與**擁有者第二裝置**（§8.4）。
+
 ### 8.2 臨時包廂（Embedded）——不變
 
 ```text
@@ -449,12 +533,13 @@ type BoothOwnerChunk = {
 
 **硬：** **禁止**無確認下同時跑 Daemon Engine + Embedded Engine。
 
-### 8.4 Guest、Peer 與 Operator 並存
+### 8.4 Roster 節點並存（Guest、Peer、Operator）
 
-- 監控手機（正式）：**Peer Engine**（`peerCap`）；可被 cast。
-- 臨時訪客：**Guest**（`/i/`）；語意不變。
-- 外出手機：**Operator Shell**（`/room/remote`）；可 cast。
-- 同一 Hub、**不同角色**——預期故事，不是 bug。
+- 監控手機（正式）：**Peer** 節點（`peerCap`）；可被 cast。
+- 臨時訪客／他人：**Guest** 節點（`/i/`）；語意不變。
+- 外出 Owner 裝置：**Operator** 節點（`/room/remote`）；可 cast、可 presence、可 `director`。
+- 擁有者**第二台**裝置：可 **Guest** 掃門牌，亦可僅用 Operator（若只有一台則後者）。
+- 同一 Hub、多個 **Roster leaf**（各一 `peerId`）——預期故事，不是 bug（§6.2）。
 
 ---
 
@@ -574,6 +659,7 @@ type AnchorSignalFrame = {
 
 - Operator 為 **offerer**；Engine 為 **answerer**（對齊「加入者出 offer」精神，但 **不**占用 invite join 槽）。
 - SDP：**2+2** booth transceiver（ROOM §7.1）；`intent.surface=room.operator` 僅作 metadata（**不**鑄新 Invite DO）。
+- **presence（硬；第七刀）：** 同一 PC roster DC 支援 `session_camera`／`session_mic`；Operator 節點與 Guest **同 wire**（§6.2.4）。Hub 在 `members` 標 `live`；混音走 ROOM §9.8.1。
 - **同一 PC** 另開 **Owner file channel** DataChannel（`booth.owner`；§7.6）；與 program transceiver **分離**（RTP 仍只節目槽）。
 - ICE：包廂 STUN 預設 + 可選 room TURN fallback（CREDITS 另段）。
 - Operator 離線後 Hub **可**關閉 Operator PC（含 owner DC）以省資源；**不**影響 Guest／Peer entrance PC。
@@ -634,7 +720,7 @@ type BoothJoinAnswer = {
 - Engine 忙（上一筆握手未完成）→ Guest `429` 或短暫重試；**仍串行**，不平行建 PC。
 - 門牌 `expired`／revoked → `410`；Engine 不在 → `503`。
 
-**與 Operator 分離：** Guest **不走** `operatorCap`、**不走** `/room/remote`、**不走** `anchor.signal` `phase: "operator-webrtc"`。
+**與 Guest 進門路徑分離：** Guest **不走** `operatorCap`、**不走** `/room/remote`、**不走** `anchor.signal` `phase: "operator-webrtc"`。拓樸上 Guest 與 Operator **皆為** Hub Roster leaf（§6.2）。
 
 ### 10.8 Dash 整合
 
@@ -767,7 +853,7 @@ Shell **重用** `GoRoomSurface` 等元件；`boothMode: "embedded" | "shell" | 
 | 包廂活著＝主持 `/room` 還開著（§6.4） | 包廂活著＝**Hub session** 還在 |
 | 主持永遠是開 `/room` 的那台（§5.4） | 權威在 **Hub**；Shell 可替換 |
 | 已登入再開 `/room`＝另一間空包廂（§5.4） | 有 live Daemon Hub → **本地 Shell 連回**；無 → Embedded 新開 |
-| 第二台請掃門牌（§5.4） | Guest 仍掃門牌；**監控正式路徑**＝Peer `peerCap`；Operator 不走門牌 |
+| 第二台請掃門牌（§5.4） | Guest 仍掃門牌；**監控正式路徑**＝Peer `peerCap`；Operator 用 `operatorCap`（**皆** Roster 節點，§6.2） |
 | 不做完美斷線重連（§3） | Operator／Shell↔Hub 可重連；Guest 靠門牌；Peer 靠 `peerCap` |
 | 私有 OPFS（§5.5.1） | 權威在 **Hub** FS；Embedded OPFS／daemon `~/.pg-booth/private/` | **Owner Shell**（本地或 Operator）讀寫；Operator 經 §7.6 |
 | Platform 不中繼資料面 | **維持**；Anchor 只 control + signal 轉發；**Owner 檔 bytes 也不經 DO** |
@@ -784,7 +870,7 @@ Shell **重用** `GoRoomSurface` 等元件；`boothMode: "embedded" | "shell" | 
 
 **§5.4 硬規則第 2 點後增：**
 
-> 遠端導播＝**Operator** 連回既有 **Hub**（見 ENGINE-PLAN）；**不是**再開 `/room`、**不是** Guest 門牌。監控鏡頭＝**Peer Engine**（`peerCap`）；**不是** Platform 門牌。
+> 遠端導播＝**Operator 節點**連回既有 **Hub**（見 ENGINE-PLAN §6.2）；**不是**再開 `/room` Embedded、**不是** Guest 門牌。監控鏡頭＝**Peer 節點**（`peerCap`）；**不是** Platform 門牌。
 
 **§5.5.1 表「誰」列後增（ENGINE 第六刀）：**
 
@@ -901,7 +987,7 @@ export interface BoothMediaSurface {
 | 4 | Operator signal | **Anchor WSS `anchor.signal`**；不新 `invite.kind`（§10.6） |
 | 5 | Rust D1 媒體 | **Peer live cast**（優先）+ Guest live；不做 Host 私有檔（§11.3） |
 | 6 | Hub／Peer 分離 | **Platform 只認 Hub**；Peer 只連 Hub + `peerCap`（§5.4） |
-| 7 | Operator 定位 | **Remote Owner Shell**；可讀寫 Hub 私有片庫（§6.1、§7.6）；監控只是情境之一 |
+| 7 | Operator 定位 | **owner 認證 Roster 節點**（§6.2）＋ Remote Owner Shell；可 presence、可讀寫 Hub 私有片庫（§6.1、§7.6）；單機一條連線；監控只是情境之一 |
 
 ---
 
@@ -910,7 +996,8 @@ export interface BoothMediaSurface {
 ### E2（Embedded + Operator）
 
 - [ ] Hub Embedded；`POST /v1/booth/anchors` 後 Dash 顯示在線。
-- [ ] 外出 Operator `/room/remote` 連回；可 `cast.offer` 切 Guest live。
+- [ ] 外出 Operator `/room/remote` 連回；可 `cast.offer` 切 Peer／Guest live。
+- [ ] Operator 節點可 `session_camera`／`session_mic`；出現在 `members`；**不需**另開 Guest 分頁即可視訊＋導播。
 - [ ] Operator **列出** Hub 私有片庫；**上傳**一檔至 Hub 私有；**下載**回外出裝置（§7.6）。
 - [ ] Operator **private cast** 上大螢幕；Guest **不可**要該私有檔。
 - [ ] 本地 `/room` Shell 連上後搶回 director；Operator 降 viewer（**仍可**讀寫片庫）。
@@ -933,6 +1020,7 @@ export interface BoothMediaSurface {
 
 | 日期 | 變更 |
 | --- | --- |
+| 2026-08-24 | **第七刀：Operator＝Roster 節點** — §6 拓樸重寫；§6.2 能力模型（`kind`≠能力上限）；Operator ✅ presence／`session_play` 入座；§8.1c 單機快樂路徑；§10.6 presence wire；委任草案 §6.2.3（未落地） |
 | 2026-08-23 | **第六刀：Operator＝Remote Owner Shell** — §6.1 能力矩陣；Hub 私有片庫遠端讀寫（§7.6 Owner file channel）；`privateFiles` 訂閱；§8.1b 快樂路徑；修訂 §7.4 viewer 可片庫讀寫 |
 | 2026-08-23 | **`invite.compose` Superseded；`play`／`go` 皆 Booth Hub：** 連線遊戲只 `invite.room`；Invite DO **保留**（門牌） |
 | 2026-08-23 | **Guest join 經 Anchor（§10.7）：** 包廂握手廢 Invite DO long poll；Hub 開著須 Anchor WSS；無 fallback |

@@ -7,6 +7,19 @@ const boothBridgeFixtures = vi.hoisted(() => ({
       ) => Promise<string>)
     | null,
   onBoothOpen: vi.fn().mockResolvedValue(undefined),
+  prepareOperatorRoster: null as
+    | ((shellId: string) => {
+        onMessage?: (data: unknown) => void;
+        onChannelClose?: () => void;
+      })
+    | null,
+  onOperatorSession: null as
+    | ((input: {
+        shellId: string;
+        session: ReturnType<typeof mockSession>;
+      }) => void)
+    | null,
+  getLocalPresence: null as (() => { agentId: string; name: string }) | null,
   preparedSlots: [] as Array<{
     handlers: {
       onChannelClose?: () => void;
@@ -30,8 +43,18 @@ const fixtures = vi.hoisted(() => ({
 vi.mock("./boothAnchorBridge", () => ({
   createBoothAnchorBridge: (ctx: {
     onGuestJoinOffer: NonNullable<typeof boothBridgeFixtures.onGuestJoinOffer>;
+    prepareOperatorRoster?: NonNullable<
+      typeof boothBridgeFixtures.prepareOperatorRoster
+    >;
+    onOperatorSession?: NonNullable<
+      typeof boothBridgeFixtures.onOperatorSession
+    >;
+    getLocalPresence?: NonNullable<typeof boothBridgeFixtures.getLocalPresence>;
   }) => {
     boothBridgeFixtures.onGuestJoinOffer = ctx.onGuestJoinOffer;
+    boothBridgeFixtures.prepareOperatorRoster = ctx.prepareOperatorRoster;
+    boothBridgeFixtures.onOperatorSession = ctx.onOperatorSession;
+    boothBridgeFixtures.getLocalPresence = ctx.getLocalPresence;
     return {
       isEnabled: () => false,
       setEnabled: vi.fn(),
@@ -439,7 +462,7 @@ describe("roomRuntime", () => {
     expect(b.close).not.toHaveBeenCalled();
     expect(rt.getStatus().phase).toBe("open");
     expect(rt.getStatus().occupantPeers).toEqual([
-      { peerId: "g-b", name: "乙" },
+      { peerId: "g-b", name: "乙", kind: "guest" },
     ]);
     expect(rt.kickPeer("local")).toBe(false);
   });
@@ -685,5 +708,57 @@ describe("roomRuntime", () => {
     });
     expect(rt.getPlayState().phase).toBe("idle");
     expect(b.send).not.toHaveBeenCalled();
+  });
+
+  it("tracks operator roster slot without inflating guest count", async () => {
+    const { createRoomRuntime } = await import("./roomRuntime");
+    const rt = createRoomRuntime();
+    await rt.openBooth();
+
+    expect(boothBridgeFixtures.getLocalPresence?.()).toEqual(
+      expect.objectContaining({
+        agentId: expect.stringMatching(/^go-room-/),
+        name: "太郎",
+      })
+    );
+
+    const shellId = "op-abc";
+    const handlers = boothBridgeFixtures.prepareOperatorRoster!(shellId);
+    const session = mockSession();
+    boothBridgeFixtures.onOperatorSession!({ shellId, session });
+
+    expect(rt.getStatus().guestCount).toBe(0);
+    expect(rt.getStatus().occupantPeers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          peerId: "op-op-abc",
+          kind: "operator",
+        }),
+      ])
+    );
+
+    handlers.onMessage!({
+      type: "presence",
+      agentId: "op-op-abc",
+      name: "遠端使用者",
+    });
+    expect(
+      rt.getStatus().occupantPeers.find((p) => p.peerId === "op-op-abc")?.name
+    ).toBe("遠端使用者");
+
+    await joinGuests(1);
+    expect(rt.getStatus().guestCount).toBe(1);
+    expect(
+      rt.getStatus().occupantPeers.filter((p) => p.kind === "operator").length
+    ).toBe(1);
+
+    session.send.mockClear();
+    expect(rt.kickPeer("op-op-abc")).toBe(true);
+    expect(session.send).not.toHaveBeenCalledWith(
+      expect.objectContaining({ op: "kick" })
+    );
+    expect(
+      rt.getStatus().occupantPeers.some((p) => p.kind === "operator")
+    ).toBe(false);
   });
 });

@@ -10,7 +10,12 @@ import {
   boothCastProgramClock,
 } from "./boothSnapshotUi";
 import { createBoothOperatorRtc } from "./boothOperatorRtc";
+import { createOperatorPresence } from "./boothOperatorPresence";
 import { createBoothOperatorClient } from "./boothPlatform";
+import {
+  operatorPeerIdForShell,
+} from "./roomOperatorSlot";
+import { goAuth } from "./goAuth.svelte";
 import {
   createBoothOwnerFileClient,
   type OwnerFileAckPayload,
@@ -48,6 +53,8 @@ export type OperatorShellStatus = {
   canDirect: boolean;
   directorRole: "operator" | "viewer" | null;
   remoteLives: { peerId: string; camera: boolean; mic: boolean }[];
+  localCamera: boolean;
+  localMic: boolean;
   lastAck: string | null;
   tvStream: MediaStream | null;
   anchor: BoothStateSnapshot["anchor"];
@@ -83,6 +90,8 @@ function emptyStatus(): OperatorShellStatus {
     canDirect: false,
     directorRole: null,
     remoteLives: [],
+    localCamera: false,
+    localMic: false,
     lastAck: null,
     tvStream: null,
     anchor: "registering",
@@ -102,11 +111,21 @@ export function operatorCanDirect(input: {
   return Boolean(d && d.shellId === input.shellId && d.role === "operator");
 }
 
+export function operatorLocalDisplayName(): string {
+  const profile = goAuth.profile;
+  const name =
+    profile?.display_name?.trim() ||
+    profile?.name?.trim() ||
+    profile?.user_id?.trim();
+  return name || "遠端";
+}
+
 export function createBoothOperatorShell(opts: { operatorCap: string }) {
   const shellId = `op-${crypto.randomUUID().slice(0, 8)}`;
   let status = emptyStatus();
   let client: ReturnType<typeof createBoothOperatorClient> | null = null;
   let operatorRtc: ReturnType<typeof createBoothOperatorRtc> | null = null;
+  let operatorPresence: ReturnType<typeof createOperatorPresence> | null = null;
   let ownerFileClient: ReturnType<typeof createBoothOwnerFileClient> | null =
     null;
   let ownerDc: RTCDataChannel | null = null;
@@ -327,6 +346,28 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
     });
   }
 
+  function operatorPeerId(): string {
+    return operatorPeerIdForShell(shellId);
+  }
+
+  function ensureOperatorPresence(): ReturnType<
+    typeof createOperatorPresence
+  > | null {
+    if (!operatorRtc) return null;
+    operatorPresence ??= createOperatorPresence({
+      peerId: operatorPeerId(),
+      getPc: () => operatorRtc?.getPc() ?? null,
+      send: (data) => operatorRtc?.sendRoster(data),
+      onChange: (state) => {
+        set({
+          localCamera: state.camera,
+          localMic: state.mic,
+        });
+      },
+    });
+    return operatorPresence;
+  }
+
   function applySnapshot(snapshot: BoothStateSnapshot): void {
     const ui = boothSnapshotToUi(snapshot);
     const canDirect = operatorCanDirect({ director, shellId });
@@ -449,6 +490,10 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
       });
       rtc = createBoothOperatorRtc({
         sendSignal: (frame) => client?.sendSignal(frame),
+        localPresence: {
+          agentId: operatorPeerId(),
+          name: operatorLocalDisplayName(),
+        },
         onProgramStream: (stream) => {
           set({ tvStream: stream });
         },
@@ -469,6 +514,7 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
         },
       });
       operatorRtc = rtc;
+      ensureOperatorPresence();
       try {
         await client.connect();
         set({ phase: "open" });
@@ -486,6 +532,8 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
         pending.reject(new Error("disconnected"));
       }
       pendingAcks.clear();
+      void operatorPresence?.dispose();
+      operatorPresence = null;
       client?.disconnect();
       client = null;
       operatorRtc?.stop();
@@ -581,6 +629,29 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
     async endPlay(): Promise<{ ok: true } | { ok: false; reason: string }> {
       sendIntent({ type: "booth.intent.play.end", v: 1 });
       return { ok: true };
+    },
+    async toggleCamera(): Promise<string | null> {
+      const presence = ensureOperatorPresence();
+      if (!presence) return "遠端連線尚未就緒";
+      if (presence.getState().camera) {
+        await presence.disableCamera();
+        return null;
+      }
+      const out = await presence.enableCamera();
+      return out.ok ? null : out.error;
+    },
+    async toggleMic(): Promise<string | null> {
+      const presence = ensureOperatorPresence();
+      if (!presence) return "遠端連線尚未就緒";
+      if (presence.getState().mic) {
+        await presence.disableMic();
+        return null;
+      }
+      const out = await presence.enableMic();
+      return out.ok ? null : out.error;
+    },
+    getOperatorPeerId(): string {
+      return operatorPeerId();
     },
   };
 }

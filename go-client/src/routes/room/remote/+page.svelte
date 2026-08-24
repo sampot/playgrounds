@@ -14,6 +14,7 @@
     goWebPageJsonLd,
   } from "$lib/goShareMeta";
   import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
+  import { chromeSession } from "$lib/chromeSession.svelte";
 
   const og = goOgMeta({
     title: "遠端連回包廂 · 山姆鍋遊樂場",
@@ -110,6 +111,9 @@
     operatorProgramTime={status.programTime}
     operatorProgramDuration={status.programDuration}
     operatorRemoteLives={status.remoteLives}
+    operatorLocalCamera={status.localCamera}
+    operatorLocalMic={status.localMic}
+    operatorLocalPeerId={remoteShell?.getOperatorPeerId()}
     onInvite={() => remoteShell?.mintInvite()}
     onRevokeInvite={() => remoteShell?.revokeInvite()}
     onEnd={() => remoteShell?.endBooth()}
@@ -124,6 +128,14 @@
     onStartManualPlay={(catalogId, picks) =>
       remoteShell?.startManualPlay(catalogId, picks)}
     onEndPlay={() => void remoteShell?.endPlay()}
+    onOperatorToggleCamera={async () => {
+      const err = await remoteShell?.toggleCamera();
+      if (err) chromeSession.setFlash(err, 2800);
+    }}
+    onOperatorToggleMic={async () => {
+      const err = await remoteShell?.toggleMic();
+      if (err) chromeSession.setFlash(err, 2800);
+    }}
   />
 {/if}
 

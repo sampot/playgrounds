@@ -191,6 +191,25 @@ describe("roomOccupancyFromSnapshot", () => {
       ],
     });
   });
+
+  it("preserves occupant kind for roster labels", () => {
+    expect(
+      roomOccupancyFromSnapshot({
+        localPeerId: "host-1",
+        occupants: [
+          { peerId: "host-1", name: "太郎", kind: "host" },
+          { peerId: "op-1", name: "遠端", kind: "operator" },
+          { peerId: "g-b", name: "乙", kind: "guest" },
+        ],
+      })
+    ).toEqual({
+      guestCount: 2,
+      occupantPeers: [
+        { peerId: "op-1", name: "遠端", kind: "operator" },
+        { peerId: "g-b", name: "乙", kind: "guest" },
+      ],
+    });
+  });
 });
 
 describe("roomMediaSummary", () => {

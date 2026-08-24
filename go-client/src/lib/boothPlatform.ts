@@ -4,6 +4,7 @@ import type {
   BoothStateSnapshot,
 } from "@pg/roster/boothChannel";
 import { isAnchorSignalFrame, isBoothJoinOfferFrame } from "@pg/roster/boothChannel";
+import type { RosterPeerHandlers } from "@pg/roster/rosterPeer";
 import { createBoothEngineOperatorRtc } from "./boothOperatorRtc";
 import { platformApiOrigin } from "./platformClient";
 
@@ -129,6 +130,12 @@ export type BoothAnchorHostHandlers = {
   getSnapshot: () => BoothStateSnapshot;
   localHostClaimsDirector: () => boolean;
   remoteOperatorEnabled?: () => boolean;
+  getLocalPresence: () => { agentId: string; name: string };
+  prepareOperatorRoster?: (shellId: string) => RosterPeerHandlers;
+  onOperatorSession?: (input: {
+    shellId: string;
+    session: import("@pg/roster/rosterPeer").RosterPeerSession;
+  }) => void;
   onOperatorIntent: (
     frame: BoothEnvelope
   ) => Promise<Record<string, unknown> | void>;
@@ -176,11 +183,17 @@ export function createBoothAnchorHost(
   let engineRtc: ReturnType<typeof createBoothEngineOperatorRtc> | null = null;
 
   function ensureEngineRtc(): ReturnType<typeof createBoothEngineOperatorRtc> | null {
-    if (!handlers.getTvProgramStream) return null;
+    if (!handlers.getTvProgramStream || !handlers.getLocalPresence) return null;
     engineRtc ??= createBoothEngineOperatorRtc({
       sendSignal: (frame) => send(frame),
       getTvStream: handlers.getTvProgramStream!,
       onOwnerChannel: (dc) => handlers.onOwnerDataChannel?.(dc),
+      localPresence: handlers.getLocalPresence(),
+      getRosterHandlers: (shellId) =>
+        handlers.prepareOperatorRoster?.(shellId) ?? ({} as RosterPeerHandlers),
+      onSession: (session, shellId) => {
+        handlers.onOperatorSession?.({ shellId, session });
+      },
     });
     return engineRtc;
   }
@@ -257,7 +270,11 @@ export function createBoothAnchorHost(
 
     if (isAnchorSignalFrame(frame)) {
       const rtc = ensureEngineRtc();
-      if (rtc) await rtc.handleSignal(frame);
+      if (rtc) {
+        const shellId =
+          typeof frame.shellId === "string" ? frame.shellId : operatorDirectorShellId;
+        await rtc.handleSignal(frame, shellId ?? undefined);
+      }
       return;
     }
 

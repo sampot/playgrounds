@@ -52,6 +52,35 @@ describe("boothSnapshotUi", () => {
     ]);
   });
 
+  it("preserves operator member kind from snapshot", () => {
+    const ui = boothSnapshotToUi(
+      snap({
+        members: [
+          {
+            peerId: "op-1",
+            displayName: "遠端",
+            kind: "operator",
+            isHost: false,
+            live: { camera: true, mic: true, display: false },
+          },
+          {
+            peerId: "g-2",
+            displayName: "訪客",
+            kind: "guest",
+            isHost: false,
+          },
+        ],
+      })
+    );
+    expect(ui.occupantPeers).toEqual([
+      { peerId: "op-1", name: "遠端", kind: "operator" },
+      { peerId: "g-2", name: "訪客", kind: "guest" },
+    ]);
+    expect(ui.remoteLives).toEqual([
+      { peerId: "op-1", camera: true, mic: true },
+    ]);
+  });
+
   it("derives program transport clock from file cast", () => {
     const ui = boothSnapshotToUi(
       snap({

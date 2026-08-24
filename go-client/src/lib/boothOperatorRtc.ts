@@ -3,15 +3,19 @@ import {
   type AnchorSignalFrame,
 } from "@pg/roster/boothChannel";
 import {
+  attachRosterDataChannel,
+  buildRosterRtcConfiguration,
+  reserveBoothMediaTransceivers,
+  waitIceComplete,
+  type RosterPeerHandlers,
+  type RosterPeerSession,
+} from "@pg/roster/rosterPeer";
+import {
   applyBoothVideoCodecPreferences,
   boothSlotOfIndex,
   ensureBoothTransceiversSendrecv,
   replaceBoothTrack,
 } from "@pg/roster/rosterBoothMedia";
-import {
-  buildRosterRtcConfiguration,
-  reserveBoothMediaTransceivers,
-} from "@pg/roster/rosterPeer";
 import { BOOTH_OWNER_DC_LABEL } from "./boothOwnerFileWire";
 
 export type OperatorRtcSend = (frame: AnchorSignalFrame) => void;
@@ -82,12 +86,74 @@ function createOperatorIceQueue(getPc: () => RTCPeerConnection | null) {
   };
 }
 
+/** Hub answerer: Operator offer SDP → Roster session + program answer. */
+export async function acceptBoothOperatorOffer(opts: {
+  sdp: string;
+  localPresence: { agentId: string; name: string };
+  rosterHandlers: RosterPeerHandlers;
+  onOwnerChannel?: (dc: RTCDataChannel) => void;
+}): Promise<{ session: RosterPeerSession; answerSdp: string }> {
+  let rosterChannel: RTCDataChannel | null = null;
+  const pc = new RTCPeerConnection(buildRosterRtcConfiguration(false));
+
+  pc.addEventListener("datachannel", (ev) => {
+    const ch = ev.channel;
+    if (ch.label === BOOTH_OWNER_DC_LABEL) {
+      opts.onOwnerChannel?.(ch);
+      return;
+    }
+    if (ch.label === "roster") {
+      rosterChannel = ch;
+      attachRosterDataChannel(ch, opts.rosterHandlers, opts.localPresence);
+    }
+  });
+
+  await pc.setRemoteDescription({ type: "offer", sdp: opts.sdp });
+  ensureBoothTransceiversSendrecv(pc);
+  applyBoothVideoCodecPreferences(pc);
+  const answer = await pc.createAnswer();
+  await pc.setLocalDescription(answer);
+  await waitIceComplete(pc);
+  const answerSdp = pc.localDescription?.sdp;
+  if (!answerSdp) throw new Error("operator_rtc_answer_missing");
+
+  const session: RosterPeerSession = {
+    pc,
+    getChannel: () => rosterChannel,
+    role: "guest",
+    close: () => {
+      try {
+        rosterChannel?.close();
+      } catch {
+        /* ignore */
+      }
+      try {
+        pc.close();
+      } catch {
+        /* ignore */
+      }
+    },
+    send: (data: unknown) => {
+      const channel = rosterChannel;
+      if (!channel || channel.readyState !== "open") {
+        throw new Error("DataChannel 尚未開啟");
+      }
+      channel.send(JSON.stringify(data));
+    },
+  };
+
+  return { session, answerSdp };
+}
+
 export function createBoothOperatorRtc(opts: {
   sendSignal: OperatorRtcSend;
   onProgramStream: (stream: MediaStream | null) => void;
   onOwnerChannel?: (dc: RTCDataChannel) => void;
+  rosterHandlers?: RosterPeerHandlers;
+  localPresence?: { agentId: string; name: string };
 }) {
   let pc: RTCPeerConnection | null = null;
+  let rosterChannel: RTCDataChannel | null = null;
   let programStream: MediaStream | null = null;
   let stopped = false;
   const iceQueue = createOperatorIceQueue(() => pc);
@@ -110,11 +176,19 @@ export function createBoothOperatorRtc(opts: {
     if (stopped || typeof RTCPeerConnection === "undefined") return;
     pc?.close();
     iceQueue.clear();
+    rosterChannel = null;
     pc = new RTCPeerConnection(buildRosterRtcConfiguration(false));
     programStream = null;
     emitProgram();
     reserveBoothMediaTransceivers(pc);
     applyBoothVideoCodecPreferences(pc);
+
+    rosterChannel = pc.createDataChannel("roster", { ordered: true });
+    attachRosterDataChannel(
+      rosterChannel,
+      opts.rosterHandlers ?? {},
+      opts.localPresence
+    );
 
     const ownerDc = pc.createDataChannel(BOOTH_OWNER_DC_LABEL, { ordered: true });
     ownerDc.onopen = () => opts.onOwnerChannel?.(ownerDc);
@@ -164,6 +238,7 @@ export function createBoothOperatorRtc(opts: {
 
   function stop(): void {
     stopped = true;
+    rosterChannel = null;
     try {
       pc?.close();
     } catch {
@@ -179,6 +254,13 @@ export function createBoothOperatorRtc(opts: {
     handleSignal,
     stop,
     getProgramStream: () => programStream,
+    getPc: () => pc,
+    sendRoster: (data: unknown) => {
+      if (!rosterChannel || rosterChannel.readyState !== "open") {
+        throw new Error("DataChannel 尚未開啟");
+      }
+      rosterChannel.send(JSON.stringify(data));
+    },
   };
 }
 
@@ -186,37 +268,42 @@ export function createBoothEngineOperatorRtc(opts: {
   sendSignal: OperatorRtcSend;
   getTvStream: () => MediaStream | null;
   onOwnerChannel?: (dc: RTCDataChannel) => void;
+  localPresence: { agentId: string; name: string };
+  getRosterHandlers: (shellId: string) => RosterPeerHandlers;
+  onSession?: (session: RosterPeerSession, shellId: string) => void;
 }) {
-  let pc: RTCPeerConnection | null = null;
-  const iceQueue = createOperatorIceQueue(() => pc);
+  let session: RosterPeerSession | null = null;
+  let activeShellId: string | null = null;
+  const iceQueue = createOperatorIceQueue(() => session?.pc ?? null);
 
   async function attachProgramTracks(): Promise<void> {
-    if (!pc) return;
+    if (!session) return;
     const { audio, video } = programTracksFromStream(opts.getTvStream());
-    await replaceBoothTrack(pc, "program", "audio", audio);
-    await replaceBoothTrack(pc, "program", "video", video);
+    await replaceBoothTrack(session.pc, "program", "audio", audio);
+    await replaceBoothTrack(session.pc, "program", "video", video);
   }
 
-  async function handleSignal(frame: AnchorSignalFrame): Promise<void> {
+  async function handleSignal(
+    frame: AnchorSignalFrame,
+    shellId?: string
+  ): Promise<void> {
     if (!isAnchorSignalFrame(frame)) return;
     if (frame.op === "offer" && frame.sdp) {
-      pc?.close();
+      const sid = shellId?.trim() || activeShellId || "operator";
+      activeShellId = sid;
+      session?.close();
       iceQueue.clear();
-      pc = new RTCPeerConnection(buildRosterRtcConfiguration(false));
-      // Offer already negotiated 2+2 transceivers — do not reserve again.
-      await pc.setRemoteDescription({ type: "offer", sdp: frame.sdp });
-      await iceQueue.flush();
-      ensureBoothTransceiversSendrecv(pc);
-      applyBoothVideoCodecPreferences(pc);
+      const accepted = await acceptBoothOperatorOffer({
+        sdp: frame.sdp,
+        localPresence: opts.localPresence,
+        rosterHandlers: opts.getRosterHandlers(sid),
+        onOwnerChannel: opts.onOwnerChannel,
+      });
+      session = accepted.session;
+      opts.onSession?.(session, sid);
       await attachProgramTracks();
 
-      pc.ondatachannel = (ev) => {
-        if (ev.channel.label === BOOTH_OWNER_DC_LABEL) {
-          opts.onOwnerChannel?.(ev.channel);
-        }
-      };
-
-      pc.onicecandidate = (ev) => {
+      session.pc.onicecandidate = (ev) => {
         const serialized = serializeOperatorRtcCandidate(ev.candidate);
         if (!serialized) return;
         opts.sendSignal({
@@ -228,20 +315,16 @@ export function createBoothEngineOperatorRtc(opts: {
         });
       };
 
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      const sdp = pc.localDescription?.sdp;
-      if (!sdp) throw new Error("operator_rtc_answer_missing");
       opts.sendSignal({
         type: "anchor.signal",
         v: 1,
         phase: "operator-webrtc",
         op: "answer",
-        sdp,
+        sdp: accepted.answerSdp,
       });
       return;
     }
-    if (frame.op === "candidate" && pc) {
+    if (frame.op === "candidate" && session) {
       await iceQueue.add(frame.candidate);
     }
   }
@@ -249,14 +332,12 @@ export function createBoothEngineOperatorRtc(opts: {
   return {
     handleSignal,
     refreshProgram: () => attachProgramTracks(),
+    getSession: () => session,
     stop: () => {
       iceQueue.clear();
-      try {
-        pc?.close();
-      } catch {
-        /* ignore */
-      }
-      pc = null;
+      session?.close();
+      session = null;
+      activeShellId = null;
     },
   };
 }

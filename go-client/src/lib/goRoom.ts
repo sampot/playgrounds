@@ -896,6 +896,7 @@ export function roomOccupancyFromSnapshot(opts: {
     occupantPeers.push({
       peerId,
       name: playerDisplayName(row.name, "訪客"),
+      kind: row.kind,
     });
   }
   return {

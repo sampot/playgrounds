@@ -165,6 +165,15 @@ function asArrayBuffer(data: unknown): ArrayBuffer | null {
   return null;
 }
 
+/** Wire roster DC handlers (exported for Operator／Engine answerer paths). */
+export function attachRosterDataChannel(
+  channel: RTCDataChannel,
+  handlers: RosterPeerHandlers,
+  localPresence?: { agentId: string; name: string }
+): void {
+  attachChannel(channel, handlers, localPresence);
+}
+
 function attachChannel(
   channel: RTCDataChannel,
   handlers: RosterPeerHandlers,
@@ -346,7 +355,7 @@ export async function createRosterOffer(opts: {
     applyBoothVideoCodecPreferences(pc);
   }
   const channel = pc.createDataChannel("roster", { ordered: true });
-  attachChannel(channel, handlers, opts.localPresence);
+  attachRosterDataChannel(channel, handlers, opts.localPresence);
 
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
@@ -394,7 +403,7 @@ export async function acceptRosterOffer(opts: {
 
   pc.addEventListener("datachannel", ev => {
     channel = ev.channel;
-    attachChannel(channel, handlers, localPresence);
+    attachRosterDataChannel(channel, handlers, localPresence);
   });
 
   await pc.setRemoteDescription({ type: "offer", sdp: decoded.sdp });

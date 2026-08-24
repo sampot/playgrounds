@@ -30,7 +30,8 @@
 - **人數對齊遊戲 session（硬）：** 包廂**不鎖 1:1 入座**。同一張**有效** Invite 短鏈可多人 join；**文字**對已連線 peer **fanout**；**分享目錄** fanout、**內容只在有人 `request` 時 Owner→Requester**。API／UI 勿把包廂寫成雙人專用隔間。鏡頭**不**因第三人加入而關。見 §5.5。
 - **預設分享模型（硬）：** 分享目錄＝這一間願意分享的**檔**（授權，**不**把內容推給任何人）。**不掛資料夾。** 其他人依檔選擇下載、檢視、或**播放**（影音）。**Live stream 不是目錄項**——開鏡頭／畫面出現在**在場名單**。見 §5.5。
 - **主持私有檔（硬）：** 私有片庫權威在 **Hub**（Embedded **OPFS**；常駐 **daemon** 本機目錄——見 [PG-GO-ROOM-ENGINE-PLAN.md](./PG-GO-ROOM-ENGINE-PLAN.md) §7.6）。與**分享目錄**分離。私有**不** fanout metadata、**不**進 `/room-file/<id>`、Guest **不能**下載／檢視／私下播。**Owner**（主持 Shell 或 Operator Shell）可讀寫；Operator 遠端經 Owner file channel，**不是**雲端片庫。主持可把私有檔**放到大螢幕上**（Hub 本機渲染 → 節目 RTP）。要讓別人「要」＝顯式**掛到分享區**。Guest 無私有庫。見 §5.5.1、§8.3。
-- **兩種在場同一條門牌（硬）：** 「請人進來」與「自己的另一台掃碼」契約相同。**第二台請掃門牌**；已登入再開 `/room`＝**另一間空包廂**，不是連上既有這一間。見 §5.4。
+- **兩種在場同一條門牌（硬）：** 「請人進來」與「自己的另一台掃碼」契約相同（**Guest 節點**）。**擁有者外出單機**可走 **Operator 節點**（`operatorCap`；不必掃門牌；一條連線看＋說＋控）——見 [PG-GO-ROOM-ENGINE-PLAN.md](./PG-GO-ROOM-ENGINE-PLAN.md) §6.2、§8.1c。已登入再開 `/room` Embedded＝另一間空包廂（或接上 Daemon 本地 Shell），**不是**用門牌連上筆電那一間。見 §5.4。
+- **Roster 節點（硬；修訂草案）：** 每個連上 Hub 的分頁／行程＝一 **Roster leaf**（`peerId`＋`members.kind`）。**權限**由 owner／`director`／委任決定，**不**由「是不是 Guest」單一標籤決定。見 ENGINE §6.2（**未落地**委任）。
 - **BoothAnchor 為請人硬性前提（硬）：** 包廂 Hub 開著須 **BoothAnchor 已註冊且 Engine WSS 連上**（見 [PG-GO-ROOM-ENGINE-PLAN.md](./PG-GO-ROOM-ENGINE-PLAN.md) §10.7）。「請人進來」mint 門牌前須 Anchor **online**（或 **degraded** 且 Engine socket 仍在）。Guest WebRTC 握手 **只**經 Anchor 推送至 Hub；**禁止** Invite DO `signal/pending` long poll；**無 fallback**。
 - **三個動詞（硬）：** **說**、**掛**、**要**分開。**說**＝開口為主（麥），文字＝不方便開口時的輔助面。掛＝把**檔**寫進分享目錄（含「從私有掛上」）。要＝對**分享**檔發**同源 HTTP**（下載／檢視／私下播放同一門面；wire 仍 DC）；大螢幕收看＝節目 RTP（不是「要」；私有亦可上大螢幕）。見 §5.3、§5.5.1、§5.6、§8.2。
 - **索取端＝同源靜態檔（硬）：** **分享目錄**每一檔，**前端一律**以同源 **`/room-file/<id>`** 存取（GET／HEAD／Range；`200`／`206`／`404`／`416` 等）。**禁止**為目錄檔另開 `blob:`／object URL 產品路徑，也禁止頁面直讀 DC chunk。**每一次** HTTP request＝一次完整 roundtrip；次數由前端決定。SW＝標準 HTTP server：**本機自己掛的 `File` → SW 直出（不開 transfer、不經 DataChannel）**；遠端檔 → 每 roundtrip 一條 `transferId`（共用 DC）。**私有檔不走此門面。** 見 §8.2、§8.3。
@@ -148,14 +149,17 @@ Guest 掃碼 `/i/<short>`  ──kind=invite.room──►  同意 → 同一包
 
 ### 5.4 兩種在場（硬）
 
-| 故事 | 主持 | Guest | 快樂路徑 |
+| 故事 | 主持／Hub | 進門節點 | 快樂路徑 |
 | --- | --- | --- | --- |
-| **請人進來** | 筆電（或一直開著的那台）`/room` | 別人掃 QR | 一起看大螢幕、開口、傳檔、私下播 |
-| **自己的另一台** | 通常是插電、畫面不關的那台（常當大螢幕來源） | **同一人**掃**這一張**門牌（不必登入） | 手機當座位收大螢幕、丟相片、私下播／下載；舊手機掛鏡頭給主持切上大螢幕 |
+| **請人進來** | 筆電（或一直開著的那台）`/room` 或 Daemon Hub | **Guest**（別人掃 QR） | 一起看大螢幕、開口、傳檔、私下播 |
+| **自己的另一台** | 通常是插電、畫面不關的那台（常當大螢幕來源） | **Guest**（**同一人**掃**這一張**門牌；不必登入） | 手機當座位收大螢幕、丟相片、私下播／下載；舊手機掛鏡頭給主持切上大螢幕 |
+| **外出單機（Owner）** | 家裡 Daemon Hub 常駐（或 Embedded 長開） | **Operator**（`operatorCap`；`/room/remote`；`members` 中 `kind: operator`） | 看 Peer／Guest 鏡頭、開自己的鏡頭／麥、切台、開局；**一條連線**；見 ENGINE §8.1c |
 
-兩者走同一條 `invite.room`，**不做**「我的裝置」帳號綁定或第二套邀請。第三人（再掃一台傳檔、再掛一路鏡頭）**不**關掉已掛的鏡頭。
+三者（Guest／Peer／Operator）在拓樸上皆為 **Hub Roster 節點**（各一 `peerId`）；差別在 **進門憑證**與 **預設能力**（ENGINE §6.2）。**Peer**（`peerCap`）用於 headless 鏡頭／掛檔，可與上表並存。
 
-**硬：** 第二台裝置**掃門牌**進來。已登入會員在手機再開 `/room`＝另一間空包廂，連不上筆電那一間。主持永遠是「把 `/room` 這頁開著的那一台」。想用手機當屋子、筆電當客人：在手機登入開 `/room`，筆電掃碼。
+**Guest 進門**走同一條 `invite.room` 門牌，**不做**「我的裝置」帳號綁定或第二套邀請。第三人（再掃一台傳檔、再掛一路鏡頭）**不**關掉已掛的鏡頭。
+
+**硬：** 第二台裝置若要 **Guest 節點**＝**掃門牌**進來。已登入會員在手機再開 `/room` Embedded＝另一間空包廂（或有 Daemon 時接上**本地 Shell**），連不上「掃門牌那一間」的 Guest 語意。主持／Owner 外出單機＝**Operator 節點**（不掃門牌）。想用手機當屋子、筆電當客人：在手機登入開 `/room`，筆電掃碼（Guest）。
 
 ### 5.5 預設分享模型（硬）
 
@@ -1288,6 +1292,7 @@ TDD：進門即主面且**未鑄**門牌、kind／surface 分流、無 SAM Guest
 
 | 日期 | 變更 |
 | --- | --- |
+| 2026-08-24 | **Operator＝Roster 節點（ENGINE 第七刀）：** §5.4 增外出 Operator 路徑；§2 Roster 節點與能力模型；對齊 ENGINE §6.2、§8.1c（單機一條連線） |
 | 2026-08-23 | **`invite.compose` Superseded：** 連線遊戲統一 `invite.room`＋`session_play`；`play`／`go` 皆 Booth Hub；Invite DO **保留** |
 | 2026-08-23 | **Guest join 經 BoothAnchor（ENGINE §10.7）：** 廢 Invite DO long poll；openBooth／請人須 Anchor WSS；無 fallback |
 | 2026-08-18 | 初版 Draft：`/room` 包廂；Phase 1＝文字＋傳檔；契約預留音視訊／投放／開局；`invite.room`；SDP 預留 m-line；ICE 與遊戲邀請切開；資料不落雲端 |

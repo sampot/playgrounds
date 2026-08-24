@@ -256,6 +256,9 @@
     operatorProgramTime?: number;
     operatorProgramDuration?: number;
     operatorRemoteLives?: { peerId: string; camera: boolean; mic: boolean }[];
+    operatorLocalCamera?: boolean;
+    operatorLocalMic?: boolean;
+    operatorLocalPeerId?: string | null;
     onCastLive?: (peerId: string, name: string) => void | Promise<void>;
     onOperatorCastState?: (payload: {
       paused?: boolean;
@@ -270,6 +273,8 @@
       peerId: string,
       layer: "audio" | "video"
     ) => void | Promise<void>;
+    onOperatorToggleCamera?: () => void | Promise<void>;
+    onOperatorToggleMic?: () => void | Promise<void>;
   };
 
   let {
@@ -313,11 +318,16 @@
     operatorProgramTime = 0,
     operatorProgramDuration = 0,
     operatorRemoteLives = [],
+    operatorLocalCamera = false,
+    operatorLocalMic = false,
+    operatorLocalPeerId = null,
     onCastLive,
     onOperatorCastState,
     onOperatorCastFile,
     onOperatorStopTv,
     onOperatorHaltLive,
+    onOperatorToggleCamera,
+    onOperatorToggleMic,
   }: Props = $props();
 
   const isOperator = $derived(role === "operator");
@@ -453,9 +463,9 @@
       localPeerId: "local",
       localName: "我",
       localLiveVideo: isOperator
-        ? false
+        ? operatorLocalCamera
         : goRoomMedia.camera || goRoomMedia.display,
-      localLiveAudio: isOperator ? false : goRoomMedia.mic,
+      localLiveAudio: isOperator ? operatorLocalMic : goRoomMedia.mic,
       others:
         occupantPeers.length > 0
           ? occupantPeers
@@ -1379,6 +1389,10 @@
 
   async function onToggleCamera() {
     mediaError = "";
+    if (isOperator) {
+      if (onOperatorToggleCamera) await onOperatorToggleCamera();
+      return;
+    }
     if (goRoomMedia.camera) {
       await goRoomMedia.disableCamera();
       return;
@@ -1411,6 +1425,10 @@
 
   async function onToggleMic() {
     mediaError = "";
+    if (isOperator) {
+      if (onOperatorToggleMic) await onOperatorToggleMic();
+      return;
+    }
     if (goRoomMedia.mic) {
       await goRoomMedia.disableMic();
       return;
@@ -1537,7 +1555,11 @@
     action: RoomHostMenuAction
   ) {
     hostMenuPeerId = null;
-    const peerId = card.mine && !isOperator ? "local" : card.peerId;
+    const peerId = card.mine
+      ? isOperator
+        ? (operatorLocalPeerId?.trim() || card.peerId)
+        : "local"
+      : card.peerId;
     mediaError = "";
     if (action === "putOnTv") {
       await onPutLiveOnTv(peerId, card.name);
@@ -2057,19 +2079,22 @@
           {/if}
         </svg>
       </button>
-      {#if !isOperator}
       <button
         type="button"
-        class={["pixel-btn", "room-dock-btn", goRoomMedia.mic && "pixel-btn--primary"]
+        class={[
+          "pixel-btn",
+          "room-dock-btn",
+          (isOperator ? operatorLocalMic : goRoomMedia.mic) && "pixel-btn--primary",
+        ]
           .filter(Boolean)
           .join(" ")}
-        aria-label={goRoomMedia.mic ? "關麥克風" : "開麥克風"}
-        aria-pressed={goRoomMedia.mic}
-        title={goRoomMedia.mic ? "關麥克風" : "開麥克風"}
+        aria-label={(isOperator ? operatorLocalMic : goRoomMedia.mic) ? "關麥克風" : "開麥克風"}
+        aria-pressed={isOperator ? operatorLocalMic : goRoomMedia.mic}
+        title={(isOperator ? operatorLocalMic : goRoomMedia.mic) ? "關麥克風" : "開麥克風"}
         onclick={() => void onToggleMic()}
       >
         <svg class="dock-icon" viewBox="0 0 24 24" aria-hidden="true">
-          {#if goRoomMedia.mic}
+          {#if isOperator ? operatorLocalMic : goRoomMedia.mic}
             <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
             <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
             <line x1="12" y1="19" x2="12" y2="22" />
@@ -2085,16 +2110,20 @@
       </button>
       <button
         type="button"
-        class={["pixel-btn", "room-dock-btn", goRoomMedia.camera && "pixel-btn--primary"]
+        class={[
+          "pixel-btn",
+          "room-dock-btn",
+          (isOperator ? operatorLocalCamera : goRoomMedia.camera) && "pixel-btn--primary",
+        ]
           .filter(Boolean)
           .join(" ")}
-        aria-label={goRoomMedia.camera ? "關鏡頭" : "開鏡頭"}
-        aria-pressed={goRoomMedia.camera}
-        title={goRoomMedia.camera ? "關鏡頭" : "開鏡頭"}
+        aria-label={(isOperator ? operatorLocalCamera : goRoomMedia.camera) ? "關鏡頭" : "開鏡頭"}
+        aria-pressed={isOperator ? operatorLocalCamera : goRoomMedia.camera}
+        title={(isOperator ? operatorLocalCamera : goRoomMedia.camera) ? "關鏡頭" : "開鏡頭"}
         onclick={() => void onToggleCamera()}
       >
         <svg class="dock-icon" viewBox="0 0 24 24" aria-hidden="true">
-          {#if goRoomMedia.camera}
+          {#if isOperator ? operatorLocalCamera : goRoomMedia.camera}
             <path d="m16 13 5.2 3.5a.5.5 0 0 0 .8-.4V7.9a.5.5 0 0 0-.8-.4L16 11" />
             <rect x="2" y="6" width="14" height="12" rx="2" />
           {:else}
@@ -2106,7 +2135,7 @@
           {/if}
         </svg>
       </button>
-      {#if canShareDisplay()}
+      {#if !isOperator && canShareDisplay()}
         <button
           type="button"
           class={["pixel-btn", "room-dock-btn", goRoomMedia.display && "pixel-btn--primary"]
@@ -2127,7 +2156,6 @@
             {/if}
           </svg>
         </button>
-      {/if}
       {/if}
       {#if isHostLike && tvOn}
         <button
