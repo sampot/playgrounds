@@ -1,9 +1,9 @@
 # Playgrounds 純玩版：包廂多路 live 錄影（`session_record`）
 
-> **狀態：** Partial（2026-08-24）— **Embedded Hub R0／R2／R3 已落地**（wire、`session_record` fanout、成員卡 UI、`MediaRecorder`→OPFS 私有片庫、Operator intent）；**R1 daemon**（`pg-boothd`／`booth-record`）仍待私有 monorepo  
+> **狀態：** Partial（2026-08-24）— **Embedded Hub R0／R2／R3 已落地**（wire、`session_record` fanout、成員卡 UI、`MediaRecorder`→OPFS 私有片庫、Operator intent）；**R1 daemon**（`pg-boothd`／`booth-record`＋**`gstreamer-rs`**) 仍待私有 native engine repo  
 > **權威決策：** 從屬 [DECISIONS.md](./DECISIONS.md) **DEC-050**（純玩版）、**DEC-045**（Roster／薄 signaling）、**DEC-047**（Platform Invite）；**不另開 DEC**  
-> **相關：** [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)（包廂產品契約；`session_cast`／`session_camera`）、[PG-GO-ROOM-ENGINE-PLAN.md](./PG-GO-ROOM-ENGINE-PLAN.md)（`pg-booth` monorepo、Operator、私有片庫 §7.6）、[PG-GO-ROOM-TAURI-PLAN.md](./PG-GO-ROOM-TAURI-PLAN.md)（桌面常駐）、[PG-GO-ROOM-PLAY-PLAN.md](./PG-GO-ROOM-PLAY-PLAN.md)（開局——**與錄影正交**）、[PG-GO-ROOM-DEV-HARNESS-PLAN.md](./PG-GO-ROOM-DEV-HARNESS-PLAN.md)（localhost harness；**勿**當產品契約）、[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)、`.cursor/rules/no-native-dialogs.mdc`、`.cursor/rules/mobile-first-ux.mdc`、[GLOSSARY.md](./GLOSSARY.md)  
-> **`pg-booth` 錄影實作：** 於**私有 monorepo**（`booth-record` crate）；本 repo 只定 wire 型別與 Shell UI 契約
+> **相關：** [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)（包廂產品契約；`session_cast`／`session_camera`）、[PG-GO-ROOM-ENGINE-PLAN.md](./PG-GO-ROOM-ENGINE-PLAN.md)（`pg-boothd` native engine、Operator、私有片庫 §7.6）、[PG-GO-ROOM-TAURI-PLAN.md](./PG-GO-ROOM-TAURI-PLAN.md)（桌面常駐）、[PG-GO-ROOM-PLAY-PLAN.md](./PG-GO-ROOM-PLAY-PLAN.md)（開局——**與錄影正交**）、[PG-GO-ROOM-DEV-HARNESS-PLAN.md](./PG-GO-ROOM-DEV-HARNESS-PLAN.md)（localhost harness；**勿**當產品契約）、[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)、`.cursor/rules/no-native-dialogs.mdc`、`.cursor/rules/mobile-first-ux.mdc`、[GLOSSARY.md](./GLOSSARY.md)  
+> **`pg-boothd` 錄影實作：** 於**私有 native engine repo**（`booth-record` crate；**`gstreamer-rs`**）；本 repo 只定 wire 型別與 Shell UI 契約
 
 一句話：主持（director）可像「放到大螢幕上」一樣，在成員卡**指定哪些在場 live 要錄影**——但可**多路同時錄**；每路一檔，由 **Hub Engine 本機**從 **presence** 旁路 tap 寫入 **Hub 私有片庫**；**不**經 Platform、**不**雲存、**不**錄大螢幕 program 切台軌。
 
@@ -40,7 +40,7 @@
 - **只開麥無畫面** 的獨立音檔（第一版；若監控要純音訊另刀）。
 - **錄分享目錄檔／私有檔播放**——要留檔請用匯入私有區或 OS 存檔，不走 `session_record`。
 - **自動錄全場**、進門即錄、隱藏錄影。
-- 在本 repo 實作 `pg-booth` monorepo 的 ffmpeg 管線（`booth-record` crate；本文件只定契約）。
+- 在本 repo 實作 `pg-boothd` 的 **`gstreamer-rs`** 管線（`booth-record` crate；本文件只定契約）。
 
 ---
 
@@ -92,8 +92,8 @@ presence A/V ──WebRTC──►  收到上行軌
 
 | Hub 模式 | 錄影實作 | 產品定位 |
 | --- | --- | --- |
-| **Daemon**（`pg-boothd`） | ffmpeg／gstreamer 寫本機 FS | **快樂路徑**；7×24 監控 |
-| **Desktop**（`pg-booth-desktop`） | `MediaRecorder`＋**plugin-fs** 串流寫（T0 TS Hub）／共用 `booth-record`（T1b+） | 輕量常駐；見 [PG-GO-ROOM-TAURI-PLAN.md](./PG-GO-ROOM-TAURI-PLAN.md) |
+| **Daemon**（`pg-boothd`） | **`gstreamer-rs`** 寫本機 FS（`booth-record`） | **快樂路徑**；7×24 監控 |
+| **Desktop**（`pg-booth-desktop`） | `MediaRecorder`＋**plugin-fs** 串流寫（web Embedded Hub） | 輕量常駐；見 [PG-GO-ROOM-TAURI-PLAN.md](./PG-GO-ROOM-TAURI-PLAN.md) |
 | **Embedded**（瀏覽器 `/room`） | `MediaRecorder` + OPFS 串流寫 | 短錄、開發驗證；Safari 當 Hub **不承諾** |
 
 ---
@@ -157,7 +157,7 @@ recordings: Array<{
 | `peer_not_live` | `targetPeer` 無 active presence live |
 | `already_recording` | 重複 start |
 | `storage_full` | OPFS／daemon 磁碟滿 |
-| `encoder_failed` | MediaRecorder／ffmpeg 失敗 |
+| `encoder_failed` | `MediaRecorder`（Embedded／hybrid）或 **`gstreamer-rs`**（`pg-boothd`）失敗 |
 | `peer_gone` | 錄影中 peer 離席（伴隨 auto-stop；可帶部分檔 `done`） |
 
 ---
@@ -177,7 +177,7 @@ recordings: Array<{
 
 | 事件 | Hub 行為 |
 | --- | --- |
-| `start` | 對 `targetPeer` presence `MediaStream`（或 RTP depacketize）開 encoder；`notify active:true` |
+| `start` | 對 `targetPeer` presence 開 encoder（Embedded：`MediaRecorder`；**`pg-boothd`：`gstreamer-rs` tap**）；`notify active:true` |
 | `stop`（主持） | `finalizing` → 關 encoder → 寫私有片庫 → `notify active:false` → `done` |
 | peer `unoffer`／kick／斷線 | **自動 stop**；盡力 finalize **部分檔**；`done` 或 `error peer_gone` |
 | Hub `end` session | 所有 recorder `finalizing`；已寫入檔保留（ROOM §8.3） |
@@ -190,7 +190,7 @@ recordings: Array<{
 | **位置** | Hub 私有片庫（ROOM §8.3；ENGINE §7.6） |
 | **檔名** | `{displayName}-{YYYYMMDD-HHmmss}.{ext}`；`label` 若有則前綴 `{label}-` |
 | **Embedded 格式** | `video/webm`（`MediaRecorder` 預設；vp8/opus 或瀏覽器能力） |
-| **Daemon 格式** | `video/mp4`（h264+aac）或 `video/webm`（實作選一；契約 `mime` 回報） |
+| **Daemon 格式** | **`gstreamer-rs`** 編碼：`video/mp4`（h264+aac）或 `video/webm`（實作選一；契約 `mime` 回報） |
 | **寫入** | **串流**寫 OPFS／本機 FS（desktop＝plugin-fs）；**禁止**整段 RAM `Blob` 再落盤（對齊 ROOM §8.3） |
 | **metadata** | 與既有私有檔同一列模型；`source: "record"`、`sourcePeerId`、`recordedAt` 可選內部欄 |
 | **大小** | 受私有片庫配額約束；滿則 `storage_full` + 頁內說明 |
@@ -201,7 +201,7 @@ recordings: Array<{
 
 錄影成品＝一般私有檔：
 
-- **放到大螢幕上** — `session_cast` + `scope: "private"`（Host 本機解碼 → program RTP）
+- **放到大螢幕上** — `session_cast` + `scope: "private"`（Host 本機解碼 → program RTP；**`pg-boothd`**＝**`gstreamer-rs`**）
 - **掛到分享** — `booth.intent.private.mountToShare`／ROOM §5.5.1
 - **刪除** — Owner Shell `private.remove`
 
@@ -276,12 +276,12 @@ recordings: Array<{
 | `go-client/src/lib/goRoomMedia.ts` 或 `boothHubEngine.ts` | Embedded Hub `RecordTap` + 私有片庫 |
 | `go-client/src/lib/roomRuntime.ts` | `session_record` fanout／intent 轉發 |
 
-### 11.2 私有 monorepo（`pg-booth`／`booth-record` crate）
+### 11.2 私有 native engine repo（`pg-boothd`／`booth-record` crate）
 
 | 子系統 | 說明 |
 | --- | --- |
 | RTP ingress tap | 每 peer 可選錄 |
-| ffmpeg 管線 | 寫 `~/.pg-booth/private/` |
+| **`gstreamer-rs` 管線** | encode→寫 `~/.pg-booth/private/`（**禁止** ffmpeg） |
 | Control Channel | `booth.intent.record.*` |
 | 配額／rotate | 磁碟滿策略 |
 
@@ -308,7 +308,7 @@ recordings: Array<{
 | 磁碟滿 | `storage_full` + 頁內 toast；daemon 設定上限 |
 | 隱私／法規 | 全場 badge；§10 進場說明 |
 | 與「不錄製」混淆 | §9 細化；GLOSSARY 更新 |
-| WebM 相容 | 私有區播放大螢幕用本機解碼；daemon 可 MP4 |
+| WebM 相容 | 私有區播放大螢幕用本機解碼；Embedded／hybrid＝瀏覽器；**`pg-boothd`** cast＝**`gstreamer-rs`**（可輸出相容 program 格式） |
 
 ---
 
@@ -329,6 +329,8 @@ recordings: Array<{
 
 | 日期 | 摘要 |
 | --- | --- |
+| 2026-08-24 | **native 媒體棧統一：** `pg-boothd` cast／錄影／`booth-record` **一律 `gstreamer-rs`**；§5.3、§7、§11.2 |
+| 2026-08-24 | **native 私有片庫 cast：** `pg-boothd` 定案 **`gstreamer-rs`**；§7.3、§12 |
 | 2026-08-24 | **Desktop 私有片庫：** `goRoomPrivateFs`（plugin-fs）＋`createHostPrivateLibrary`；與 OPFS／daemon layout 對齊 |
 | 2026-08-24 | **Embedded 落地：** R0 wire + R2 Shell UI + R3 `MediaRecorder`→OPFS；Operator `booth.intent.record.*` + snapshot `recordings` |
 | 2026-08-23 | 初稿：多路 presence 錄影、`session_record` wire、Hub 私有片庫、與 cast 正交 |
