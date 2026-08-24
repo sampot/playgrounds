@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  BOOTH_OWNER_CHUNK_BYTES,
+  BOOTH_OWNER_SCTP_MAX_MESSAGE,
   base64ToBytes,
   bytesToBase64,
   encodeOwnerChunk,
@@ -7,6 +9,7 @@ import {
   parseOwnerChunkMessage,
   readFileInChunks,
   waitForOwnerDcDrain,
+  waitForOpenOwnerDataChannel,
 } from "./boothOwnerFileWire";
 
 describe("boothOwnerFileWire", () => {
@@ -28,6 +31,29 @@ describe("boothOwnerFileWire", () => {
     }, 32);
     await pending;
     expect(amount).toBe(0);
+  });
+
+  it("waitForOpenOwnerDataChannel resolves when dc opens", async () => {
+    const dc = {
+      readyState: "connecting",
+    } as RTCDataChannel;
+    const pending = waitForOpenOwnerDataChannel(() => dc, 500);
+    setTimeout(() => {
+      Object.defineProperty(dc, "readyState", { value: "open" });
+    }, 40);
+    await expect(pending).resolves.toBe(dc);
+  });
+
+  it("keeps encoded owner chunks under SCTP max-message-size", () => {
+    const payload = new Uint8Array(BOOTH_OWNER_CHUNK_BYTES).fill(0xab);
+    const raw = encodeOwnerChunk({
+      type: "booth.owner.chunk",
+      v: 1,
+      transferId: "transfer-max-size-check",
+      seq: 0,
+      data: bytesToBase64(payload),
+    });
+    expect(raw.length).toBeLessThan(BOOTH_OWNER_SCTP_MAX_MESSAGE);
   });
 
   it("round-trips owner chunk JSON", () => {

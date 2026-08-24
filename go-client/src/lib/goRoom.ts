@@ -1223,6 +1223,20 @@ export function roomGuestHostName(
   return playerDisplayName(name, "");
 }
 
+/** Operator status line under the TV when the remote link is open. */
+export function roomOperatorStatusLine(opts: {
+  canDirect: boolean;
+  message?: string | null;
+  anchorHint?: string | null;
+}): string {
+  const base =
+    opts.message?.trim() ||
+    (opts.canDirect ? "遠端導播中" : "遠端檢視");
+  const hint = opts.anchorHint?.trim();
+  if (hint) return `${base} · ${hint}`;
+  return base;
+}
+
 /** Guest status line: booth identity + stage／spectator play. */
 export function roomGuestStatusLine(opts: {
   guestCount: number;

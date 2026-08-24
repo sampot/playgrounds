@@ -130,6 +130,12 @@ describe("goFriendlyError", () => {
     expect(msg).not.toMatch(/engine_offline/i);
   });
 
+  it("operator no_active_anchor is plain Chinese", () => {
+    const msg = friendlyOperatorError(new Error("no_active_anchor"));
+    expect(msg).toContain("包廂");
+    expect(msg).not.toMatch(/no_active_anchor/i);
+  });
+
   it("operator datachannel queue full is plain Chinese", () => {
     const msg = friendlyOperatorError(
       new Error(

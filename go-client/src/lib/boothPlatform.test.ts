@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createBoothOperatorClient } from "./boothPlatform";
+import { createBoothOperatorClient, mintOperatorCap } from "./boothPlatform";
 
 class MockWebSocket {
   static instances: MockWebSocket[] = [];
@@ -112,5 +112,37 @@ describe("createBoothOperatorClient", () => {
     sock.open();
     sock.receive(JSON.stringify({ type: "booth.event.engine.offline", v: 1 }));
     await expect(pending).rejects.toThrow("engine_offline");
+  });
+});
+
+describe("mintOperatorCap", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("mints via field API key bearer", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          operatorCap: "pg_op_minted",
+          expiresAt: Date.now() + 60_000,
+          remoteUrl: "https://go.test/room/remote?cap=pg_op_minted",
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const out = await mintOperatorCap("pg_sk_test_key");
+    expect(out.operatorCap).toBe("pg_op_minted");
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/v1/booth/operator-caps"),
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          Authorization: "Bearer pg_sk_test_key",
+        }),
+      })
+    );
   });
 });

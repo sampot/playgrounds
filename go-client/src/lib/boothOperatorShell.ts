@@ -2,7 +2,13 @@ import {
   friendlyOperatorAckError,
   friendlyOperatorError,
 } from "./goFriendlyError";
-import { isRtcDataChannelQueueFullError } from "./boothOwnerFileWire";
+import { captureProgramFromBlob } from "./goRoomMedia";
+import { OperatorFileProgram, castFileScope } from "./operatorFileProgram";
+import {
+  isRtcDataChannelQueueFullError,
+  isRtcMaxMessageSizeError,
+  waitForOpenOwnerDataChannel,
+} from "./boothOwnerFileWire";
 import type { BoothEnvelope, BoothStateSnapshot } from "@pg/roster/boothChannel";
 import type { RoomInviteDoor, RoomOccupantPeer } from "./goRoom";
 import {
@@ -17,6 +23,7 @@ import {
   operatorPeerIdForShell,
 } from "./roomOperatorSlot";
 import { goAuth } from "./goAuth.svelte";
+import { chromeSession } from "./chromeSession.svelte";
 import {
   createBoothOwnerFileClient,
   type OwnerFileAckPayload,
@@ -30,6 +37,7 @@ import {
 } from "./boothOperatorSurface";
 import { goRoomPrivateFiles } from "./goRoomPrivateFiles.svelte";
 import { goRoomFiles } from "./goRoomFiles.svelte";
+import { ensureRoomFileSw } from "./goRoomPlayBridge";
 import type { GoLoadProgress } from "./goLoadProgress";
 
 export type OperatorShellPhase = "idle" | "connecting" | "open" | "error";
@@ -69,6 +77,7 @@ export type OperatorShellStatus = {
 type Listener = (s: OperatorShellStatus) => void;
 
 const ACK_WAIT_MS = 45_000;
+const RTC_CHANNEL_WAIT_MS = 30_000;
 
 function emptyStatus(): OperatorShellStatus {
   return {
@@ -142,6 +151,158 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
     }
   >();
 
+  let rosterChannelOpen = false;
+  let ownerChannelOpen = false;
+  let rtcReady = false;
+  let pendingSnapshot: BoothStateSnapshot | null = null;
+  let rtcWaitTimer: ReturnType<typeof setTimeout> | null = null;
+  let sessionFileAttached = false;
+  let rtcProgramStream: MediaStream | null = null;
+
+  const fileProgram = new OperatorFileProgram({
+    fetchFile: async (id, scope) => fetchHubCastFile(id, scope),
+    capture: captureProgramFromBlob,
+    onStream(stream) {
+      if (stream) {
+        set({ tvStream: stream });
+        return;
+      }
+      set({ tvStream: status.tvOn ? rtcProgramStream : null });
+    },
+    onError(message) {
+      chromeSession.setFlash(message, 3200);
+    },
+  });
+
+  async function fetchHubCastFile(
+    id: string,
+    scope: ReturnType<typeof castFileScope>
+  ): Promise<File | null> {
+    const owner = await ensureOwnerFileClient();
+    if (!owner) return null;
+    const intentType =
+      scope === "private"
+        ? "booth.intent.private.fetch"
+        : "booth.intent.share.fetch";
+    try {
+      const ack = await sendIntentForAck({
+        type: intentType,
+        v: 1,
+        payload: { id },
+      });
+      if (!ack?.transferId) return null;
+      const blob = await owner.receive(ack.transferId);
+      const name =
+        (scope === "private"
+          ? goRoomPrivateFiles.entries.find((e) => e.id === id)?.name
+          : goRoomFiles.entries.find((e) => e.id === id)?.name) ?? "program";
+      return new File([blob], name, {
+        type: blob.type || "application/octet-stream",
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  async function syncOperatorFileCast(
+    cast: BoothStateSnapshot["cast"] | undefined
+  ): Promise<void> {
+    if (!rtcReady) return;
+    await fileProgram.syncCast(cast);
+  }
+
+  function clearRtcWaitTimer(): void {
+    if (rtcWaitTimer) {
+      clearTimeout(rtcWaitTimer);
+      rtcWaitTimer = null;
+    }
+  }
+
+  function resetRtcReadiness(): void {
+    clearRtcWaitTimer();
+    rosterChannelOpen = false;
+    ownerChannelOpen = false;
+    rtcReady = false;
+    pendingSnapshot = null;
+  }
+
+  function operatorOpenMessage(): string {
+    return operatorCanDirect({ director, shellId })
+      ? "遠端導播中"
+      : "遠端檢視（家裡主持使用中）";
+  }
+
+  function handleOperatorLinkLost(): void {
+    resetRtcReadiness();
+    ownerDc = null;
+    ownerFileClient = null;
+    if (status.phase === "open" || status.phase === "connecting") {
+      set({
+        phase: "error",
+        error: "與包廂的 WebRTC 連線已中斷",
+      });
+    }
+  }
+
+  function markRosterChannelOpen(): void {
+    rosterChannelOpen = true;
+    tryPromoteToOpen();
+  }
+
+  function markOwnerChannelOpen(): void {
+    ownerChannelOpen = true;
+    tryPromoteToOpen();
+  }
+
+  function tryPromoteToOpen(): void {
+    if (rtcReady || !rosterChannelOpen || !ownerChannelOpen) return;
+    rtcReady = true;
+    clearRtcWaitTimer();
+    wireOperatorSessionFile();
+    const snap = pendingSnapshot;
+    if (snap) {
+      publishSnapshot(snap);
+    } else {
+      set({
+        phase: "open",
+        message: operatorOpenMessage(),
+        error: null,
+      });
+    }
+  }
+
+  function startRtcWaitTimer(): void {
+    clearRtcWaitTimer();
+    rtcWaitTimer = setTimeout(() => {
+      rtcWaitTimer = null;
+      if (!rtcReady && status.phase === "connecting") {
+        set({
+          phase: "error",
+          error: "無法建立與包廂的 WebRTC 通道",
+        });
+      }
+    }, RTC_CHANNEL_WAIT_MS);
+  }
+
+  function wireOperatorSessionFile(): void {
+    if (sessionFileAttached || !operatorRtc) return;
+    sessionFileAttached = true;
+    goRoomFiles.attach({
+      localAgentId: operatorPeerId(),
+      localName: operatorLocalDisplayName(),
+      sendJson: (msg) => operatorRtc?.sendRoster(msg),
+      sendBinary: (buf) => operatorRtc?.sendRosterBinary(buf),
+      bufferedAmount: () => operatorRtc?.rosterBufferedAmount() ?? 0,
+    });
+    void ensureRoomFileSw();
+  }
+
+  function detachOperatorSessionFile(): void {
+    if (!sessionFileAttached) return;
+    sessionFileAttached = false;
+    goRoomFiles.detach();
+  }
+
   function emit(): void {
     const snap = { ...status };
     for (const l of listeners) l(snap);
@@ -181,10 +342,10 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
     return wait;
   }
 
-  function ensureOwnerFileClient(): ReturnType<
-    typeof createBoothOwnerFileClient
-  > | null {
-    if (!ownerDc || ownerDc.readyState !== "open") return null;
+  function bindOwnerFileClient(
+    dc: RTCDataChannel
+  ): ReturnType<typeof createBoothOwnerFileClient> {
+    ownerDc = dc;
     ownerFileClient ??= createBoothOwnerFileClient({
       send: (text) => {
         if (ownerDc?.readyState !== "open") {
@@ -197,9 +358,20 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
     return ownerFileClient;
   }
 
+  async function ensureOwnerFileClient(): Promise<ReturnType<
+    typeof createBoothOwnerFileClient
+  > | null> {
+    const dc = await waitForOpenOwnerDataChannel(() => ownerDc);
+    if (!dc) return null;
+    return bindOwnerFileClient(dc);
+  }
+
   function operatorFileError(err: unknown): string {
     if (isRtcDataChannelQueueFullError(err)) {
       return "檔案通道忙碌中，請稍候再試（可先等傳檔完成）。";
+    }
+    if (isRtcMaxMessageSizeError(err)) {
+      return "檔案通道封包過大，請更新用戶端後再試。";
     }
     return err instanceof Error ? err.message : String(err);
   }
@@ -207,8 +379,8 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
   async function importPrivateFiles(
     files: File[]
   ): Promise<string | null> {
-    const owner = ensureOwnerFileClient();
-    if (!owner) return "遠端檔案通道尚未就緒";
+    const owner = await ensureOwnerFileClient();
+    if (!owner) return "遠端檔案通道尚未就緒（請等連線完成後再試）";
     for (const file of files) {
       try {
         const ack = await sendIntentForAck({
@@ -251,8 +423,8 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
   }
 
   async function downloadPrivate(id: string): Promise<string | null> {
-    const owner = ensureOwnerFileClient();
-    if (!owner) return "遠端檔案通道尚未就緒";
+    const owner = await ensureOwnerFileClient();
+    if (!owner) return "遠端檔案通道尚未就緒（請等連線完成後再試）";
     try {
       const ack = await sendIntentForAck({
         type: "booth.intent.private.fetch",
@@ -278,24 +450,12 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
   }
 
   async function importShareFiles(files: File[]): Promise<string | null> {
-    const owner = ensureOwnerFileClient();
-    if (!owner) return "遠端檔案通道尚未就緒";
+    if (!sessionFileAttached) {
+      return "分享通道尚未就緒（請等連線完成後再試）";
+    }
     for (const file of files) {
-      try {
-        const ack = await sendIntentForAck({
-          type: "booth.intent.share.import",
-          v: 1,
-          payload: {
-            name: file.name,
-            size: file.size,
-            mime: file.type || undefined,
-          },
-        });
-        if (!ack?.transferId) return "無法上傳到包廂";
-        await owner.upload(ack.transferId, file);
-      } catch (e) {
-        return operatorFileError(e);
-      }
+      const result = await goRoomFiles.shareLocalFile(file);
+      if (!result.ok) return result.error;
     }
     return null;
   }
@@ -314,8 +474,8 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
   }
 
   async function downloadShare(id: string): Promise<string | null> {
-    const owner = ensureOwnerFileClient();
-    if (!owner) return "遠端檔案通道尚未就緒";
+    const owner = await ensureOwnerFileClient();
+    if (!owner) return "遠端檔案通道尚未就緒（請等連線完成後再試）";
     try {
       const ack = await sendIntentForAck({
         type: "booth.intent.share.fetch",
@@ -353,7 +513,6 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
         download: downloadPrivate,
       },
       shareHandlers: {
-        importFiles: importShareFiles,
         unshare: unshareShare,
         download: downloadShare,
       },
@@ -387,20 +546,56 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
     prev: MediaStream | null
   ): MediaStream | null {
     if (!ui.tvOn) return null;
-    return prev;
+    return prev ?? rtcProgramStream;
   }
 
-  function applySnapshot(snapshot: BoothStateSnapshot): void {
+  function resolveTvLabel(
+    cast: BoothStateSnapshot["cast"] | undefined,
+    fallback: string | null
+  ): string | null {
+    if (!cast || cast.kind === "idle") return null;
+    if (cast.kind === "file") {
+      const id = typeof cast.id === "string" ? cast.id : "";
+      const fromShare = goRoomFiles.entries.find((e) => e.id === id)?.name;
+      const fromPrivate = goRoomPrivateFiles.entries.find(
+        (e) => e.id === id
+      )?.name;
+      return fromShare ?? fromPrivate ?? fallback;
+    }
+    return fallback;
+  }
+
+  function resolveProgramClock(
+    cast: BoothStateSnapshot["cast"] | undefined
+  ): Pick<
+    OperatorShellStatus,
+    "programTransport" | "programPaused" | "programTime" | "programDuration"
+  > {
+    const hub = boothCastProgramClock(cast);
+    const local = fileProgram.program?.clock?.();
+    if (!local) return hub;
+    return {
+      programTransport: hub.transport || local.duration > 0,
+      programPaused: local.paused,
+      programTime: local.currentTime,
+      programDuration: local.duration,
+    };
+  }
+
+  function publishSnapshot(snapshot: BoothStateSnapshot): void {
     const ui = boothSnapshotToUi(snapshot);
     const canDirect = operatorCanDirect({ director, shellId });
-    const programClock = boothCastProgramClock(snapshot.cast);
+    const programClock = resolveProgramClock(snapshot.cast);
     ensureSurface();
     syncOperatorChatTail(snapshot.chatTail);
-    mirrorOperatorShareFiles(snapshot.shareFiles);
-    mirrorOperatorPrivateFiles(snapshot.privateFiles);
+    mirrorOperatorShareFiles(snapshot.shareFiles, snapshot.shareFileCount);
+    mirrorOperatorPrivateFiles(
+      snapshot.privateFiles,
+      snapshot.privateFileCount
+    );
     set({
       phase: "open",
-      message: canDirect ? "遠端導播中" : "遠端檢視（家裡主持使用中）",
+      message: operatorOpenMessage(),
       error: null,
       guestCount: ui.guestCount,
       inviteDoor: ui.inviteDoor,
@@ -413,18 +608,26 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
       hostDisplayName: ui.hostDisplayName,
       playCatalogId: ui.playCatalogId,
       tvOn: ui.tvOn,
-      tvLabel: ui.tvLabel,
+      tvLabel: resolveTvLabel(snapshot.cast, ui.tvLabel),
       tvStream: resolveOperatorTvStream(ui, status.tvStream),
       remoteLives: ui.remoteLives,
       canDirect,
       directorRole: canDirect ? "operator" : director ? "viewer" : null,
       anchor: snapshot.anchor,
       anchorHint: boothAnchorStatusLabel(snapshot.anchor),
-      programTransport: programClock.transport,
-      programPaused: programClock.paused,
-      programTime: programClock.time,
-      programDuration: programClock.duration,
+      programTransport: programClock.programTransport,
+      programPaused: programClock.programPaused,
+      programTime: programClock.programTime,
+      programDuration: programClock.programDuration,
     });
+    void syncOperatorFileCast(snapshot.cast);
+  }
+
+  function applySnapshot(snapshot: BoothStateSnapshot): void {
+    pendingSnapshot = snapshot;
+    if (rtcReady) {
+      publishSnapshot(snapshot);
+    }
   }
 
   return {
@@ -447,6 +650,7 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
         });
         return;
       }
+      resetRtcReadiness();
       set({ phase: "connecting", message: "連線中…", error: null });
       let rtc: ReturnType<typeof createBoothOperatorRtc> | null = null;
       client = createBoothOperatorClient({
@@ -476,23 +680,23 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
           director = hello.director ?? null;
           const canDirect = operatorCanDirect({ director, shellId });
           set({
+            phase: "connecting",
             canDirect,
             directorRole: canDirect ? "operator" : director ? "viewer" : null,
-            message: canDirect
-              ? "遠端導播中"
-              : "遠端檢視（家裡主持使用中）",
+            message: "建立 WebRTC 通道…",
           });
         },
         onDirectorChanged: (next) => {
           director = next;
           const canDirect = operatorCanDirect({ director, shellId });
-          set({
+          const partial: Partial<OperatorShellStatus> = {
             canDirect,
             directorRole: canDirect ? "operator" : director ? "viewer" : null,
-            message: canDirect
-              ? "遠端導播中"
-              : "遠端檢視（家裡主持使用中）",
-          });
+          };
+          if (rtcReady) {
+            partial.message = operatorOpenMessage();
+          }
+          set(partial);
         },
         onEngineOffline: () => {
           set({
@@ -516,8 +720,17 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
           agentId: operatorPeerId(),
           name: operatorLocalDisplayName(),
         },
+        rosterHandlers: {
+          onChannelOpen: markRosterChannelOpen,
+          onChannelClose: handleOperatorLinkLost,
+          onMessage: (msg) => goRoomFiles.onControl(msg),
+          onBinary: (buf) => goRoomFiles.onBinary(buf),
+        },
         onProgramStream: (stream) => {
-          set({ tvStream: stream ?? null });
+          rtcProgramStream = stream ?? null;
+          if (!fileProgram.program) {
+            set({ tvStream: stream ?? null });
+          }
         },
         onOwnerChannel: (dc) => {
           ownerDc = dc;
@@ -525,21 +738,25 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
           dc.onmessage = (ev) => {
             const text = typeof ev.data === "string" ? ev.data : "";
             if (!text) return;
-            ensureOwnerFileClient()?.handleMessage(text);
+            if (dc.readyState === "open") {
+              bindOwnerFileClient(dc).handleMessage(text);
+            }
           };
           dc.onclose = () => {
             if (ownerDc === dc) {
-              ownerDc = null;
-              ownerFileClient = null;
+              handleOperatorLinkLost();
             }
           };
+          bindOwnerFileClient(dc);
+          markOwnerChannelOpen();
         },
       });
       operatorRtc = rtc;
       ensureOperatorPresence();
       try {
         await client.connect();
-        set({ phase: "open" });
+        set({ phase: "connecting", message: "建立 WebRTC 通道…" });
+        startRtcWaitTimer();
         void operatorRtc.start();
       } catch (e) {
         set({
@@ -554,6 +771,8 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
         pending.reject(new Error("disconnected"));
       }
       pendingAcks.clear();
+      resetRtcReadiness();
+      detachOperatorSessionFile();
       void operatorPresence?.dispose();
       operatorPresence = null;
       client?.disconnect();
@@ -562,6 +781,8 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
       operatorRtc = null;
       ownerDc = null;
       ownerFileClient = null;
+      fileProgram.stop();
+      rtcProgramStream = null;
       director = null;
       if (surfaceAttached) {
         detachOperatorSurface();

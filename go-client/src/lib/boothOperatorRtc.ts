@@ -191,7 +191,9 @@ export function createBoothOperatorRtc(opts: {
     );
 
     const ownerDc = pc.createDataChannel(BOOTH_OWNER_DC_LABEL, { ordered: true });
-    ownerDc.onopen = () => opts.onOwnerChannel?.(ownerDc);
+    const bindOwnerChannel = () => opts.onOwnerChannel?.(ownerDc);
+    ownerDc.onopen = bindOwnerChannel;
+    if (ownerDc.readyState === "open") bindOwnerChannel();
 
     pc.ontrack = (ev) => {
       const idx = pc?.getTransceivers().indexOf(ev.transceiver) ?? -1;
@@ -261,6 +263,13 @@ export function createBoothOperatorRtc(opts: {
       }
       rosterChannel.send(JSON.stringify(data));
     },
+    sendRosterBinary: (buf: ArrayBuffer) => {
+      if (!rosterChannel || rosterChannel.readyState !== "open") {
+        throw new Error("DataChannel 尚未開啟");
+      }
+      rosterChannel.send(buf);
+    },
+    rosterBufferedAmount: () => rosterChannel?.bufferedAmount ?? 0,
   };
 }
 

@@ -25,7 +25,6 @@ export type OperatorPrivateHandlers = {
 };
 
 export type OperatorShareHandlers = {
-  importFiles: (files: File[]) => Promise<string | null>;
   unshare: (id: string) => Promise<string | null>;
   download: (id: string) => Promise<string | null>;
 };
@@ -67,13 +66,13 @@ export function attachOperatorSurface(opts: {
     });
   }
   if (opts.shareHandlers) {
-    goRoomFiles.attachOperatorMirror(opts.shareHandlers);
+    goRoomFiles.attachOperatorRemote(opts.shareHandlers);
   }
 }
 
 export function detachOperatorSurface(): void {
   goSessionChat.detach();
-  goRoomFiles.clearOperatorMirror();
+  goRoomFiles.clearOperatorRemote();
   goRoomPrivateFiles.clearMirror();
 }
 
@@ -93,35 +92,44 @@ export function syncOperatorChatTail(
 }
 
 export function mirrorOperatorShareFiles(
-  files: BoothFileSummary[] | undefined
+  files: BoothFileSummary[] | undefined,
+  fileCount?: number
 ): void {
-  goRoomFiles.setMirrorEntries(
-    (files ?? []).map((f) => ({
-      id: f.id,
-      name: f.name,
-      size: f.size,
-      mime: f.mime,
-      status:
-        f.status === "ready"
-          ? ("listed" as const)
-          : f.status === "receiving"
-            ? ("transferring" as const)
-            : f.status === "error"
-              ? ("error" as const)
-              : ("listed" as const),
-      received: f.status === "ready" ? f.size : 0,
-      ownerId: "engine",
-      ownerName: "包廂",
-      mine: true,
-    }))
-  );
+  const resolved =
+    fileCount === 0 ? [] : (files ?? []);
+  const entries = resolved.map((f) => ({
+    id: f.id,
+    name: f.name,
+    size: f.size,
+    mime: f.mime,
+    status:
+      f.status === "ready"
+        ? ("listed" as const)
+        : f.status === "receiving"
+          ? ("transferring" as const)
+          : f.status === "error"
+            ? ("error" as const)
+            : ("listed" as const),
+    received: f.status === "ready" ? f.size : 0,
+    ownerId: "engine",
+    ownerName: "包廂",
+    mine: true,
+  }));
+  if (goRoomFiles.sessionFileAttached()) {
+    goRoomFiles.mergeHubShareEntries(entries);
+    return;
+  }
+  goRoomFiles.setMirrorEntries(entries);
 }
 
 export function mirrorOperatorPrivateFiles(
-  files: BoothFileSummary[] | undefined
+  files: BoothFileSummary[] | undefined,
+  fileCount?: number
 ): void {
+  const resolved =
+    fileCount === 0 ? [] : (files ?? []);
   goRoomPrivateFiles.setMirrorEntries(
-    (files ?? []).map((f) => ({
+    resolved.map((f) => ({
       id: f.id,
       name: f.name,
       size: f.size,

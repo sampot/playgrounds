@@ -9,9 +9,26 @@ const clientOpts: {
 let onProgramStream: ((stream: MediaStream | null) => void) | undefined;
 let capturedRtcOpts: {
   localPresence?: { agentId: string; name: string };
+  rosterHandlers?: { onChannelOpen?: () => void; onChannelClose?: () => void };
+  onOwnerChannel?: (dc: RTCDataChannel) => void;
   sendRoster?: (data: unknown) => void;
   getPc?: () => RTCPeerConnection | null;
 } | undefined;
+
+function fakeOwnerDataChannel(): RTCDataChannel {
+  return {
+    readyState: "open",
+    send: vi.fn(),
+    bufferedAmount: 0,
+    onmessage: null,
+    onclose: null,
+  } as unknown as RTCDataChannel;
+}
+
+function openOperatorRtcChannels(): void {
+  capturedRtcOpts?.rosterHandlers?.onChannelOpen?.();
+  capturedRtcOpts?.onOwnerChannel?.(fakeOwnerDataChannel());
+}
 
 vi.mock("./boothPlatform", () => ({
   createBoothOperatorClient: vi.fn((opts: typeof clientOpts) => {
@@ -29,6 +46,8 @@ vi.mock("./boothOperatorRtc", () => ({
   createBoothOperatorRtc: vi.fn((opts: {
     onProgramStream: (stream: MediaStream | null) => void;
     localPresence?: { agentId: string; name: string };
+    rosterHandlers?: { onChannelOpen?: () => void; onChannelClose?: () => void };
+    onOwnerChannel?: (dc: RTCDataChannel) => void;
   }) => {
     onProgramStream = opts.onProgramStream;
     capturedRtcOpts = opts;
@@ -38,6 +57,8 @@ vi.mock("./boothOperatorRtc", () => ({
       handleSignal: vi.fn(),
       getPc: () => null,
       sendRoster: vi.fn(),
+      sendRosterBinary: vi.fn(),
+      rosterBufferedAmount: () => 0,
     };
   }),
 }));
@@ -81,10 +102,25 @@ describe("createBoothOperatorShell", () => {
     expect(shell.getStatus().error).not.toMatch(/remote_disabled/i);
   });
 
+  it("stays connecting until both WebRTC data channels are open", async () => {
+    const { createBoothOperatorShell } = await import("./boothOperatorShell");
+    const shell = createBoothOperatorShell({ operatorCap: "cap-test" });
+    await shell.connect();
+    expect(shell.getStatus().phase).toBe("connecting");
+    expect(shell.getStatus().message).toContain("WebRTC");
+
+    capturedRtcOpts?.rosterHandlers?.onChannelOpen?.();
+    expect(shell.getStatus().phase).toBe("connecting");
+
+    capturedRtcOpts?.onOwnerChannel?.(fakeOwnerDataChannel());
+    expect(shell.getStatus().phase).toBe("open");
+  });
+
   it("clears the program preview when booth cast goes idle", async () => {
     const { createBoothOperatorShell } = await import("./boothOperatorShell");
     const shell = createBoothOperatorShell({ operatorCap: "cap-test" });
     await shell.connect();
+    openOperatorRtcChannels();
     const base = {
       sessionId: "sess-1",
       ownerUserId: "u1",
@@ -138,6 +174,7 @@ describe("createBoothOperatorShell", () => {
     const { createBoothOperatorShell } = await import("./boothOperatorShell");
     const shell = createBoothOperatorShell({ operatorCap: "cap-test" });
     await shell.connect();
+    openOperatorRtcChannels();
     const err = await shell.toggleCamera();
     expect(err).toBeNull();
     expect(shell.getStatus().localCamera).toBe(true);

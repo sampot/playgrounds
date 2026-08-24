@@ -23,8 +23,6 @@ class GoRoomFiles {
   #attachGen = 0;
   #pendingControl: unknown[] = [];
   #pendingBinary: ArrayBuffer[] = [];
-  #operatorMirror = false;
-  #remoteShareImport: ((files: File[]) => Promise<string | null>) | null = null;
   #remoteUnshare: ((id: string) => Promise<string | null>) | null = null;
   #remoteDownload: ((id: string) => Promise<string | null>) | null = null;
 
@@ -86,7 +84,7 @@ class GoRoomFiles {
   }
 
   detach(): void {
-    this.clearOperatorMirror();
+    this.clearOperatorRemote();
     this.#attachGen++;
     this.#pendingControl = [];
     this.#pendingBinary = [];
@@ -105,21 +103,29 @@ class GoRoomFiles {
     this.playback = null;
   }
 
-  /** Operator Shell: share catalog from booth snapshot + remote handlers. */
-  attachOperatorMirror(opts: {
-    importFiles: (files: File[]) => Promise<string | null>;
+  /** Operator Shell: hub share catalog remote unshare/download (not peer upload). */
+  attachOperatorRemote(opts: {
     unshare: (id: string) => Promise<string | null>;
     download: (id: string) => Promise<string | null>;
   }): void {
-    this.#operatorMirror = true;
-    this.#remoteShareImport = opts.importFiles;
     this.#remoteUnshare = opts.unshare;
     this.#remoteDownload = opts.download;
   }
 
-  clearOperatorMirror(): void {
-    this.#operatorMirror = false;
-    this.#remoteShareImport = null;
+  sessionFileAttached(): boolean {
+    return this.#xfer !== null;
+  }
+
+  mergeHubShareEntries(entries: RoomFileEntry[]): void {
+    if (!entries.length) return;
+    const byId = new Map(this.entries.map((entry) => [entry.id, entry]));
+    for (const entry of entries) {
+      if (!byId.has(entry.id)) byId.set(entry.id, entry);
+    }
+    this.entries = [...byId.values()];
+  }
+
+  clearOperatorRemote(): void {
     this.#remoteUnshare = null;
     this.#remoteDownload = null;
     if (!this.#xfer) {
@@ -145,7 +151,7 @@ class GoRoomFiles {
   }
 
   async unshareRemote(id: string): Promise<string | null> {
-    if (!this.#operatorMirror || !this.#remoteUnshare) return "尚未就緒";
+    if (!this.#remoteUnshare) return "尚未就緒";
     this.busy = true;
     try {
       return await this.#remoteUnshare(id);
@@ -155,26 +161,15 @@ class GoRoomFiles {
   }
 
   async downloadRemote(id: string): Promise<string | null> {
-    if (!this.#operatorMirror || !this.#remoteDownload) return "尚未就緒";
+    if (!this.#remoteDownload) return "尚未就緒";
     return this.#remoteDownload(id);
   }
 
   shareLocalFile(file: File) {
-    if (this.#operatorMirror && this.#remoteShareImport) {
-      this.busy = true;
-      return this.#remoteShareImport([file])
-        .then((err) => {
-          if (err) return { ok: false as const, error: err };
-          return { ok: true as const };
-        })
-        .finally(() => {
-          this.busy = false;
-        });
+    if (this.#xfer) {
+      return this.#xfer.shareLocalFile(file);
     }
-    return (
-      this.#xfer?.shareLocalFile(file) ??
-      Promise.resolve({ ok: false as const, error: "尚未連線" })
-    );
+    return Promise.resolve({ ok: false as const, error: "尚未連線" });
   }
 
   shareLocalDirectory(files: File[]) {

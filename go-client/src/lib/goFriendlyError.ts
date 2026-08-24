@@ -221,6 +221,14 @@ export function friendlyOperatorError(err: unknown): string {
     return "家裡包廂未連線。請確認包廂分頁仍開啟、保持作用中，且已開啟「允許遠端連回包廂」。";
   }
 
+  if (lower === "no_active_anchor" || /no_active_anchor/.test(lower)) {
+    return "家裡包廂未連線。請確認包廂已常駐且已開啟「允許遠端連回包廂」。";
+  }
+
+  if (lower === "anchor_degraded" || /anchor_degraded/.test(lower)) {
+    return "家裡包廂連線不穩，請確認包廂仍開啟後再試。";
+  }
+
   if (isLikelyRateLimited(err)) {
     return "現在連線的人有點多，請稍後再試一次。";
   }

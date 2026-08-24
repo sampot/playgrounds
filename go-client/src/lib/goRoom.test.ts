@@ -114,6 +114,7 @@ import {
   roomGuestStatusLine,
   roomGuestNameFallback,
   roomStatusLineVisible,
+  roomOperatorStatusLine,
   roomTvStatusGate,
   roomShellActiveTab,
   roomShellDefaultPane,
@@ -1005,6 +1006,22 @@ describe("booth copy", () => {
     expect(roomStatusLineVisible({ cinemaHud: false, phase: "ready" })).toBe(
       false
     );
+  });
+
+  it("combines operator anchor hints into the hall status line", () => {
+    expect(
+      roomOperatorStatusLine({
+        canDirect: true,
+        message: "遠端導播中",
+        anchorHint: "包廂連線不穩定",
+      })
+    ).toBe("遠端導播中 · 包廂連線不穩定");
+    expect(
+      roomOperatorStatusLine({
+        canDirect: false,
+        anchorHint: null,
+      })
+    ).toBe("遠端檢視");
   });
 
   it("gives the guest door a booth, not a bare consent form", () => {

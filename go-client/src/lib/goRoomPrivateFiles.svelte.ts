@@ -144,6 +144,7 @@ class GoRoomPrivateFiles {
       this.busy = true;
       try {
         await this.#remoteRemove(id);
+        this.entries = this.entries.filter((entry) => entry.id !== id);
       } finally {
         this.busy = false;
       }

@@ -317,7 +317,10 @@ export async function routeBooth(
   }
 
   if (request.method === "POST" && pathname === "/v1/booth/operator-caps") {
-    const auth = await requireAccessToken(env, request);
+    const bearer = parseBearer(request);
+    const auth = bearer?.startsWith("pg_sk_")
+      ? await requireApiKey(env, request)
+      : await requireAccessToken(env, request);
     if (!auth.ok) return auth.res;
     const body = (await request.json().catch(() => ({}))) as {
       boothSessionId?: string;

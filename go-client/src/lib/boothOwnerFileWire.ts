@@ -5,13 +5,20 @@ import {
 } from "@pg/roster/boothChannel";
 
 export const BOOTH_OWNER_DC_LABEL = "booth.owner";
-export const BOOTH_OWNER_CHUNK_BYTES = 48 * 1024;
+/** SCTP max-message-size is ~64KiB; JSON base64 expands ~4/3. */
+export const BOOTH_OWNER_SCTP_MAX_MESSAGE = 65536;
+export const BOOTH_OWNER_CHUNK_BYTES = 32 * 1024;
 /** Align with room file DC backpressure (goRoomFileTransfer). */
 export const BOOTH_OWNER_BUFFER_HIGH = 64 * 1024;
 
 export function isRtcDataChannelQueueFullError(error: unknown): boolean {
   const msg = error instanceof Error ? error.message : String(error);
   return /send queue is full|Queue is full/i.test(msg);
+}
+
+export function isRtcMaxMessageSizeError(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error);
+  return /max-message-size/i.test(msg);
 }
 
 export async function waitForOwnerDcDrain(
@@ -22,6 +29,31 @@ export async function waitForOwnerDcDrain(
   while (get() > high) {
     await new Promise((resolve) => setTimeout(resolve, 16));
   }
+}
+
+/** Wait until the owner file DataChannel is open (WebRTC may lag behind booth.hello). */
+export function waitForOpenOwnerDataChannel(
+  getDc: () => RTCDataChannel | null,
+  timeoutMs = 20_000
+): Promise<RTCDataChannel | null> {
+  const open = getDc();
+  if (open?.readyState === "open") return Promise.resolve(open);
+  return new Promise((resolve) => {
+    const deadline = Date.now() + timeoutMs;
+    const tick = () => {
+      const dc = getDc();
+      if (dc?.readyState === "open") {
+        resolve(dc);
+        return;
+      }
+      if (Date.now() >= deadline) {
+        resolve(null);
+        return;
+      }
+      setTimeout(tick, 50);
+    };
+    tick();
+  });
 }
 
 export type BoothOwnerChunkWire = BoothOwnerChunk & {

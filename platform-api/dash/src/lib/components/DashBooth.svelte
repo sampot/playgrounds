@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { dash } from "$lib/dash.svelte";
   import { copyText, formatTime } from "$lib/api";
+  import { formatBoothDeviceLoginCommand } from "../../../../src/boothDeviceCli.js";
 
   type BoothDevice = {
     id: string;
@@ -106,6 +107,21 @@
     if (!mintedToken) return;
     const ok = await copyText(mintedToken);
     dash.flash(ok ? "已複製裝置憑證" : "無法複製，請手動選取", ok ? "ok" : "warn");
+  }
+
+  function mintedLoginCommand(): string | null {
+    if (!mintedToken || !mintedOwnerId) return null;
+    return formatBoothDeviceLoginCommand({
+      deviceToken: mintedToken,
+      ownerUserId: mintedOwnerId,
+    });
+  }
+
+  async function copyMintedLoginCommand() {
+    const cmd = mintedLoginCommand();
+    if (!cmd) return;
+    const ok = await copyText(cmd);
+    dash.flash(ok ? "已複製登入命令" : "無法複製，請手動選取", ok ? "ok" : "warn");
   }
 
   function askRevokeDevice(device: BoothDevice) {
@@ -275,13 +291,23 @@
         {#if mintedOwnerId}
           <p class="muted mono">帳號 ID：{mintedOwnerId}</p>
         {/if}
-        <p class="muted mono">
-          pg-boothd login --device-token &lt;憑證&gt; --owner {mintedOwnerId ?? "&lt;帳號 ID&gt;"}
-        </p>
+        {#if mintedLoginCommand()}
+          <p class="dash-device-cli-label muted">登入命令（可直接貼到終端機）</p>
+          <code class="dash-device-cli">{mintedLoginCommand()}</code>
+        {/if}
         <div class="dash-booth-actions">
           <button type="button" class="pixel-btn" onclick={() => void copyMintedToken()}>
             複製憑證
           </button>
+          {#if mintedLoginCommand()}
+            <button
+              type="button"
+              class="pixel-btn pixel-btn--primary"
+              onclick={() => void copyMintedLoginCommand()}
+            >
+              複製登入命令
+            </button>
+          {/if}
           <button
             type="button"
             class="pixel-btn"
@@ -392,6 +418,19 @@
     word-break: break-all;
     font-size: 0.85rem;
     margin: 0.5rem 0;
+  }
+  .dash-device-cli-label {
+    margin: 0.75rem 0 0.35rem;
+    font-size: 0.85rem;
+  }
+  .dash-device-cli {
+    display: block;
+    word-break: break-all;
+    font-size: 0.85rem;
+    margin: 0 0 0.5rem;
+    padding: 0.5rem 0.65rem;
+    border-radius: 4px;
+    background: color-mix(in srgb, currentColor 6%, transparent);
   }
   .dash-device-list {
     list-style: none;

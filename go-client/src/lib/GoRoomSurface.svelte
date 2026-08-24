@@ -26,7 +26,14 @@
   import { listRoomPlayableGames } from "$lib/goRoomPlayBootstrap";
   import { getGoCatalogEntry } from "$lib/goCatalog";
   import type { GoLoadProgress } from "$lib/goLoadProgress";
-  import { goAuth } from "$lib/goAuth.svelte";
+  import {
+    GO_ROOM_OPERATOR_CONNECTING_BODY,
+    GO_ROOM_OPERATOR_CONNECTING_TITLE,
+    GO_ROOM_OPERATOR_GATE_BODY,
+    GO_ROOM_OPERATOR_GATE_BUTTON,
+    GO_ROOM_OPERATOR_GATE_TITLE,
+    roomOperatorLoginGate,
+  } from "$lib/operatorRemote";
   import { boothDesktopGoto } from "$lib/boothDesktopNav";
   import { readRemoteAnchorEnabled } from "$lib/boothAnchorBridge";
   import { roomAdClickAction } from "$lib/goAds";
@@ -98,6 +105,7 @@
     roomShellViewportBox,
     roomStageStatus,
     roomStatusLineVisible,
+    roomOperatorStatusLine,
     roomTvHudHasTransport,
     roomTvHudKind,
     roomTvHudRestore,
@@ -202,6 +210,8 @@
     message: string;
     error: string | null;
     loggedIn?: boolean;
+    /** Operator `/room/remote`: cap deep link skips login gate. */
+    operatorCapFromUrl?: boolean;
     shortUrl: string | null;
     inviteExpiresAt: number | null;
     inviteDoor?: RoomInviteDoor;
@@ -253,6 +263,7 @@
     operatorTvLabel?: string | null;
     operatorTvStream?: MediaStream | null;
     operatorCanDirect?: boolean;
+    operatorAnchorHint?: string | null;
     operatorProgramTransport?: boolean;
     operatorProgramPaused?: boolean;
     operatorProgramTime?: number;
@@ -290,6 +301,7 @@
     message,
     error,
     loggedIn = false,
+    operatorCapFromUrl = false,
     shortUrl = null,
     inviteExpiresAt = null,
     inviteDoor = "none",
@@ -320,6 +332,7 @@
     operatorTvLabel = null,
     operatorTvStream = null,
     operatorCanDirect = false,
+    operatorAnchorHint = null,
     operatorProgramTransport = false,
     operatorProgramPaused = true,
     operatorProgramTime = 0,
@@ -546,7 +559,29 @@
         })
   );
   const loginGate = $derived(
-    roomHostLoginGate({ role, loggedIn, phase, clientReady })
+    isOperator
+      ? roomOperatorLoginGate({
+          capFromUrl: operatorCapFromUrl,
+          loggedIn,
+          phase,
+          clientReady,
+        })
+      : roomHostLoginGate({ role, loggedIn, phase, clientReady })
+  );
+  const loginGateTitle = $derived(
+    isOperator ? GO_ROOM_OPERATOR_GATE_TITLE : "開包廂"
+  );
+  const loginGateBody = $derived(
+    isOperator ? GO_ROOM_OPERATOR_GATE_BODY : GO_ROOM_GATE_BODY
+  );
+  const loginGateButton = $derived(
+    isOperator ? GO_ROOM_OPERATOR_GATE_BUTTON : "登入後開包廂"
+  );
+  const connectingTitle = $derived(
+    isOperator ? GO_ROOM_OPERATOR_CONNECTING_TITLE : GO_ROOM_CONNECTING_TITLE
+  );
+  const connectingBody = $derived(
+    isOperator ? GO_ROOM_OPERATOR_CONNECTING_BODY : GO_ROOM_CONNECTING_BODY
   );
   const tvStatusGate = $derived(roomTvStatusGate(phase));
 
@@ -767,7 +802,11 @@
     if (phase === "ended") return message || "這一間已結束";
     if (inBooth) {
       if (isOperator) {
-        return message || (operatorCanDirect ? "遠端導播中" : "遠端檢視");
+        return roomOperatorStatusLine({
+          canDirect: operatorCanDirect,
+          message,
+          anchorHint: operatorAnchorHint,
+        });
       }
       if (role === "guest") {
         const hostName =
@@ -1697,9 +1736,18 @@
     if (!id) return;
     clearPendingBrowserSave(id);
     if (isOperator) {
-      void goRoomFiles.unshareRemote(id).then((err) => {
-        if (err) fileError = err;
-      });
+      const entry = goRoomFiles.entries.find((e) => e.id === id);
+      const mine =
+        entry?.ownerId != null &&
+        operatorLocalPeerId != null &&
+        entry.ownerId === operatorLocalPeerId;
+      if (mine) {
+        goRoomFiles.unshare(id);
+      } else {
+        void goRoomFiles.unshareRemote(id).then((err) => {
+          if (err) fileError = err;
+        });
+      }
     } else {
       goRoomFiles.unshare(id, { host: isHostLike && !isOperator });
     }
@@ -1995,20 +2043,22 @@
       {/if}
       {#if loginGate}
         <div class="room-tv-gate" role="region" aria-labelledby="room-gate-title">
-          <p id="room-gate-title" class="room-tv-gate-title pixel-text">開包廂</p>
+          <p id="room-gate-title" class="room-tv-gate-title pixel-text">{loginGateTitle}</p>
           <p class="room-tv-gate-body">
-            {GO_ROOM_GATE_BODY}
+            {loginGateBody}
           </p>
           <button
             type="button"
             class="pixel-btn pixel-btn--primary room-tv-gate-btn"
             onclick={() => onLogin?.()}
           >
-            登入後開包廂
+            {loginGateButton}
           </button>
-          <p class="muted room-tv-gate-hint">
-            {GO_ROOM_LOGIN_HINT} 單機小品不受影響。
-          </p>
+          {#if !isOperator}
+            <p class="muted room-tv-gate-hint">
+              {GO_ROOM_LOGIN_HINT} 單機小品不受影響。
+            </p>
+          {/if}
         </div>
       {:else if tvStatusGate}
         <div
@@ -2023,9 +2073,9 @@
         >
           {#if phase === "connecting"}
             <p id="room-status-gate-title" class="room-tv-gate-title pixel-text">
-              {message || GO_ROOM_CONNECTING_TITLE}
+              {message || connectingTitle}
             </p>
-            <p class="room-tv-gate-body">{GO_ROOM_CONNECTING_BODY}</p>
+            <p class="room-tv-gate-body">{connectingBody}</p>
           {:else if phase === "error"}
             <p id="room-status-gate-title" class="room-tv-gate-title pixel-text err">
               {error || "無法開始"}

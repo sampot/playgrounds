@@ -118,7 +118,7 @@ export type RoomProgramClock = {
   duration: number;
 };
 
-type CapturedProgram = {
+export type CapturedProgram = {
   audio: MediaStreamTrack | null;
   video: MediaStreamTrack | null;
   stop: () => void;
@@ -2079,7 +2079,7 @@ function captureFromMediaElement(el: HTMLMediaElement): CapturedProgram | null {
   };
 }
 
-async function captureProgramFromBlob(
+export async function captureProgramFromBlob(
   file: File
 ): Promise<CapturedProgram | null> {
   if (

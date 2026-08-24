@@ -103,18 +103,18 @@ export type OperatorCapResult = {
   remoteUrl: string;
 };
 
+/** Mint a short-lived Operator cap for the logged-in account (field API key). */
 export async function mintOperatorCap(
-  accessToken: string,
+  apiKey: string,
   boothSessionId?: string
 ): Promise<OperatorCapResult> {
   const origin = platformApiOrigin();
   const res = await fetch(`${origin}/v1/booth/operator-caps`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${accessToken}`,
+      Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
-    credentials: "include",
     body: JSON.stringify(boothSessionId ? { boothSessionId } : {}),
   });
   const data = (await res.json().catch(() => ({}))) as OperatorCapResult & {

@@ -15,8 +15,10 @@ vi.mock("./goSessionChat.svelte", () => ({
 vi.mock("./goRoomFiles.svelte", () => ({
   goRoomFiles: {
     setMirrorEntries: vi.fn(),
-    attachOperatorMirror: vi.fn(),
-    clearOperatorMirror: vi.fn(),
+    mergeHubShareEntries: vi.fn(),
+    sessionFileAttached: vi.fn(() => false),
+    attachOperatorRemote: vi.fn(),
+    clearOperatorRemote: vi.fn(),
   },
 }));
 
@@ -55,5 +57,31 @@ describe("boothOperatorSurface", () => {
       type: "booth.intent.chat.send",
       payload: { message: { text: "hi" } },
     });
+  });
+
+  it("clears private mirror when privateFileCount is zero", async () => {
+    const { mirrorOperatorPrivateFiles } = await import("./boothOperatorSurface");
+    const { goRoomPrivateFiles } = await import("./goRoomPrivateFiles.svelte");
+    mirrorOperatorPrivateFiles(undefined, 0);
+    expect(goRoomPrivateFiles.setMirrorEntries).toHaveBeenCalledWith([]);
+  });
+
+  it("clears share mirror when shareFileCount is zero", async () => {
+    const { mirrorOperatorShareFiles } = await import("./boothOperatorSurface");
+    const { goRoomFiles } = await import("./goRoomFiles.svelte");
+    mirrorOperatorShareFiles(undefined, 0);
+    expect(goRoomFiles.setMirrorEntries).toHaveBeenCalledWith([]);
+  });
+
+  it("merges hub share snapshot when session_file is attached", async () => {
+    const { mirrorOperatorShareFiles } = await import("./boothOperatorSurface");
+    const { goRoomFiles } = await import("./goRoomFiles.svelte");
+    vi.mocked(goRoomFiles.sessionFileAttached).mockReturnValue(true);
+    mirrorOperatorShareFiles(
+      [{ id: "f1", name: "clip.mp4", size: 10, status: "ready" }],
+      1
+    );
+    expect(goRoomFiles.mergeHubShareEntries).toHaveBeenCalled();
+    expect(goRoomFiles.setMirrorEntries).not.toHaveBeenCalled();
   });
 });
