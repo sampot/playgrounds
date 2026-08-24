@@ -48,6 +48,16 @@ import {
   ROOM_FILE_JOB_MAX_TASKS,
   createRoomFileJobRegistry,
 } from "./goRoomFileJobs";
+import { isShareDirFileId } from "./goRoomShareTypes";
+
+export type HostShareCatalogEntry = {
+  id: string;
+  name: string;
+  size: number;
+  mime?: string;
+  relativePath: string;
+  file: File;
+};
 
 export type { RoomFileWritable };
 export { SESSION_FILE_PLAY_BUFFER_MAX } from "./goRoomFilePlay";
@@ -98,6 +108,8 @@ export type RoomFileBrowserDownload =
 export type RoomFileTransfer = {
   shareLocalFile(file: File): Promise<RoomFileResult>;
   shareLocalDirectory(files: File[]): Promise<RoomFileResult>;
+  /** Desktop／daemon shareLibraryDir scan → catalog fanout (ENGINE §11.2a). */
+  syncHostShareCatalog(entries: HostShareCatalogEntry[]): void;
   unshareLocal(id: string): boolean;
   unshare(id: string, opts?: { host?: boolean }): boolean;
   download(id: string, pickSave: RoomFilePickSave): Promise<RoomFileResult>;
@@ -612,6 +624,59 @@ export function createRoomFileTransfer(
 
   async function shareLocalDirectory(_files: File[]): Promise<RoomFileResult> {
     return { ok: false, error: GO_ROOM_HANG_FILES_ONLY };
+  }
+
+  function syncHostShareCatalog(incoming: HostShareCatalogEntry[]): void {
+    const nextIds = new Set(incoming.map((e) => e.id));
+    for (const entry of [...entries]) {
+      if (entry.mine && isShareDirFileId(entry.id) && !nextIds.has(entry.id)) {
+        unshareLocal(entry.id);
+      }
+    }
+    for (const item of incoming) {
+      const existing = entries.find((e) => e.id === item.id);
+      if (
+        existing &&
+        existing.size === item.size &&
+        existing.name === item.name &&
+        existing.path === item.relativePath
+      ) {
+        outboundFiles.set(item.id, item.file);
+        continue;
+      }
+      if (existing?.mine) {
+        unshareLocal(item.id);
+      }
+      outboundFiles.set(item.id, item.file);
+      const mime = item.mime || roomFileContentType(item.file.type, item.name) || undefined;
+      entries = [
+        ...entries.filter((e) => e.id !== item.id),
+        {
+          id: item.id,
+          name: item.name,
+          size: item.size,
+          mime,
+          ownerId: deps.localAgentId,
+          ownerName: deps.localName,
+          mine: true,
+          status: "listed",
+          received: 0,
+          path: item.relativePath,
+        },
+      ];
+      sendSafe(
+        buildSessionFileControl({
+          op: "share",
+          id: item.id,
+          name: item.name,
+          size: item.size,
+          mime,
+          owner: deps.localAgentId,
+          ownerName: deps.localName,
+        })
+      );
+    }
+    emit();
   }
 
   function localFile(id: string): File | null {
@@ -1694,6 +1759,7 @@ export function createRoomFileTransfer(
   return {
     shareLocalFile,
     shareLocalDirectory,
+    syncHostShareCatalog,
     unshareLocal,
     unshare,
     download,

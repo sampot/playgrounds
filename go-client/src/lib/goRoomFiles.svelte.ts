@@ -184,6 +184,12 @@ class GoRoomFiles {
     );
   }
 
+  syncHostShareCatalog(
+    entries: import("./goRoomFileTransfer").HostShareCatalogEntry[]
+  ): void {
+    this.#xfer?.syncHostShareCatalog(entries);
+  }
+
   localFile(id: string): File | null {
     return this.#xfer?.localFile(id) ?? null;
   }

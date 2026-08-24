@@ -12,6 +12,7 @@ export type BoothDesktopRuntimeInfo = {
 
 export type BoothDesktopPaths = {
   dataDir: string;
+  shareLibraryDir: string;
   privateLibraryDir: string;
   credentialsPath: string;
   shellTokenPath: string;

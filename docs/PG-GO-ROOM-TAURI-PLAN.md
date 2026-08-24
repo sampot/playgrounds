@@ -1,6 +1,6 @@
 # Playgrounds 純玩版：桌面常駐包廂（`pg-booth-desktop`／Tauri hybrid）
 
-> **狀態：** Draft（2026-08-24，**第九刀**）— 契約從屬 [PG-GO-ROOM-ENGINE-PLAN.md](./PG-GO-ROOM-ENGINE-PLAN.md)（Engine／Shell 分離、BoothAnchor、Control Channel）；**未落地**  
+> **狀態：** Draft（2026-08-24，**第十刀**）— 契約從屬 [PG-GO-ROOM-ENGINE-PLAN.md](./PG-GO-ROOM-ENGINE-PLAN.md)（Engine／Shell 分離、BoothAnchor、Control Channel、**§11.2a 雙目錄**）；私有 plugin-fs **部分落地**；**share 目錄自動 catalog 規格已定、未落地**  
 > **權威決策：** 從屬 [DECISIONS.md](./DECISIONS.md) **DEC-050**（純玩版）、**DEC-045**（Roster／薄 signaling）、**DEC-047**（Platform Invite／Dash）；**不另開 DEC**  
 > **相關：** [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)（包廂產品契約）、[PG-GO-ROOM-ENGINE-PLAN.md](./PG-GO-ROOM-ENGINE-PLAN.md)（`pg-boothd` native engine、Hub／Peer、Operator）、[PG-GO-ROOM-RECORD-PLAN.md](./PG-GO-ROOM-RECORD-PLAN.md)（多路 live 錄影）、[PG-GO-ROOM-PLAY-PLAN.md](./PG-GO-ROOM-PLAY-PLAN.md)（開局——與常駐正交）、[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)、[PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md)、[PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)、[PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md)、`.cursor/rules/no-native-dialogs.mdc`、`.cursor/rules/mobile-first-ux.mdc`、[GLOSSARY.md](./GLOSSARY.md)  
 > **`pg-booth-desktop`：** **私有 Tauri hybrid repo**；**非**開源；**不在**本 repo（`playgrounds`）落地實作——本文件只定義與 go／Platform 的**契約邊界**  
@@ -135,7 +135,7 @@ Platform／Dash 只辨識 **Hub online**＋`device_token`；UI 可標「桌面�
 │  · EmbeddedBoothHubEngine（TS）— Hub 權威                   │
 │  · BoothAnchor WSS、WebRTC、cast、session_*                   │
 │  · GoRoomSurface；boothMode: "embedded" 或 "shell"           │
-│  · Tauri plugin-fs → privateLibraryDir（§7.4）               │
+│  · plugin-fs → shareLibraryDir + privateLibraryDir（§7.4）   │
 └───────────────┬─────────────────────────────────────────────┘
                 │ WSS
                 ▼
@@ -172,15 +172,27 @@ Platform／Dash 只辨識 **Hub online**＋`device_token`；UI 可標「桌面�
 
 **硬：** WebView **是** Hub 權威（hybrid 模型）；**不是**「過渡態等 Rust 引擎」。
 
-### 7.4 儲存
+### 7.4 儲存（對齊 ENGINE §11.2a）
+
+**一句話：** hybrid 與 **`pg-boothd` native hub** 共用**雙目錄契約**——**`share/`** 內檔案**自動**進分享 catalog；**`private/`** 私有片庫。兩者皆經 **`@tauri-apps/plugin-fs`**（capabilities 分開 scope）。**Embedded 瀏覽器**仍 ROOM 逐檔分享＋OPFS 私有——**不用**此目錄模型。
 
 | 項 | 路徑／行為 |
 | --- | --- |
-| **私有片庫** | `{app_data}/booth/private/`；**不用** WebView OPFS |
-| **Shell 讀寫** | go-client `createHostPrivateLibrary()` → `@tauri-apps/plugin-fs` 直寫 `booth_paths.privateLibraryDir`；layout＝`manifest.json`＋`files/pvt_*`（與 OPFS／daemon 同形） |
-| **plugin-fs scope（硬）** | Tauri `allow-fs-private-library.toml`：`$HOME/.local/share/pg-booth/private/**`（Linux）、`$HOME/Library/Application Support/me.samkuo.pg-booth/private/**`（macOS）、`$APPDATA/me/samkuo/pg-booth/private/**`（Windows）；與 native `booth_storage::private_library_dir()` **目錄契約**一致（**非**程式共用） |
-| **`device_token`** | web 層或 Tauri secure store；格式與 `pg-boothd` **同契約**（`~/.pg-booth/credentials.json` 0600） |
-| **`shellLocalToken`** | `~/.pg-booth/shell.token` 或 app 專用路徑；僅 loopback Control Channel |
+| **分享目錄** | `{app_data}/share/`（`booth_paths.shareLibraryDir`）；**不用** WebView 記憶體 catalog 當權威 |
+| **分享 catalog** | go-client **`createHostShareLibrary()`**（待落地）→ plugin-fs 監看／掃描 `shareLibraryDir` → Hub fanout metadata；bytes 仍 `/room-file/<id>` |
+| **私有片庫** | `{app_data}/private/`；**不用** WebView OPFS |
+| **私有 Shell 讀寫** | `createHostPrivateLibrary()` → plugin-fs 直寫 `privateLibraryDir`；layout＝`manifest.json`＋`files/pvt_*`（與 OPFS／daemon 同形；**已落地**） |
+| **plugin-fs scope（硬）** | **`allow-fs-share-library.toml`**：`…/pg-booth/share/**`（Linux／macOS／Windows 路徑對齊 native `booth_storage::share_library_dir()`） |
+| | **`allow-fs-private-library.toml`**：`…/pg-booth/private/**`（**已落地**） |
+| **`booth_paths` IPC** | Rust 暴露 `{ dataDir, shareLibraryDir, privateLibraryDir, credentialsPath, shellTokenPath }` |
+| **`device_token`** | web 層或 Tauri secure store；格式與 `pg-boothd` **同契約**（`credentials.json` 0600） |
+| **`shellLocalToken`** | `shell.token` 或 app 專用路徑；僅 loopback Control Channel |
+
+**硬：**
+
+- **禁止**把 private 目錄自動 mirror 到 share catalog。
+- **禁止**在 hybrid 要求使用者逐檔 `shareLocalFile` 才能分享常駐目錄內檔——丟進 `shareLibraryDir` 即 catalog（UI 可顯示路徑＋重新整理）。
+- Operator 遠端 **`booth.intent.share.import`** 仍可用（補單檔）；Embedded 瀏覽器路徑不變。
 
 ---
 
@@ -201,6 +213,7 @@ Platform／Dash 只辨識 **Hub online**＋`device_token`；UI 可標「桌面�
 | **目標使用者** | 一般會員、家裡一台舊電腦／平板 | 進階／NAS／機房／邊緣 |
 | **安裝** | 圖形安裝包、托盤 | CLI、`install`（systemd／launchd） |
 | **Hub 實作** | **web**（`go-client` Embedded Hub） | **Rust** native engine（**`gstreamer-rs`** 媒體棧） |
+| **分享／私有儲存** | **plugin-fs** 雙目錄（§7.4；share **待落地**） | **`share/`＋`private/`** 本機 FS（ENGINE §11.2a） |
 | **與 playgrounds** | **共用 web 程式**（主） | **契約對齊**（非程式共用） |
 | **Rust 共用** | **無**（不引用 boothd crate） | 獨立 repo |
 | **記憶體** | 較高（含 WebView） | 較低 |
@@ -240,7 +253,7 @@ type BoothEngineMode = "embedded" | "daemon" | "desktop";
 
 | 階段 | `pg-booth-desktop` | `playgrounds` |
 | --- | --- | --- |
-| **T0 spike** | Tauri 托盤 + WebView Embedded Hub；plugin-fs 私有片庫 | `go-client` dist；契約測試 |
+| **T0 spike** | Tauri 托盤 + WebView Embedded Hub；plugin-fs **雙目錄**（private 已落地；share 監看 **待落地**） | `go-client` dist；`createHostShareLibrary`；契約測試 |
 | **T1 Desktop MVP** | 24×7 常駐；Anchor 在 web 層；Operator 切台；單實例／優雅 end | `/room` 偵測 localhost；Dash 標籤 |
 | **T2 產品化** | 開機自啟、更新、崩潰恢復 | 安裝說明連結（dash／docs） |
 | **T3 Peer（可選）** | 仍引導 `pg-boothd peer` | — |
@@ -272,6 +285,8 @@ type BoothEngineMode = "embedded" | "daemon" | "desktop";
 - [ ] Guest 掃 `/i/` 進房；握手經 BoothAnchor（與 `pg-boothd` 相同 Platform 路徑）。
 - [ ] 外出 Operator `/room/remote` 可 `cast.offer` 切 live。
 - [ ] 托盤「結束包廂」經頁內確認；Anchor offline；Guest／Peer 見散場。
+- [ ] **分享目錄：** 丟檔進 `shareLibraryDir` → 在場 Guest catalog 可見；`/room-file/<id>` 可取 bytes（**待落地**）。
+- [ ] **私有片庫：** `createHostPrivateLibrary` plugin-fs 讀寫正常（**已落地** go-client）。
 - [ ] 同帳號啟動第二 Hub（Embedded 或 `pg-boothd`）有明確衝突處理。
 - [ ] Hub／Anchor 在 **web 層**；**無** `pg-boothd` Rust crate 依賴；log 無 SDP 正文持久化。
 - [ ] **不要求** E3b 完成 ≥2 手機 `pg-boothd peer`（屬 E3a）；desktop MVP 可單 Hub + 瀏覽器 Guest 驗收。
@@ -294,6 +309,7 @@ type BoothEngineMode = "embedded" | "daemon" | "desktop";
 
 | 日期 | 變更 |
 | --- | --- |
+| 2026-08-24 | **第十刀：雙目錄儲存** — §7.4 `shareLibraryDir` 自動 catalog＋`privateLibraryDir`；`allow-fs-share-library` capabilities；對齊 ENGINE §11.2a |
 | 2026-08-24 | **native 媒體棧：** `pg-boothd` cast／錄影統一 **`gstreamer-rs`**；§9 |
 | 2026-08-24 | **第九刀：定位修訂** — GUI hybrid **不**與 native engine 共用 Rust；以 `playgrounds` web 為主；§5／§7／§9 重寫；移除 T0／T1 Rust 引擎收斂敘事 |
 | 2026-08-24 | **pg-booth-desktop：** `tauri-plugin-fs` + `allow-fs-private-library` capabilities（對齊 private 路徑契約） |

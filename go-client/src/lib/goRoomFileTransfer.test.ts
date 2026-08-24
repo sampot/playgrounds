@@ -2713,4 +2713,32 @@ describe("createRoomFileTransfer", () => {
       )
     ).toBe(true);
   });
+
+  it("syncHostShareCatalog mirrors shareLibraryDir entries and unshares removed ids", () => {
+    const sent: unknown[] = [];
+    const xfer = createRoomFileTransfer({
+      localAgentId: "host",
+      localName: "主持",
+      sendJson: (m) => sent.push(m),
+      sendBinary: () => {},
+    });
+    const clip = fileOf("clip.mp4", 4, "video/mp4");
+    xfer.syncHostShareCatalog([
+      {
+        id: "shr_abc123450001",
+        name: "clip.mp4",
+        size: 4,
+        mime: "video/mp4",
+        relativePath: "clip.mp4",
+        file: clip,
+      },
+    ]);
+    expect(xfer.getState().entries).toHaveLength(1);
+    expect(xfer.localFile("shr_abc123450001")).toBe(clip);
+    expect(sent.some((m) => (m as { op?: string }).op === "share")).toBe(true);
+
+    xfer.syncHostShareCatalog([]);
+    expect(xfer.getState().entries).toHaveLength(0);
+    expect(xfer.localFile("shr_abc123450001")).toBeNull();
+  });
 });

@@ -1,6 +1,6 @@
 # Playgrounds 純玩版：包廂引擎／殼／常駐 daemon（`pg-boothd`）
 
-> **狀態：** Draft（2026-08-24，**第九刀**）— 契約草案；Anchor／Operator **部分落地**；**Operator＝owner 認證的 Roster 節點**（§6、§6.2；**第七刀**修訂）＋ Remote Owner Shell（§6.1、§7.6）與 Hub 私有片庫遠端讀寫**規格已定、實作未落地**；**Guest join 經 Anchor WSS**（§10.7）**規格已定、實作未落地**；從屬並**修訂** [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)  
+> **狀態：** Draft（2026-08-24，**第十刀**）— 契約草案；Anchor／Operator **部分落地**；**Operator＝owner 認證的 Roster 節點**（§6、§6.2；**第七刀**修訂）＋ Remote Owner Shell（§6.1、§7.6）與 Hub 私有片庫遠端讀寫**規格已定、實作未落地**；**Guest join 經 Anchor WSS**（§10.7）**規格已定、實作未落地**；**常駐 Hub 雙目錄儲存**（§11.2a：`share/` 自動掛載＋`private/`；hybrid＝plugin-fs）**規格已定、分享目錄實作未落地**；從屬並**修訂** [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)  
 > **`pg-boothd`（私有 native engine repo）：** headless CLI；**非**開源；**不在**本 repo（`playgrounds`）落地實作——本文件只定義與 go／Platform 的**契約邊界**  
 > **`pg-booth-desktop`（私有 Tauri hybrid repo）：** 輕量 GUI 節點；**與 `pg-boothd` 不共用 Rust 程式**；實作以 **`playgrounds`／`go-client` web 版**為主（詳見 [PG-GO-ROOM-TAURI-PLAN.md](./PG-GO-ROOM-TAURI-PLAN.md)）  
 > **權威決策：** 從屬 [DECISIONS.md](./DECISIONS.md) **DEC-050**（純玩版）、**DEC-045**（Roster／薄 signaling）、**DEC-047**（Platform Invite／Dash）；對齊 **DEC-024**（headless runtime 分層敘事）  
@@ -130,7 +130,7 @@
 | `invite.room` mint | Hub | Shell 觸發 intent |
 | `/room-file/<id>` SW | Hub HTTP 門面 | Shell／Guest／Peer 仍發 HTTP |
 | 私有片庫（ROOM §5.5.1） | Hub 本機 FS（daemon `~/.pg-booth/private/`；Embedded **OPFS**；desktop **plugin-fs**→`privateLibraryDir`） | **Owner Shell** 讀寫（本地 `/room` 直連；遠端 Operator 經 §7.6）；Guest **—** |
-| 分享目錄管理 | Hub 權威＋fanout | Owner Shell 掛／撤（intent）；Guest 掛本機檔 |
+| 分享目錄（ROOM §5.5） | **Embedded：** 記憶體 catalog＋Owner **逐檔**掛／撤；**常駐 Hub：** `~/.pg-booth/share/`（§11.2a）**目錄監看→自動 catalog**＋`/room-file/<id>` | Embedded：Owner Shell 手動掛／撤；Guest 掛本機檔；常駐：Owner **丟檔進 share 目錄**即可；Operator 仍可 `share.import` 補單檔 |
 | Guest `/i/` | Guest 握手經 **BoothAnchor** → Hub（§10.7） | Guest 頁（非 Shell） |
 | 監控鏡頭／NAS 掛檔 | **Peer** 連 Hub（`peerCap`） | Shell 管理 `peerCap`（§5.4） |
 
@@ -767,13 +767,67 @@ type BoothJoinAnswer = {
 | Platform invite | 門牌 `invite.room` mint；Guest 握手經 **BoothAnchor**（§10.7）；**device_token** 或輪替 API key |
 | `session_*` DC | 與現行 roster 模組語意一致 |
 | Guest mesh | `session_mesh` 介紹；檔直連優先（ROOM 1c） |
-| 分享目錄 + HTTP | 本機 `http://127.0.0.1:<port>/room-file/<id>`（Range）；遠端仍 DC transfer |
-| 私有片庫 | `~/.pg-booth/private/`（可設定）；**不** fanout |
+| 分享目錄 + HTTP | **`shareLibraryDir`**（§11.2a）監看→catalog fanout；本機 `http://127.0.0.1:<port>/room-file/<id>`（Range）；遠端仍 DC transfer |
+| 私有片庫 | **`privateLibraryDir`**（§11.2a）；**不** fanout |
 | 私有片庫 cast | 本機檔→program RTP；**`gstreamer-rs`** |
 | 多路 live 錄影 | Hub presence tap→私有片庫；**`gstreamer-rs`**（`booth-record`） |
 | BoothAnchor | WSS 註冊、心跳、Guest join 轉發、Operator signal 轉發（**hub only**） |
 | Control Channel | 本地 WS `/booth/control` |
 | `peerCap` | mint／revoke；Peer join 驗證 |
+
+### 11.2a Hub 本機儲存（常駐 Hub 雙目錄；硬）
+
+**一句話：** **`pg-boothd` hub** 與 **`pg-booth-desktop` hybrid** 共用**目錄契約**：**`share/`**＝分享目錄來源（檔案進目錄即出現在分享 catalog）；**`private/`**＝私有片庫（**不** fanout）。**Embedded 瀏覽器 Hub** **不**用此模型——仍對齊 ROOM §5.5 **逐檔**掛分享、OPFS 私有（**不掛資料夾**）。
+
+#### 目錄 layout（預設；可設定根目錄）
+
+```text
+~/.pg-booth/                              # 或 app_data/me.samkuo.pg-booth/
+  share/                                  # shareLibraryDir — 分享區來源
+  private/                                # privateLibraryDir — manifest.json + files/pvt_*
+  credentials.json                        # device_token（0600）
+  shell.token                             # loopback Shell（0600）
+```
+
+| 平台 | `shareLibraryDir` | `privateLibraryDir` |
+| --- | --- | --- |
+| **`pg-boothd`（native）** | `{data}/share/` | `{data}/private/` |
+| **`pg-booth-desktop`（hybrid）** | Tauri `booth_paths.shareLibraryDir` → **plugin-fs** | Tauri `booth_paths.privateLibraryDir` → **plugin-fs**（已落地） |
+| **Embedded（瀏覽器）** | —（無持久 share 目錄） | OPFS `room-private/` |
+
+#### 分享目錄（`shareLibraryDir`）
+
+| 項 | 規格 |
+| --- | --- |
+| **語意** | 目錄內**一般檔**（非子目錄項；對齊 ROOM **只掛檔** wire）→ Hub **自動**建 share id、fanout `session_file.share` metadata |
+| **監看** | Hub 啟動 **全量掃描**；執行中 **fs notify** 或週期 rescan（實作選一；語意：新增／更新／刪除反映 catalog） |
+| **刪除** | 檔自目錄消失 → 等價 `unshare`（metadata 撤銷；進行中 transfer 依 ROOM 規則收尾） |
+| **bytes** | 仍由 Hub **`/room-file/<id>`**（daemon HTTP）或 hybrid 等價門面直出；**不**上 Platform |
+| **id** | 與私有命名空間**分開**；穩定 id 對應相對路徑或 content hash（實作定案；**禁止**與 `pvt_*` 混用） |
+| **Owner UI** | 常駐 Hub：**不必**逐檔 `share.import`；可顯示「分享資料夾路徑」＋重新整理。Embedded／Operator 遠端單檔上傳仍可用 `booth.intent.share.import` |
+
+#### 私有片庫（`privateLibraryDir`）
+
+| 項 | 規格 |
+| --- | --- |
+| **layout** | `manifest.json`＋`files/pvt_*`（與 OPFS／現行 go-client 同形） |
+| **語意** | **不** fanout；**不**進 `/room-file/`；Guest **不可**要 bytes（ROOM §5.5.1） |
+| **掛到分享** | 仍須顯式 **`private.mountToShare`**／UI「掛到分享」——**禁止** private 目錄自動出現在 share catalog |
+
+#### 與 ROOM §5.5 的關係（硬）
+
+| 部署 | 分享「掛」 |
+| --- | --- |
+| **Embedded** | ROOM **硬**：**不掛資料夾**；`<input type="file">`／drop **逐檔** |
+| **常駐 Hub** | **產品分線**：**不**在 UI 選資料夾掛 wire `kind:dir`；改 **OS 層丟檔進 `shareLibraryDir`**，Hub 代為逐檔 catalog |
+| **Guest** | 仍可掛**本機單檔**（不變） |
+| **Peer** | 可貢獻**本機路徑**或相機（§11.2b）；與 Hub `shareLibraryDir` **分開** |
+
+#### `playgrounds`／`go-client` 契約（草案）
+
+- `createHostPrivateLibrary()` — 已落地：desktop→plugin-fs；embedded→OPFS。
+- **`createHostShareLibrary()`**（待落地）— desktop／常駐：plugin-fs 或 native 監看 **`shareLibraryDir`**；embedded：現行 `goRoomFiles` 記憶體 catalog。
+- **`BoothHubEngine`** 只吃 **catalog 抽象**；Embedded 與 hybrid **同一 Hub 程式**，差在 storage backend。
 
 ### 11.2b Peer 必須實作
 
@@ -841,6 +895,9 @@ vendor/go-client-dist/  # playgrounds 建置產物（Embedded Hub + Shell UI）
 **`playgrounds`（本 repo；開源宿主）：**
 
 ```text
+go-client/src/lib/
+  goRoomPrivateLibrary.ts   # createHostPrivateLibrary（OPFS / plugin-fs）
+  goRoomShareLibrary.ts     # createHostShareLibrary（待落地；§11.2a）
 go-client/src/lib/booth/
   boothHubEngine.ts      # 介面 + Embedded Hub 實作
   boothPeerClient.ts     # Peer 連 Hub（TS 嵌入式 peer 若需要）
@@ -862,7 +919,7 @@ platform-api/src/boothAnchorDo.ts   # BoothAnchor DO
 | `/room/remote` | `operator` | Operator cap；連 Anchor + WebRTC + Owner file channel（§7.6） |
 | `/i/<short>` | `guest` | **不變** |
 
-Shell **重用** `GoRoomSurface` 等元件；`boothMode: "embedded" | "shell" | "operator"` 控制 intent 出口、**私有片庫資料源**（本機 OPFS vs Hub snapshot＋§7.6）與導播唯讀鎖。
+Shell **重用** `GoRoomSurface` 等元件；`boothMode: "embedded" | "shell" | "operator"` 控制 intent 出口、**片庫／分享資料源**（Embedded：OPFS 私有＋逐檔分享；desktop／daemon：§11.2a 雙目錄；Operator：Hub snapshot＋§7.6）與導播唯讀鎖。
 
 **Operator UI 對齊（硬）：**
 
@@ -884,7 +941,8 @@ Shell **重用** `GoRoomSurface` 等元件；`boothMode: "embedded" | "shell" | 
 | 已登入再開 `/room`＝另一間空包廂（§5.4） | 有 live Daemon Hub → **本地 Shell 連回**；無 → Embedded 新開 |
 | 第二台請掃門牌（§5.4） | Guest 仍掃門牌；**監控正式路徑**＝Peer `peerCap`；Operator 用 `operatorCap`（**皆** Roster 節點，§6.2） |
 | 不做完美斷線重連（§3） | Operator／Shell↔Hub 可重連；Guest 靠門牌；Peer 靠 `peerCap` |
-| 私有 OPFS（§5.5.1） | 權威在 **Hub** FS；Embedded OPFS／daemon `~/.pg-booth/private/` | **Owner Shell**（本地或 Operator）讀寫；Operator 經 §7.6 |
+| 私有 OPFS（§5.5.1） | 權威在 **Hub** FS；Embedded OPFS／常駐 **`privateLibraryDir`**（§11.2a） | **Owner Shell**（本地或 Operator）讀寫；Operator 經 §7.6 |
+| ROOM §5.5 逐檔分享 | **僅 Embedded** | 常駐 Hub **share 目錄自動 catalog**（§11.2a）；**不**改 Guest 逐檔掛 |
 | Platform 不中繼資料面 | **維持**；Anchor 只 control + signal 轉發；**Owner 檔 bytes 也不經 DO** |
 
 ### 13.2 ROOM 明確不變
@@ -998,8 +1056,8 @@ export interface BoothMediaSurface {
 | **E0 契約** | 本文件 + GLOSSARY + ROOM 交叉引用 | 審閱通過 |
 | **E1 Hub 介面** | `BoothHubEngine` TS 介面；Embedded 重構為實作體 | 單測；現行 e2e 不 regress |
 | **E2 Anchor + Operator（Embedded）** | `BoothAnchorDO`、`boothChannel` 型別、go `/room/remote`、Dash 狀態卡、**Owner 私有片庫遠端讀寫（§7.6）** | 家裡 Embedded；外出 Operator 切 live cast **與**上傳私有檔；E2 驗收 §18 |
-| **E3a `pg-boothd` MVP** | **native engine repo** 交付 hub + peer；本 repo Platform／Shell 對齊契約 | §18 E3a 驗收 |
-| **E3b `pg-booth-desktop` MVP** | **Tauri hybrid repo**；消費 `go-client` dist；**不**共用 `pg-boothd` Rust | [TAURI-PLAN §13](./PG-GO-ROOM-TAURI-PLAN.md) |
+| **E3a `pg-boothd` MVP** | **native engine repo** 交付 hub + peer；**§11.2a** 雙目錄（share 監看＋private） | §18 E3a 驗收 |
+| **E3b `pg-booth-desktop` MVP** | **Tauri hybrid repo**；消費 `go-client` dist；plugin-fs 雙目錄；**不**共用 `pg-boothd` Rust | [TAURI-PLAN §13](./PG-GO-ROOM-TAURI-PLAN.md) |
 | **E3c native Hub 收斂** | `pg-boothd` 內 `booth-hub` crate 穩定；**不**要求 desktop 遷入同一 Rust 引擎 | boothd 專業 headless 路徑 |
 | **E4 產品化** | 裝置綁定、systemd、room TURN | 跨網 Operator 穩定 |
 | **E5** | 私有片庫 cast（`pg-boothd` **`gstreamer-rs`**）、完整 mesh／HTTP 對齊 | 非 E2 阻塞 |
@@ -1044,6 +1102,7 @@ export interface BoothMediaSurface {
 - [ ] Peer 斷線重連（`peerCap` 仍有效）；Hub 仍在。
 - [ ] `pg-boothd stop`（hub）；Peer／Guest 看到主持已關閉；Anchor offline。
 - [ ] Peer 行程**無** Platform API 呼叫（流量／log 可驗）。
+- [ ] 丟檔進 **`shareLibraryDir`** → 在場 catalog 自動出現；Guest `/room-file/<id>` 可取 bytes（§11.2a）。
 
 ### E3b（`pg-booth-desktop` 輕量常駐）
 
@@ -1055,6 +1114,7 @@ export interface BoothMediaSurface {
 
 | 日期 | 變更 |
 | --- | --- |
+| 2026-08-24 | **第十刀：常駐 Hub 雙目錄** — §11.2a `shareLibraryDir` 自動 catalog＋`privateLibraryDir`；hybrid／daemon 對齊；Embedded 仍 ROOM 逐檔；§5.2／§12／§13.1 |
 | 2026-08-24 | **Desktop 私有片庫（go-client）：** `plugin-fs`＋`createHostPrivateLibrary`；與 OPFS／daemon layout 對齊（TAURI-PLAN §7.4） |
 | 2026-08-24 | **native 媒體棧統一：** `pg-boothd` cast／錄影／`booth-record` **一律 `gstreamer-rs`**；§11.1、§11.2–11.3 |
 | 2026-08-24 | **native 私有片庫 cast：** `pg-boothd` 定案 **`gstreamer-rs`**；§7.6、§11.3、§16 E5 |

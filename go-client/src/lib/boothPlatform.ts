@@ -126,9 +126,19 @@ export async function mintOperatorCap(
   return data;
 }
 
+export type BoothDirectorGrant = {
+  shellId: string;
+  role: "host" | "operator";
+};
+
 export type BoothAnchorHostHandlers = {
   getSnapshot: () => BoothStateSnapshot;
   localHostClaimsDirector: () => boolean;
+  claimOperatorDirector?: (shellId: string) => {
+    role: "operator" | "viewer";
+    director?: BoothDirectorGrant;
+  };
+  operatorCanDirect?: (shellId: string) => boolean;
   remoteOperatorEnabled?: () => boolean;
   getLocalPresence: () => { agentId: string; name: string };
   prepareOperatorRoster?: (shellId: string) => RosterPeerHandlers;
@@ -247,16 +257,27 @@ export function createBoothAnchorHost(
       operatorConnections += 1;
       const shellId =
         typeof frame.shellId === "string" ? frame.shellId : `op-${Date.now()}`;
-      const role = handlers.localHostClaimsDirector()
-        ? "viewer"
-        : (operatorDirectorShellId = shellId, "operator");
+      let role: "operator" | "viewer";
+      let director: BoothDirectorGrant | undefined;
+      if (handlers.claimOperatorDirector) {
+        const grant = handlers.claimOperatorDirector(shellId);
+        role = grant.role;
+        director = grant.director;
+        operatorDirectorShellId =
+          role === "operator" ? shellId : director?.shellId ?? null;
+      } else {
+        role = handlers.localHostClaimsDirector()
+          ? "viewer"
+          : ((operatorDirectorShellId = shellId), "operator");
+        director =
+          role === "operator" ? { shellId, role: "operator" } : undefined;
+      }
       const snapshot = handlers.getSnapshot();
       send({
         type: "booth.hello.ok",
         sessionId: snapshot.sessionId,
         mode: "embedded",
-        director:
-          role === "operator" ? { shellId, role: "operator" } : undefined,
+        director,
       });
       send({ type: "booth.state.snapshot", v: 1, ...snapshot });
       void ensureEngineRtc()?.refreshProgram();
@@ -281,9 +302,10 @@ export function createBoothAnchorHost(
     if (frame.type?.startsWith("booth.intent.")) {
       const shellId =
         typeof frame.shellId === "string" ? frame.shellId : operatorDirectorShellId;
-      const canDirect =
-        !handlers.localHostClaimsDirector() &&
-        Boolean(shellId && operatorDirectorShellId === shellId);
+      const canDirect = handlers.operatorCanDirect
+        ? handlers.operatorCanDirect(shellId ?? "")
+        : !handlers.localHostClaimsDirector() &&
+          Boolean(shellId && operatorDirectorShellId === shellId);
       if (!canDirect) {
         send({
           type: "booth.ack",

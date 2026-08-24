@@ -1,4 +1,5 @@
 import type { BoothEnvelope, BoothStateSnapshot } from "@pg/roster/boothChannel";
+import type { BoothHubEngine, BoothIntent, BoothShellContext } from "./booth/boothHubEngine";
 import {
   broadcastSessionChat,
   isSessionChatMessage,
@@ -17,7 +18,12 @@ import { goRoomPrivateFiles } from "./goRoomPrivateFiles.svelte";
 import { goRoomMedia } from "./goRoomMedia.svelte";
 import { goSessionChat } from "./goSessionChat.svelte";
 import { newRoomPrivateFileId } from "./goRoomPrivateLibrary";
+import { isBoothDesktopShell } from "./boothDesktop";
 import type { RoomStatus } from "./roomRuntime";
+
+function resolveSnapshotEngineMode(): "embedded" | "daemon" {
+  return isBoothDesktopShell() ? "daemon" : "embedded";
+}
 
 export const GO_ROOM_REMOTE_ANCHOR_KEY = "go_room_remote_anchor_v1";
 
@@ -104,9 +110,20 @@ export function createBoothAnchorBridge(ctx: {
     shellId: string;
     session: import("@pg/roster/rosterPeer").RosterPeerSession;
   }) => void;
+  dispatchHubIntent?: (
+    intent: BoothIntent,
+    shell: BoothShellContext
+  ) => Promise<{ ok: boolean; error?: string; payload?: Record<string, unknown> }>;
+  claimHubOperatorDirector?: BoothHubEngine["claimOperatorDirector"];
+  hubOperatorCanDirect?: (shellId: string) => boolean;
+  syncHubDirectorFocus?: (localHostClaimsDirector: boolean) => void;
+  getBoothSessionId?: () => string;
 }): BoothAnchorBridge {
-  const boothSessionId = crypto.randomUUID();
-  let enabled = readRemoteAnchorEnabled();
+  const fallbackSessionId = crypto.randomUUID();
+  let enabled = readRemoteAnchorEnabled() || isBoothDesktopShell();
+  if (isBoothDesktopShell()) {
+    writeRemoteAnchorEnabled(true);
+  }
   let host: BoothAnchorHost | null = null;
   let starting: Promise<void> | null = null;
   let ownerDc: RTCDataChannel | null = null;
@@ -200,9 +217,9 @@ export function createBoothAnchorBridge(ctx: {
           }))
         : undefined;
     return {
-      sessionId: boothSessionId,
+      sessionId: ctx.getBoothSessionId?.() ?? fallbackSessionId,
       ownerUserId: ctx.getOwnerUserId() ?? "",
-      engineMode: "embedded",
+      engineMode: resolveSnapshotEngineMode(),
       hostPeerId,
       hostDisplayName: hostName,
       members: [
@@ -250,7 +267,9 @@ export function createBoothAnchorBridge(ctx: {
 
   function localHostClaimsDirector(): boolean {
     if (typeof document === "undefined") return true;
-    return document.hasFocus();
+    const claims = document.hasFocus();
+    ctx.syncHubDirectorFocus?.(claims);
+    return claims;
   }
 
   async function handleOperatorIntent(
@@ -365,6 +384,38 @@ export function createBoothAnchorBridge(ctx: {
       if (!out.ok) throw new Error(out.reason ?? "play_end_failed");
       return;
     }
+    if (frame.type === "booth.intent.peer.mint") {
+      if (!ctx.dispatchHubIntent) throw new Error("peer_mint_unavailable");
+      const shellId =
+        typeof frame.shellId === "string" ? frame.shellId : "op-unknown";
+      const ack = await ctx.dispatchHubIntent(
+        {
+          type: "peer.mint",
+          label:
+            typeof frame.label === "string" ? frame.label : undefined,
+          ttlSec:
+            typeof frame.ttlSec === "number" ? frame.ttlSec : undefined,
+        },
+        { shellId, role: "operator" }
+      );
+      if (!ack.ok) throw new Error(ack.error ?? "peer_mint_failed");
+      host?.publishSnapshot();
+      return ack.payload;
+    }
+    if (frame.type === "booth.intent.peer.revoke") {
+      if (!ctx.dispatchHubIntent) throw new Error("peer_revoke_unavailable");
+      const shellId =
+        typeof frame.shellId === "string" ? frame.shellId : "op-unknown";
+      const peerCapId =
+        typeof frame.peerCapId === "string" ? frame.peerCapId : "";
+      const ack = await ctx.dispatchHubIntent(
+        { type: "peer.revoke", peerCapId },
+        { shellId, role: "operator" }
+      );
+      if (!ack.ok) throw new Error(ack.error ?? "peer_revoke_failed");
+      host?.publishSnapshot();
+      return;
+    }
     if (frame.type === "booth.intent.chat.send") {
       const payload = frame.payload as { message?: unknown };
       const msg = payload?.message;
@@ -397,6 +448,16 @@ export function createBoothAnchorBridge(ctx: {
     if (frame.type === "booth.intent.private.remove") {
       const id = (frame.payload as { id?: string })?.id?.trim();
       if (!id) throw new Error("private_not_found");
+      if (ctx.dispatchHubIntent) {
+        const shellId =
+          typeof frame.shellId === "string" ? frame.shellId : "op-unknown";
+        const ack = await ctx.dispatchHubIntent(
+          { type: "private.remove", id },
+          { shellId, role: "operator" }
+        );
+        if (!ack.ok) throw new Error(ack.error ?? "private_not_found");
+        return;
+      }
       await goRoomPrivateFiles.remove(id);
       host?.publishSnapshot();
       return;
@@ -411,6 +472,16 @@ export function createBoothAnchorBridge(ctx: {
     if (frame.type === "booth.intent.private.mountToShare") {
       const id = (frame.payload as { id?: string })?.id?.trim();
       if (!id) throw new Error("private_not_found");
+      if (ctx.dispatchHubIntent) {
+        const shellId =
+          typeof frame.shellId === "string" ? frame.shellId : "op-unknown";
+        const ack = await ctx.dispatchHubIntent(
+          { type: "private.mountToShare", id },
+          { shellId, role: "operator" }
+        );
+        if (!ack.ok) throw new Error(ack.error ?? "private_not_found");
+        return;
+      }
       const file = await goRoomPrivateFiles.getFile(id);
       if (!file) throw new Error("private_not_found");
       const result = await goRoomFiles.shareLocalFile(file);
@@ -437,7 +508,18 @@ export function createBoothAnchorBridge(ctx: {
     }
     if (frame.type === "booth.intent.share.unshare") {
       const id = (frame.payload as { id?: string })?.id?.trim();
-      if (!id || !goRoomFiles.unshare(id, { host: true })) {
+      if (!id) throw new Error("share_not_found");
+      if (ctx.dispatchHubIntent) {
+        const shellId =
+          typeof frame.shellId === "string" ? frame.shellId : "op-unknown";
+        const ack = await ctx.dispatchHubIntent(
+          { type: "share.unshare", id },
+          { shellId, role: "operator" }
+        );
+        if (!ack.ok) throw new Error(ack.error ?? "share_not_found");
+        return;
+      }
+      if (!goRoomFiles.unshare(id, { host: true })) {
         throw new Error("share_not_found");
       }
       host?.publishSnapshot();
@@ -478,6 +560,8 @@ export function createBoothAnchorBridge(ctx: {
         {
           getSnapshot: buildSnapshot,
           localHostClaimsDirector,
+          claimOperatorDirector: ctx.claimHubOperatorDirector,
+          operatorCanDirect: ctx.hubOperatorCanDirect,
           onOperatorIntent: handleOperatorIntent,
           onGuestJoinOffer: (input) => ctx.onGuestJoinOffer(input),
           remoteOperatorEnabled: () => enabled,
@@ -493,7 +577,7 @@ export function createBoothAnchorBridge(ctx: {
         },
         {
           apiKey: key,
-          boothSessionId,
+          boothSessionId: ctx.getBoothSessionId?.() ?? fallbackSessionId,
           deviceLabel:
             typeof navigator !== "undefined"
               ? navigator.userAgent.slice(0, 48)

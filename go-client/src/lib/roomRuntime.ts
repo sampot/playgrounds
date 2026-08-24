@@ -87,7 +87,7 @@ import {
   writeRoomInviteSession,
   type RoomInviteSessionSnapshot,
 } from "./goRoomInviteSession";
-import { createBoothAnchorBridge } from "./boothAnchorBridge";
+import { createBoothAnchorBridge, readRemoteAnchorEnabled } from "./boothAnchorBridge";
 import {
   applyBoothCastStateToMedia,
   boothCastSummaryFromProgram,
@@ -97,6 +97,28 @@ import {
   operatorDisplayNameForShell,
   operatorPeerIdForShell,
 } from "./roomOperatorSlot";
+import {
+  createEmbeddedBoothHubEngine,
+  type BoothHubEngine,
+} from "./booth/boothHubEngine";
+import {
+  createBoothShellClient,
+  embeddedHostShellContext,
+  type BoothShellClient,
+} from "./booth/boothShellClient";
+import { createBoothShareCatalogSync, type BoothShareCatalogSync } from "./booth/boothShareCatalogSync";
+import { createHostShareLibrary } from "./goRoomShareLibrary";
+import {
+  applySnapshotToRoomFields,
+  createLocalDaemonHubEngine,
+} from "./booth/boothRemoteHubEngine";
+import {
+  probeLocalBoothEngine,
+  resolveShellLocalToken,
+  writeStoredShellToken,
+  type BoothLocalEngineStatus,
+} from "./booth/boothLocalEngine";
+import { isBoothDesktopShell } from "./boothDesktop";
 
 export type RoomPhase = "idle" | "open" | "ended" | "error";
 
@@ -122,6 +144,9 @@ export type RoomStatus = {
   playCanvasSrcdoc: string | null;
   playCanvasMode: "sw" | "memory" | null;
   playCanvasGeneration: number;
+  /** `embedded` = in-page hub; `local-daemon` = browser shell on pg-boothd control channel. */
+  boothAttachment: "embedded" | "local-daemon";
+  localDaemon: BoothLocalEngineStatus | null;
 };
 
 type Listener = (s: RoomStatus) => void;
@@ -176,7 +201,11 @@ export function createRoomRuntime(opts?: {
     playCanvasSrcdoc: null,
     playCanvasMode: null,
     playCanvasGeneration: 0,
+    boothAttachment: "embedded",
+    localDaemon: null,
   };
+  let localDaemonEngine: ReturnType<typeof createLocalDaemonHubEngine> | null =
+    null;
   const listeners = new Set<Listener>();
   let inviteExpiryTimer: ReturnType<typeof setTimeout> | null = null;
   let castClockPublishTimer: ReturnType<typeof setTimeout> | null = null;
@@ -194,6 +223,7 @@ export function createRoomRuntime(opts?: {
   let closing = false;
   let opening = false;
   let fileHub: RoomFileStarHub | null = null;
+  let shareCatalogSync: BoothShareCatalogSync | null = null;
   let playHost: HostRuntime | null = null;
   let playCanvas: MountedGoCanvas | null = null;
   let playFiles: FileMap | null = null;
@@ -333,6 +363,8 @@ export function createRoomRuntime(opts?: {
     prepareHandlers: prepareGuestJoinHandlers,
   });
 
+  const hubRef: { engine: BoothHubEngine | null } = { engine: null };
+
   const anchorBridge = createBoothAnchorBridge({
     getStatus: () => status,
     getOwnerUserId: () => goAuth.profile?.user_id ?? null,
@@ -430,6 +462,29 @@ export function createRoomRuntime(opts?: {
     onOperatorSession: ({ shellId, session }) => {
       prepareOperatorSlot(shellId).attachSession(session);
     },
+    dispatchHubIntent: (intent, shell) => {
+      if (!hubRef.engine) {
+        return Promise.resolve({ ok: false, error: "session_ended" });
+      }
+      return hubRef.engine.dispatch(intent, shell);
+    },
+    claimHubOperatorDirector: (shellId) =>
+      hubRef.engine?.claimOperatorDirector(shellId) ?? {
+        role: "viewer" as const,
+      },
+    hubOperatorCanDirect: (shellId) => {
+      const engine = hubRef.engine;
+      if (!engine) return false;
+      const director = engine.getDirector();
+      return (
+        !localHostPageClaimsDirector() &&
+        Boolean(director && director.shellId === shellId)
+      );
+    },
+    syncHubDirectorFocus: (claims) => {
+      hubRef.engine?.syncDirectorFromHostFocus(claims);
+    },
+    getBoothSessionId: () => hubRef.engine?.sessionId ?? "",
   });
 
   function clearPlayCanvas(): void {
@@ -580,6 +635,15 @@ export function createRoomRuntime(opts?: {
     });
     goRoomPrivateFiles.attach();
     void ensureRoomFileSw();
+    const shareLib = createHostShareLibrary();
+    if (shareLib?.supported) {
+      shareCatalogSync?.stop();
+      shareCatalogSync = createBoothShareCatalogSync({
+        library: shareLib,
+        syncCatalog: (entries) => goRoomFiles.syncHostShareCatalog(entries),
+      });
+      void shareCatalogSync.start();
+    }
     goRoomMedia.attach({
       localAgentId,
       occupantCount: () => liveGuestCount() + 1,
@@ -861,8 +925,17 @@ export function createRoomRuntime(opts?: {
   }
 
   async function revokeInviteAndAnswer(): Promise<void> {
-    revokeInviteDoor();
-    anchorBridge.publishSnapshot();
+    const engine = hubRef.engine;
+    if (!engine) {
+      revokeInviteDoor();
+      anchorBridge.publishSnapshot();
+      return;
+    }
+    const ack = await engine.dispatch(
+      { type: "invite.revoke" },
+      embeddedHostShellContext()
+    );
+    if (ack.ok) anchorBridge.publishSnapshot();
   }
 
   function expireDoor(inviteId: string): void {
@@ -924,7 +997,25 @@ export function createRoomRuntime(opts?: {
       return { inviteId: status.inviteId, shortUrl: status.shortUrl };
     }
     if (mintInflight) return mintInflight;
-    mintInflight = mintInviteAndAnswerInner().finally(() => {
+    mintInflight = (async () => {
+      const engine = hubRef.engine;
+      if (!engine) return mintInviteAndAnswerInner();
+      const ack = await engine.dispatch(
+        { type: "invite.mint" },
+        embeddedHostShellContext()
+      );
+      if (!ack.ok) {
+        if (ack.error === "not_director") {
+          set({ error: "目前無法請人" });
+          return null;
+        }
+        return null;
+      }
+      if (status.inviteId && status.shortUrl) {
+        return { inviteId: status.inviteId, shortUrl: status.shortUrl };
+      }
+      return null;
+    })().finally(() => {
       mintInflight = null;
     });
     return mintInflight;
@@ -1036,6 +1127,20 @@ export function createRoomRuntime(opts?: {
         message: occupancyMessage(),
       });
       if (!doorIsLive()) restoreDoorFromSession();
+      void refreshLocalDaemonProbe().then((probe) => {
+        if (!probe.online) return;
+        if (probe.needsToken) {
+          set({
+            message:
+              "本機常駐包廂運行中。請設定 shell token 後連回。",
+          });
+          return;
+        }
+        if (isBoothDesktopShell()) return;
+        set({
+          message: "本機常駐包廂運行中。可連回同一間。",
+        });
+      });
       await anchorBridge.onBoothOpen();
     } finally {
       opening = false;
@@ -1311,7 +1416,53 @@ export function createRoomRuntime(opts?: {
     }
   }
 
-  async function close(opts?: {
+  function localHostPageClaimsDirector(): boolean {
+    if (typeof document === "undefined") return true;
+    return document.hasFocus();
+  }
+
+  function buildHubSnapshot(): import("@pg/roster/boothChannel").BoothStateSnapshot {
+    const inviteGate =
+      status.inviteDoor === "live"
+        ? "live"
+        : status.inviteDoor === "expired"
+          ? "expired"
+          : "none";
+    return {
+      sessionId: hubRef.engine?.sessionId ?? "",
+      ownerUserId: goAuth.profile?.user_id ?? "",
+      engineMode: isBoothDesktopShell() ? "daemon" : "embedded",
+      hostPeerId: localAgentId,
+      hostDisplayName: roomHostDisplayName(goAuth.profile),
+      members: [
+        {
+          peerId: localAgentId,
+          displayName: roomHostDisplayName(goAuth.profile),
+          kind: "host",
+          isHost: true,
+        },
+        ...status.occupantPeers.map((p) => ({
+          peerId: p.peerId,
+          displayName: p.name,
+          kind:
+            p.kind === "operator" || p.kind === "peer" || p.kind === "guest"
+              ? p.kind
+              : ("guest" as const),
+          isHost: false,
+        })),
+      ],
+      inviteGate,
+      inviteShortUrl: status.shortUrl ?? undefined,
+      inviteExpiresAt: status.inviteExpiresAt ?? undefined,
+      shareFileCount: goRoomFiles.entries.length,
+      privateFileCount: goRoomPrivateFiles.entries.length,
+      guestCount: status.guestCount,
+      anchor: anchorBridge.isEnabled() ? "online" : "offline",
+      director: hubRef.engine?.getDirector() ?? undefined,
+    };
+  }
+
+  async function teardownBooth(opts?: {
     message?: string;
     /** Default `ended` (Host「結束」). `idle` for logout — back to login gate. */
     landOn?: "idle" | "ended";
@@ -1335,6 +1486,8 @@ export function createRoomRuntime(opts?: {
     clearPlayCanvas();
     sessionPlay.reset();
     goSessionChat.detach();
+    shareCatalogSync?.stop();
+    shareCatalogSync = null;
     goRoomFiles.detach();
     goRoomPrivateFiles.detach();
     goRoomMedia.detach();
@@ -1381,8 +1534,184 @@ export function createRoomRuntime(opts?: {
     closing = false;
   }
 
+  const hubEngine = createEmbeddedBoothHubEngine({
+    ownerUserId: () => goAuth.profile?.user_id ?? null,
+    buildSnapshot: buildHubSnapshot,
+    localHostClaimsDirector: localHostPageClaimsDirector,
+    onDirectorChanged: () => anchorBridge.publishSnapshot(),
+    handlers: {
+      inviteMint: async () => {
+        const out = await mintInviteAndAnswerInner();
+        if (!out) throw new Error("invite_mint_failed");
+      },
+      inviteRevoke: async () => {
+        revokeInviteDoor();
+      },
+      castOffer: async (payload) => {
+        if (payload.kind === "live" && payload.peerId) {
+          const resolved =
+            payload.peerId === "local" ? localAgentId : payload.peerId;
+          const out = await goRoomMedia.putLiveOnTv(resolved, payload.label);
+          if (!out.ok) throw new Error(out.error);
+          anchorBridge.refreshProgram();
+          return;
+        }
+        if (payload.kind === "file" && payload.id) {
+          const out =
+            payload.scope === "private"
+              ? await goRoomMedia.startPrivateProgram(payload.id)
+              : await goRoomMedia.startListedProgram(payload.id);
+          if (!out.ok) throw new Error(out.error);
+          return;
+        }
+        throw new Error("invalid_cast_offer");
+      },
+      castUnoffer: async () => {
+        await goRoomMedia.stopProgram();
+      },
+      castState: async (payload) => {
+        applyBoothCastStateToMedia(goRoomMedia, payload);
+      },
+      ejectPeer: async (peerId) => {
+        if (!kickPeer(peerId)) throw new Error("peer_gone");
+      },
+      end: async () => {
+        await teardownBooth();
+      },
+      privateRemove: async (id) => {
+        await goRoomPrivateFiles.remove(id);
+        anchorBridge.publishSnapshot();
+      },
+      privateMountToShare: async (id) => {
+        const file = await goRoomPrivateFiles.getFile(id);
+        if (!file) throw new Error("private_not_found");
+        const result = await goRoomFiles.shareLocalFile(file);
+        if (!result.ok) throw new Error(result.error);
+        anchorBridge.publishSnapshot();
+      },
+      shareUnshare: async (id) => {
+        if (!goRoomFiles.unshare(id, { host: true })) {
+          throw new Error("share_not_found");
+        }
+        anchorBridge.publishSnapshot();
+      },
+      shareRescan: async () => {
+        await shareCatalogSync?.rescan();
+        anchorBridge.publishSnapshot();
+      },
+    },
+  });
+  hubRef.engine = hubEngine;
+  hubEngine.registerShell(embeddedHostShellContext());
+  let shellClient: BoothShellClient = createBoothShellClient({
+    engine: hubEngine,
+    mode: "embedded",
+  });
+
+  function applyDaemonSnapshot(
+    snapshot: import("@pg/roster/boothChannel").BoothStateSnapshot
+  ): void {
+    const mapped = applySnapshotToRoomFields(snapshot);
+    set({
+      guestCount: mapped.guestCount,
+      shortUrl: mapped.inviteShortUrl ?? status.shortUrl,
+      inviteExpiresAt: mapped.inviteExpiresAt ?? status.inviteExpiresAt,
+      inviteDoor: mapped.inviteGate,
+      occupantPeers: mapped.occupantPeers.map((p) => ({
+        peerId: p.peerId,
+        name: p.name,
+      })),
+      occupantNames: mapped.occupantPeers.map((p) => p.name),
+    });
+  }
+
+  async function refreshLocalDaemonProbe(): Promise<BoothLocalEngineStatus> {
+    const token = await resolveShellLocalToken();
+    const probe = await probeLocalBoothEngine({ shellToken: token });
+    set({ localDaemon: probe.online || probe.needsToken ? probe : null });
+    return probe;
+  }
+
+  async function attachLocalDaemonShell(opts?: {
+    shellToken?: string;
+  }): Promise<{ ok: boolean; error?: string }> {
+    if (opts?.shellToken) writeStoredShellToken(opts.shellToken);
+    try {
+      localDaemonEngine?.disconnect();
+      localDaemonEngine = createLocalDaemonHubEngine({
+        shellId: "browser-shell",
+        shellToken: opts?.shellToken,
+      });
+      const snapshot = await localDaemonEngine.connectChannel();
+      hubRef.engine = localDaemonEngine;
+      shellClient = createBoothShellClient({
+        engine: localDaemonEngine,
+        mode: "shell",
+        shellId: "browser-shell",
+      });
+      await anchorBridge.setEnabled(false);
+      applyDaemonSnapshot(snapshot);
+      set({
+        boothAttachment: "local-daemon",
+        message: "已連回本機常駐包廂",
+        error: null,
+      });
+      return { ok: true };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "local_daemon_connect_failed";
+      set({ error: msg });
+      return { ok: false, error: msg };
+    }
+  }
+
+  async function detachLocalDaemonShell(): Promise<void> {
+    localDaemonEngine?.disconnect();
+    localDaemonEngine = null;
+    hubRef.engine = hubEngine;
+    shellClient = createBoothShellClient({
+      engine: hubEngine,
+      mode: "embedded",
+    });
+    set({ boothAttachment: "embedded", message: "" });
+    if (readRemoteAnchorEnabled()) {
+      await anchorBridge.setEnabled(true);
+    }
+  }
+
+  async function close(opts?: {
+    message?: string;
+    landOn?: "idle" | "ended";
+  }): Promise<void> {
+    if (closing) return;
+    if (status.phase === "idle") return;
+    if (status.phase === "ended" && (opts?.landOn ?? "ended") === "ended") {
+      return;
+    }
+    const ack = await hubRef.engine!.dispatch(
+      { type: "end" },
+      embeddedHostShellContext()
+    );
+    if (!ack.ok && ack.error === "session_ended") {
+      await teardownBooth(opts);
+    } else if (!ack.ok) {
+      set({
+        error:
+          ack.error === "not_director"
+            ? "目前無法結束這一間"
+            : "無法結束這一間",
+      });
+      return;
+    }
+    if (opts?.message && status.phase !== "idle") {
+      set({ message: opts.message });
+    }
+    if (opts?.landOn === "idle" && status.phase === "ended") {
+      set({ phase: "idle", message: "" });
+    }
+  }
+
   operatorHooks.mintInvite = async () => {
-    await mintInviteAndAnswer();
+    await mintInviteAndAnswerInner();
   };
   operatorHooks.revokeInvite = async () => {
     revokeInviteDoor();
@@ -1396,7 +1725,7 @@ export function createRoomRuntime(opts?: {
     kickPeer(peerId);
   };
   operatorHooks.endBooth = async () => {
-    await close();
+    await teardownBooth();
   };
   operatorHooks.stopTv = async () => {
     await goRoomMedia.stopProgram();
@@ -1440,6 +1769,11 @@ export function createRoomRuntime(opts?: {
     revokeInviteAndAnswer,
     kickPeer,
     close,
+    getShellClient: (): BoothShellClient => shellClient,
+    getHubEngine: (): BoothHubEngine => hubRef.engine ?? hubEngine,
+    probeLocalDaemon: refreshLocalDaemonProbe,
+    attachLocalDaemonShell,
+    detachLocalDaemonShell,
     setRemoteAnchorEnabled: (enabled: boolean) => anchorBridge.setEnabled(enabled),
     getRemoteAnchorEnabled: () => anchorBridge.isEnabled(),
   };
