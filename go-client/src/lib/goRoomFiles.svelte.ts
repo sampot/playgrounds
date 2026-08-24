@@ -86,6 +86,7 @@ class GoRoomFiles {
   }
 
   detach(): void {
+    this.clearOperatorMirror();
     this.#attachGen++;
     this.#pendingControl = [];
     this.#pendingBinary = [];

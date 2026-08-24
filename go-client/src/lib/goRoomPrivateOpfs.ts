@@ -25,10 +25,25 @@ export type RoomPrivateImportResult =
   | { ok: true; entry: RoomPrivateEntry }
   | { ok: false; error: string };
 
+export type RoomPrivateStreamWriter = {
+  id: string;
+  writeChunk(chunk: Blob): Promise<void>;
+  finalize(): Promise<RoomPrivateImportResult>;
+  abort(): Promise<void>;
+};
+
+export type RoomPrivateOpenStreamResult =
+  | { ok: true; writer: RoomPrivateStreamWriter }
+  | { ok: false; error: string };
+
 export type RoomPrivateLibrary = {
   readonly supported: boolean;
   list(): Promise<RoomPrivateEntry[]>;
   importFile(file: File): Promise<RoomPrivateImportResult>;
+  openStreamWrite(opts: {
+    name: string;
+    mime: string;
+  }): Promise<RoomPrivateOpenStreamResult>;
   getFile(id: string): Promise<File | null>;
   remove(id: string): Promise<void>;
   clear(): Promise<void>;
@@ -169,6 +184,68 @@ export function createRoomPrivateLibrary(
         entries.push(entry);
         await writeManifest(base, entries);
         return { ok: true, entry };
+      } catch (err) {
+        const msg =
+          err instanceof Error && err.message
+            ? err.message
+            : "無法寫入私有片庫";
+        return { ok: false, error: msg };
+      }
+    },
+    async openStreamWrite(opts) {
+      if (!supported) {
+        return { ok: false, error: GO_ROOM_PRIVATE_UNSUPPORTED };
+      }
+      try {
+        const base = await root();
+        const dir = await filesDir(base);
+        const id = newRoomPrivateFileId(newId);
+        const entry: RoomPrivateEntry = {
+          id,
+          name: sanitizeName(opts.name),
+          mime: opts.mime || "application/octet-stream",
+          size: 0,
+          createdAt: now(),
+        };
+        const fh = await dir.getFileHandle(id, { create: true });
+        const w = await fh.createWritable();
+        let size = 0;
+        let closed = false;
+        const writer: RoomPrivateStreamWriter = {
+          id,
+          async writeChunk(chunk) {
+            if (closed) return;
+            await w.write(chunk);
+            size += chunk.size;
+          },
+          async finalize() {
+            if (closed) {
+              return { ok: false, error: "錄影已結束" };
+            }
+            closed = true;
+            await w.close();
+            const done: RoomPrivateEntry = { ...entry, size };
+            const entries = await readManifest(base);
+            entries.push(done);
+            await writeManifest(base, entries);
+            return { ok: true, entry: done };
+          },
+          async abort() {
+            if (closed) return;
+            closed = true;
+            try {
+              await w.abort();
+            } catch {
+              /* ignore */
+            }
+            try {
+              await dir.removeEntry(id);
+            } catch {
+              /* ignore */
+            }
+          },
+        };
+        return { ok: true, writer };
       } catch (err) {
         const msg =
           err instanceof Error && err.message

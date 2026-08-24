@@ -72,12 +72,25 @@ export function roomPlaySwAvailable(): boolean {
   return Boolean(controller());
 }
 
+/** Nudge a waiting worker after deploy (SW also skipWaiting on install). */
+function nudgeWaitingServiceWorker(
+  reg: ServiceWorkerRegistration
+): void {
+  const waiting = reg.waiting;
+  if (!waiting) return;
+  try {
+    waiting.postMessage({ type: "skip-waiting" });
+  } catch {
+    /* ignore */
+  }
+}
+
 /**
  * Ensure go SW is registered and controlling this page.
  * Safari guests often land with a ready registration but no controller until
  * claim／controllerchange — download／play need the controller for `/room-file/`.
  */
-export async function ensureRoomFileSw(timeoutMs = 4000): Promise<boolean> {
+export async function ensureRoomFileSw(timeoutMs = 8000): Promise<boolean> {
   try {
     if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
       return false;
@@ -85,24 +98,41 @@ export async function ensureRoomFileSw(timeoutMs = 4000): Promise<boolean> {
     if (!isGoCanvasSwUsable()) return false;
     if (navigator.serviceWorker.controller) return true;
 
-    await navigator.serviceWorker.register(GO_SW_URL, { scope: "/" });
+    const reg = await navigator.serviceWorker.register(GO_SW_URL, {
+      scope: "/",
+    });
+    nudgeWaitingServiceWorker(reg);
     await navigator.serviceWorker.ready;
     if (navigator.serviceWorker.controller) return true;
 
+    const deadline = Date.now() + timeoutMs;
     await new Promise<void>((resolve) => {
-      const t = setTimeout(resolve, timeoutMs);
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        clearInterval(poll);
+        navigator.serviceWorker.removeEventListener(
+          "controllerchange",
+          onControllerChange
+        );
+        resolve();
+      };
+      const onControllerChange = () => {
+        if (navigator.serviceWorker.controller) finish();
+      };
+      const poll = setInterval(() => {
+        if (navigator.serviceWorker.controller || Date.now() >= deadline) {
+          finish();
+        }
+      }, 200);
+      const timer = setTimeout(finish, timeoutMs);
       navigator.serviceWorker.addEventListener(
         "controllerchange",
-        () => {
-          clearTimeout(t);
-          resolve();
-        },
-        { once: true }
+        onControllerChange
       );
-      if (navigator.serviceWorker.controller) {
-        clearTimeout(t);
-        resolve();
-      }
+      if (navigator.serviceWorker.controller) finish();
     });
     return Boolean(navigator.serviceWorker.controller);
   } catch {
@@ -111,7 +141,7 @@ export async function ensureRoomFileSw(timeoutMs = 4000): Promise<boolean> {
 }
 
 export async function waitRoomPlaySw(): Promise<boolean> {
-  return ensureRoomFileSw(3000);
+  return ensureRoomFileSw(6000);
 }
 
 export type RoomOpenTransferMsg = {
@@ -315,7 +345,7 @@ export async function ensureLocalRoomFileRegistered(
     register?: (id: string, file: File) => void;
   }
 ): Promise<boolean> {
-  const ready = await ensureRoomFileSw(opts?.timeoutMs ?? 4000);
+  const ready = await ensureRoomFileSw(opts?.timeoutMs ?? 8000);
   if (!ready) return false;
   const reg = opts?.register ?? registerLocalRoomFile;
   reg(id, file);

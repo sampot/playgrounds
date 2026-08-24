@@ -8,6 +8,7 @@ export const BOOTH_CHANNEL_VERSION = 1 as const;
 export type BoothSubscribeScope =
   | "members"
   | "cast"
+  | "recordings"
   | "inviteGate"
   | "shareFiles"
   | "privateFiles"
@@ -24,7 +25,12 @@ export type BoothErrorCode =
   | "cast_rejected"
   | "not_owner"
   | "private_not_found"
-  | "transfer_rejected";
+  | "transfer_rejected"
+  | "peer_not_live"
+  | "already_recording"
+  | "storage_full"
+  | "encoder_failed"
+  | "peer_gone";
 
 export type BoothMemberKind = "host" | "guest" | "peer" | "operator";
 
@@ -57,6 +63,12 @@ export type BoothStateSnapshot = {
   cast?: {
     kind: "idle" | "file" | "live" | "play";
   } & Record<string, unknown>;
+  recordings?: Array<{
+    peerId: string;
+    displayName: string;
+    startedAt: number;
+    status: "recording" | "finalizing";
+  }>;
   inviteGate: "none" | "live" | "expired";
   inviteShortUrl?: string;
   inviteExpiresAt?: number;

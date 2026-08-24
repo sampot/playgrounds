@@ -39,6 +39,7 @@ const EMPTY: RoomMediaState = {
   streamingFileId: null,
   castingFileId: null,
   programScope: null,
+  recordingPeerIds: [],
 };
 
 class GoRoomMedia {
@@ -70,6 +71,7 @@ class GoRoomMedia {
   streamingFileId = $state<string | null>(null);
   castingFileId = $state<string | null>(null);
   programScope = $state<"share" | "private" | null>(null);
+  recordingPeerIds = $state<string[]>([]);
   #media: RoomMedia | null = null;
   #unsub: (() => void) | null = null;
 
@@ -85,10 +87,13 @@ class GoRoomMedia {
     fileMeta?: (id: string) => { name: string; kind: "audio" | "video" } | null;
     onTvProgramChange?: () => void;
     onProgramClock?: () => void;
+    onRecordingChange?: () => void;
+    onRecordingDone?: () => void;
   }): void {
     this.detach();
     this.#media = createRoomMedia(opts);
     let tvSig = "";
+    let recordSig = "";
     this.#unsub = this.#media.subscribe((s) => {
       this.camera = s.camera;
       this.mic = s.mic;
@@ -118,6 +123,12 @@ class GoRoomMedia {
       this.streamingFileId = s.streamingFileId;
       this.castingFileId = s.castingFileId;
       this.programScope = s.programScope;
+      this.recordingPeerIds = s.recordingPeerIds;
+      const nextRecordSig = s.recordingPeerIds.join("|");
+      if (nextRecordSig !== recordSig) {
+        recordSig = nextRecordSig;
+        opts.onRecordingChange?.();
+      }
       const nextTvSig = [
         s.programStream?.id ?? "",
         s.localProgramStream?.id ?? "",
@@ -167,6 +178,7 @@ class GoRoomMedia {
     this.streamingFileId = null;
     this.castingFileId = null;
     this.programScope = null;
+    this.recordingPeerIds = [];
   }
 
   enableCamera() {
@@ -271,6 +283,20 @@ class GoRoomMedia {
   putLiveOnTv(peerId: string, name?: string) {
     return (
       this.#media?.putLiveOnTv(peerId, name) ??
+      Promise.resolve({ ok: false as const, error: "尚未連線" })
+    );
+  }
+
+  startRecording(peerId: string, displayName?: string, label?: string) {
+    return (
+      this.#media?.startRecording(peerId, displayName, label) ??
+      Promise.resolve({ ok: false as const, error: "尚未連線" })
+    );
+  }
+
+  stopRecording(peerId: string) {
+    return (
+      this.#media?.stopRecording(peerId) ??
       Promise.resolve({ ok: false as const, error: "尚未連線" })
     );
   }

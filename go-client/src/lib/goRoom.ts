@@ -591,7 +591,9 @@ export function roomCinemaPeekHintShow(opts: {
 }
 
 export const GO_ROOM_PUT_ON_TV = "放到大螢幕上";
-export const GO_ROOM_FORCE_MUTE = "強制靜音";
+export const GO_ROOM_START_RECORD = "開始錄影";
+export const GO_ROOM_STOP_RECORD = "停止錄影";
+export const GO_ROOM_RECORDING_BADGE = "錄影中";
 export const GO_ROOM_FORCE_CAMERA_OFF = "關閉鏡頭";
 export const GO_ROOM_KICK = "踢出包廂";
 export const GO_ROOM_MEMBER_MORE = "更多";
@@ -610,9 +612,9 @@ export const GO_ROOM_MIC_STOP_LISTEN = "停止收聽";
 export const GO_ROOM_CAST_WATCH = "播放";
 export const GO_ROOM_CAST_STOP_WATCH = "停止播放";
 export const GO_ROOM_HANG_FILES_ONLY = "只能掛檔，不掛資料夾";
-/** `/room-file/` needs a controlling go SW — refresh if this appears after deploy. */
+/** `/room-file/` play／download／cast needs a controlling go SW — refresh if this appears after deploy. */
 export const GO_ROOM_FILE_SW_REQUIRED =
-  "頁面尚未就緒。請重新整理後再掛檔或推播。";
+  "頁面尚未就緒。請重新整理後再播放、下載或推播。";
 export const GO_ROOM_CAST_UNSUPPORTED =
   "播不了這份檔。請改用電腦再掛一次，或改下載。";
 export const GO_ROOM_CAST_SOURCE_UNSUPPORTED =
@@ -960,6 +962,7 @@ export const GO_ROOM_ROLE_HOST = "主持人";
 export const GO_ROOM_ROLE_PRESENTER = "主講人";
 export const GO_ROOM_ON_AIR = "LIVE";
 export const GO_ROOM_HAND_RAISE = "舉手";
+export const GO_ROOM_FORCE_MUTE = "強制靜音";
 /** Compact roster cue: mesh DC open — file bytes need not relay via Host. */
 export const GO_ROOM_MEMBER_DIRECT = "傳檔直達";
 
@@ -975,6 +978,7 @@ export type RoomMemberCardView = {
   cameraOn: boolean;
   speaking: boolean;
   onAir: boolean;
+  recording: boolean;
   handRaised: boolean;
   /** Guest↔Guest mesh DataChannel open with local peer. */
   directLink: boolean;
@@ -1017,12 +1021,27 @@ export function roomMemberShowsDirectLink(opts: {
   return opts.directPeerIds.includes(id);
 }
 
-/** Member-list card model: roles, mic／camera, LIVE, 舉手, mesh cue. */
+export function roomMemberRecording(opts: {
+  peerId: string;
+  mine: boolean;
+  localAgentId?: string | null;
+  recordingPeerIds: readonly string[];
+}): boolean {
+  const ids = opts.recordingPeerIds;
+  if (opts.mine) {
+    const localId = opts.localAgentId?.trim();
+    if (localId && ids.includes(localId)) return true;
+  }
+  return ids.includes(opts.peerId);
+}
+
+/** Member-list card model: roles, mic／camera, LIVE, 錄影中, 舉手, mesh cue. */
 export function roomMemberCard(opts: {
   occupant: RoomOccupant;
   hostPeerId?: string | null;
   tvSourcePeerId?: string | null;
   localAgentId?: string | null;
+  recordingPeerIds?: readonly string[];
   speaking?: boolean;
   handRaised?: boolean;
   avatarUrl?: string | null;
@@ -1035,6 +1054,12 @@ export function roomMemberCard(opts: {
     mine: opts.occupant.mine,
     tvSourcePeerId: opts.tvSourcePeerId ?? null,
     localAgentId: opts.localAgentId,
+  });
+  const recording = roomMemberRecording({
+    peerId: opts.occupant.peerId,
+    mine: opts.occupant.mine,
+    localAgentId: opts.localAgentId,
+    recordingPeerIds: opts.recordingPeerIds ?? [],
   });
   const micOn = opts.occupant.liveAudio;
   return {
@@ -1049,6 +1074,7 @@ export function roomMemberCard(opts: {
     cameraOn: opts.occupant.liveVideo,
     speaking: Boolean(opts.speaking) && micOn,
     onAir,
+    recording,
     handRaised: Boolean(opts.handRaised),
     directLink: Boolean(opts.directLink) && !opts.occupant.mine,
     kindLabel: roomMemberKindLabel(opts.occupant.memberKind),
@@ -1070,6 +1096,7 @@ export function roomMemberCardsSorted(
     const rank =
       memberRankBit(a.host) - memberRankBit(b.host) ||
       memberRankBit(a.onAir) - memberRankBit(b.onAir) ||
+      memberRankBit(a.recording) - memberRankBit(b.recording) ||
       memberRankBit(a.handRaised) - memberRankBit(b.handRaised) ||
       memberRankBit(a.speaking) - memberRankBit(b.speaking);
     if (rank !== 0) return rank;
@@ -1104,6 +1131,27 @@ export function roomHostMemberPutOnTv(opts: {
     show: live,
     enabled: live && !opts.onAir,
     label: GO_ROOM_PUT_ON_TV,
+  };
+}
+
+/** Host-only record control next to a member card (PG-GO-ROOM-RECORD-PLAN §8.1). */
+export function roomHostMemberRecord(opts: {
+  liveVideo: boolean;
+  recording?: boolean;
+}): { show: boolean; enabled: boolean; label: string; stop: boolean } {
+  if (opts.recording) {
+    return {
+      show: true,
+      enabled: true,
+      label: GO_ROOM_STOP_RECORD,
+      stop: true,
+    };
+  }
+  return {
+    show: opts.liveVideo,
+    enabled: opts.liveVideo,
+    label: GO_ROOM_START_RECORD,
+    stop: false,
   };
 }
 

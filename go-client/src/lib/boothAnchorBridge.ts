@@ -14,6 +14,7 @@ import { roomHostDisplayName, roomTvBindStream } from "./goRoom";
 import { goAuth } from "./goAuth.svelte";
 import { goRoomFiles } from "./goRoomFiles.svelte";
 import { goRoomPrivateFiles } from "./goRoomPrivateFiles.svelte";
+import { goRoomMedia } from "./goRoomMedia.svelte";
 import { goSessionChat } from "./goSessionChat.svelte";
 import { newRoomPrivateFileId } from "./goRoomPrivateOpfs";
 import type { RoomStatus } from "./roomRuntime";
@@ -65,6 +66,12 @@ export function createBoothAnchorBridge(ctx: {
     peerId: string,
     layer: "audio" | "video"
   ) => Promise<void>;
+  onOperatorStartRecord: (
+    peerId: string,
+    displayName?: string,
+    label?: string
+  ) => Promise<void>;
+  onOperatorStopRecord: (peerId: string) => Promise<void>;
   onOperatorMintInvite: () => Promise<void>;
   onOperatorRevokeInvite: () => Promise<void>;
   onOperatorCastState: (payload: {
@@ -125,6 +132,7 @@ export function createBoothAnchorBridge(ctx: {
       send: (text) => {
         if (ownerDc?.readyState === "open") ownerDc.send(text);
       },
+      bufferedAmount: () => ownerDc?.bufferedAmount ?? 0,
     });
     return ownerFileHost;
   }
@@ -177,6 +185,20 @@ export function createBoothAnchorBridge(ctx: {
       mime: entry.mime,
       status: "ready" as const,
     }));
+    const recordingIds = goRoomMedia.recordingPeerIds;
+    const recordings =
+      recordingIds.length > 0
+        ? recordingIds.map((peerId) => ({
+            peerId,
+            displayName:
+              peerId === hostPeerId
+                ? hostName
+                : s.occupantPeers.find((p) => p.peerId === peerId)?.name ??
+                  peerId,
+            startedAt: Date.now(),
+            status: "recording" as const,
+          }))
+        : undefined;
     return {
       sessionId: boothSessionId,
       ownerUserId: ctx.getOwnerUserId() ?? "",
@@ -212,6 +234,7 @@ export function createBoothAnchorBridge(ctx: {
         }),
       ],
       cast: ctx.getCastSummary?.(),
+      recordings,
       inviteGate,
       inviteShortUrl: s.shortUrl ?? undefined,
       inviteExpiresAt: s.inviteExpiresAt ?? undefined,
@@ -273,6 +296,29 @@ export function createBoothAnchorBridge(ctx: {
         throw new Error("invalid_halt");
       }
       await ctx.onOperatorHaltLive(peerId, layer);
+      return;
+    }
+    if (frame.type === "booth.intent.record.start") {
+      const payload = frame.payload as {
+        peerId?: string;
+        displayName?: string;
+        label?: string;
+      };
+      const peerId = payload?.peerId?.trim();
+      if (!peerId) throw new Error("missing_peer");
+      await ctx.onOperatorStartRecord(
+        peerId,
+        payload.displayName,
+        payload.label
+      );
+      host?.publishSnapshot();
+      return;
+    }
+    if (frame.type === "booth.intent.record.stop") {
+      const peerId = (frame.payload as { peerId?: string })?.peerId?.trim();
+      if (!peerId) throw new Error("missing_peer");
+      await ctx.onOperatorStopRecord(peerId);
+      host?.publishSnapshot();
       return;
     }
     if (frame.type === "booth.intent.invite.mint") {

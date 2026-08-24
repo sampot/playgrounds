@@ -7,6 +7,7 @@ const boothBridgeFixtures = vi.hoisted(() => ({
       ) => Promise<string>)
     | null,
   onBoothOpen: vi.fn().mockResolvedValue(undefined),
+  refreshProgram: vi.fn(),
   prepareOperatorRoster: null as
     | ((shellId: string) => {
         onMessage?: (data: unknown) => void;
@@ -60,7 +61,7 @@ vi.mock("./boothAnchorBridge", () => ({
       setEnabled: vi.fn(),
       onBoothOpen: boothBridgeFixtures.onBoothOpen,
       publishSnapshot: vi.fn(),
-      refreshProgram: vi.fn(),
+      refreshProgram: boothBridgeFixtures.refreshProgram,
       stop: vi.fn().mockResolvedValue(undefined),
     };
   },

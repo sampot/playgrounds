@@ -57,6 +57,29 @@ describe("boothOwnerFileChannel", () => {
     expect(clientOut.length).toBeGreaterThan(0);
   });
 
+  it("paces upload when the owner DC send buffer is high", async () => {
+    let buffered = 256 * 1024;
+    const host = createBoothOwnerFileHost(
+      hostDeps({
+        send: () => {
+          buffered = Math.max(0, buffered - 48 * 1024);
+        },
+        bufferedAmount: () => buffered,
+      })
+    );
+    const client = createBoothOwnerFileClient({
+      send: (text) => host.handleMessage(text),
+      bufferedAmount: () => buffered,
+    });
+    const { transferId } = host.beginPrivateUpload({
+      name: "big.bin",
+      size: 200_000,
+      mime: "application/octet-stream",
+    });
+    const file = new File([new Uint8Array(200_000)], "big.bin");
+    await client.upload(transferId, file);
+  });
+
   it("uploads a share file to the hub host over chunk messages", async () => {
     const imported: File[] = [];
 

@@ -30,6 +30,11 @@ import {
   type SessionMicMessage,
 } from "@pg/roster/rosterSessionCamera";
 import {
+  buildSessionRecordMessage,
+  isSessionRecordMessage,
+  type SessionRecordMessage,
+} from "@pg/roster/rosterSessionRecord";
+import {
   GO_ROOM_CAST_UNSUPPORTED,
   GO_ROOM_DISPLAY_PERM_DENIED,
   GO_ROOM_FILE_SW_REQUIRED,
@@ -44,6 +49,15 @@ import {
 } from "./goRoomPresenceAudioMix";
 import { ensureLocalRoomFileRegistered } from "./goRoomPlayBridge";
 import { roomFilePath } from "./goRoomPlayRegistry";
+import {
+  createRoomPrivateLibrary,
+  type RoomPrivateLibrary,
+} from "./goRoomPrivateOpfs";
+import {
+  applyRecordNotify,
+  createPresenceRecordHub,
+  type PresenceRecordHub,
+} from "./goRoomPresenceRecord";
 
 export type RoomMediaPeer = {
   peerId: string;
@@ -90,6 +104,8 @@ export type RoomMediaState = {
   castingFileId: string | null;
   /** share｜private when a file is on the TV; null for live／off. */
   programScope: "share" | "private" | null;
+  /** Peers with an active Hub recording tap (PG-GO-ROOM-RECORD-PLAN). */
+  recordingPeerIds: string[];
 };
 
 export type RoomMediaResult =
@@ -159,7 +175,8 @@ export type RoomMediaControl =
   | SessionCastMessage
   | SessionCameraMessage
   | SessionMicMessage
-  | SessionBoothMessage;
+  | SessionBoothMessage
+  | SessionRecordMessage;
 
 export type RoomMedia = {
   enableCamera(): Promise<RoomMediaResult>;
@@ -177,6 +194,12 @@ export type RoomMedia = {
   playProgram(): void;
   seekProgram(seconds: number): void;
   putLiveOnTv(peerId: string, name?: string): Promise<RoomMediaResult>;
+  startRecording(
+    peerId: string,
+    displayName?: string,
+    label?: string
+  ): Promise<RoomMediaResult>;
+  stopRecording(peerId: string): Promise<RoomMediaResult>;
   haltLive(
     peerId: string,
     layer: "audio" | "video"
@@ -253,6 +276,8 @@ export function createRoomMedia(opts: {
   ownerOf?: (id: string) => string | null;
   fileMeta?: (id: string) => { name: string; kind: "audio" | "video" } | null;
   onProgramClock?: () => void;
+  onRecordingDone?: () => void;
+  privateLibrary?: RoomPrivateLibrary;
 }): RoomMedia {
   const getUserMedia =
     opts.getUserMedia ??
@@ -301,6 +326,27 @@ export function createRoomMedia(opts: {
   const micListeners = new Set<string>();
   const programWatchers = new Set<string>();
   let remoteLives: { peerId: string; camera: boolean; mic: boolean }[] = [];
+  const recordingNotified = new Set<string>();
+  const privateLibrary =
+    opts.privateLibrary ??
+    (opts.forward ? createRoomPrivateLibrary() : null);
+  const recorder: PresenceRecordHub | null =
+    opts.forward && privateLibrary
+      ? createPresenceRecordHub({
+          localAgentId: opts.localAgentId,
+          privateLibrary,
+          getLive: (peerId) => {
+            if (peerId === opts.localAgentId) {
+              return { camera: Boolean(camera), mic: Boolean(mic) };
+            }
+            const live = remoteLives.find((l) => l.peerId === peerId);
+            return live ? { camera: live.camera, mic: live.mic } : null;
+          },
+          getPresenceStream: (peerId) => presenceStreamForRecord(peerId),
+          sendJson: (msg) => opts.sendJson(msg),
+          onRecordingDone: opts.onRecordingDone,
+        })
+      : null;
   let presenceCache: { ids: string; stream: MediaStream } | null = null;
   let programCache: { ids: string; stream: MediaStream } | null = null;
   let localProgramCache: { ids: string; stream: MediaStream } | null = null;
@@ -310,6 +356,29 @@ export function createRoomMedia(opts: {
   /** Entrance／Host-star PCs only — mesh is DC file path, never RTP. */
   function rtpPeers(): RoomMediaPeer[] {
     return opts.peers().filter((p) => p.via !== "mesh");
+  }
+
+  function presenceStreamForRecord(peerId: string): MediaStream | null {
+    if (peerId === opts.localAgentId) {
+      const tracks = [camera, mic].filter((t): t is MediaStreamTrack =>
+        isLiveTrack(t)
+      );
+      if (!tracks.length || typeof MediaStream !== "function") return null;
+      return new MediaStream(tracks);
+    }
+    const peer = rtpPeers().find((p) => p.peerId === peerId);
+    if (!peer) return null;
+    const tracks = [
+      receiverTrack(peer.pc, "presence", "video"),
+      receiverTrack(peer.pc, "presence", "audio"),
+    ].filter((t): t is MediaStreamTrack => isLiveTrack(t));
+    if (!tracks.length || typeof MediaStream !== "function") return null;
+    return new MediaStream(tracks);
+  }
+
+  function recordingPeerIds(): string[] {
+    if (recorder) return recorder.recordingPeerIds();
+    return [...recordingNotified];
   }
 
   function collectMicSources(): PresenceAudioSource[] {
@@ -523,6 +592,7 @@ export function createRoomMedia(opts: {
         : streamingFileId || remoteProgramFileId,
       castingFileId: programFromLive ? null : castingFileId,
       programScope: programFromLive ? null : programScope,
+      recordingPeerIds: recordingPeerIds(),
     };
   }
 
@@ -650,6 +720,9 @@ export function createRoomMedia(opts: {
       watching = false;
       listening = false;
       watchingPeerId = null;
+    }
+    if (patch.camera === false && recorder) {
+      void recorder.onPeerGone(peerId);
     }
   }
 
@@ -1334,6 +1407,24 @@ export function createRoomMedia(opts: {
       emit();
       return { ok: true };
     },
+    async startRecording(peerId, displayName, label) {
+      if (!recorder) {
+        return { ok: false, error: "這台無法錄影" };
+      }
+      const out = await recorder.start(
+        peerId,
+        displayName?.trim() || "鏡頭",
+        label
+      );
+      emit();
+      return out.ok ? { ok: true } : { ok: false, error: out.error };
+    },
+    async stopRecording(peerId) {
+      if (!recorder) return { ok: true };
+      const out = await recorder.stop(peerId);
+      emit();
+      return out.ok ? { ok: true } : { ok: false, error: out.error };
+    },
     async haltLive(peerId, layer) {
       const local =
         !peerId ||
@@ -1535,6 +1626,16 @@ export function createRoomMedia(opts: {
       await thisForwardFrom(fromPeerId);
     },
     async onControl(data) {
+      if (isSessionRecordMessage(data)) {
+        if (opts.forward) return;
+        if (data.op === "notify" && data.targetPeer) {
+          const next = applyRecordNotify(recordingNotified, data);
+          recordingNotified.clear();
+          for (const id of next) recordingNotified.add(id);
+          emit();
+        }
+        return;
+      }
       if (isSessionBoothMessage(data)) {
         if (opts.forward) return;
         if (data.to !== opts.localAgentId) return;
@@ -1800,6 +1901,8 @@ export function createRoomMedia(opts: {
       return () => listeners.delete(listener);
     },
     dispose() {
+      recorder?.dispose();
+      recordingNotified.clear();
       liveSource = null;
       void dropCamera();
       void stopTrack(mic);

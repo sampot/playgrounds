@@ -2,6 +2,7 @@ import {
   friendlyOperatorAckError,
   friendlyOperatorError,
 } from "./goFriendlyError";
+import { isRtcDataChannelQueueFullError } from "./boothOwnerFileWire";
 import type { BoothEnvelope, BoothStateSnapshot } from "@pg/roster/boothChannel";
 import type { RoomInviteDoor, RoomOccupantPeer } from "./goRoom";
 import {
@@ -185,9 +186,22 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
   > | null {
     if (!ownerDc || ownerDc.readyState !== "open") return null;
     ownerFileClient ??= createBoothOwnerFileClient({
-      send: (text) => ownerDc?.send(text),
+      send: (text) => {
+        if (ownerDc?.readyState !== "open") {
+          throw new Error("owner_dc_not_ready");
+        }
+        ownerDc.send(text);
+      },
+      bufferedAmount: () => ownerDc?.bufferedAmount ?? 0,
     });
     return ownerFileClient;
+  }
+
+  function operatorFileError(err: unknown): string {
+    if (isRtcDataChannelQueueFullError(err)) {
+      return "檔案通道忙碌中，請稍候再試（可先等傳檔完成）。";
+    }
+    return err instanceof Error ? err.message : String(err);
   }
 
   async function importPrivateFiles(
@@ -209,7 +223,7 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
         if (!ack?.transferId) return "無法上傳到包廂";
         await owner.upload(ack.transferId, file);
       } catch (e) {
-        return e instanceof Error ? e.message : String(e);
+        return operatorFileError(e);
       }
     }
     return null;
@@ -232,7 +246,7 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
       });
       return null;
     } catch (e) {
-      return e instanceof Error ? e.message : String(e);
+      return operatorFileError(e);
     }
   }
 
@@ -259,7 +273,7 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
       return null;
     } catch (e) {
-      return e instanceof Error ? e.message : String(e);
+      return operatorFileError(e);
     }
   }
 
@@ -280,7 +294,7 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
         if (!ack?.transferId) return "無法上傳到包廂";
         await owner.upload(ack.transferId, file);
       } catch (e) {
-        return e instanceof Error ? e.message : String(e);
+        return operatorFileError(e);
       }
     }
     return null;
@@ -295,7 +309,7 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
       });
       return null;
     } catch (e) {
-      return e instanceof Error ? e.message : String(e);
+      return operatorFileError(e);
     }
   }
 
@@ -322,7 +336,7 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
       return null;
     } catch (e) {
-      return e instanceof Error ? e.message : String(e);
+      return operatorFileError(e);
     }
   }
 
@@ -368,6 +382,14 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
     return operatorPresence;
   }
 
+  function resolveOperatorTvStream(
+    ui: { tvOn: boolean },
+    prev: MediaStream | null
+  ): MediaStream | null {
+    if (!ui.tvOn) return null;
+    return prev;
+  }
+
   function applySnapshot(snapshot: BoothStateSnapshot): void {
     const ui = boothSnapshotToUi(snapshot);
     const canDirect = operatorCanDirect({ director, shellId });
@@ -392,7 +414,7 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
       playCatalogId: ui.playCatalogId,
       tvOn: ui.tvOn,
       tvLabel: ui.tvLabel,
-      tvStream: ui.tvOn ? status.tvStream : null,
+      tvStream: resolveOperatorTvStream(ui, status.tvStream),
       remoteLives: ui.remoteLives,
       canDirect,
       directorRole: canDirect ? "operator" : director ? "viewer" : null,
@@ -495,7 +517,7 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
           name: operatorLocalDisplayName(),
         },
         onProgramStream: (stream) => {
-          set({ tvStream: stream });
+          set({ tvStream: stream ?? null });
         },
         onOwnerChannel: (dc) => {
           ownerDc = dc;
@@ -583,6 +605,20 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
         type: "booth.intent.live.halt",
         v: 1,
         payload: { peerId, layer },
+      });
+    },
+    startRecord(peerId: string, displayName?: string, label?: string): void {
+      sendIntent({
+        type: "booth.intent.record.start",
+        v: 1,
+        payload: { peerId, displayName, label },
+      });
+    },
+    stopRecord(peerId: string): void {
+      sendIntent({
+        type: "booth.intent.record.stop",
+        v: 1,
+        payload: { peerId },
       });
     },
     kickPeer(peerId: string): void {

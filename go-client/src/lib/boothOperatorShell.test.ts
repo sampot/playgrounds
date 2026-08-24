@@ -103,6 +103,11 @@ describe("createBoothOperatorShell", () => {
     expect(shell.getStatus().tvStream).not.toBeNull();
     clientOpts.onSnapshot?.({
       ...base,
+      cast: { kind: "live", label: "鏡頭" },
+    });
+    expect(shell.getStatus().tvStream).not.toBeNull();
+    clientOpts.onSnapshot?.({
+      ...base,
       cast: { kind: "idle" },
     });
     expect(shell.getStatus().tvOn).toBe(false);

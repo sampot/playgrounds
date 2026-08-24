@@ -16,14 +16,11 @@ export const BOOTH_TRANSCEIVER_SLOTS = [
   kind: BoothMediaKind;
 }[];
 
-type BoothTransceiver = {
-  direction?: string;
-  sender?: {
-    replaceTrack: (track: MediaStreamTrack | null) => Promise<void>;
-    track?: { kind?: string } | null;
-  };
-  receiver?: { track?: { kind?: string } | null };
-  setCodecPreferences?: (codecs: unknown[]) => void;
+type BoothTransceiver = Pick<
+  RTCRtpTransceiver,
+  "direction" | "sender" | "receiver"
+> & {
+  setCodecPreferences?: RTCRtpTransceiver["setCodecPreferences"];
 };
 
 export type BoothTransceiverPc = {
@@ -95,7 +92,7 @@ export function applyBoothVideoCodecPreferences(pc: BoothTransceiverPc): void {
     if (transceiverKind(t) !== "video") continue;
     if (typeof t.setCodecPreferences !== "function") continue;
     try {
-      t.setCodecPreferences(preferred);
+      t.setCodecPreferences?.(preferred as RTCRtpCodec[]);
     } catch {
       /* ignore */
     }

@@ -216,7 +216,10 @@ export function encodeRosterWire(
     throw new RosterWireError("bad_version", `不支援的 wire 版本：${payload.v}`);
   }
   if (payload.tpl !== ROSTER_SDP_TPL && payload.tpl !== ROSTER_SDP_TPL_AV) {
-    throw new RosterWireError("bad_tpl", `不支援的樣板：${payload.tpl}`);
+    throw new RosterWireError(
+      "bad_tpl",
+      `不支援的樣板：${JSON.stringify((payload as { tpl: unknown }).tpl)}`
+    );
   }
   const maxChars = opts?.maxChars ?? ROSTER_WIRE_MAX_CHARS;
   const json = JSON.stringify(payload);

@@ -1,11 +1,11 @@
 # Playgrounds 純玩版：包廂引擎／殼／常駐 daemon（`pg-boothd`）
 
 > **狀態：** Draft（2026-08-24，**第七刀**）— 契約草案；Anchor／Operator **部分落地**；**Operator＝owner 認證的 Roster 節點**（§6、§6.2；**第七刀**修訂）＋ Remote Owner Shell（§6.1、§7.6）與 Hub 私有片庫遠端讀寫**規格已定、實作未落地**；**Guest join 經 Anchor WSS**（§10.7）**規格已定、實作未落地**；從屬並**修訂** [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)  
-> **`pg-boothd`：** 於**獨立私有 repo** 開發；**非**開源產品；**不在**本 repo（`playgrounds`）落地實作——本文件只定義與 go／Platform 的**契約邊界**  
+> **`pg-booth`（私有 monorepo）：** 含 **`pg-boothd`**（headless CLI）與 **`pg-booth-desktop`**（Tauri 輕量常駐）；**非**開源；**不在**本 repo（`playgrounds`）落地實作——本文件只定義與 go／Platform 的**契約邊界**（desktop 詳見 [PG-GO-ROOM-TAURI-PLAN.md](./PG-GO-ROOM-TAURI-PLAN.md)）  
 > **權威決策：** 從屬 [DECISIONS.md](./DECISIONS.md) **DEC-050**（純玩版）、**DEC-045**（Roster／薄 signaling）、**DEC-047**（Platform Invite／Dash）；對齊 **DEC-024**（headless runtime 分層敘事）  
-> **相關：** [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)（包廂產品契約；wire `session_*`）、[PG-GO-ROOM-PLAY-PLAN.md](./PG-GO-ROOM-PLAY-PLAN.md)（開局；daemon 第一版**非目標**）、[PG-GO-ROOM-RECORD-PLAN.md](./PG-GO-ROOM-RECORD-PLAN.md)（多路 live 錄影；Hub 私有片庫；**未落地**）、[PG-GO-ROOM-DEV-HARNESS-PLAN.md](./PG-GO-ROOM-DEV-HARNESS-PLAN.md)（localhost harness；**勿**當產品契約）、[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)、[PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md)、[PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)、[PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md)、[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（包廂 Operator TURN fallback）、[PG-BACKEND-RUNTIME-SPEC.md](./PG-BACKEND-RUNTIME-SPEC.md)（殼↔Runtime 通道類比）、`.cursor/rules/no-native-dialogs.mdc`、`.cursor/rules/mobile-first-ux.mdc`、[GLOSSARY.md](./GLOSSARY.md)
+> **相關：** [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)（包廂產品契約；wire `session_*`）、[PG-GO-ROOM-TAURI-PLAN.md](./PG-GO-ROOM-TAURI-PLAN.md)（桌面常駐 Tauri）、[PG-GO-ROOM-PLAY-PLAN.md](./PG-GO-ROOM-PLAY-PLAN.md)（開局；daemon 第一版**非目標**）、[PG-GO-ROOM-RECORD-PLAN.md](./PG-GO-ROOM-RECORD-PLAN.md)（多路 live 錄影；Hub 私有片庫；**未落地**）、[PG-GO-ROOM-DEV-HARNESS-PLAN.md](./PG-GO-ROOM-DEV-HARNESS-PLAN.md)（localhost harness；**勿**當產品契約）、[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)、[PG-GO-AUTH-PLAN.md](./PG-GO-AUTH-PLAN.md)、[PG-PLATFORM-API-PLAN.md](./PG-PLATFORM-API-PLAN.md)、[PG-PLATFORM-DASH-SPEC.md](./PG-PLATFORM-DASH-SPEC.md)、[PG-PLATFORM-CREDITS-PLAN.md](./PG-PLATFORM-CREDITS-PLAN.md)（包廂 Operator TURN fallback）、[PG-BACKEND-RUNTIME-SPEC.md](./PG-BACKEND-RUNTIME-SPEC.md)（殼↔Runtime 通道類比）、`.cursor/rules/no-native-dialogs.mdc`、`.cursor/rules/mobile-first-ux.mdc`、[GLOSSARY.md](./GLOSSARY.md)
 
-一句話：**包廂＝一個 Booth Hub Engine**（WebRTC Hub、門牌、目錄、導播、私有片庫）＋可選的 **Booth Peer Engine**（headless 終端，連上 Hub 貢獻**檔案**或 **live stream**）。**Platform 只跟 Hub Engine 連線**（`invite.room` **門牌 mint**、**BoothAnchor** Guest／Operator signal、Operator cap）；Peer **不**註冊錨點、**不**打 Platform API。Hub 常駐＝**`pg-boothd`**；Peer 常駐＝**`pg-boothd peer`**。**Booth Shell** 只連 **Hub** 送 intent。瀏覽器 `/i/` **Guest** 仍掃 Platform 門牌（short 鏈／join_cap，**Invite DO**）；**WebRTC 握手經 BoothAnchor WSS 推送至 Hub**——與 headless **Peer** 並存。**`play`／`go` 皆為 Embedded Booth Hub**；**連線遊戲**只 `invite.room`（`invite.compose` Superseded）。
+一句話：**包廂＝一個 Booth Hub Engine**（WebRTC Hub、門牌、目錄、導播、私有片庫）＋可選的 **Booth Peer Engine**（headless 終端，連上 Hub 貢獻**檔案**或 **live stream**）。**Platform 只跟 Hub Engine 連線**（`invite.room` **門牌 mint**、**BoothAnchor** Guest／Operator signal、Operator cap）；Peer **不**註冊錨點、**不**打 Platform API。Hub 常駐＝私有 monorepo **`pg-booth`** 的 **`pg-boothd`**（專業 headless）或 **`pg-booth-desktop`**（Tauri 輕量）；Peer 常駐＝**`pg-boothd peer`**。**Booth Shell** 只連 **Hub** 送 intent。瀏覽器 `/i/` **Guest** 仍掃 Platform 門牌（short 鏈／join_cap，**Invite DO**）；**WebRTC 握手經 BoothAnchor WSS 推送至 Hub**——與 headless **Peer** 並存。**`play`／`go` 皆為 Embedded Booth Hub**；**連線遊戲**只 `invite.room`（`invite.compose` Superseded）。
 
 ---
 
@@ -28,9 +28,10 @@
 - **Shell 只連 Hub（硬）：** Booth Shell 送 intent 給 **Hub**；**不**直接指揮 Peer。
 - **Platform 只認 Hub（硬）：** BoothAnchor WSS、`invite.room` **門牌 mint**、Guest join signal（§10.7）、`device_token`（hub）、Operator `operatorCap`——**僅 Hub Engine**。Peer **禁止**註冊 anchor、**禁止**呼叫 `/v1/invites`／`/v1/booth/anchors`。
 - **BoothAnchor 為請人硬性前提（硬）：** Hub 開著須 **Anchor 已註冊且 Engine WSS 連上**；「請人進來」mint 門牌前須確認 Anchor **online**（或 **degraded** 且 Engine socket 仍在）。**禁止** Invite DO `signal/pending` long poll 作為包廂 Guest 握手路徑；**無 fallback**。
-- **兩種 Hub 部署：**
+- **三種 Hub 部署：**
   - **Embedded Hub：** 瀏覽器 **`go` `/room`** 或 **`play` 場殼對等 Booth 面**（過渡；`play` 亦為 Booth Hub，連線＝`invite.room`）。
-  - **Daemon Hub：** `pg-boothd`（預設 hub 模式）。
+  - **Desktop Hub：** **`pg-booth-desktop`**（Tauri；見 [PG-GO-ROOM-TAURI-PLAN.md](./PG-GO-ROOM-TAURI-PLAN.md)）。
+  - **Daemon Hub：** `pg-boothd`（預設 hub 模式；同一 `pg-booth` monorepo）。
 - **Peer 部署：** `pg-boothd peer`（同一 binary；獨立行程／裝置）。
 - **瀏覽器 Guest 保留：** 臨時訪客、無法裝 daemon 的裝置仍掃 `/i/`；握手 **經 BoothAnchor 推送至 Hub**（§10.7）。
 - **BoothAnchor DO：** **Hub** 長連 WSS（**必須**）；Operator 經 Platform 連回**同一 Hub**；Guest join offer／answer **經 DO 轉發**（**不**經 Invite DO signal 隊列）。
@@ -52,7 +53,7 @@
 - **`pg-boothd` 第一版** 大螢幕 SAM 開局（`session_play`）；不阻塞監控 MVP。
 - 把 Peer Engine 做成另一種 Platform `invite.kind`（Peer **只**認 Hub 本機 `peerCap`）。
 - Peer Engine 註冊 BoothAnchor 或持有 `device_token`（**僅 Hub**）。
-- 在本 repo 內開發／開源 **`pg-boothd`** 原始碼（實作在**獨立私有 repo**）。
+- 在本 repo 內開發／開源 **`pg-booth`** monorepo 原始碼（`pg-boothd`／`pg-booth-desktop` 實作在**私有 monorepo**）。
 - 讓 `sam-host`（Node SAM headless）承擔包廂 Hub——兩者分離。
 - 在 Dash 中繼 WebRTC 媒體（DASH-SPEC 非目標維持）。
 
@@ -67,7 +68,9 @@
 | **Booth Engine** | 統稱；實作上必須標 **hub** 或 **peer** 模式 |
 | **Booth Shell**（包廂殼） | UI 客戶端：只連 **Hub**、送 intent、收 state／媒體預覽；**無** Hub 權威 |
 | **Embedded Hub** | Hub Engine 與 Shell 同處瀏覽器 `/room` 分頁（過渡形） |
-| **`pg-boothd`** | **獨立私有 repo** 的 Rust 常駐二進位；hub／`peer` 子命令；**非**開源；本 repo **只**定契約 |
+| **`pg-booth`** | **私有 monorepo**（Rust workspace）；含 `pg-boothd`、`pg-booth-desktop` 與共用 `crates/*`；**非**開源；本 repo **只**定契約 |
+| **`pg-boothd`** | monorepo 內 headless CLI；hub（預設）／`peer` 子命令 |
+| **`pg-booth-desktop`** | monorepo 內 Tauri 安裝包；輕量常駐 Hub；見 [PG-GO-ROOM-TAURI-PLAN.md](./PG-GO-ROOM-TAURI-PLAN.md) |
 | **`peerCap`** | Hub 本機核發、Peer 進房憑證；**不**經 Platform Invite DO |
 | **BoothAnchor**（錨點） | Platform `BoothAnchorDO` + **Hub** 長連 WSS；**Guest join signal 中繼**（§10.7） |
 | **Operator**（遠端節點） | 帳號擁有者的 **owner 認證 Roster 節點**＋ **Remote Owner Shell** UI；Hub leaf（`kind: "operator"`）；`operatorCap` 進門；可導播、可 presence、可讀寫 **Hub 私有片庫**（§6.1）；**進門路徑**與 Guest／`peerCap` Peer 不同（§6.2） |
@@ -77,7 +80,7 @@
 | **boothSessionId** | 本場 **Hub** session 的 UUID；**不是**永久房號 |
 | **Control Channel** | Shell ↔ **Hub** 的控制／狀態通道（見 §7）；**不**載檔案 bytes（bytes 走 Owner file channel） |
 | **輕量模式** | Embedded Hub；關分頁＝散場 |
-| **常駐模式** | Daemon Hub；關 Shell 不散場 |
+| **常駐模式** | Desktop／Daemon Hub；關 Shell 不散場 |
 | **`session_booth`（wire）** | Guest／Peer↔Hub DC 上的主持 moderation（mute／kick）；**不是**本文件的 Booth Engine——見 [rosterSessionBooth.ts](../src/components/playgrounds/roster/rosterSessionBooth.ts) |
 
 對讀者：**仍叫「包廂」**；勿暴露 Engine／DO 內部語。Dash 可說「常駐包廂」「連回包廂」。
@@ -138,7 +141,10 @@
 | 模式 | Hub | Peer | Shell | 典型用途 |
 | --- | --- | --- | --- | --- |
 | **Embedded** | 瀏覽器分頁 | — | 同頁 | 臨時包廂、試用 |
-| **Daemon Hub** | `pg-boothd` | — | 無或遠端 Operator | 監控、常駐 |
+| **Desktop Hub** | `pg-booth-desktop` | — | 同殼或托盤 | 家裡 7×24、一般會員 |
+| **Desktop + Operator** | `pg-booth-desktop` | 可選 boothd peer | 外出 Operator | 遠端導播 |
+| **Desktop + 瀏覽器 Shell** | `pg-booth-desktop` | 可選 | `go` 連 `localhost` WS | Hub 背景 + 瀏覽器大螢幕 |
+| **Daemon Hub** | `pg-boothd` | — | 無或遠端 Operator | NAS／機房、專業常駐 |
 | **Daemon Hub + Peer** | `pg-boothd` | `pg-boothd peer` ×N | 無或遠端 Operator | 舊手機鏡頭、邊緣掛檔 |
 | **Daemon + 本地 Shell** | `pg-boothd` | 可選 | 瀏覽器連 `localhost` Control Channel | 家裡大螢幕 + 穩定 Hub |
 | **Daemon + Operator** | `pg-boothd` | 可選 | 外出 Operator | 遠端導播 |
@@ -733,18 +739,23 @@ type BoothJoinAnswer = {
 
 ---
 
-## 11. `pg-boothd`（Rust daemon；**獨立 repo**）
+## 11. `pg-booth` 私有 monorepo（`pg-boothd` + `pg-booth-desktop`）
 
 ### 11.1 定位
 
-- **正式**長期包廂執行體；**無 UI**；**非**開源產品。
-- **開發邊界（硬）：** 原始碼與發行在**另一個私有 repo**——**不在** `sampot/playgrounds`。本 repo 只維護：
+- **正式**長期包廂執行體；實作在**私有 monorepo `pg-booth`**（Rust workspace）——**不在** `sampot/playgrounds`。
+- **兩個 deliverable（硬）：**
+  - **`pg-boothd`** — headless CLI；hub（預設）／`peer`；專業／NAS／邊緣。
+  - **`pg-booth-desktop`** — Tauri 安裝包；輕量 7×24；詳見 [PG-GO-ROOM-TAURI-PLAN.md](./PG-GO-ROOM-TAURI-PLAN.md)。
+- **共用 `crates/*`（硬）：** `booth-protocol`、`booth-platform`、`booth-anchor`、`booth-control`、`booth-storage` 等——**禁止** desktop 與 boothd 各實作一套 Anchor／Platform 邊界。
+- **開發邊界（硬）：** 本 repo（`playgrounds`）只維護：
   - 與 go／Platform 的**契約**（本文件、`boothChannel` 型別、BoothAnchor API）；
   - **Embedded Hub**（瀏覽器）與 **Booth Shell**（`/room`、`/room/remote`）；
   - Platform **`/v1/booth/*`**、`device_token` 核發／撤銷（Dash）。
-- 語言：**Rust**（長期常駐、WebRTC、系統服務）。
-- **兩種模式（同一 binary）：**
-  - **`pg-boothd`（hub，預設）** — Booth **Hub** Engine；連 Platform。
+- 語言：**Rust**（長期常駐、WebRTC、系統服務）；desktop 另含 **Tauri** 殼與 WebView bundle。
+- **Hub 模式（同一 monorepo、可共用 `booth-hub` crate）：**
+  - **`pg-boothd`（hub，預設）** — Booth **Hub** Engine；連 Platform；無 GUI。
+  - **`pg-booth-desktop`** — 同上 Hub 語意；Tauri 托盤／可選 WebView Shell。
   - **`pg-boothd peer`** — Booth **Peer** Engine；**只**連 Hub；不持有 `device_token`。
 - 與 `src/sam-host/node`（SAM headless）**分離**；與 `go-client/`、`platform-api/` **分 repo**。
 
@@ -805,9 +816,18 @@ pg-boothd status         # sessionId／peerCount／anchor online
 pg-boothd stop           # 優雅 booth.intent.end + 退出（hub）
 ```
 
-### 11.6 本 repo 與外部 repo 分工
+### 11.6 本 repo 與 `pg-booth` monorepo 分工
 
-**`pg-boothd`（私有 repo；契約對齊 §11.2–11.2b）：** hub／peer 實作、WebRTC、本機 `/room-file`、Control Channel server、`~/.pg-booth/` 執行時狀態。目錄佈局由該 repo 自管；**勿**在 `playgrounds` 加 `boothd/`。
+**`pg-booth`（私有 monorepo；契約對齊 §11.2–11.2b）：**
+
+```text
+crates/booth-*          # 共用：protocol、anchor、platform、hub、peer、record…
+apps/boothd/            # pg-boothd CLI
+apps/booth-desktop/     # pg-booth-desktop（Tauri）
+vendor/go-client-dist/  # playgrounds 建置產物（Shell UI）
+```
+
+hub／peer／desktop 實作、WebRTC、本機 `/room-file`、Control Channel server、`~/.pg-booth/` 執行時狀態。**勿**在 `playgrounds` 加 `boothd/` 或 `booth-tauri/`。
 
 **`playgrounds`（本 repo；開源宿主）：**
 
@@ -866,7 +886,7 @@ Shell **重用** `GoRoomSurface` 等元件；`boothMode: "embedded" | "shell" | 
 
 **§6.4 表「包廂」列：**
 
-> 活著條件：**Booth Hub session** 還在（Embedded＝`/room` 分頁內 Hub；常駐＝`pg-boothd` hub）。死法：`booth.intent.end`、Hub 行程停、Embedded 關分頁。
+> 活著條件：**Booth Hub session** 還在（Embedded＝`/room` 分頁內 Hub；常駐＝`pg-boothd` hub 或 `pg-booth-desktop`）。死法：`booth.intent.end`、Hub 行程停、Embedded 關分頁。
 
 **§5.4 硬規則第 2 點後增：**
 
@@ -969,7 +989,9 @@ export interface BoothMediaSurface {
 | **E0 契約** | 本文件 + GLOSSARY + ROOM 交叉引用 | 審閱通過 |
 | **E1 Hub 介面** | `BoothHubEngine` TS 介面；Embedded 重構為實作體 | 單測；現行 e2e 不 regress |
 | **E2 Anchor + Operator（Embedded）** | `BoothAnchorDO`、`boothChannel` 型別、go `/room/remote`、Dash 狀態卡、**Owner 私有片庫遠端讀寫（§7.6）** | 家裡 Embedded；外出 Operator 切 live cast **與**上傳私有檔；E2 驗收 §18 |
-| **E3 `pg-boothd` MVP** | **外部私有 repo** 交付 hub + peer；本 repo Platform／Shell 對齊契約 | §18 驗收（跨 repo 手測） |
+| **E3a `pg-boothd` MVP** | **`pg-booth` monorepo** 交付 hub + peer；本 repo Platform／Shell 對齊契約 | §18 E3a 驗收 |
+| **E3b `pg-booth-desktop` MVP** | 同 monorepo 交付 Tauri；共用 anchor／storage crates | [TAURI-PLAN §13](./PG-GO-ROOM-TAURI-PLAN.md) |
+| **E3c Hub 收斂** | `booth-hub` crate；desktop WebView 僅 Shell | boothd + desktop 同一引擎 |
 | **E4 產品化** | 裝置綁定、systemd、room TURN | 跨網 Operator 穩定 |
 | **E5** | 私有片庫 cast（daemon ffmpeg）、完整 mesh／HTTP 對齊 | 非 E2 阻塞 |
 
@@ -1004,7 +1026,7 @@ export interface BoothMediaSurface {
 - [ ] Operator 斷線重連；Guest **不**掉。
 - [ ] Platform log 無 SDP 正文持久化；Anchor **無**檔案 chunk 日誌。
 
-### E3（`pg-boothd` hub + peer 監控 MVP）
+### E3a（`pg-boothd` hub + peer 監控 MVP）
 
 - [ ] 家裡 `pg-boothd`（hub）常駐；無瀏覽器分頁；Dash 顯示在線。
 - [ ] ≥2 支裝置 `pg-boothd peer` 掛鏡頭；Hub 不關鏡頭。
@@ -1014,12 +1036,17 @@ export interface BoothMediaSurface {
 - [ ] `pg-boothd stop`（hub）；Peer／Guest 看到主持已關閉；Anchor offline。
 - [ ] Peer 行程**無** Platform API 呼叫（流量／log 可驗）。
 
+### E3b（`pg-booth-desktop` 輕量常駐）
+
+見 [PG-GO-ROOM-TAURI-PLAN.md](./PG-GO-ROOM-TAURI-PLAN.md) §13。
+
 ---
 
 ## 19. 變更紀錄
 
 | 日期 | 變更 |
 | --- | --- |
+| 2026-08-24 | **第八刀：`pg-booth` 私有 monorepo** — `pg-booth-desktop`（Tauri 輕量）與 `pg-boothd` 共用 `crates/*`；§5.3 Desktop 部署；§11／§16 E3 拆分；見 [PG-GO-ROOM-TAURI-PLAN.md](./PG-GO-ROOM-TAURI-PLAN.md) |
 | 2026-08-24 | **第七刀：Operator＝Roster 節點** — §6 拓樸重寫；§6.2 能力模型（`kind`≠能力上限）；Operator ✅ presence／`session_play` 入座；§8.1c 單機快樂路徑；§10.6 presence wire；委任草案 §6.2.3（未落地） |
 | 2026-08-23 | **第六刀：Operator＝Remote Owner Shell** — §6.1 能力矩陣；Hub 私有片庫遠端讀寫（§7.6 Owner file channel）；`privateFiles` 訂閱；§8.1b 快樂路徑；修訂 §7.4 viewer 可片庫讀寫 |
 | 2026-08-23 | **`invite.compose` Superseded；`play`／`go` 皆 Booth Hub：** 連線遊戲只 `invite.room`；Invite DO **保留**（門牌） |

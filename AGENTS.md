@@ -62,9 +62,10 @@ Reader-facing narrative stays personal／non-product (blog DEC-004).
 - `docs/PG-CATALOG-UX-PLAN.md` — 型錄人機 UX（Phase 2–5 landed）
 - `docs/PG-GO-CLIENT-PLAN.md` — 純玩版 Guest（DEC-050）
 - `docs/PG-GO-ROOM-PLAN.md` — 純玩版包廂 `/room`（Invite 一般用途隔間；Phase 1＝文字／傳檔；主持私有 OPFS＝2g 契約凍）
-- `docs/PG-GO-ROOM-ENGINE-PLAN.md` — 包廂引擎／殼契約、BoothAnchor 遠端監控；**`pg-boothd` 在獨立私有 repo**（Draft；修訂 ROOM「包廂＝分頁」敘事）
+- `docs/PG-GO-ROOM-ENGINE-PLAN.md` — 包廂引擎／殼契約、BoothAnchor 遠端監控；**`pg-booth` 私有 monorepo**（`pg-boothd` + `pg-booth-desktop`；Draft；修訂 ROOM「包廂＝分頁」敘事）
+- `docs/PG-GO-ROOM-TAURI-PLAN.md` — 桌面常駐包廂 Tauri（`pg-booth-desktop`；私有 monorepo；Draft）
 - `docs/PG-GO-ROOM-PLAY-PLAN.md` — 包廂內重用 peer 開局（`session_play`；ROOM Phase 3；實作延後）
-- `docs/PG-GO-ROOM-RECORD-PLAN.md` — 多路 live 錄影（`session_record`；Hub 私有片庫；未落地）
+- `docs/PG-GO-ROOM-RECORD-PLAN.md` — 多路 live 錄影（`session_record`；Embedded Hub 已落地；daemon R1 待 `pg-booth`）
 - `docs/PG-GO-ROOM-DEV-HARNESS-PLAN.md` — 包廂 localhost／Agent harness（免 SSO、多 tab 進門；預設不開 `platform:dev`）
 - `wrangler.jsonc` — single-site self-host (README Deploy to Cloudflare)
 - `wrangler.official.jsonc` — author field-net

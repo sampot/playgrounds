@@ -3,8 +3,10 @@ import {
   BOOTH_OWNER_CHUNK_BYTES,
   bytesToBase64,
   encodeOwnerChunk,
+  isRtcDataChannelQueueFullError,
   parseOwnerChunkMessage,
   readFileInChunks,
+  waitForOwnerDcDrain,
   base64ToBytes,
   type BoothOwnerChunkWire,
 } from "./boothOwnerFileWire";
@@ -46,11 +48,23 @@ export function createBoothOwnerFileHost(deps: {
   exportShareFile: (id: string) => Promise<File | null>;
   newPrivateId: () => string;
   send: (text: string) => void;
+  bufferedAmount?: () => number;
 }) {
   const sessions = new Map<string, TransferSession>();
 
-  function sendChunk(frame: BoothOwnerChunk & { data?: string }): void {
-    deps.send(encodeOwnerChunk(frame));
+  async function sendChunk(frame: BoothOwnerChunk & { data?: string }): Promise<void> {
+    const payload = encodeOwnerChunk(frame);
+    for (let attempt = 0; attempt < 12; attempt++) {
+      await waitForOwnerDcDrain(deps.bufferedAmount);
+      try {
+        deps.send(payload);
+        return;
+      } catch (error) {
+        if (!isRtcDataChannelQueueFullError(error) || attempt === 11) {
+          throw error;
+        }
+      }
+    }
   }
 
   async function flushUpload(transferId: string): Promise<void> {
@@ -187,6 +201,7 @@ export function createBoothOwnerFileHost(deps: {
 
 export function createBoothOwnerFileClient(deps: {
   send: (text: string) => void;
+  bufferedAmount?: () => number;
 }) {
   const inbound = new Map<
     string,
@@ -198,8 +213,19 @@ export function createBoothOwnerFileClient(deps: {
   >();
   const earlyChunks = new Map<string, BoothOwnerChunkWire[]>();
 
-  function sendChunk(frame: BoothOwnerChunk & { data?: string }): void {
-    deps.send(encodeOwnerChunk(frame));
+  async function sendChunk(frame: BoothOwnerChunk & { data?: string }): Promise<void> {
+    const payload = encodeOwnerChunk(frame);
+    for (let attempt = 0; attempt < 12; attempt++) {
+      await waitForOwnerDcDrain(deps.bufferedAmount);
+      try {
+        deps.send(payload);
+        return;
+      } catch (error) {
+        if (!isRtcDataChannelQueueFullError(error) || attempt === 11) {
+          throw error;
+        }
+      }
+    }
   }
 
   function ingest(frame: BoothOwnerChunkWire): void {

@@ -581,10 +581,6 @@ export function createRoomFileTransfer(
     const id = newId();
     const mime = roomFileContentType(file.type, name) || undefined;
     outboundFiles.set(id, file);
-    if (!(await registerLocalInSw(id, file))) {
-      outboundFiles.delete(id);
-      return { ok: false, error: GO_ROOM_FILE_SW_REQUIRED };
-    }
     entries = [
       ...entries,
       {
@@ -672,7 +668,11 @@ export function createRoomFileTransfer(
       return { ok: false, error: GO_ROOM_HANG_FILES_ONLY };
     }
     if (entry.mine) {
-      if (!outboundFiles.get(id)) return { ok: false, error: "找不到這個檔" };
+      const local = outboundFiles.get(id);
+      if (!local) return { ok: false, error: "找不到這個檔" };
+      if (!(await registerLocalInSw(id, local))) {
+        return { ok: false, error: GO_ROOM_FILE_SW_REQUIRED };
+      }
       let writable: RoomFileWritable | null;
       try {
         writable = await pickSave({ suggestedName: entry.name });

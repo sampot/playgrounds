@@ -6,6 +6,23 @@ import {
 
 export const BOOTH_OWNER_DC_LABEL = "booth.owner";
 export const BOOTH_OWNER_CHUNK_BYTES = 48 * 1024;
+/** Align with room file DC backpressure (goRoomFileTransfer). */
+export const BOOTH_OWNER_BUFFER_HIGH = 64 * 1024;
+
+export function isRtcDataChannelQueueFullError(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error);
+  return /send queue is full|Queue is full/i.test(msg);
+}
+
+export async function waitForOwnerDcDrain(
+  bufferedAmount?: () => number,
+  high = BOOTH_OWNER_BUFFER_HIGH
+): Promise<void> {
+  const get = bufferedAmount ?? (() => 0);
+  while (get() > high) {
+    await new Promise((resolve) => setTimeout(resolve, 16));
+  }
+}
 
 export type BoothOwnerChunkWire = BoothOwnerChunk & {
   data?: string;

@@ -103,6 +103,7 @@ export function createRosterSessionWatchBridge(opts: {
     },
     async leave() {
       /* no-op — booth host ends the play */
+      return { ok: true as const };
     },
   };
 }

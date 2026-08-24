@@ -66,6 +66,7 @@ import {
   isSessionCameraMessage,
   isSessionMicMessage,
 } from "@pg/roster/rosterSessionCamera";
+import { isSessionRecordMessage } from "@pg/roster/rosterSessionRecord";
 import {
   isSessionPlayMessage,
 } from "@pg/roster/rosterSessionPlay";
@@ -1106,7 +1107,8 @@ export function createGuestRuntime() {
             } else if (
               isSessionCastMessage(data) ||
               isSessionCameraMessage(data) ||
-              isSessionMicMessage(data)
+              isSessionMicMessage(data) ||
+              isSessionRecordMessage(data)
             ) {
               void goRoomMedia.onCastControl(data);
             } else if (isSessionPlayMessage(data)) {

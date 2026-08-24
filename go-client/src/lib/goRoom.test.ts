@@ -48,6 +48,10 @@ import {
   roomOccupancyFromSnapshot,
   roomHostMemberMenu,
   roomHostMemberPutOnTv,
+  roomHostMemberRecord,
+  GO_ROOM_START_RECORD,
+  GO_ROOM_STOP_RECORD,
+  GO_ROOM_RECORDING_BADGE,
   roomMemberAvatarInitial,
   roomMemberCard,
   roomMemberKindLabel,
@@ -55,6 +59,7 @@ import {
   GO_ROOM_MEMBER_KIND_PEER,
   roomMemberCardsSorted,
   roomMemberOnAir,
+  roomMemberRecording,
   roomMemberShowsDirectLink,
   roomOccupantRows,
   GO_ROOM_FORCE_CAMERA_OFF,
@@ -578,6 +583,7 @@ function memberStub(
     cameraOn: false,
     speaking: false,
     onAir: false,
+    recording: false,
     handRaised: false,
     directLink: false,
     kindLabel: null,
@@ -663,7 +669,7 @@ describe("roomMemberCardsSorted", () => {
   });
 });
 
-describe("roomHostMemberMenu", () => {
+describe("roomHostMemberPutOnTv", () => {
   it("exposes put-on-TV on the card when someone is live", () => {
     const putOnTv = roomHostMemberPutOnTv({
       liveAudio: true,
@@ -685,7 +691,62 @@ describe("roomHostMemberMenu", () => {
       false
     );
   });
+});
 
+describe("roomHostMemberRecord", () => {
+  it("offers start when live video is on and stop while recording", () => {
+    expect(
+      roomHostMemberRecord({ liveVideo: true, recording: false })
+    ).toMatchObject({
+      show: true,
+      enabled: true,
+      label: GO_ROOM_START_RECORD,
+      stop: false,
+    });
+    expect(
+      roomHostMemberRecord({ liveVideo: true, recording: true })
+    ).toMatchObject({
+      show: true,
+      enabled: true,
+      label: GO_ROOM_STOP_RECORD,
+      stop: true,
+    });
+    expect(roomHostMemberRecord({ liveVideo: false }).show).toBe(false);
+  });
+});
+
+describe("roomMemberRecording", () => {
+  it("marks cards from recordingPeerIds including the local host row", () => {
+    const card = roomMemberCard({
+      occupant: {
+        peerId: "g-a",
+        name: "甲",
+        mine: false,
+        liveAudio: false,
+        liveVideo: true,
+      },
+      hostPeerId: "local",
+      recordingPeerIds: ["g-a"],
+    });
+    expect(card.recording).toBe(true);
+    expect(
+      roomMemberCard({
+        occupant: {
+          peerId: "local",
+          name: "主持",
+          mine: true,
+          liveAudio: false,
+          liveVideo: true,
+        },
+        hostPeerId: "local",
+        localAgentId: "local",
+        recordingPeerIds: ["local"],
+      }).recording
+    ).toBe(true);
+  });
+});
+
+describe("roomHostMemberMenu", () => {
   it("keeps mute, camera off, and kick in the overflow menu", () => {
     const items = roomHostMemberMenu({
       mine: false,

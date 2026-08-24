@@ -264,17 +264,20 @@ describe("createRoomFileTransfer", () => {
     expect(xfer.getState().entries).toHaveLength(2);
   });
 
-  it("rejects share when Service Worker is not ready", async () => {
+  it("lists share without Service Worker; local play needs SW", async () => {
     const xfer = createRoomFileTransfer({
       localAgentId: "host-1",
       localName: "太郎",
       sendJson: () => {},
       sendBinary: () => {},
       ensureRoomFileSw: async () => false,
+      newId: () => "file-sw",
     });
-    const out = await xfer.shareLocalFile(fileOf("note.txt", 4));
-    expect(out).toEqual({ ok: false, error: GO_ROOM_FILE_SW_REQUIRED });
-    expect(xfer.getState().entries).toHaveLength(0);
+    const share = await xfer.shareLocalFile(fileOf("note.txt", 4));
+    expect(share.ok).toBe(true);
+    expect(xfer.getState().entries).toHaveLength(1);
+    const play = await xfer.play("file-sw");
+    expect(play).toEqual({ ok: false, error: GO_ROOM_FILE_SW_REQUIRED });
   });
 
   it("infers video/mp4 when the picker File has an empty type", async () => {

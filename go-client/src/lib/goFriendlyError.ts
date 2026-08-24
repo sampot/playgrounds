@@ -229,6 +229,10 @@ export function friendlyOperatorError(err: unknown): string {
     return "暫時連不上包廂。請確認網路後再試一次。";
   }
 
+  if (/send queue is full|queuedata|datachannel.*full/i.test(lower)) {
+    return "檔案通道忙碌中，請稍候再試（可先等傳檔完成）。";
+  }
+
   if (isSafeUserCopy(raw) && /包廂|連回|導播|離線|後台/.test(raw)) {
     return raw;
   }

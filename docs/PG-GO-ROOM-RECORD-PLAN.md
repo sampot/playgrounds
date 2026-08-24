@@ -1,9 +1,9 @@
 # Playgrounds 純玩版：包廂多路 live 錄影（`session_record`）
 
-> **狀態：** Draft（2026-08-23）— **契約從屬** [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)（媒體槽、私有片庫、cast）與 [PG-GO-ROOM-ENGINE-PLAN.md](./PG-GO-ROOM-ENGINE-PLAN.md)（Hub 權威、Control Channel）；**未落地**  
+> **狀態：** Partial（2026-08-24）— **Embedded Hub R0／R2／R3 已落地**（wire、`session_record` fanout、成員卡 UI、`MediaRecorder`→OPFS 私有片庫、Operator intent）；**R1 daemon**（`pg-boothd`／`booth-record`）仍待私有 monorepo  
 > **權威決策：** 從屬 [DECISIONS.md](./DECISIONS.md) **DEC-050**（純玩版）、**DEC-045**（Roster／薄 signaling）、**DEC-047**（Platform Invite）；**不另開 DEC**  
-> **相關：** [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)（包廂產品契約；`session_cast`／`session_camera`）、[PG-GO-ROOM-ENGINE-PLAN.md](./PG-GO-ROOM-ENGINE-PLAN.md)（`pg-boothd`、Operator、私有片庫 §7.6）、[PG-GO-ROOM-PLAY-PLAN.md](./PG-GO-ROOM-PLAY-PLAN.md)（開局——**與錄影正交**）、[PG-GO-ROOM-DEV-HARNESS-PLAN.md](./PG-GO-ROOM-DEV-HARNESS-PLAN.md)（localhost harness；**勿**當產品契約）、[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)、`.cursor/rules/no-native-dialogs.mdc`、`.cursor/rules/mobile-first-ux.mdc`、[GLOSSARY.md](./GLOSSARY.md)  
-> **`pg-boothd` 錄影實作：** 於**獨立私有 repo**；本 repo 只定 wire 型別與 Shell UI 契約
+> **相關：** [PG-GO-ROOM-PLAN.md](./PG-GO-ROOM-PLAN.md)（包廂產品契約；`session_cast`／`session_camera`）、[PG-GO-ROOM-ENGINE-PLAN.md](./PG-GO-ROOM-ENGINE-PLAN.md)（`pg-booth` monorepo、Operator、私有片庫 §7.6）、[PG-GO-ROOM-TAURI-PLAN.md](./PG-GO-ROOM-TAURI-PLAN.md)（桌面常駐）、[PG-GO-ROOM-PLAY-PLAN.md](./PG-GO-ROOM-PLAY-PLAN.md)（開局——**與錄影正交**）、[PG-GO-ROOM-DEV-HARNESS-PLAN.md](./PG-GO-ROOM-DEV-HARNESS-PLAN.md)（localhost harness；**勿**當產品契約）、[PG-GO-CLIENT-PLAN.md](./PG-GO-CLIENT-PLAN.md)、`.cursor/rules/no-native-dialogs.mdc`、`.cursor/rules/mobile-first-ux.mdc`、[GLOSSARY.md](./GLOSSARY.md)  
+> **`pg-booth` 錄影實作：** 於**私有 monorepo**（`booth-record` crate）；本 repo 只定 wire 型別與 Shell UI 契約
 
 一句話：主持（director）可像「放到大螢幕上」一樣，在成員卡**指定哪些在場 live 要錄影**——但可**多路同時錄**；每路一檔，由 **Hub Engine 本機**從 **presence** 旁路 tap 寫入 **Hub 私有片庫**；**不**經 Platform、**不**雲存、**不**錄大螢幕 program 切台軌。
 
@@ -40,7 +40,7 @@
 - **只開麥無畫面** 的獨立音檔（第一版；若監控要純音訊另刀）。
 - **錄分享目錄檔／私有檔播放**——要留檔請用匯入私有區或 OS 存檔，不走 `session_record`。
 - **自動錄全場**、進門即錄、隱藏錄影。
-- 在本 repo 實作 `pg-boothd` 的 ffmpeg 管線（私有 repo；本文件只定契約）。
+- 在本 repo 實作 `pg-booth` monorepo 的 ffmpeg 管線（`booth-record` crate；本文件只定契約）。
 
 ---
 
@@ -93,6 +93,7 @@ presence A/V ──WebRTC──►  收到上行軌
 | Hub 模式 | 錄影實作 | 產品定位 |
 | --- | --- | --- |
 | **Daemon**（`pg-boothd`） | ffmpeg／gstreamer 寫本機 FS | **快樂路徑**；7×24 監控 |
+| **Desktop**（`pg-booth-desktop`） | 共用 `booth-record`（可晚於 daemon） | 輕量常駐；見 [PG-GO-ROOM-TAURI-PLAN.md](./PG-GO-ROOM-TAURI-PLAN.md) |
 | **Embedded**（瀏覽器 `/room`） | `MediaRecorder` + OPFS 串流寫 | 短錄、開發驗證；Safari 當 Hub **不承諾** |
 
 ---
@@ -274,7 +275,7 @@ recordings: Array<{
 | `go-client/src/lib/goRoomMedia.ts` 或 `boothHubEngine.ts` | Embedded Hub `RecordTap` + OPFS |
 | `go-client/src/lib/roomRuntime.ts` | `session_record` fanout／intent 轉發 |
 
-### 11.2 私有 repo（`pg-boothd`）
+### 11.2 私有 monorepo（`pg-booth`／`booth-record` crate）
 
 | 子系統 | 說明 |
 | --- | --- |
@@ -302,7 +303,7 @@ recordings: Array<{
 
 | 風險 | 緩解 |
 | --- | --- |
-| Embedded Hub 背景節流 | 產品引導常駐 `pg-boothd`；Embedded 標「短錄」 |
+| Embedded Hub 背景節流 | 產品引導常駐 `pg-booth-desktop` 或 `pg-boothd`；Embedded 標「短錄」 |
 | 磁碟滿 | `storage_full` + 頁內 toast；daemon 設定上限 |
 | 隱私／法規 | 全場 badge；§10 進場說明 |
 | 與「不錄製」混淆 | §9 細化；GLOSSARY 更新 |
@@ -327,4 +328,5 @@ recordings: Array<{
 
 | 日期 | 摘要 |
 | --- | --- |
+| 2026-08-24 | **Embedded 落地：** R0 wire + R2 Shell UI + R3 `MediaRecorder`→OPFS；Operator `booth.intent.record.*` + snapshot `recordings` |
 | 2026-08-23 | 初稿：多路 presence 錄影、`session_record` wire、Hub 私有片庫、與 cast 正交 |

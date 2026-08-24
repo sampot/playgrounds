@@ -130,6 +130,16 @@ describe("goFriendlyError", () => {
     expect(msg).not.toMatch(/engine_offline/i);
   });
 
+  it("operator datachannel queue full is plain Chinese", () => {
+    const msg = friendlyOperatorError(
+      new Error(
+        "Failed to execute 'send' on 'RTCDataChannel': RTCDataChannel send queue is full"
+      )
+    );
+    expect(msg).toContain("檔案通道忙碌");
+    expect(msg).not.toMatch(/RTCDataChannel|send queue/i);
+  });
+
   it("operator ack maps not_director", () => {
     expect(friendlyOperatorAckError("not_director")).toContain("檢視");
     expect(friendlyOperatorAckError("not_director")).not.toMatch(/not_director/i);

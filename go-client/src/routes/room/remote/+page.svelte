@@ -104,7 +104,7 @@
     playHostName={status.hostDisplayName}
     operatorTvOn={status.tvOn}
     operatorTvLabel={status.tvLabel}
-    operatorTvStream={status.tvOn ? status.tvStream : null}
+    operatorTvStream={status.tvStream}
     operatorCanDirect={status.canDirect}
     operatorProgramTransport={status.programTransport}
     operatorProgramPaused={status.programPaused}
@@ -123,6 +123,8 @@
       remoteShell?.putFileOnTv(fileId, scope ?? "share")}
     onOperatorStopTv={() => remoteShell?.stopTv()}
     onOperatorHaltLive={(peerId, layer) => remoteShell?.haltLive(peerId, layer)}
+    onOperatorStartRecord={(peerId, name) => remoteShell?.startRecord(peerId, name)}
+    onOperatorStopRecord={(peerId) => remoteShell?.stopRecord(peerId)}
     onOperatorCastState={(payload) => remoteShell?.sendCastState(payload)}
     onStartPlay={(catalogId) => remoteShell?.startAutoPlay(catalogId)}
     onStartManualPlay={(catalogId, picks) =>

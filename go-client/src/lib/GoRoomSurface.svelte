@@ -81,6 +81,7 @@
     roomTvStatusGate,
     roomHostMemberMenu,
     roomHostMemberPutOnTv,
+    roomHostMemberRecord,
     roomMemberCard,
     roomMemberCardsSorted,
     roomMemberShowsDirectLink,
@@ -273,6 +274,11 @@
       peerId: string,
       layer: "audio" | "video"
     ) => void | Promise<void>;
+    onOperatorStartRecord?: (
+      peerId: string,
+      displayName?: string
+    ) => void | Promise<void>;
+    onOperatorStopRecord?: (peerId: string) => void | Promise<void>;
     onOperatorToggleCamera?: () => void | Promise<void>;
     onOperatorToggleMic?: () => void | Promise<void>;
   };
@@ -326,6 +332,8 @@
     onOperatorCastFile,
     onOperatorStopTv,
     onOperatorHaltLive,
+    onOperatorStartRecord,
+    onOperatorStopRecord,
     onOperatorToggleCamera,
     onOperatorToggleMic,
   }: Props = $props();
@@ -487,6 +495,8 @@
           occupant: person,
           hostPeerId,
           tvSourcePeerId: goRoomMedia.tvSourcePeerId,
+          localAgentId: playLocalPeerId,
+          recordingPeerIds: goRoomMedia.recordingPeerIds,
           avatarUrl: person.mine ? goAuth.profile?.avatar_url : null,
           directLink: roomMemberShowsDirectLink({
             mine: person.mine,
@@ -1552,7 +1562,7 @@
 
   async function onHostMemberAction(
     card: (typeof memberCards)[number],
-    action: RoomHostMenuAction
+    action: RoomHostMenuAction | "putOnTv" | "startRecord" | "stopRecord"
   ) {
     hostMenuPeerId = null;
     const peerId = card.mine
@@ -1563,6 +1573,30 @@
     mediaError = "";
     if (action === "putOnTv") {
       await onPutLiveOnTv(peerId, card.name);
+      return;
+    }
+    if (action === "startRecord" || action === "stopRecord") {
+      if (isOperator) {
+        if (!operatorCanDirect) {
+          mediaError = "家裡主持使用中，無法遠端操作";
+          return;
+        }
+        try {
+          if (action === "stopRecord") {
+            await onOperatorStopRecord?.(peerId);
+          } else {
+            await onOperatorStartRecord?.(peerId, card.name);
+          }
+        } catch (e) {
+          mediaError = e instanceof Error ? e.message : String(e);
+        }
+        return;
+      }
+      const out =
+        action === "stopRecord"
+          ? await goRoomMedia.stopRecording(peerId)
+          : await goRoomMedia.startRecording(peerId, card.name);
+      if (!out.ok) mediaError = out.error;
       return;
     }
     if (isOperator) {
@@ -2343,6 +2377,14 @@
                         })
                       : null
                   }
+                  record={
+                    isHostLike && (!isOperator || operatorCanDirect)
+                      ? roomHostMemberRecord({
+                          liveVideo: card.cameraOn,
+                          recording: card.recording,
+                        })
+                      : null
+                  }
                   hostMenu={
                     isHostLike && (!isOperator || operatorCanDirect)
                       ? roomHostMemberMenu({
@@ -2381,7 +2423,7 @@
                 {#if isHostLike}
                   <p class="muted">
                     {#if selectedPerson.liveVideo || selectedPerson.liveAudio}
-                      放到大螢幕上在成員卡上；其餘在更多。
+                      放到大螢幕上、開始錄影在成員卡上；其餘在更多。
                     {:else}
                       主持操作在卡片旁的更多。
                     {/if}

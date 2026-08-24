@@ -302,7 +302,7 @@
 
 #### 6.2.5 常駐包廂（**後段**；見 [PG-GO-ROOM-ENGINE-PLAN.md](./PG-GO-ROOM-ENGINE-PLAN.md)）
 
-**職：** 讓已安裝 `pg-boothd` 的使用者從後台得知包廂是否在線，並一鍵「連回包廂」做遠端導播（Operator）。**不是**鑄場 Invite；**不是**第二個「登入我的遊樂場」。
+**職：** 讓已安裝 **`pg-booth-desktop`** 或 **`pg-boothd`** 的使用者從後台得知包廂是否在線，並一鍵「連回包廂」做遠端導播（Operator）。**不是**鑄場 Invite；**不是**第二個「登入我的遊樂場」。
 
 **可見性：** `user` 與 `admin` 皆可見（非營運專屬）。
 
@@ -311,7 +311,7 @@
 | 放置 | **遊樂場** tab；通行證區下方（或點數區上方）；窄螢幕堆疊 |
 | 資料來源 | `GET /v1/booth/anchors/active`（持 access token） |
 | **在線** | 顯示：裝置名（`deviceLabel`）、「N 人在」、大螢幕摘要（例：「臥室鏡頭」／「沒訊號」） |
-| **離線** | 「目前沒有常駐包廂」+ 說明如何取得 **`pg-boothd`**（**非**開源；連產品文件／安裝說明；**不**在 dash 內嵌安裝器、**不**連 GitHub 原始碼） |
+| **離線** | 「目前沒有常駐包廂」+ 說明如何取得 **`pg-booth-desktop`**（輕量）或 **`pg-boothd`**（專業）（**非**開源；連產品文件／安裝說明；**不**在 dash 內嵌安裝器、**不**連 GitHub 原始碼） |
 | 主 CTA（在線） | 「**連回包廂**」→ 開 `remoteUrl`（go `/room/remote?…`） |
 | 次動作 | 「結束常駐包廂」→ 頁內確認 → `DELETE /v1/booth/anchors/active` |
 | **裝置** | 子區：已綁定 `device_token` 列表；可「撤銷裝置」 |

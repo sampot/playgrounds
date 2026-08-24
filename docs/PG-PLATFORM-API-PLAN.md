@@ -314,7 +314,7 @@ Auth：`Authorization: Bearer <access_token|api_key|join_cap|…>`（依端點�
 
 **權威契約：** [PG-GO-ROOM-ENGINE-PLAN.md](./PG-GO-ROOM-ENGINE-PLAN.md) §10。
 
-**一句話：** 每 Platform 帳號至多一個 **BoothAnchor DO stub**（id＝`ownerUserId`）；**僅 Booth Hub Engine**（外部私有 **`pg-boothd` hub** 或 Embedded Hub）**必須**長連 WSS 註冊 live session；Dash／go Operator 經 **operatorCap** 連回**同一 Hub**；**Guest `invite.room` roster 握手**經 **`POST /v1/booth/join/offer`** 轉 Engine WSS（**不**經 Invite DO long poll；**無 fallback**）。中繼 `booth.*` 控制幀與 `anchor.signal`／`booth.join.*` 子幀；**不**中繼 RTP／檔 bytes、**不**參與 **Peer** `peerCap` 配對（Hub 本機）。**`pg-boothd` 實作不在本 repo。**
+**一句話：** 每 Platform 帳號至多一個 **BoothAnchor DO stub**（id＝`ownerUserId`）；**僅 Booth Hub Engine**（私有 **`pg-booth`** monorepo 的 **`pg-boothd` hub**／**`pg-booth-desktop`** 或 Embedded Hub）**必須**長連 WSS 註冊 live session；Dash／go Operator 經 **operatorCap** 連回**同一 Hub**；**Guest `invite.room` roster 握手**經 **`POST /v1/booth/join/offer`** 轉 Engine WSS（**不**經 Invite DO long poll；**無 fallback**）。中繼 `booth.*` 控制幀與 `anchor.signal`／`booth.join.*` 子幀；**不**中繼 RTP／檔 bytes、**不**參與 **Peer** `peerCap` 配對（Hub 本機）。**`pg-booth` 實作不在本 repo。**
 
 ### 與 Invite DO 的分工
 

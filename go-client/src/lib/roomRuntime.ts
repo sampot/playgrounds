@@ -29,6 +29,7 @@ import {
   isSessionCameraMessage,
   isSessionMicMessage,
 } from "@pg/roster/rosterSessionCamera";
+import { isSessionRecordMessage } from "@pg/roster/rosterSessionRecord";
 import { isSessionPlayMessage } from "@pg/roster/rosterSessionPlay";
 import type { SessionPlaySeat } from "@pg/roster/rosterSessionPlay";
 import { createRoomMeshBroker } from "./goRoomMeshBroker";
@@ -64,6 +65,7 @@ import type { HostRuntime } from "./hostRuntime";
 import type { MountedGoCanvas } from "./mountGoCanvas";
 import type { FileMap } from "@pg/projectTypes";
 import { canvasEntryUrl, syncGoCanvasSnapshot } from "./goCanvas";
+import { ensureRoomFileSw } from "./goRoomPlayBridge";
 import { buildGoMemoryCanvas } from "./goMemoryCanvas";
 import { withGoPgSurfaceQuery } from "./goPgSurface";
 import {
@@ -368,6 +370,7 @@ export function createRoomRuntime(opts?: {
         peerId === "local" ? localAgentId : peerId;
       const out = await goRoomMedia.putLiveOnTv(resolved, label);
       if (!out.ok) throw new Error(out.error);
+      anchorBridge.refreshProgram();
     },
     onOperatorCastFile: async (fileId, scope) => {
       const out =
@@ -383,6 +386,20 @@ export function createRoomRuntime(opts?: {
       const resolved =
         peerId === "local" ? localAgentId : peerId;
       const out = await goRoomMedia.haltLive(resolved, layer);
+      if (!out.ok) throw new Error(out.error);
+    },
+    onOperatorStartRecord: async (peerId, displayName, label) => {
+      const resolved = peerId === "local" ? localAgentId : peerId;
+      const out = await goRoomMedia.startRecording(
+        resolved,
+        displayName?.trim() || "鏡頭",
+        label
+      );
+      if (!out.ok) throw new Error(out.error);
+    },
+    onOperatorStopRecord: async (peerId) => {
+      const resolved = peerId === "local" ? localAgentId : peerId;
+      const out = await goRoomMedia.stopRecording(resolved);
       if (!out.ok) throw new Error(out.error);
     },
     onOperatorMintInvite: () => operatorHooks.mintInvite(),
@@ -562,6 +579,7 @@ export function createRoomRuntime(opts?: {
       bufferedAmount: (destPeerId) => hub.requesterBufferedAmount(destPeerId),
     });
     goRoomPrivateFiles.attach();
+    void ensureRoomFileSw();
     goRoomMedia.attach({
       localAgentId,
       occupantCount: () => liveGuestCount() + 1,
@@ -594,7 +612,13 @@ export function createRoomRuntime(opts?: {
         anchorBridge.refreshProgram();
         anchorBridge.publishSnapshot();
       },
+      onRecordingChange: () => {
+        anchorBridge.publishSnapshot();
+      },
       onProgramClock: scheduleCastSnapshot,
+      onRecordingDone: () => {
+        void goRoomPrivateFiles.refresh();
+      },
     });
   }
 
@@ -719,7 +743,8 @@ export function createRoomRuntime(opts?: {
         } else if (
           isSessionCastMessage(data) ||
           isSessionCameraMessage(data) ||
-          isSessionMicMessage(data)
+          isSessionMicMessage(data) ||
+          isSessionRecordMessage(data)
         ) {
           void goRoomMedia.onCastControl(data);
           for (const sess of otherSessions(slot)) {

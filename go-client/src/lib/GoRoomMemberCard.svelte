@@ -4,6 +4,7 @@
     GO_ROOM_MEMBER_DIRECT,
     GO_ROOM_MEMBER_MORE,
     GO_ROOM_ON_AIR,
+    GO_ROOM_RECORDING_BADGE,
     GO_ROOM_ROLE_HOST,
     GO_ROOM_ROLE_PRESENTER,
     type RoomHostMenuItem,
@@ -17,15 +18,25 @@
     label: string;
   };
 
+  type RecordAction = {
+    show: boolean;
+    enabled: boolean;
+    label: string;
+    stop: boolean;
+  };
+
   type Props = {
     card: RoomMemberCardView;
     selected?: boolean;
     onclick?: () => void;
     putOnTv?: PutOnTvAction | null;
+    record?: RecordAction | null;
     hostMenu?: RoomHostMenuItem[];
     hostMenuOpen?: boolean;
     onHostMenuToggle?: () => void;
-    onHostAction?: (action: RoomHostMenuItem["action"] | "putOnTv") => void;
+    onHostAction?: (
+      action: RoomHostMenuItem["action"] | "putOnTv" | "startRecord" | "stopRecord"
+    ) => void;
   };
 
   let {
@@ -33,6 +44,7 @@
     selected = false,
     onclick,
     putOnTv = null,
+    record = null,
     hostMenu,
     hostMenuOpen = false,
     onHostMenuToggle,
@@ -47,6 +59,7 @@
     bits.push(card.cameraOn ? "鏡頭開啟" : "鏡頭關閉");
     if (card.speaking) bits.push("發言中");
     if (card.onAir) bits.push("播送中");
+    if (card.recording) bits.push(GO_ROOM_RECORDING_BADGE);
     if (card.handRaised) bits.push(GO_ROOM_HAND_RAISE);
     if (card.directLink) bits.push(GO_ROOM_MEMBER_DIRECT);
     return bits.join(" · ");
@@ -59,6 +72,7 @@
   class={[
     "member-card",
     card.onAir && "member-card--on-air",
+    card.recording && "member-card--recording",
     card.directLink && "member-card--direct",
     selected && "member-card--selected",
   ]
@@ -133,6 +147,9 @@
       <span class="member-name">{card.name}</span>
       {#if card.onAir}
         <span class="member-live">{GO_ROOM_ON_AIR}</span>
+      {/if}
+      {#if card.recording}
+        <span class="member-recording">{GO_ROOM_RECORDING_BADGE}</span>
       {/if}
     </span>
     {#if card.host || card.presenter || card.kindLabel}
@@ -225,6 +242,26 @@
       {putOnTv.label}
     </button>
   {/if}
+  {#if record?.show}
+    <button
+      type="button"
+      class={[
+        "pixel-btn",
+        "member-record",
+        record.stop ? "pixel-btn--danger" : "pixel-btn--primary",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      disabled={!record.enabled}
+      aria-label={`${record.label} · ${card.name}`}
+      onclick={(e) => {
+        e.stopPropagation();
+        onHostAction?.(record.stop ? "stopRecord" : "startRecord");
+      }}
+    >
+      {record.label}
+    </button>
+  {/if}
   {#if hostMenu && hostMenu.length > 0}
     <button
       type="button"
@@ -299,6 +336,9 @@
     box-shadow:
       0 0 0 2px color-mix(in oklab, rgb(var(--gold)) 55%, transparent),
       var(--pixel-shadow);
+  }
+  .member-card--recording {
+    border-color: color-mix(in oklab, rgb(var(--danger)) 45%, rgb(var(--ink)));
   }
   .member-card--on-air .member-avatar-wrap::after {
     content: "";
@@ -411,6 +451,18 @@
     letter-spacing: 0.04em;
     line-height: 1.2;
   }
+  .member-recording {
+    flex: 0 0 auto;
+    padding: 0.05rem 0.3rem;
+    border: 2px solid rgb(var(--ink));
+    border-radius: var(--radius);
+    background: color-mix(in oklab, rgb(var(--danger)) 18%, rgb(var(--card)));
+    color: rgb(var(--ink));
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    line-height: 1.2;
+  }
   .member-roles {
     display: flex;
     flex-wrap: wrap;
@@ -510,7 +562,8 @@
     font-weight: 800;
     letter-spacing: 0.05em;
   }
-  .member-cast {
+  .member-cast,
+  .member-record {
     flex: 1 1 100%;
     min-height: 44px;
     width: 100%;
