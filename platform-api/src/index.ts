@@ -29,6 +29,10 @@ import {
   unlinkLine,
 } from "./auth.js";
 import {
+  lookupDeviceToken,
+  touchDeviceTokenLastUsed,
+} from "./boothDevices.js";
+import {
   addCredits,
   debitTurnCredentials,
   listCreditSessions,
@@ -214,6 +218,65 @@ async function requireApiKey(
     return { ok: false, res: json({ error: "forbidden" }, 403) };
   }
   return { ok: true, userId: key.userId, role: key.role };
+}
+
+/** Booth hub: API key or device_token (anchor + invite.room). */
+async function requireHubCredential(
+  env: Env,
+  req: Request
+): Promise<
+  | {
+      ok: true;
+      userId: string;
+      role: "admin" | "user";
+      kind: "api_key" | "device_token";
+    }
+  | { ok: false; res: Response }
+> {
+  const bearer = parseBearer(req);
+  if (!bearer) {
+    return { ok: false, res: json({ error: "unauthorized" }, 401) };
+  }
+  if (bearer.startsWith("pg_at_")) {
+    return {
+      ok: false,
+      res: json(
+        {
+          error: "wrong_credential",
+          message: "Hub APIs require API key or device token",
+        },
+        401
+      ),
+    };
+  }
+  const key = await lookupApiKey(env.STORE, bearer);
+  if (key) {
+    const user = await getUser(env.STORE, key.userId);
+    if (user?.disabled) {
+      return { ok: false, res: json({ error: "forbidden" }, 403) };
+    }
+    return {
+      ok: true,
+      userId: key.userId,
+      role: key.role,
+      kind: "api_key",
+    };
+  }
+  const device = await lookupDeviceToken(env.STORE, bearer);
+  if (device) {
+    const user = await getUser(env.STORE, device.userId);
+    if (user?.disabled) {
+      return { ok: false, res: json({ error: "forbidden" }, 403) };
+    }
+    await touchDeviceTokenLastUsed(env.STORE, device);
+    return {
+      ok: true,
+      userId: device.userId,
+      role: device.role,
+      kind: "device_token",
+    };
+  }
+  return { ok: false, res: json({ error: "unauthorized" }, 401) };
 }
 
 /** Dashboard account APIs — access token only (Bearer or session cookie). */
@@ -428,6 +491,7 @@ async function route(
   const boothRes = await routeBooth(request, env, url, {
     json,
     requireApiKey,
+    requireHubCredential,
     requireAccessToken,
     parseBearer,
     inviteStub: (inviteId) => inviteStub(env, inviteId),
@@ -1333,7 +1397,7 @@ async function route(
 
   // Create invite
   if (request.method === "POST" && pathname === "/v1/invites") {
-    const auth = await requireApiKey(env, request);
+    const auth = await requireHubCredential(env, request);
     if (!auth.ok) return auth.res;
     const body = (await request.json()) as {
       kind?: string;
@@ -1342,6 +1406,15 @@ async function route(
       ttlMs?: number;
     };
     const kind = body.kind || "signal.handshake";
+    if (auth.kind === "device_token" && kind !== "invite.room") {
+      return json(
+        {
+          error: "forbidden",
+          message: "device token may only mint invite.room",
+        },
+        403
+      );
+    }
     const intent = body.intent ?? {};
     const targetField = body.targetField || DEFAULT_TARGET_FIELD;
     const ttlMs = body.ttlMs && body.ttlMs > 0 ? body.ttlMs : INVITE_TTL_MS;
@@ -1480,7 +1553,7 @@ async function route(
   // Delete invite
   const delMatch = /^\/v1\/invites\/([^/]+)$/.exec(pathname);
   if (request.method === "DELETE" && delMatch) {
-    const auth = await requireApiKey(env, request);
+    const auth = await requireHubCredential(env, request);
     if (!auth.ok) return auth.res;
     const inviteId = decodeURIComponent(delMatch[1]!);
     const stub = inviteStub(env, inviteId);

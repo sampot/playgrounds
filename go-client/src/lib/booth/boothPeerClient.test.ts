@@ -85,43 +85,32 @@ describe("boothPeerClient", () => {
     expect(out.peerId).toBe("peer-1");
   });
 
-  it("falls back to HTTP when embedded signal times out", async () => {
-    const fetchImpl = vi.fn(async () => ({
-      ok: true,
-      json: async () => ({ answerWire: "http-answer", peerId: "peer-http" }),
-    })) as unknown as typeof fetch;
-
-    const client = createBoothPeerClient({
-      peerCap: "pg_peer_ok",
-      embeddedHubSessionId: "missing-host",
-      embeddedSignalTimeoutMs: 150,
-      hubBaseUrl: "http://127.0.0.1:7847",
-      localPresence: { agentId: "agent-1", name: "Cam" },
-      handlers: {},
-      fetchImpl,
-    });
-
-    const out = await client.join();
-    expect(out.peerId).toBe("peer-http");
-    expect(fetchImpl).toHaveBeenCalledWith(
-      "http://127.0.0.1:7847/v1/booth/peer/offer",
-      expect.objectContaining({ method: "POST" })
-    );
+  it("requires embedded hub session id", () => {
+    expect(() =>
+      createBoothPeerClient({
+        peerCap: "pg_peer_ok",
+        embeddedHubSessionId: "  ",
+        localPresence: { agentId: "a", name: "n" },
+        handlers: {},
+      })
+    ).toThrow("embedded_hub_required");
   });
 
-  it("surfaces HTTP errors", async () => {
-    const fetchImpl = vi.fn(async () => ({
-      ok: false,
-      status: 403,
-      json: async () => ({ error: "peer_gone" }),
-    })) as unknown as typeof fetch;
+  it("surfaces embedded signal rejection", async () => {
+    registerEmbeddedPeerSignalHost({
+      getHubSessionId: () => "sess-1",
+      validatePeerCap: () => false,
+      acceptPeerOffer: async () => ({
+        answerWire: "mock-answer",
+        peerId: "peer-1",
+      }),
+    });
 
     const client = createBoothPeerClient({
       peerCap: "pg_peer_bad",
-      hubBaseUrl: "http://127.0.0.1:7847",
+      embeddedHubSessionId: "sess-1",
       localPresence: { agentId: "a", name: "n" },
       handlers: {},
-      fetchImpl,
     });
 
     await expect(client.join()).rejects.toThrow("peer_gone");

@@ -1,4 +1,10 @@
 import {
+  listDeviceTokens,
+  mintDeviceToken,
+  revokeDeviceToken,
+  touchDeviceTokenLastUsed,
+} from "./boothDevices.js";
+import {
   anchorSecretPlaintext,
   goPublicOrigin,
   OPERATOR_CAP_TTL_MS,
@@ -26,6 +32,18 @@ type BoothRouteDeps = {
     req: Request
   ) => Promise<
     | { ok: true; userId: string; role: "admin" | "user" }
+    | { ok: false; res: Response }
+  >;
+  requireHubCredential: (
+    env: BoothRouteEnv,
+    req: Request
+  ) => Promise<
+    | {
+        ok: true;
+        userId: string;
+        role: "admin" | "user";
+        kind: "api_key" | "device_token";
+      }
     | { ok: false; res: Response }
   >;
   requireAccessToken: (
@@ -122,8 +140,14 @@ export async function routeBooth(
   deps: BoothRouteDeps
 ): Promise<Response | null> {
   const { pathname } = url;
-  const { json, requireApiKey, requireAccessToken, parseBearer, inviteStub } =
-    deps;
+  const {
+    json,
+    requireApiKey,
+    requireHubCredential,
+    requireAccessToken,
+    parseBearer,
+    inviteStub,
+  } = deps;
 
   if (request.method === "POST" && pathname === "/v1/booth/join/offer") {
     const joinCap = parseBearer(request);
@@ -180,7 +204,7 @@ export async function routeBooth(
   }
 
   if (request.method === "POST" && pathname === "/v1/booth/anchors") {
-    const auth = await requireApiKey(env, request);
+    const auth = await requireHubCredential(env, request);
     if (!auth.ok) return auth.res;
     const body = (await request.json().catch(() => ({}))) as {
       boothSessionId?: string;
@@ -222,9 +246,9 @@ export async function routeBooth(
 
   if (request.method === "DELETE" && pathname === "/v1/booth/anchors/active") {
     let userId: string | null = null;
-    const apiAuth = await requireApiKey(env, request);
-    if (apiAuth.ok) {
-      userId = apiAuth.userId;
+    const hubAuth = await requireHubCredential(env, request);
+    if (hubAuth.ok) {
+      userId = hubAuth.userId;
     } else {
       const atAuth = await requireAccessToken(env, request);
       if (!atAuth.ok) return atAuth.res;
@@ -234,6 +258,45 @@ export async function routeBooth(
     const res = await stub.fetch("https://booth/revoke", { method: "POST" });
     if (!res.ok) return json({ error: "revoke_failed" }, res.status);
     await clearAnchorSecretMapping(env.STORE, userId);
+    return json({ ok: true });
+  }
+
+  if (request.method === "POST" && pathname === "/v1/booth/devices") {
+    const auth = await requireAccessToken(env, request);
+    if (!auth.ok) return auth.res;
+    const body = (await request.json().catch(() => ({}))) as {
+      label?: string;
+    };
+    const { plaintext, record } = await mintDeviceToken(
+      env.STORE,
+      auth.userId,
+      auth.role,
+      body.label ?? ""
+    );
+    return json({
+      id: record.id,
+      deviceToken: plaintext,
+      label: record.label,
+      prefix: record.prefix,
+      createdAt: record.createdAt,
+      ownerUserId: auth.userId,
+    });
+  }
+
+  if (request.method === "GET" && pathname === "/v1/booth/devices") {
+    const auth = await requireAccessToken(env, request);
+    if (!auth.ok) return auth.res;
+    const devices = await listDeviceTokens(env.STORE, auth.userId);
+    return json({ devices });
+  }
+
+  const deviceMatch = /^\/v1\/booth\/devices\/([^/]+)$/.exec(pathname);
+  if (request.method === "DELETE" && deviceMatch) {
+    const auth = await requireAccessToken(env, request);
+    if (!auth.ok) return auth.res;
+    const deviceId = decodeURIComponent(deviceMatch[1]!);
+    const ok = await revokeDeviceToken(env.STORE, auth.userId, deviceId);
+    if (!ok) return json({ error: "not_found" }, 404);
     return json({ ok: true });
   }
 

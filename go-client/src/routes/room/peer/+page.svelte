@@ -10,7 +10,6 @@
     goWebPageJsonLd,
   } from "$lib/goShareMeta";
   import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
-  import { BOOTH_LOCAL_DEFAULT_PORT } from "$lib/booth/boothLocalEngine";
 
   const og = goOgMeta({
     title: "監控 Peer · 山姆鍋遊樂場",
@@ -29,7 +28,6 @@
 
   let peerCap = $state("");
   let hubSessionId = $state("");
-  let hubUrl = $state("");
   let label = $state("");
   let displayName = $state("監控 Peer");
   let phase = $state<PeerPhase>("idle");
@@ -38,7 +36,26 @@
   let peerId = $state<string | null>(null);
   let session: RosterPeerSession | null = null;
 
-  const canConnect = $derived(Boolean(peerCap.trim()) && phase !== "connecting");
+  const canConnect = $derived(
+    Boolean(peerCap.trim() && hubSessionId.trim()) && phase !== "connecting"
+  );
+
+  function peerJoinErrorMessage(err: unknown): string {
+    const code = err instanceof Error ? err.message : String(err);
+    if (code === "embedded_signal_timeout") {
+      return "找不到主持中的包廂分頁。請在同一瀏覽器保持 /room 開啟，並使用主持端產生的連結。";
+    }
+    if (code === "embedded_signal_unavailable") {
+      return "此瀏覽器不支援監控 Peer 連線。";
+    }
+    if (code === "embedded_hub_required") {
+      return "連結缺少包廂識別（hub）。請從主持端重新複製監控連結。";
+    }
+    if (code === "peer_gone") {
+      return "監控連結已失效或已撤銷。";
+    }
+    return err instanceof Error ? err.message : "無法加入";
+  }
 
   onMount(() => {
     if (!browser) return;
@@ -46,10 +63,9 @@
       page.url.searchParams.get("cap")?.trim() ??
       "";
     hubSessionId = page.url.searchParams.get("hub")?.trim() ?? "";
-    hubUrl = page.url.searchParams.get("hubUrl")?.trim() ?? "";
     label = page.url.searchParams.get("label")?.trim() ?? "";
     if (label) displayName = label;
-    if (peerCap) void connect();
+    if (peerCap && hubSessionId) void connect();
     return () => {
       try {
         session?.close();
@@ -62,7 +78,8 @@
 
   async function connect() {
     const cap = peerCap.trim();
-    if (!cap || phase === "connecting") return;
+    const hub = hubSessionId.trim();
+    if (!cap || !hub || phase === "connecting") return;
     phase = "connecting";
     error = null;
     message = "連線中…";
@@ -71,10 +88,7 @@
       const agentId = `peer-${crypto.randomUUID().slice(0, 8)}`;
       const out = await joinBoothAsPeer({
         peerCap: cap,
-        hubBaseUrl:
-          hubUrl.trim() ||
-          `http://127.0.0.1:${BOOTH_LOCAL_DEFAULT_PORT}`,
-        embeddedHubSessionId: hubSessionId.trim() || undefined,
+        embeddedHubSessionId: hub,
         label: label.trim() || displayName.trim() || undefined,
         localPresence: {
           agentId,
@@ -107,7 +121,7 @@
       }
     } catch (e) {
       phase = "error";
-      error = e instanceof Error ? e.message : "無法加入";
+      error = peerJoinErrorMessage(e);
       message = "";
     }
   }
@@ -130,12 +144,16 @@
 <main class="peer-page">
   <header class="peer-header">
     <h1>監控 Peer</h1>
-    <p>以 peerCap 加入包廂 roster（網頁或 pg-boothd CLI）。</p>
+    <p>
+      以 peerCap 加入<strong>同一瀏覽器</strong>內 Embedded 包廂 roster。常駐
+      pg-boothd 請用 CLI：<code>pg-boothd peer --cap …</code>。
+    </p>
   </header>
 
-  {#if !peerCap}
+  {#if !peerCap || !hubSessionId}
     <p class="peer-alert" role="alert">
-      請從主持端「監控 Peer」複製連結，或帶入有效的 peerCap 參數。
+      請從主持端「監控 Peer」複製完整連結（含 peerCap 與 hub）。瀏覽器不連 localhost
+      booth server。
     </p>
   {/if}
 
@@ -154,6 +172,12 @@
       <label>
         <span>peerCap</span>
         <input type="text" bind:value={peerCap} autocomplete="off" />
+      </label>
+    {/if}
+    {#if !page.url.searchParams.get("hub")}
+      <label>
+        <span>hub（包廂 session）</span>
+        <input type="text" bind:value={hubSessionId} autocomplete="off" />
       </label>
     {/if}
     <button type="submit" disabled={!canConnect}>
@@ -187,6 +211,9 @@
     font-size: 0.88rem;
     opacity: 0.85;
     line-height: 1.45;
+  }
+  .peer-header code {
+    font-size: 0.82em;
   }
   .peer-alert {
     padding: 0.65rem 0.75rem;

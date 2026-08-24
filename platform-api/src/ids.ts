@@ -50,6 +50,11 @@ export function apiKeyPlaintext(): string {
   return `pg_sk_${randomId(24)}`;
 }
 
+/** Booth hub device credential (pg-boothd / pg-booth-desktop anchor). */
+export function deviceTokenPlaintext(): string {
+  return `pg_dt_${randomId(24)}`;
+}
+
 /** Dashboard session Bearer — not for field shell. */
 export function accessTokenPlaintext(): string {
   return `pg_at_${randomId(24)}`;
@@ -118,6 +123,13 @@ export function keyPrefix(plaintext: string): string {
     ? plaintext.slice(6)
     : plaintext;
   return `pg_sk_${body.slice(0, 8)}`;
+}
+
+export function deviceTokenPrefix(plaintext: string): string {
+  const body = plaintext.startsWith("pg_dt_")
+    ? plaintext.slice(6)
+    : plaintext;
+  return `pg_dt_${body.slice(0, 8)}`;
 }
 
 export function fieldDeepLink(

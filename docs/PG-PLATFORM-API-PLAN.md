@@ -296,7 +296,7 @@ Auth：`Authorization: Bearer <access_token|api_key|join_cap|…>`（依端點�
 | `POST` | `/v1/booth/operator-caps` | access token | 換短命 Operator cap + `remoteUrl` |
 | `POST` | `/v1/booth/join/offer` | `join_cap` | Guest 包廂 roster 握手；見 ENGINE §10.7 |
 | `GET` | `/v1/booth/ws` | Upgrade：`anchorSecret` 或 `operatorCap` | BoothAnchor WebSocket（Engine／Operator） |
-| `POST` | `/v1/booth/devices` | access token | 核發 `device_token`（`pg-boothd login`；**未落地**） |
+| `POST` | `/v1/booth/devices` | access token | 核發 `device_token`（`pg-boothd login`；**已落地**） |
 | `GET` | `/v1/booth/devices` | access token | 列出已綁定裝置 |
 | `DELETE` | `/v1/booth/devices/:id` | access token | 撤銷裝置 token |
 

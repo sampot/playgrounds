@@ -7,6 +7,7 @@ import {
   provisionTokenPlaintext,
   sha256Hex,
 } from "./ids.js";
+import { revokeAllDeviceTokensForUser } from "./boothDevices.js";
 
 export type StoredApiKey = {
   userId: string;
@@ -505,6 +506,7 @@ export async function deleteUserAccount(
   await invalidateUserProvision(store, userId);
   await deleteApiKey(store, userId);
   await revokeAllAccessTokensForUser(store, userId);
+  await revokeAllDeviceTokensForUser(store, userId);
   await store.delete(USER_REC(userId));
   await removeUserFromIndex(store, userId);
   return { ok: true };
