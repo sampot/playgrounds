@@ -1,6 +1,6 @@
 /**
  * Hub-side presence live recording (PG-GO-ROOM-RECORD-PLAN §7).
- * Embedded Hub: MediaRecorder + OPFS stream write.
+ * Embedded Hub: MediaRecorder + private library stream write.
  */
 
 import {
@@ -10,7 +10,7 @@ import {
 import type {
   RoomPrivateLibrary,
   RoomPrivateStreamWriter,
-} from "./goRoomPrivateOpfs";
+} from "./goRoomPrivateTypes";
 
 export type RoomRecordResult =
   | { ok: true }

@@ -23,7 +23,7 @@
 - **主持指定、多路並行（硬）：** director 可對多個 `peerId` 同時 `session_record.start`；每路 **一檔**，互不合成。
 - **錄 presence live，不錄 program（硬）：** 來源＝該 peer 的 **在場** RTP（`session_camera` 已 `offer` 的鏡頭／畫面分享）；**不是**當下大螢幕節目槽（切台會斷 continuity）。
 - **Hub Engine 執行（硬）：** 錄製 tap 在 Hub ingress；Shell 只送 intent；Guest／Peer **不**自行錄製上傳。
-- **落地私有片庫（硬）：** 停止後檔進 Hub 私有命名空間（Embedded OPFS；daemon `~/.pg-booth/private/`）；**不**自動 fanout 分享 metadata、**不**進 `/room-file/<id>`。
+- **落地私有片庫（硬）：** 停止後檔進 Hub 私有命名空間（Embedded **瀏覽器** OPFS；`pg-booth-desktop` **plugin-fs**→`privateLibraryDir`；daemon `~/.pg-booth/private/`）；**不**自動 fanout 分享 metadata、**不**進 `/room-file/<id>`。
 - **與 cast 正交：** 可不 cast 也錄；可 cast 同時錄同一人；cast 改源**不**影響已在錄的 peer。
 - **全場透明：** 被錄 peer 的成員卡顯示 **錄影中** badge；進場說明更新（見 §10）。
 - **Platform 零媒體：** signaling 只 JSON；bytes **不**經 BoothAnchor DO／R2。
@@ -93,7 +93,7 @@ presence A/V ──WebRTC──►  收到上行軌
 | Hub 模式 | 錄影實作 | 產品定位 |
 | --- | --- | --- |
 | **Daemon**（`pg-boothd`） | ffmpeg／gstreamer 寫本機 FS | **快樂路徑**；7×24 監控 |
-| **Desktop**（`pg-booth-desktop`） | 共用 `booth-record`（可晚於 daemon） | 輕量常駐；見 [PG-GO-ROOM-TAURI-PLAN.md](./PG-GO-ROOM-TAURI-PLAN.md) |
+| **Desktop**（`pg-booth-desktop`） | `MediaRecorder`＋**plugin-fs** 串流寫（T0 TS Hub）／共用 `booth-record`（T1b+） | 輕量常駐；見 [PG-GO-ROOM-TAURI-PLAN.md](./PG-GO-ROOM-TAURI-PLAN.md) |
 | **Embedded**（瀏覽器 `/room`） | `MediaRecorder` + OPFS 串流寫 | 短錄、開發驗證；Safari 當 Hub **不承諾** |
 
 ---
@@ -191,7 +191,7 @@ recordings: Array<{
 | **檔名** | `{displayName}-{YYYYMMDD-HHmmss}.{ext}`；`label` 若有則前綴 `{label}-` |
 | **Embedded 格式** | `video/webm`（`MediaRecorder` 預設；vp8/opus 或瀏覽器能力） |
 | **Daemon 格式** | `video/mp4`（h264+aac）或 `video/webm`（實作選一；契約 `mime` 回報） |
-| **寫入** | **串流**寫 OPFS／FS；**禁止**整段 RAM `Blob` 再落盤（對齊 ROOM §8.3） |
+| **寫入** | **串流**寫 OPFS／本機 FS（desktop＝plugin-fs）；**禁止**整段 RAM `Blob` 再落盤（對齊 ROOM §8.3） |
 | **metadata** | 與既有私有檔同一列模型；`source: "record"`、`sourcePeerId`、`recordedAt` 可選內部欄 |
 | **大小** | 受私有片庫配額約束；滿則 `storage_full` + 頁內說明 |
 
@@ -272,7 +272,8 @@ recordings: Array<{
 | `src/components/playgrounds/roster/rosterSessionRecord.ts` | wire 型別 + `isSessionRecordMessage` + tests |
 | `go-client/src/lib/goRoom.ts` | `roomHostMemberRecord`、文案常數 |
 | `go-client/src/lib/GoRoomMemberCard.svelte` | 錄影按鈕、badge |
-| `go-client/src/lib/goRoomMedia.ts` 或 `boothHubEngine.ts` | Embedded Hub `RecordTap` + OPFS |
+| `go-client/src/lib/goRoomPrivateFs.ts` | Desktop Shell `plugin-fs` 私有片庫 |
+| `go-client/src/lib/goRoomMedia.ts` 或 `boothHubEngine.ts` | Embedded Hub `RecordTap` + 私有片庫 |
 | `go-client/src/lib/roomRuntime.ts` | `session_record` fanout／intent 轉發 |
 
 ### 11.2 私有 monorepo（`pg-booth`／`booth-record` crate）
@@ -328,5 +329,6 @@ recordings: Array<{
 
 | 日期 | 摘要 |
 | --- | --- |
+| 2026-08-24 | **Desktop 私有片庫：** `goRoomPrivateFs`（plugin-fs）＋`createHostPrivateLibrary`；與 OPFS／daemon layout 對齊 |
 | 2026-08-24 | **Embedded 落地：** R0 wire + R2 Shell UI + R3 `MediaRecorder`→OPFS；Operator `booth.intent.record.*` + snapshot `recordings` |
 | 2026-08-23 | 初稿：多路 presence 錄影、`session_record` wire、Hub 私有片庫、與 cast 正交 |

@@ -129,7 +129,7 @@
 | `session_cast` 發起 | Hub 驗權並執行 | Operator／主持 Shell 送 intent |
 | `invite.room` mint | Hub | Shell 觸發 intent |
 | `/room-file/<id>` SW | Hub HTTP 門面 | Shell／Guest／Peer 仍發 HTTP |
-| 私有片庫（ROOM §5.5.1） | Hub 本機 FS（daemon `~/.pg-booth/private/` 或 Embedded OPFS） | **Owner Shell** 讀寫（本地 `/room` 直連；遠端 Operator 經 §7.6）；Guest **—** |
+| 私有片庫（ROOM §5.5.1） | Hub 本機 FS（daemon `~/.pg-booth/private/`；Embedded **OPFS**；desktop **plugin-fs**→`privateLibraryDir`） | **Owner Shell** 讀寫（本地 `/room` 直連；遠端 Operator 經 §7.6）；Guest **—** |
 | 分享目錄管理 | Hub 權威＋fanout | Owner Shell 掛／撤（intent）；Guest 掛本機檔 |
 | Guest `/i/` | Guest 握手經 **BoothAnchor** → Hub（§10.7） | Guest 頁（非 Shell） |
 | 監控鏡頭／NAS 掛檔 | **Peer** 連 Hub（`peerCap`） | Shell 管理 `peerCap`（§5.4） |
@@ -1046,6 +1046,7 @@ export interface BoothMediaSurface {
 
 | 日期 | 變更 |
 | --- | --- |
+| 2026-08-24 | **Desktop 私有片庫（go-client）：** `plugin-fs`＋`createHostPrivateLibrary`；與 OPFS／daemon layout 對齊（TAURI-PLAN §7.4） |
 | 2026-08-24 | **第八刀：`pg-booth` 私有 monorepo** — `pg-booth-desktop`（Tauri 輕量）與 `pg-boothd` 共用 `crates/*`；§5.3 Desktop 部署；§11／§16 E3 拆分；見 [PG-GO-ROOM-TAURI-PLAN.md](./PG-GO-ROOM-TAURI-PLAN.md) |
 | 2026-08-24 | **第七刀：Operator＝Roster 節點** — §6 拓樸重寫；§6.2 能力模型（`kind`≠能力上限）；Operator ✅ presence／`session_play` 入座；§8.1c 單機快樂路徑；§10.6 presence wire；委任草案 §6.2.3（未落地） |
 | 2026-08-23 | **第六刀：Operator＝Remote Owner Shell** — §6.1 能力矩陣；Hub 私有片庫遠端讀寫（§7.6 Owner file channel）；`privateFiles` 訂閱；§8.1b 快樂路徑；修訂 §7.4 viewer 可片庫讀寫 |

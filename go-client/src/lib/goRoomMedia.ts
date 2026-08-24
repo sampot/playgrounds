@@ -50,9 +50,9 @@ import {
 import { ensureLocalRoomFileRegistered } from "./goRoomPlayBridge";
 import { roomFilePath } from "./goRoomPlayRegistry";
 import {
-  createRoomPrivateLibrary,
+  createHostPrivateLibrary,
   type RoomPrivateLibrary,
-} from "./goRoomPrivateOpfs";
+} from "./goRoomPrivateLibrary";
 import {
   applyRecordNotify,
   createPresenceRecordHub,
@@ -329,7 +329,7 @@ export function createRoomMedia(opts: {
   const recordingNotified = new Set<string>();
   const privateLibrary =
     opts.privateLibrary ??
-    (opts.forward ? createRoomPrivateLibrary() : null);
+    (opts.forward ? createHostPrivateLibrary() : null);
   const recorder: PresenceRecordHub | null =
     opts.forward && privateLibrary
       ? createPresenceRecordHub({

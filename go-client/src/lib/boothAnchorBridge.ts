@@ -16,7 +16,7 @@ import { goRoomFiles } from "./goRoomFiles.svelte";
 import { goRoomPrivateFiles } from "./goRoomPrivateFiles.svelte";
 import { goRoomMedia } from "./goRoomMedia.svelte";
 import { goSessionChat } from "./goSessionChat.svelte";
-import { newRoomPrivateFileId } from "./goRoomPrivateOpfs";
+import { newRoomPrivateFileId } from "./goRoomPrivateLibrary";
 import type { RoomStatus } from "./roomRuntime";
 
 export const GO_ROOM_REMOTE_ANCHOR_KEY = "go_room_remote_anchor_v1";

@@ -802,14 +802,14 @@ session_file.cancel    { id, transferId }
 
 OS 檔案選擇器允許（掛檔、另存、匯入私有）。**不掛目錄。** 可執行檔拒（頁內，非原生 dialog）。**否決**自動上傳 Platform／R2。
 
-### 8.3 主持私有檔（OPFS；契約凍；Phase **2g** 已落地）
+### 8.3 主持私有檔（儲存契約凍；Phase **2g** 已落地）
 
 對齊 §5.5.1。這一節凍**儲存與隔離**；UI／cast 接線見 Phase 2g（手測：私有影／音可上大螢幕；圖同 2e）。
 
 | 項 | 規格 |
 | --- | --- |
 | **用途** | Host 本機片庫：匯入、列、刪、本機預覽、上大螢幕、**掛到分享** |
-| **儲存** | **允許** OPFS（`navigator.storage.getDirectory()` 或其子目錄，例：`room-private/`）。**禁止**用同一 OPFS 當分享 DC transfer 緩衝 |
+| **儲存** | **Embedded 瀏覽器 Hub：** OPFS（`navigator.storage.getDirectory()` 子目錄 `room-private/`）。**`pg-booth-desktop` Shell：** **不用** OPFS；`@tauri-apps/plugin-fs` 寫 `booth_paths.privateLibraryDir`（`manifest.json`＋`files/pvt_*`；見 TAURI-PLAN §7.4）。**daemon：** `~/.pg-booth/private/`。**禁止**用私有庫路徑當分享 DC transfer 緩衝 |
 | **與 `/room-file`** | 私有 id **永不**註冊進分享 `/room-file/<id>` registry。Guest／遠端 HTTP 對私有 id → **404**（或不存在於 registry） |
 | **上大螢幕** | Host 本機讀 OPFS → 解碼表面 → `captureStream` → 節目 RTP（`session_cast`＋`scope: "private"`）。**不**經 `session_file` bytes |
 | **掛到分享** | 從 OPFS 取得可讀 blob／File → 既有分享掛上路徑（新分享 id＋metadata fanout）。之後別人「要」走 §8.2 |

@@ -180,7 +180,10 @@ Platform／Dash 只辨識 **Hub online**＋`device_token`；UI 可標「桌面�
 
 | 項 | 路徑／行為 |
 | --- | --- |
-| **私有片庫** | `{app_data}/booth/private/`（`booth-storage`）；**不用** OPFS |
+| **私有片庫** | `{app_data}/booth/private/`（`booth-storage` 目錄契約）；**不用** WebView OPFS |
+| **Shell 讀寫（T0–T1 TS Hub）** | go-client `createHostPrivateLibrary()` → `@tauri-apps/plugin-fs` 直寫 `booth_paths.privateLibraryDir`；layout＝`manifest.json`＋`files/pvt_*`（與 OPFS／daemon 同形） |
+| **plugin-fs scope（硬）** | Tauri `allow-fs-private-library.toml`：`$HOME/.local/share/pg-booth/private/**`（Linux）、`$HOME/Library/Application Support/me.samkuo.pg-booth/private/**`（macOS）、`$APPDATA/me/samkuo/pg-booth/private/**`（Windows）；與 `booth_storage::private_library_dir()` 一致 |
+| **T1b+ Hub native** | 錄影／匯入權威可收斂至 `booth-storage` crate；Shell 改 Hub snapshot＋Owner file channel（同 Operator）——目錄仍同一 `privateLibraryDir` |
 | **`device_token`** | secure store 或 `~/.pg-booth/credentials.json`（0600）；與 boothd **同格式** |
 | **`shellLocalToken`** | `~/.pg-booth/shell.token` 或 app 專用路徑；僅 loopback Control Channel |
 
@@ -294,4 +297,6 @@ type BoothEngineMode = "embedded" | "daemon" | "desktop";
 
 | 日期 | 變更 |
 | --- | --- |
+| 2026-08-24 | **pg-booth-desktop：** `tauri-plugin-fs` + `allow-fs-private-library` capabilities（對齊 `booth-storage` private 路徑） |
+| 2026-08-24 | **go-client 落地：** Desktop Shell 私有片庫經 `@tauri-apps/plugin-fs`＋`booth_paths.privateLibraryDir`；§7.4 增 plugin-fs scope／layout 契約 |
 | 2026-08-24 | 初稿：Tauri 輕量常駐、`pg-booth` 私有 monorepo 與 `pg-boothd` 共用 crates、Hybrid 分層、T0／T1 演進、E3b 驗收 |

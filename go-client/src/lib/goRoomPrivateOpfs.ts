@@ -1,55 +1,38 @@
 /**
- * Host-only private media library (OPFS). Never registers into `/room-file`.
- * PG-GO-ROOM-PLAN §5.5.1／§8.3.
+ * Host private media library — Embedded Hub OPFS backend.
+ * PG-GO-ROOM-PLAN §5.5.1／§8.3. Desktop uses goRoomPrivateFs (TAURI-PLAN §7.4).
  */
 
-export const GO_ROOM_PRIVATE_OPFS_ROOT = "room-private";
-export const GO_ROOM_PRIVATE_ID_PREFIX = "pvt_";
-export const GO_ROOM_PRIVATE_UNSUPPORTED =
-  "這台瀏覽器沒有私有片庫（需要 OPFS）。可改用分享區掛檔。";
+import {
+  GO_ROOM_PRIVATE_FILES_DIR,
+  GO_ROOM_PRIVATE_MANIFEST,
+  GO_ROOM_PRIVATE_OPFS_ROOT,
+  GO_ROOM_PRIVATE_UNSUPPORTED_OPFS,
+  isRoomPrivateFileId,
+  newRoomPrivateFileId,
+  parseRoomPrivateManifest,
+  sanitizeRoomPrivateName,
+  type RoomPrivateEntry,
+  type RoomPrivateImportResult,
+  type RoomPrivateLibrary,
+  type RoomPrivateOpenStreamResult,
+  type RoomPrivateStreamWriter,
+} from "./goRoomPrivateTypes";
 
-const MANIFEST = "manifest.json";
-const FILES_DIR = "files";
-const ID_MAX = 128;
-const NAME_MAX = 200;
+export {
+  GO_ROOM_PRIVATE_ID_PREFIX,
+  GO_ROOM_PRIVATE_OPFS_ROOT,
+  GO_ROOM_PRIVATE_UNSUPPORTED_OPFS as GO_ROOM_PRIVATE_UNSUPPORTED,
+  isRoomPrivateFileId,
+  newRoomPrivateFileId,
+  type RoomPrivateEntry,
+  type RoomPrivateImportResult,
+  type RoomPrivateLibrary,
+  type RoomPrivateOpenStreamResult,
+  type RoomPrivateStreamWriter,
+} from "./goRoomPrivateTypes";
 
-export type RoomPrivateEntry = {
-  id: string;
-  name: string;
-  mime: string;
-  size: number;
-  createdAt: number;
-};
-
-export type RoomPrivateImportResult =
-  | { ok: true; entry: RoomPrivateEntry }
-  | { ok: false; error: string };
-
-export type RoomPrivateStreamWriter = {
-  id: string;
-  writeChunk(chunk: Blob): Promise<void>;
-  finalize(): Promise<RoomPrivateImportResult>;
-  abort(): Promise<void>;
-};
-
-export type RoomPrivateOpenStreamResult =
-  | { ok: true; writer: RoomPrivateStreamWriter }
-  | { ok: false; error: string };
-
-export type RoomPrivateLibrary = {
-  readonly supported: boolean;
-  list(): Promise<RoomPrivateEntry[]>;
-  importFile(file: File): Promise<RoomPrivateImportResult>;
-  openStreamWrite(opts: {
-    name: string;
-    mime: string;
-  }): Promise<RoomPrivateOpenStreamResult>;
-  getFile(id: string): Promise<File | null>;
-  remove(id: string): Promise<void>;
-  clear(): Promise<void>;
-};
-
-export type RoomPrivateLibraryDeps = {
+export type RoomPrivateOpfsDeps = {
   getDirectory?: () => Promise<FileSystemDirectoryHandle>;
   isSupported?: () => boolean;
   newId?: () => string;
@@ -58,25 +41,6 @@ export type RoomPrivateLibraryDeps = {
   now?: () => number;
 };
 
-export function isRoomPrivateFileId(id: string): boolean {
-  return (
-    typeof id === "string" &&
-    id.startsWith(GO_ROOM_PRIVATE_ID_PREFIX) &&
-    id.length > GO_ROOM_PRIVATE_ID_PREFIX.length &&
-    id.length <= ID_MAX
-  );
-}
-
-export function newRoomPrivateFileId(rand = randomHex): string {
-  return `${GO_ROOM_PRIVATE_ID_PREFIX}${rand()}`;
-}
-
-function randomHex(): string {
-  const bytes = new Uint8Array(8);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-}
-
 function isOpfsSupported(): boolean {
   return (
     typeof navigator !== "undefined" &&
@@ -84,13 +48,8 @@ function isOpfsSupported(): boolean {
   );
 }
 
-function sanitizeName(name: string): string {
-  const trimmed = name.trim().slice(0, NAME_MAX) || "file";
-  return trimmed.replace(/[/\\]/g, "_");
-}
-
-export function createRoomPrivateLibrary(
-  deps: RoomPrivateLibraryDeps = {}
+export function createRoomPrivateOpfsLibrary(
+  deps: RoomPrivateOpfsDeps = {}
 ): RoomPrivateLibrary {
   const supported = (deps.isSupported ?? isOpfsSupported)();
   const now = deps.now ?? (() => Date.now());
@@ -108,25 +67,17 @@ export function createRoomPrivateLibrary(
   async function filesDir(
     base: FileSystemDirectoryHandle
   ): Promise<FileSystemDirectoryHandle> {
-    return base.getDirectoryHandle(FILES_DIR, { create: true });
+    return base.getDirectoryHandle(GO_ROOM_PRIVATE_FILES_DIR, { create: true });
   }
 
   async function readManifest(
     base: FileSystemDirectoryHandle
   ): Promise<RoomPrivateEntry[]> {
     try {
-      const fh = await base.getFileHandle(MANIFEST);
+      const fh = await base.getFileHandle(GO_ROOM_PRIVATE_MANIFEST);
       const file = await fh.getFile();
       const raw = JSON.parse(await file.text()) as unknown;
-      if (!Array.isArray(raw)) return [];
-      return raw.filter(
-        (e): e is RoomPrivateEntry =>
-          Boolean(e) &&
-          typeof e === "object" &&
-          isRoomPrivateFileId(String((e as RoomPrivateEntry).id)) &&
-          typeof (e as RoomPrivateEntry).name === "string" &&
-          typeof (e as RoomPrivateEntry).size === "number"
-      );
+      return parseRoomPrivateManifest(raw);
     } catch {
       return [];
     }
@@ -136,7 +87,9 @@ export function createRoomPrivateLibrary(
     base: FileSystemDirectoryHandle,
     entries: RoomPrivateEntry[]
   ): Promise<void> {
-    const fh = await base.getFileHandle(MANIFEST, { create: true });
+    const fh = await base.getFileHandle(GO_ROOM_PRIVATE_MANIFEST, {
+      create: true,
+    });
     const w = await fh.createWritable();
     await w.write(JSON.stringify(entries));
     await w.close();
@@ -154,7 +107,7 @@ export function createRoomPrivateLibrary(
     },
     async importFile(file) {
       if (!supported) {
-        return { ok: false, error: GO_ROOM_PRIVATE_UNSUPPORTED };
+        return { ok: false, error: GO_ROOM_PRIVATE_UNSUPPORTED_OPFS };
       }
       try {
         const base = await root();
@@ -162,7 +115,7 @@ export function createRoomPrivateLibrary(
         const id = newRoomPrivateFileId(newId);
         const entry: RoomPrivateEntry = {
           id,
-          name: sanitizeName(file.name),
+          name: sanitizeRoomPrivateName(file.name),
           mime: file.type || "application/octet-stream",
           size: file.size,
           createdAt: now(),
@@ -194,7 +147,7 @@ export function createRoomPrivateLibrary(
     },
     async openStreamWrite(opts) {
       if (!supported) {
-        return { ok: false, error: GO_ROOM_PRIVATE_UNSUPPORTED };
+        return { ok: false, error: GO_ROOM_PRIVATE_UNSUPPORTED_OPFS };
       }
       try {
         const base = await root();
@@ -202,7 +155,7 @@ export function createRoomPrivateLibrary(
         const id = newRoomPrivateFileId(newId);
         const entry: RoomPrivateEntry = {
           id,
-          name: sanitizeName(opts.name),
+          name: sanitizeRoomPrivateName(opts.name),
           mime: opts.mime || "application/octet-stream",
           size: 0,
           createdAt: now(),
@@ -307,4 +260,17 @@ export function createRoomPrivateLibrary(
       }
     },
   };
+}
+
+/** Embedded browser Hub — OPFS backend. */
+export function createRoomPrivateLibrary(
+  deps: RoomPrivateOpfsDeps = {}
+): RoomPrivateLibrary {
+  return createRoomPrivateOpfsLibrary(deps);
+}
+
+function randomHex(): string {
+  const bytes = new Uint8Array(8);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }

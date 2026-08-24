@@ -2,10 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import {
   GO_ROOM_PRIVATE_ID_PREFIX,
   GO_ROOM_PRIVATE_OPFS_ROOT,
-  createRoomPrivateLibrary,
   isRoomPrivateFileId,
   newRoomPrivateFileId,
-} from "./goRoomPrivateOpfs";
+} from "./goRoomPrivateTypes";
+import { createRoomPrivateOpfsLibrary } from "./goRoomPrivateOpfs";
 
 describe("room private id namespace", () => {
   it("prefixes private ids and rejects share-looking ids", () => {
@@ -19,7 +19,11 @@ describe("room private id namespace", () => {
 
 function memoryOpfs() {
   const files = new Map<string, Uint8Array>();
-  const dirs = new Set<string>(["", GO_ROOM_PRIVATE_OPFS_ROOT, `${GO_ROOM_PRIVATE_OPFS_ROOT}/files`]);
+  const dirs = new Set<string>([
+    "",
+    GO_ROOM_PRIVATE_OPFS_ROOT,
+    `${GO_ROOM_PRIVATE_OPFS_ROOT}/files`,
+  ]);
 
   function dirHandle(path: string): FileSystemDirectoryHandle {
     return {
@@ -64,7 +68,7 @@ function memoryOpfs() {
       async getFile() {
         const bytes = files.get(key) ?? new Uint8Array();
         const name = key.split("/").pop() || "blob";
-        return new File([bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)], name);
+        return new File([Uint8Array.from(bytes)], name);
       },
       async createWritable() {
         const chunks: Uint8Array[] = [];
@@ -102,10 +106,10 @@ function memoryOpfs() {
   };
 }
 
-describe("createRoomPrivateLibrary", () => {
+describe("createRoomPrivateOpfsLibrary", () => {
   it("imports list deletes without touching a share registry", async () => {
     const mem = memoryOpfs();
-    const lib = createRoomPrivateLibrary({
+    const lib = createRoomPrivateOpfsLibrary({
       getDirectory: mem.getDirectory,
       isSupported: () => true,
       newId: () => "aabbccdd",
@@ -136,7 +140,7 @@ describe("createRoomPrivateLibrary", () => {
   });
 
   it("reports unsupported when OPFS is missing", async () => {
-    const lib = createRoomPrivateLibrary({
+    const lib = createRoomPrivateOpfsLibrary({
       getDirectory: async () => {
         throw new Error("no opfs");
       },
@@ -152,7 +156,7 @@ describe("createRoomPrivateLibrary", () => {
   it("never registers into a share room-file registry hook", async () => {
     const mem = memoryOpfs();
     const registerLocal = vi.fn();
-    const lib = createRoomPrivateLibrary({
+    const lib = createRoomPrivateOpfsLibrary({
       getDirectory: mem.getDirectory,
       isSupported: () => true,
       newId: () => "11223344",

@@ -1,12 +1,9 @@
 /**
- * Host-only private OPFS library UI state. Never fans out via session_file.
+ * Host-only private library UI state. Never fans out via session_file.
  */
 
-import {
-  createRoomPrivateLibrary,
-  type RoomPrivateEntry,
-  type RoomPrivateLibrary,
-} from "./goRoomPrivateOpfs";
+import { createHostPrivateLibrary } from "./goRoomPrivateLibrary";
+import type { RoomPrivateEntry, RoomPrivateLibrary } from "./goRoomPrivateTypes";
 
 class GoRoomPrivateFiles {
   entries = $state<RoomPrivateEntry[]>([]);
@@ -23,7 +20,7 @@ class GoRoomPrivateFiles {
 
   attach(): void {
     this.detach();
-    this.#lib = createRoomPrivateLibrary();
+    this.#lib = createHostPrivateLibrary();
     this.supported = this.#lib.supported;
     this.#attached = true;
     this.#mirror = false;
@@ -103,7 +100,7 @@ class GoRoomPrivateFiles {
     }
     if (!this.#lib) return "尚未就緒";
     if (!this.#lib.supported) {
-      this.error = "這台瀏覽器沒有私有片庫（需要 OPFS）。";
+      this.error = "這台環境沒有私有片庫。";
       return this.error;
     }
     this.busy = true;

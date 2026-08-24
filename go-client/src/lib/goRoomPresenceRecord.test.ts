@@ -7,7 +7,7 @@ import {
   resolveRecordTargetPeer,
 } from "./goRoomPresenceRecord";
 import { buildSessionRecordMessage } from "@pg/roster/rosterSessionRecord";
-import type { RoomPrivateLibrary } from "./goRoomPrivateOpfs";
+import type { RoomPrivateLibrary } from "./goRoomPrivateTypes";
 
 describe("goRoomPresenceRecord helpers", () => {
   it("resolves local peer ids to the host agent id", () => {

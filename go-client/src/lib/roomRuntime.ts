@@ -43,7 +43,7 @@ import { goSessionChat } from "./goSessionChat.svelte";
 import { goRoomFiles } from "./goRoomFiles.svelte";
 import { goRoomPrivateFiles } from "./goRoomPrivateFiles.svelte";
 import { goRoomMedia } from "./goRoomMedia.svelte";
-import { isRoomPrivateFileId } from "./goRoomPrivateOpfs";
+import { isRoomPrivateFileId } from "./goRoomPrivateLibrary";
 import { createRoomFileStarHub, type RoomFileStarHub } from "./goRoomFileStar";
 import {
   createRoomSessionPlay,
