@@ -25,6 +25,7 @@
     goOgMeta,
     goWebPageJsonLd,
   } from "$lib/goShareMeta";
+  import { isBoothDesktopShell } from "$lib/boothDesktop";
   import { PLAYGROUNDS_GO_ORIGIN } from "@utils/playgroundsUrls";
 
   const og = goOgMeta({
@@ -54,6 +55,9 @@
   let autoMintStarted = false;
 
   onMount(() => {
+    if (isBoothDesktopShell()) {
+      document.documentElement.dataset.boothDesktop = "1";
+    }
     const unsub = runtime.subscribe((s) => {
       status = s;
       devHandle?.sync();

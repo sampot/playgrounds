@@ -27,6 +27,7 @@
   import { getGoCatalogEntry } from "$lib/goCatalog";
   import type { GoLoadProgress } from "$lib/goLoadProgress";
   import { goAuth } from "$lib/goAuth.svelte";
+  import { boothDesktopGoto } from "$lib/boothDesktopNav";
   import { readRemoteAnchorEnabled } from "$lib/boothAnchorBridge";
   import { roomAdClickAction } from "$lib/goAds";
   import { chromeSession } from "$lib/chromeSession.svelte";
@@ -1727,10 +1728,14 @@
     pendingAdHref = null;
   }
 
+  function navigateFromRoom(href: string) {
+    void boothDesktopGoto(href, goto);
+  }
+
   function askEnd(leaveHome = false) {
     pendingAdHref = null;
     if (!live) {
-      if (leaveHome) void goto("/");
+      if (leaveHome) navigateFromRoom("/");
       else void onEnd?.();
       return;
     }
@@ -1743,8 +1748,8 @@
     const adHref = pendingAdHref;
     pendingAdHref = null;
     await onEnd?.();
-    if (adHref) void goto(adHref);
-    else if (leaveAfterEnd) void goto("/");
+    if (adHref) navigateFromRoom(adHref);
+    else if (leaveAfterEnd) navigateFromRoom("/");
     leaveAfterEnd = false;
   }
 
@@ -1756,7 +1761,7 @@
 
   function onAdNavigate(href: string) {
     if (roomAdClickAction(live) === "goto") {
-      void goto(href);
+      navigateFromRoom(href);
       return;
     }
     pendingAdHref = href;
@@ -3385,7 +3390,7 @@
     z-index: 4;
     display: flex;
     flex-direction: column;
-    align-items: stretch;
+    align-items: center;
     justify-content: center;
     gap: 0.55rem;
     padding: 0.85rem 1rem;
@@ -3394,6 +3399,7 @@
     color: #f4efe4;
     pointer-events: auto;
     overflow: hidden;
+    text-align: center;
   }
   .room-tv-gate--connecting::after {
     content: "";
@@ -3435,10 +3441,11 @@
     line-height: 1.45;
     font-size: 0.92rem;
     max-width: 22rem;
+    width: min(100%, 22rem);
   }
   .room-tv-gate-btn {
     min-height: 44px;
-    align-self: stretch;
+    width: min(100%, 16rem);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -3448,8 +3455,9 @@
   .room-tv-gate-actions {
     display: flex;
     flex-direction: column;
+    align-items: center;
     gap: 0.5rem;
-    align-self: stretch;
+    width: min(100%, 16rem);
   }
   .room-tv-gate .err {
     color: #ffb4b8;
@@ -3466,21 +3474,16 @@
   }
   @container (min-width: 28rem) {
     .room-tv-gate {
-      align-items: center;
-      text-align: center;
       padding: 1.25rem 1.5rem;
     }
     .room-tv-gate-body,
     .room-tv-gate-hint {
       max-width: 28rem;
+      width: min(100%, 28rem);
     }
-    .room-tv-gate-btn {
-      align-self: center;
-      min-width: min(100%, 16rem);
-    }
+    .room-tv-gate-btn,
     .room-tv-gate-actions {
-      align-items: center;
-      max-width: 28rem;
+      width: min(100%, 16rem);
     }
   }
   .room-ad {

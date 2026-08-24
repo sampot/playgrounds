@@ -4,11 +4,13 @@ export const GO_PUBLIC_ORIGIN = "https://go.samkuo.me";
 
 export function isLoopbackPageOrigin(origin: string): boolean {
   try {
-    const host = new URL(origin).hostname.toLowerCase();
+    const url = new URL(origin);
+    const host = url.hostname.toLowerCase();
     return (
       host === "localhost" ||
       host === "127.0.0.1" ||
-      host.endsWith(".localhost")
+      host.endsWith(".localhost") ||
+      url.protocol === "tauri:"
     );
   } catch {
     return false;

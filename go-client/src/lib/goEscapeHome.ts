@@ -9,9 +9,12 @@ export function shouldEscapeToHome(args: {
   pathname: string;
   modalOpen?: boolean;
   textEntry?: boolean;
+  /** pg-booth-desktop: stay on booth; no lobby escape. */
+  boothDesktop?: boolean;
 }): boolean {
   if (args.key !== "Escape") return false;
   if (args.modalOpen) return false;
   if (args.textEntry) return false;
+  if (args.boothDesktop) return false;
   return isEscapeHomePath(args.pathname);
 }

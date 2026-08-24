@@ -24,4 +24,17 @@ describe("withCors", () => {
       "https://go.samkuo.me"
     );
   });
+
+  it("allows pg-booth-desktop Tauri origins", () => {
+    for (const origin of ["tauri://localhost", "http://tauri.localhost"]) {
+      const req = new Request("https://api.samkuo.me/v1/field/provision/redeem", {
+        headers: { Origin: origin },
+      });
+      const out = withCors(
+        req,
+        new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } })
+      );
+      expect(out.headers.get("Access-Control-Allow-Origin")).toBe(origin);
+    }
+  });
 });

@@ -205,8 +205,10 @@ export function goPublicOrigin(env?: {
 
 /**
  * Normalize field to origin (no path) or null if invalid.
- * Official `*.samkuo.me` → https. Localhost／127.0.0.1 → keep scheme;
+ * Official `*.samkuo.me` → https. Loopback (`localhost`／`127.0.0.1`／`*.localhost`) → keep http(s);
  * bare host without scheme defaults to **http** for loopback, else https.
+ * `*.localhost` covers Tauri on Windows/Android (`http(s)://tauri.localhost`).
+ * `tauri:` covers Tauri on macOS/Linux (`tauri://localhost` for pg-booth-desktop).
  */
 export function normalizeFieldOrigin(input: string): string | null {
   const raw = input.trim();
@@ -217,16 +219,29 @@ export function normalizeFieldOrigin(input: string): string | null {
       url = new URL(raw);
     } else {
       const hostname = raw.split("/")[0]?.split(":")[0]?.toLowerCase() || "";
-      const scheme =
-        hostname === "localhost" || hostname === "127.0.0.1" ? "http" : "https";
+      const loopbackBare =
+        hostname === "localhost" ||
+        hostname === "127.0.0.1" ||
+        hostname.endsWith(".localhost");
+      const scheme = loopbackBare ? "http" : "https";
       url = new URL(`${scheme}://${raw}`);
     }
   } catch {
     return null;
   }
   const host = url.hostname.toLowerCase();
-  if (host === "localhost" || host === "127.0.0.1") {
-    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+  const loopbackHost =
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host.endsWith(".localhost");
+  if (loopbackHost) {
+    if (
+      url.protocol !== "http:" &&
+      url.protocol !== "https:" &&
+      url.protocol !== "tauri:"
+    ) {
+      return null;
+    }
     const port = url.port ? `:${url.port}` : "";
     return `${url.protocol}//${host}${port}`;
   }

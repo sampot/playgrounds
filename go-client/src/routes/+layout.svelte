@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { browser } from "$app/environment";
-  import { goto } from "$app/navigation";
+  import { beforeNavigate, goto } from "$app/navigation";
   import { page } from "$app/state";
   import Chrome from "$lib/Chrome.svelte";
   import GoPlayIntro from "$lib/GoPlayIntro.svelte";
@@ -9,6 +9,11 @@
   import { chromeSession } from "$lib/chromeSession.svelte";
   import { goAuth } from "$lib/goAuth.svelte";
   import { goBrowserSupports } from "$lib/goCanvasSupport";
+  import { isBoothDesktopShell, boothDesktopOpenExternal } from "$lib/boothDesktop";
+  import {
+    boothDesktopExternalPlaygroundUrl,
+    boothDesktopScopeRedirect,
+  } from "$lib/boothDesktopNav";
   import { shouldEscapeToHome } from "$lib/goEscapeHome";
   import { registerGoServiceWorker } from "$lib/registerGoSw";
   import { pixelWipe, pixelWipeOut } from "$lib/goTransition";
@@ -24,6 +29,25 @@
    */
   const browserUnsupported = $state(browser && !goBrowserSupports().supported);
   const playing = $derived(chromeSession.canvasActive);
+  const boothDesktop = $derived(browser && isBoothDesktopShell());
+
+  beforeNavigate((nav) => {
+    if (!boothDesktop || !nav.to) return;
+    const path = nav.to.url.pathname;
+    if (!boothDesktopScopeRedirect(path)) return;
+    nav.cancel();
+    const external = boothDesktopExternalPlaygroundUrl(
+      nav.to.url.pathname + nav.to.url.search + nav.to.url.hash
+    );
+    if (external) void boothDesktopOpenExternal(external);
+  });
+
+  $effect(() => {
+    if (!boothDesktop) return;
+    const redirect = boothDesktopScopeRedirect(page.url.pathname);
+    if (!redirect) return;
+    void goto(redirect + page.url.search + page.url.hash, { replaceState: true });
+  });
 
   function isTextEntryTarget(target: EventTarget | null): boolean {
     if (!(target instanceof HTMLElement)) return false;
@@ -46,6 +70,7 @@
           pathname: page.url.pathname,
           modalOpen,
           textEntry: isTextEntryTarget(event.target),
+          boothDesktop: isBoothDesktopShell(),
         })
       ) {
         return;
@@ -64,7 +89,9 @@
 </script>
 
 <div class={["site", playing && "site--playing"].filter(Boolean).join(" ")}>
-  <Chrome />
+  {#if !boothDesktop}
+    <Chrome />
+  {/if}
   <main class={["main", playing && "main--playing"].filter(Boolean).join(" ")}>
     {#if browserUnsupported}
       <GoUnsupported />

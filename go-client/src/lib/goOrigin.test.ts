@@ -40,6 +40,8 @@ describe("localizeInviteShortUrl", () => {
 describe("isLoopbackPageOrigin", () => {
   it("detects localhost-style origins used in go:dev", () => {
     expect(isLoopbackPageOrigin("http://localhost:5174")).toBe(true);
+    expect(isLoopbackPageOrigin("http://tauri.localhost")).toBe(true);
+    expect(isLoopbackPageOrigin("tauri://localhost")).toBe(true);
     expect(isLoopbackPageOrigin("https://go.samkuo.me")).toBe(false);
   });
 });
@@ -52,5 +54,14 @@ describe("goPageOrigin", () => {
     expect(
       goPageOrigin({ origin: "https://go.samkuo.me", hostname: "go.samkuo.me" })
     ).toBe("https://go.samkuo.me");
+    expect(
+      goPageOrigin({
+        origin: "http://tauri.localhost",
+        hostname: "tauri.localhost",
+      })
+    ).toBe("http://tauri.localhost");
+    expect(
+      goPageOrigin({ origin: "tauri://localhost", hostname: "localhost" })
+    ).toBe("tauri://localhost");
   });
 });

@@ -53,6 +53,11 @@ describe("normalizeFieldOrigin", () => {
     expect(normalizeFieldOrigin("http://localhost:5173")).toBe(
       "http://localhost:5173"
     );
+    expect(normalizeFieldOrigin("http://tauri.localhost")).toBe(
+      "http://tauri.localhost"
+    );
+    expect(normalizeFieldOrigin("tauri.localhost")).toBe("http://tauri.localhost");
+    expect(normalizeFieldOrigin("tauri://localhost")).toBe("tauri://localhost");
     expect(defaultFieldOriginOrFallback(null)).toBe("https://play.samkuo.me");
   });
 
@@ -74,6 +79,24 @@ describe("normalizeFieldOrigin", () => {
       "/s/pg-gomoku"
     );
     expect(url).toBe("https://go.samkuo.me/s/pg-gomoku#pg_provision=pg_pv_abc");
+  });
+
+  it("builds provision deep link for tauri desktop shell", () => {
+    const url = fieldProvisionDeepLink(
+      "http://tauri.localhost",
+      "pg_pv_abc",
+      "/room"
+    );
+    expect(url).toBe("http://tauri.localhost/room#pg_provision=pg_pv_abc");
+  });
+
+  it("builds provision deep link for macOS tauri protocol", () => {
+    const url = fieldProvisionDeepLink(
+      "tauri://localhost",
+      "pg_pv_abc",
+      "/room"
+    );
+    expect(url).toBe("tauri://localhost/room#pg_provision=pg_pv_abc");
   });
 
   it("drops path traversal / fragment attempts from return path", () => {

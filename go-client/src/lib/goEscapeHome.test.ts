@@ -40,4 +40,14 @@ describe("shouldEscapeToHome", () => {
       shouldEscapeToHome({ key: "Escape", pathname: "/help", textEntry: true })
     ).toBe(false);
   });
+
+  it("does not escape to lobby in pg-booth-desktop shell", () => {
+    expect(
+      shouldEscapeToHome({
+        key: "Escape",
+        pathname: "/room",
+        boothDesktop: true,
+      })
+    ).toBe(false);
+  });
 });

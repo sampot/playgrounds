@@ -1,4 +1,6 @@
-const ALLOWED_ORIGIN = /^(https:\/\/([a-z0-9-]+\.)*samkuo\.me|http:\/\/localhost(:\d+)?|http:\/\/127\.0\.0\.1(:\d+)?)$/i;
+/** First-party field origins + pg-booth-desktop Tauri shells (macOS `tauri://`, Win/Android `http://tauri.localhost`). */
+const ALLOWED_ORIGIN =
+  /^(https:\/\/([a-z0-9-]+\.)*samkuo\.me|http:\/\/localhost(:\d+)?|http:\/\/127\.0\.0\.1(:\d+)?|http:\/\/tauri\.localhost(:\d+)?|tauri:\/\/localhost)$/i;
 
 export function corsHeaders(req: Request): HeadersInit {
   const origin = req.headers.get("Origin") || "";
