@@ -11,12 +11,6 @@ import type {
   BoothShellContext,
 } from "./boothHubEngine";
 import type { BoothControlChannel } from "./boothControlChannel";
-import { createBoothControlChannel } from "./boothControlChannel";
-import {
-  controlWsUrlWithToken,
-  probeLocalBoothEngine,
-  resolveShellLocalToken,
-} from "./boothLocalEngine";
 import type { BoothDirectorLock } from "./boothState";
 import { boothShellCanDirect } from "./boothState";
 import { intentRequiresDirector } from "./boothHubEngine";
@@ -206,33 +200,4 @@ export function applySnapshotToRoomFields(snapshot: BoothStateSnapshot): {
         kind: m.kind,
       })),
   };
-}
-
-export function createLocalDaemonHubEngine(opts: {
-  shellId?: string;
-  port?: number;
-  shellToken?: string | null;
-}): ReturnType<typeof createRemoteBoothHubEngine> {
-  const shellId = opts.shellId ?? "browser-shell";
-  return createRemoteBoothHubEngine({
-    shellId,
-    role: "host",
-    connect: async () => {
-      const token = opts.shellToken ?? (await resolveShellLocalToken());
-      if (!token) throw new Error("shell_token_missing");
-      const probe = await probeLocalBoothEngine({
-        port: opts.port,
-        shellToken: token,
-      });
-      if (!probe.online || !probe.controlWsUrl) {
-        throw new Error("local_engine_offline");
-      }
-      const ch = createBoothControlChannel({
-        wsUrl: controlWsUrlWithToken(probe.controlWsUrl, token),
-        shellId,
-        role: "host",
-      });
-      return ch;
-    },
-  });
 }

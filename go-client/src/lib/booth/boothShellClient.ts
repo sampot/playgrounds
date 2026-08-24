@@ -10,7 +10,7 @@ import type {
   BoothShellContext,
 } from "./boothHubEngine";
 
-export type BoothShellMode = "embedded" | "shell" | "operator";
+export type BoothShellMode = "embedded" | "operator";
 
 export type BoothShellClient = {
   readonly mode: BoothShellMode;

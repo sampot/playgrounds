@@ -28,7 +28,7 @@
 - **Shell 可選（硬）：**
   - **同殼 Shell：** WebView 內嵌 `go-client` `/room`（家裡大螢幕）。
   - **托盤無窗：** 僅 Hub；外出 `/room/remote` Operator。
-  - **外殼 Shell：** 瀏覽器 `go` `/room` 偵測本機 Hub → `boothMode: "shell"` 連 `localhost` Control Channel（ENGINE §12）。
+  - **外殼 Shell：** 瀏覽器 `go` **`/room` 永遠 Embedded Hub**（不連 `localhost` Control Channel）。常駐 **`pg-boothd`** 僅 Operator／Peer 路徑可達。
 - **單帳號單 Hub（硬）：** 與 ENGINE §10.2 相同；桌面 Hub 與 Embedded／另一 `pg-boothd` **互斥**；衝突時須明確 replace 或拒絕。
 - **GUI 環境（硬）：** 目標含手機、平板與其他有 GUI 的裝置（Android／iOS 背景政策複雜，見 §3 非目標 MVP）。
 
@@ -134,7 +134,7 @@ Platform／Dash 只辨識 **Hub online**＋`device_token`；UI 可標「桌面�
 │ go-client（Embedded Booth Hub + Shell）                      │
 │  · EmbeddedBoothHubEngine（TS）— Hub 權威                   │
 │  · BoothAnchor WSS、WebRTC、cast、session_*                   │
-│  · GoRoomSurface；boothMode: "embedded" 或 "shell"           │
+│  · GoRoomSurface；boothMode: "embedded"（WebView 內 Hub）      │
 │  · plugin-fs → shareLibraryDir + privateLibraryDir（§7.4）   │
 └───────────────┬─────────────────────────────────────────────┘
                 │ WSS
@@ -166,7 +166,7 @@ Platform／Dash 只辨識 **Hub online**＋`device_token`；UI 可標「桌面�
 | --- | --- |
 | **Hub** | `EmbeddedBoothHubEngine`（與瀏覽器 `/room` **同程式路徑**） |
 | **Platform** | web 層 `device_token`、Anchor WSS、Guest join（ENGINE §10.7） |
-| **Shell** | `GoRoomSurface`；本地大螢幕或 `boothMode: "shell"` |
+| **Shell** | `GoRoomSurface`；WebView 內 **Embedded Hub** |
 | **媒體** | WebRTC 在 WebView；`BoothMediaSurface` 綁 `<video>` |
 | **演進** | 新 Hub 能力**先**在 `playgrounds`／`go-client` 落地；desktop **跟 dist**——**不**在 Rust fork 引擎 |
 
@@ -231,21 +231,21 @@ Platform／Dash 只辨識 **Hub online**＋`device_token`；UI 可標「桌面�
 
 | 路由 | desktop 存在時行為 |
 | --- | --- |
-| `/room` | 偵測本機 Control Channel → **`boothMode: "shell"`**；或提示「常駐包廂已運行」並提供連回／結束 |
+| `/room` | **永遠 `embedded`**（WebView 或瀏覽器分頁內 Hub） |
 | `/room/remote` | **不變**（Operator） |
 | `/i/<short>` | **不變**（Guest） |
 
-**衝突（硬）：** 本機已有 desktop Hub 時，開 Embedded `/room` 須 **replace 或拒絕**（對齊 ENGINE §8.3、§17 #1）。
+**衝突（硬）：** 本機另有 **`pg-boothd` hub** 時，瀏覽器 **`/room` 仍只開 Embedded**；不連 localhost、不搶 daemon session（對齊 ENGINE §8.3）。
 
 `boothMode` 擴充（契約草案）：
 
 ```ts
-type BoothShellMode = "embedded" | "shell" | "operator";
-/** Engine 回報 */
+type BoothShellMode = "embedded" | "operator";
+/** Engine 回報（Hub 本體） */
 type BoothEngineMode = "embedded" | "daemon" | "desktop";
 ```
 
-`desktop` 對 Shell 行為與 `daemon` **相同**（連 localhost Control Channel）；差別在產品文案與 Dash 標籤。
+`desktop`／`daemon` 指 **Hub 行程**（Tauri WebView 內仍為 Embedded；headless `pg-boothd` 不經 `/room` shell 連回）。
 
 ---
 
@@ -254,7 +254,7 @@ type BoothEngineMode = "embedded" | "daemon" | "desktop";
 | 階段 | `pg-booth-desktop` | `playgrounds` |
 | --- | --- | --- |
 | **T0 spike** | Tauri 托盤 + WebView Embedded Hub；plugin-fs **雙目錄**（private 已落地；share 監看 **待落地**） | `go-client` dist；`createHostShareLibrary`；契約測試 |
-| **T1 Desktop MVP** | 24×7 常駐；Anchor 在 web 層；Operator 切台；單實例／優雅 end | `/room` 偵測 localhost；Dash 標籤 |
+| **T1 Desktop MVP** | 24×7 常駐；Anchor 在 web 層；Operator 切台；單實例／優雅 end | WebView Embedded `/room`；Dash 標籤 |
 | **T2 產品化** | 開機自啟、更新、崩潰恢復 | 安裝說明連結（dash／docs） |
 | **T3 Peer（可選）** | 仍引導 `pg-boothd peer` | — |
 

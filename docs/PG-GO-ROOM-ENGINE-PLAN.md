@@ -141,12 +141,10 @@
 | 模式 | Hub | Peer | Shell | 典型用途 |
 | --- | --- | --- | --- | --- |
 | **Embedded** | 瀏覽器分頁 | — | 同頁 | 臨時包廂、試用 |
-| **Desktop Hub** | `pg-booth-desktop` | — | 同殼或托盤 | 家裡 7×24、一般會員 |
+| **Desktop Hub** | `pg-booth-desktop` | — | 同殼 Embedded Hub | 家裡 7×24、一般會員 |
 | **Desktop + Operator** | `pg-booth-desktop` | 可選 boothd peer | 外出 Operator | 遠端導播 |
-| **Desktop + 瀏覽器 Shell** | `pg-booth-desktop` | 可選 | `go` 連 `localhost` WS | Hub 背景 + 瀏覽器大螢幕 |
 | **Daemon Hub** | `pg-boothd` | — | 無或遠端 Operator | NAS／機房、專業常駐 |
 | **Daemon Hub + Peer** | `pg-boothd` | `pg-boothd peer` ×N | 無或遠端 Operator | 舊手機鏡頭、邊緣掛檔 |
-| **Daemon + 本地 Shell** | `pg-boothd` | 可選 | 瀏覽器連 `localhost` Control Channel | 家裡大螢幕 + 穩定 Hub |
 | **Daemon + Operator** | `pg-boothd` | 可選 | 外出 Operator | 遠端導播 |
 
 ### 5.4 Hub 與 Peer（硬）
@@ -185,7 +183,7 @@
 | 層級 | 實體 | 在 `members`？ | 備註 |
 | --- | --- | --- | --- |
 | **Hub** | Booth Hub Engine | — | 星狀中心；cast 執行；**唯一**連 Platform |
-| **Shell（無獨立 peerId）** | Embedded 同頁 UI／Daemon 本地 `/room` 連 `localhost` | 否（或合併 host peer） | 送 `booth.*` intent；**不是** leaf 節點時不另開 roster PC |
+| **Shell（無獨立 peerId）** | Embedded 同頁 UI | 否（或合併 host peer） | 送 `booth.*` intent；**不是** leaf 節點時不另開 roster PC |
 | **Roster 節點** | Guest／Peer／Operator | ✅ | 見 §6.2 |
 
 | Roster `kind` | 連線方式 | 預設導播 | 收看大螢幕 | Hub 私有片庫 | 備註 |
@@ -305,7 +303,7 @@
 | 部署 | 傳輸 | 認證 |
 | --- | --- | --- |
 | Embedded | 同頁 `BoothHubEngine` 介面（§14）；無額外 socket | N/A（同進程） |
-| Daemon 本地 Shell | `ws://127.0.0.1:<port>/booth/control` 或 unix socket | `shellLocalToken`（daemon 啟動時印出／寫入 `~/.pg-booth/shell.token`） |
+| Daemon Control Channel | `ws://127.0.0.1:<port>/booth/control` 或 unix socket | `shellLocalToken`（daemon 啟動時印出／寫入 `~/.pg-booth/shell.token`）；**供 daemon 本機工具／桌面殼**，**不是** go `/room` 瀏覽器連回 |
 | 遠端 Operator | **經 BoothAnchor DO** 中繼 `booth.*` 幀 | `operatorCap`（§9） |
 
 遠端 Operator 的**媒體**不走 DO：Operator ↔ Hub 另建 **WebRTC Operator 節點**（§10.6；**Roster leaf**）；**檔案 bytes** 走 **Owner file channel**（§7.6，同一 PC 上的 DataChannel）。**presence**（鏡頭／麥）走同一 PC 的 `session_camera`／`session_mic`（§6.2.4），**不**要求再開 Guest 門牌。
@@ -529,15 +527,17 @@ type BoothOwnerChunk = {
 登入 → /room → 按需鑄門牌 → Guest 掃碼 → 關分頁散場
 ```
 
-### 8.3 開 `/room` 時已有 Daemon（定案）
+### 8.3 開 `/room`（定案）
+
+**硬：** go **`/room` 永遠 Embedded Booth Hub**（分頁內權威 Hub）。**不**偵測、**不**連線本機 `pg-boothd`／`localhost` Control Channel。
 
 | 條件 | 行為 |
 | --- | --- |
-| 帳號已有 live Daemon Engine | `/room` **預設**進 **本地 Shell**（連 `localhost` Control Channel）；頁內說明「常駐包廂運行中」 |
-| 使用者選「改開輕量包廂」 | 頁內確認 → **結束 Daemon session** → 本頁 Embedded 新開（破壞性） |
-| 無 Daemon | 現行 Embedded |
+| 已登入開 `/room` | 本頁 **Embedded 新開或延續**（關分頁即散場） |
+| 帳號另有 live **`pg-boothd` Hub** | **不**從 `/room` 連回；遠端導播走 **`/room/remote`（Operator）**；監控走 **`peerCap`** |
+| **`pg-booth-desktop`** | WebView 內同樣 **Embedded Hub**（見 [TAURI-PLAN](./PG-GO-ROOM-TAURI-PLAN.md)）；與 headless daemon **分離** |
 
-**硬：** **禁止**無確認下同時跑 Daemon Engine + Embedded Engine。
+**硬：** **禁止** `/room` 與本機 daemon 雙 Hub 並存或自動切換。
 
 ### 8.4 Roster 節點並存（Guest、Peer、Operator）
 
@@ -564,7 +564,7 @@ type BoothOwnerChunk = {
 1. **包廂活著＝Hub session 還在**（不再綁「主持分頁」）。
 2. **關 Shell ≠ 散場**（Daemon Hub 模式）。
 3. **Peer 斷線 ≠ 散場**；Hub 仍在則可重連（新 `peerCap` 或仍有效 cap）。
-4. **已登入再開 `/room`**：若帳號已有 live Hub → **接上同一間**（Shell）；若無 → Embedded **新開**或引導「常駐包廂已在 NAS 運行」。
+4. **已登入再開 `/room`**：永遠 **Embedded 新開**（本頁 Hub）；常駐 **`pg-boothd`** 須用 Operator／Peer 路徑，**不**從 `/room` 連 `localhost`。
 5. **Guest 契約不變**：仍掃 `/i/<short>`；門牌過期規則不變。
 6. **Operator 重連**：允許；Guest／Peer 重進各靠門牌或 `peerCap`。
 7. **`boothSessionId`**：每場 **Hub** 一個 UUID；**不是**使用者可收藏的房號。
@@ -915,11 +915,11 @@ platform-api/src/boothAnchorDo.ts   # BoothAnchor DO
 
 | 路由 | 模式 | 說明 |
 | --- | --- | --- |
-| `/room` | `embedded` 或 `shell` | 無 live daemon → Embedded；有 daemon → 本地 Shell 連 `localhost` 或提示「常駐包廂已運行」 |
+| `/room` | `embedded` | **永遠** Embedded Hub；不連本機 daemon |
 | `/room/remote` | `operator` | Operator cap；連 Anchor + WebRTC + Owner file channel（§7.6） |
 | `/i/<short>` | `guest` | **不變** |
 
-Shell **重用** `GoRoomSurface` 等元件；`boothMode: "embedded" | "shell" | "operator"` 控制 intent 出口、**片庫／分享資料源**（Embedded：OPFS 私有＋逐檔分享；desktop／daemon：§11.2a 雙目錄；Operator：Hub snapshot＋§7.6）與導播唯讀鎖。
+Shell **重用** `GoRoomSurface` 等元件；`boothMode: "embedded" | "operator"` 控制 intent 出口、**片庫／分享資料源**（Embedded：OPFS 私有＋逐檔分享；desktop／daemon：§11.2a 雙目錄；Operator：Hub snapshot＋§7.6）與導播唯讀鎖。
 
 **Operator UI 對齊（硬）：**
 
@@ -938,7 +938,7 @@ Shell **重用** `GoRoomSurface` 等元件；`boothMode: "embedded" | "shell" | 
 | --- | --- |
 | 包廂活著＝主持 `/room` 還開著（§6.4） | 包廂活著＝**Hub session** 還在 |
 | 主持永遠是開 `/room` 的那台（§5.4） | 權威在 **Hub**；Shell 可替換 |
-| 已登入再開 `/room`＝另一間空包廂（§5.4） | 有 live Daemon Hub → **本地 Shell 連回**；無 → Embedded 新開 |
+| 已登入再開 `/room`＝另一間空包廂（§5.4） | Embedded **新開**（本頁）；**不**連本機 daemon；常駐 Hub 走 Operator／Peer |
 | 第二台請掃門牌（§5.4） | Guest 仍掃門牌；**監控正式路徑**＝Peer `peerCap`；Operator 用 `operatorCap`（**皆** Roster 節點，§6.2） |
 | 不做完美斷線重連（§3） | Operator／Shell↔Hub 可重連；Guest 靠門牌；Peer 靠 `peerCap` |
 | 私有 OPFS（§5.5.1） | 權威在 **Hub** FS；Embedded OPFS／常駐 **`privateLibraryDir`**（§11.2a） | **Owner Shell**（本地或 Operator）讀寫；Operator 經 §7.6 |
@@ -1070,7 +1070,7 @@ export interface BoothMediaSurface {
 
 | # | 問題 | 定案 |
 | --- | --- | --- |
-| 1 | Embedded 與 Daemon 並存 | 有 live Daemon 時 `/room` **預設 Shell 連回**；新開 Embedded 須**確認並結束 Daemon**（§8.3） |
+| 1 | Embedded 與 Daemon 並存 | **`/room` 永遠 Embedded**；**不**從瀏覽器連本機 daemon（§8.3） |
 | 2 | 導播優先 | **本地 host Shell ＞ Operator**；其餘 viewer（§7.4） |
 | 3 | 裝置數 | **單帳號單 live Hub**；新 hub daemon `409` 除非 `force: true`（§10.2） |
 | 4 | Operator signal | **Anchor WSS `anchor.signal`**；不新 `invite.kind`（§10.6） |

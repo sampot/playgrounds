@@ -87,7 +87,7 @@ import {
   writeRoomInviteSession,
   type RoomInviteSessionSnapshot,
 } from "./goRoomInviteSession";
-import { createBoothAnchorBridge, readRemoteAnchorEnabled } from "./boothAnchorBridge";
+import { createBoothAnchorBridge } from "./boothAnchorBridge";
 import {
   applyBoothCastStateToMedia,
   boothCastSummaryFromProgram,
@@ -109,17 +109,6 @@ import {
 } from "./booth/boothShellClient";
 import { createBoothShareCatalogSync, type BoothShareCatalogSync } from "./booth/boothShareCatalogSync";
 import { createHostShareLibrary } from "./goRoomShareLibrary";
-import {
-  applySnapshotToRoomFields,
-  createLocalDaemonHubEngine,
-} from "./booth/boothRemoteHubEngine";
-import {
-  probeLocalBoothEngine,
-  resolveShellLocalToken,
-  writeStoredShellToken,
-  type BoothLocalEngineStatus,
-} from "./booth/boothLocalEngine";
-import { isBoothDesktopShell } from "./boothDesktop";
 
 export type RoomPhase = "idle" | "open" | "ended" | "error";
 
@@ -145,9 +134,6 @@ export type RoomStatus = {
   playCanvasSrcdoc: string | null;
   playCanvasMode: "sw" | "memory" | null;
   playCanvasGeneration: number;
-  /** `embedded` = in-page hub; `local-daemon` = browser shell on pg-boothd control channel. */
-  boothAttachment: "embedded" | "local-daemon";
-  localDaemon: BoothLocalEngineStatus | null;
   /** Active monitoring peer join link (director mint). */
   peerJoinUrl: string | null;
   peerCapId: string | null;
@@ -206,14 +192,10 @@ export function createRoomRuntime(opts?: {
     playCanvasSrcdoc: null,
     playCanvasMode: null,
     playCanvasGeneration: 0,
-    boothAttachment: "embedded",
-    localDaemon: null,
     peerJoinUrl: null,
     peerCapId: null,
     peerCapExpiresAt: null,
   };
-  let localDaemonEngine: ReturnType<typeof createLocalDaemonHubEngine> | null =
-    null;
   const listeners = new Set<Listener>();
   let inviteExpiryTimer: ReturnType<typeof setTimeout> | null = null;
   let castClockPublishTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1193,20 +1175,6 @@ export function createRoomRuntime(opts?: {
         message: occupancyMessage(),
       });
       if (!doorIsLive()) restoreDoorFromSession();
-      void refreshLocalDaemonProbe().then((probe) => {
-        if (!probe.online) return;
-        if (probe.needsToken) {
-          set({
-            message:
-              "本機常駐包廂運行中。請設定 shell token 後連回。",
-          });
-          return;
-        }
-        if (isBoothDesktopShell()) return;
-        set({
-          message: "本機常駐包廂運行中。可連回同一間。",
-        });
-      });
       await anchorBridge.onBoothOpen();
       ensurePeerSignalHost();
     } finally {
@@ -1498,7 +1466,7 @@ export function createRoomRuntime(opts?: {
     return {
       sessionId: hubRef.engine?.sessionId ?? "",
       ownerUserId: goAuth.profile?.user_id ?? "",
-      engineMode: isBoothDesktopShell() ? "daemon" : "embedded",
+      engineMode: "embedded",
       hostPeerId: localAgentId,
       hostDisplayName: roomHostDisplayName(goAuth.profile),
       members: [
@@ -1686,83 +1654,10 @@ export function createRoomRuntime(opts?: {
   });
   hubRef.engine = hubEngine;
   hubEngine.registerShell(embeddedHostShellContext());
-  let shellClient: BoothShellClient = createBoothShellClient({
+  const shellClient: BoothShellClient = createBoothShellClient({
     engine: hubEngine,
     mode: "embedded",
   });
-
-  function applyDaemonSnapshot(
-    snapshot: import("@pg/roster/boothChannel").BoothStateSnapshot
-  ): void {
-    const mapped = applySnapshotToRoomFields(snapshot);
-    set({
-      guestCount: mapped.guestCount,
-      shortUrl: mapped.inviteShortUrl ?? status.shortUrl,
-      inviteExpiresAt: mapped.inviteExpiresAt ?? status.inviteExpiresAt,
-      inviteDoor: mapped.inviteGate,
-      occupantPeers: mapped.occupantPeers.map((p) => ({
-        peerId: p.peerId,
-        name: p.name,
-      })),
-      occupantNames: mapped.occupantPeers.map((p) => p.name),
-    });
-  }
-
-  async function refreshLocalDaemonProbe(): Promise<BoothLocalEngineStatus> {
-    const token = await resolveShellLocalToken();
-    const probe = await probeLocalBoothEngine({ shellToken: token });
-    set({ localDaemon: probe.online || probe.needsToken ? probe : null });
-    return probe;
-  }
-
-  async function attachLocalDaemonShell(opts?: {
-    shellToken?: string;
-  }): Promise<{ ok: boolean; error?: string }> {
-    if (opts?.shellToken) writeStoredShellToken(opts.shellToken);
-    try {
-      localDaemonEngine?.disconnect();
-      localDaemonEngine = createLocalDaemonHubEngine({
-        shellId: "browser-shell",
-        shellToken: opts?.shellToken,
-      });
-      const snapshot = await localDaemonEngine.connectChannel();
-      hubRef.engine = localDaemonEngine;
-      shellClient = createBoothShellClient({
-        engine: localDaemonEngine,
-        mode: "shell",
-        shellId: "browser-shell",
-      });
-      await anchorBridge.setEnabled(false);
-      applyDaemonSnapshot(snapshot);
-      disposePeerSignal?.();
-      disposePeerSignal = null;
-      set({
-        boothAttachment: "local-daemon",
-        message: "已連回本機常駐包廂",
-        error: null,
-      });
-      return { ok: true };
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "local_daemon_connect_failed";
-      set({ error: msg });
-      return { ok: false, error: msg };
-    }
-  }
-
-  async function detachLocalDaemonShell(): Promise<void> {
-    localDaemonEngine?.disconnect();
-    localDaemonEngine = null;
-    hubRef.engine = hubEngine;
-    shellClient = createBoothShellClient({
-      engine: hubEngine,
-      mode: "embedded",
-    });
-    set({ boothAttachment: "embedded", message: "" });
-    if (readRemoteAnchorEnabled()) {
-      await anchorBridge.setEnabled(true);
-    }
-    ensurePeerSignalHost();
-  }
 
   async function close(opts?: {
     message?: string;
@@ -1898,9 +1793,6 @@ export function createRoomRuntime(opts?: {
     close,
     getShellClient: (): BoothShellClient => shellClient,
     getHubEngine: (): BoothHubEngine => hubRef.engine ?? hubEngine,
-    probeLocalDaemon: refreshLocalDaemonProbe,
-    attachLocalDaemonShell,
-    detachLocalDaemonShell,
     setRemoteAnchorEnabled: (enabled: boolean) => anchorBridge.setEnabled(enabled),
     getRemoteAnchorEnabled: () => anchorBridge.isEnabled(),
   };

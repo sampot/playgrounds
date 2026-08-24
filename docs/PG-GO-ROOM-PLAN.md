@@ -30,7 +30,7 @@
 - **人數對齊遊戲 session（硬）：** 包廂**不鎖 1:1 入座**。同一張**有效** Invite 短鏈可多人 join；**文字**對已連線 peer **fanout**；**分享目錄** fanout、**內容只在有人 `request` 時 Owner→Requester**。API／UI 勿把包廂寫成雙人專用隔間。鏡頭**不**因第三人加入而關。見 §5.5。
 - **預設分享模型（硬）：** 分享目錄＝這一間願意分享的**檔**（授權，**不**把內容推給任何人）。**不掛資料夾。** 其他人依檔選擇下載、檢視、或**播放**（影音）。**Live stream 不是目錄項**——開鏡頭／畫面出現在**在場名單**。見 §5.5。
 - **主持私有檔（硬）：** 私有片庫權威在 **Hub**（Embedded **OPFS**；常駐 **daemon** 本機目錄——見 [PG-GO-ROOM-ENGINE-PLAN.md](./PG-GO-ROOM-ENGINE-PLAN.md) §7.6）。與**分享目錄**分離。私有**不** fanout metadata、**不**進 `/room-file/<id>`、Guest **不能**下載／檢視／私下播。**Owner**（主持 Shell 或 Operator Shell）可讀寫；Operator 遠端經 Owner file channel，**不是**雲端片庫。主持可把私有檔**放到大螢幕上**（Hub 本機渲染 → 節目 RTP）。要讓別人「要」＝顯式**掛到分享區**。Guest 無私有庫。見 §5.5.1、§8.3。
-- **兩種在場同一條門牌（硬）：** 「請人進來」與「自己的另一台掃碼」契約相同（**Guest 節點**）。**擁有者外出單機**可走 **Operator 節點**（`operatorCap`；不必掃門牌；一條連線看＋說＋控）——見 [PG-GO-ROOM-ENGINE-PLAN.md](./PG-GO-ROOM-ENGINE-PLAN.md) §6.2、§8.1c。已登入再開 `/room` Embedded＝另一間空包廂（或接上 Daemon 本地 Shell），**不是**用門牌連上筆電那一間。見 §5.4。
+- **兩種在場同一條門牌（硬）：** 「請人進來」與「自己的另一台掃碼」契約相同（**Guest 節點**）。**擁有者外出單機**可走 **Operator 節點**（`operatorCap`；不必掃門牌；一條連線看＋說＋控）——見 [PG-GO-ROOM-ENGINE-PLAN.md](./PG-GO-ROOM-ENGINE-PLAN.md) §6.2、§8.1c。已登入再開 `/room` Embedded＝**本頁另一間空包廂**（**不**連本機 `pg-boothd`），**不是**用門牌連上筆電那一間。見 §5.4。
 - **Roster 節點（硬；修訂草案）：** 每個連上 Hub 的分頁／行程＝一 **Roster leaf**（`peerId`＋`members.kind`）。**權限**由 owner／`director`／委任決定，**不**由「是不是 Guest」單一標籤決定。見 ENGINE §6.2（**未落地**委任）。
 - **BoothAnchor 為請人硬性前提（硬）：** 包廂 Hub 開著須 **BoothAnchor 已註冊且 Engine WSS 連上**（見 [PG-GO-ROOM-ENGINE-PLAN.md](./PG-GO-ROOM-ENGINE-PLAN.md) §10.7）。「請人進來」mint 門牌前須 Anchor **online**（或 **degraded** 且 Engine socket 仍在）。Guest WebRTC 握手 **只**經 Anchor 推送至 Hub；**禁止** Invite DO `signal/pending` long poll；**無 fallback**。
 - **三個動詞（硬）：** **說**、**掛**、**要**分開。**說**＝開口為主（麥），文字＝不方便開口時的輔助面。掛＝把**檔**寫進分享目錄（含「從私有掛上」）。要＝對**分享**檔發**同源 HTTP**（下載／檢視／私下播放同一門面；wire 仍 DC）；大螢幕收看＝節目 RTP（不是「要」；私有亦可上大螢幕）。見 §5.3、§5.5.1、§5.6、§8.2。
@@ -159,7 +159,7 @@ Guest 掃碼 `/i/<short>`  ──kind=invite.room──►  同意 → 同一包
 
 **Guest 進門**走同一條 `invite.room` 門牌，**不做**「我的裝置」帳號綁定或第二套邀請。第三人（再掃一台傳檔、再掛一路鏡頭）**不**關掉已掛的鏡頭。
 
-**硬：** 第二台裝置若要 **Guest 節點**＝**掃門牌**進來。已登入會員在手機再開 `/room` Embedded＝另一間空包廂（或有 Daemon 時接上**本地 Shell**），連不上「掃門牌那一間」的 Guest 語意。主持／Owner 外出單機＝**Operator 節點**（不掃門牌）。想用手機當屋子、筆電當客人：在手機登入開 `/room`，筆電掃碼（Guest）。
+**硬：** 第二台裝置若要 **Guest 節點**＝**掃門牌**進來。已登入會員在手機再開 `/room` Embedded＝**本頁另一間空包廂**（**不**從瀏覽器連本機常駐 daemon），連不上「掃門牌那一間」的 Guest 語意。主持／Owner 外出單機＝**Operator 節點**（不掃門牌）。想用手機當屋子、筆電當客人：在手機登入開 `/room`，筆電掃碼（Guest）。
 
 ### 5.5 預設分享模型（硬）
 
