@@ -38,6 +38,7 @@
   import { readRemoteAnchorEnabled } from "$lib/boothAnchorBridge";
   import { roomAdClickAction } from "$lib/goAds";
   import { chromeSession } from "$lib/chromeSession.svelte";
+  import { goAuth } from "$lib/goAuth.svelte";
   import {
     GO_ROOM_CAMERA_STOP_WATCH,
     GO_ROOM_CONNECTING_BODY,
@@ -1494,6 +1495,13 @@
     if (filePreviewImg) filePreviewImg.src = "";
   }
 
+  function onPreviewKeydown(event: KeyboardEvent) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closePreview();
+    }
+  }
+
   async function onPlayFile(id: string) {
     mediaError = "";
     fileError = "";
@@ -1963,6 +1971,7 @@
   ]
     .filter(Boolean)
     .join(" ")}
+  data-phase={phase}
   bind:this={roomEl}
 >
   <h1 class="sr-only">包廂</h1>
@@ -3094,6 +3103,7 @@
       aria-modal="true"
       aria-labelledby="file-preview-title"
       tabindex="-1"
+      onkeydown={onPreviewKeydown}
       onclick={(e) => {
         if (e.currentTarget === e.target) closePreview();
       }}
@@ -3333,7 +3343,7 @@
         transparent 52%
       );
   }
-  html[data-theme="dark"] .room--in-booth::before {
+  :global(html[data-theme="dark"]) .room--in-booth::before {
     background:
       radial-gradient(
         ellipse 75% 42% at 50% -8%,

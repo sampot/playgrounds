@@ -679,12 +679,18 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
         onHelloOk: (hello) => {
           director = hello.director ?? null;
           const canDirect = operatorCanDirect({ director, shellId });
-          set({
-            phase: "connecting",
+          const partial: Partial<OperatorShellStatus> = {
             canDirect,
             directorRole: canDirect ? "operator" : director ? "viewer" : null,
-            message: "建立 WebRTC 通道…",
-          });
+          };
+          if (rtcReady || status.phase === "open") {
+            partial.phase = "open";
+            partial.message = operatorOpenMessage();
+          } else {
+            partial.phase = "connecting";
+            partial.message = "建立 WebRTC 通道…";
+          }
+          set(partial);
         },
         onDirectorChanged: (next) => {
           director = next;
@@ -693,7 +699,8 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
             canDirect,
             directorRole: canDirect ? "operator" : director ? "viewer" : null,
           };
-          if (rtcReady) {
+          if (rtcReady || status.phase === "open") {
+            partial.phase = "open";
             partial.message = operatorOpenMessage();
           }
           set(partial);
@@ -733,6 +740,7 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
           }
         },
         onOwnerChannel: (dc) => {
+          if (ownerDc === dc && ownerFileClient) return;
           ownerDc = dc;
           ownerFileClient = null;
           dc.onmessage = (ev) => {
@@ -755,7 +763,9 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
       ensureOperatorPresence();
       try {
         await client.connect();
-        set({ phase: "connecting", message: "建立 WebRTC 通道…" });
+        if (!rtcReady && status.phase !== "open") {
+          set({ phase: "connecting", message: "建立 WebRTC 通道…" });
+        }
         startRtcWaitTimer();
         void operatorRtc.start();
       } catch (e) {

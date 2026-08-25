@@ -191,9 +191,14 @@ export function createBoothOperatorRtc(opts: {
     );
 
     const ownerDc = pc.createDataChannel(BOOTH_OWNER_DC_LABEL, { ordered: true });
-    const bindOwnerChannel = () => opts.onOwnerChannel?.(ownerDc);
-    ownerDc.onopen = bindOwnerChannel;
-    if (ownerDc.readyState === "open") bindOwnerChannel();
+    let ownerChannelNotified = false;
+    const notifyOwnerChannel = () => {
+      if (ownerChannelNotified) return;
+      ownerChannelNotified = true;
+      opts.onOwnerChannel?.(ownerDc);
+    };
+    ownerDc.onopen = notifyOwnerChannel;
+    if (ownerDc.readyState === "open") notifyOwnerChannel();
 
     pc.ontrack = (ev) => {
       const idx = pc?.getTransceivers().indexOf(ev.transceiver) ?? -1;

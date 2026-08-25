@@ -133,6 +133,27 @@ describe("boothOwnerFileChannel", () => {
     );
   });
 
+  it("resolves download when hub chunks arrive before receive()", async () => {
+    const client = createBoothOwnerFileClient({
+      send: () => {},
+    });
+    const transferId = "early-tid";
+    client.handleMessage(
+      JSON.stringify({
+        type: "booth.owner.chunk",
+        v: 1,
+        transferId,
+        seq: 0,
+        eof: true,
+        data: btoa(String.fromCharCode(1, 2, 3)),
+      })
+    );
+    const blob = await client.receive(transferId);
+    expect(new Uint8Array(await blob.arrayBuffer())).toEqual(
+      new Uint8Array([1, 2, 3])
+    );
+  });
+
   it("downloads a share file from the hub host", async () => {
     const client = createBoothOwnerFileClient({
       send: () => {},

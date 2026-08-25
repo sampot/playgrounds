@@ -4,6 +4,10 @@ import { operatorCanDirect } from "./boothOperatorShell";
 const clientOpts: {
   onRemoteDisabled?: () => void;
   onSnapshot?: (snap: import("@pg/roster/boothChannel").BoothStateSnapshot) => void;
+  onHelloOk?: (hello: {
+    director?: { shellId: string; role: string } | null;
+  }) => void;
+  onDirectorChanged?: (next: { shellId: string; role: string } | null) => void;
 } = {};
 
 let onProgramStream: ((stream: MediaStream | null) => void) | undefined;
@@ -30,11 +34,21 @@ function openOperatorRtcChannels(): void {
   capturedRtcOpts?.onOwnerChannel?.(fakeOwnerDataChannel());
 }
 
+let resolveConnect: (() => void) | null = null;
+let connectEntered = false;
+let deferConnectResolve = false;
+
 vi.mock("./boothPlatform", () => ({
   createBoothOperatorClient: vi.fn((opts: typeof clientOpts) => {
     Object.assign(clientOpts, opts);
     return {
-      connect: async () => {},
+      connect: async () => {
+        connectEntered = true;
+        if (!deferConnectResolve) return;
+        await new Promise<void>((resolve) => {
+          resolveConnect = resolve;
+        });
+      },
       disconnect: vi.fn(),
       sendIntent: vi.fn(),
       sendSignal: vi.fn(),
@@ -88,8 +102,13 @@ describe("createBoothOperatorShell", () => {
     vi.clearAllMocks();
     delete clientOpts.onRemoteDisabled;
     delete clientOpts.onSnapshot;
+    delete clientOpts.onHelloOk;
+    delete clientOpts.onDirectorChanged;
     onProgramStream = undefined;
     capturedRtcOpts = undefined;
+    resolveConnect = null;
+    connectEntered = false;
+    deferConnectResolve = false;
   });
 
   it("surfaces remote disabled as plain-language error", async () => {
@@ -114,6 +133,34 @@ describe("createBoothOperatorShell", () => {
 
     capturedRtcOpts?.onOwnerChannel?.(fakeOwnerDataChannel());
     expect(shell.getStatus().phase).toBe("open");
+  });
+
+  it("stays open when WebRTC channels open before connect() resolves", async () => {
+    deferConnectResolve = true;
+    const { createBoothOperatorShell } = await import("./boothOperatorShell");
+    const shell = createBoothOperatorShell({ operatorCap: "cap-test" });
+    const connectPromise = shell.connect();
+    expect(connectEntered).toBe(true);
+    openOperatorRtcChannels();
+    resolveConnect?.();
+    await connectPromise;
+    expect(shell.getStatus().phase).toBe("open");
+    expect(shell.getStatus().message).toContain("遠端");
+  });
+
+  it("stays open when hello arrives after WebRTC channels are ready", async () => {
+    const { createBoothOperatorShell } = await import("./boothOperatorShell");
+    const shell = createBoothOperatorShell({ operatorCap: "cap-test" });
+    const connectPromise = shell.connect();
+    openOperatorRtcChannels();
+    await connectPromise;
+    expect(shell.getStatus().phase).toBe("open");
+
+    clientOpts.onHelloOk?.({
+      director: { shellId: shell.getShellId(), role: "operator" },
+    });
+    expect(shell.getStatus().phase).toBe("open");
+    expect(shell.getStatus().message).toBe("遠端導播中");
   });
 
   it("clears the program preview when booth cast goes idle", async () => {

@@ -51,18 +51,19 @@
 
   let capFromUrl = $state(false);
   let operatorCap = $state("");
-  let status = $state<OperatorShellStatus | null>(null);
-  let remoteShell: BoothOperatorShell | null = null;
+  let shellStatus = $state<OperatorShellStatus | null>(null);
+  let remoteShell = $state<BoothOperatorShell | null>(null);
   let mintPhase = $state<OperatorMintPhase>("idle");
   let mintError = $state<string | null>(null);
   let mintStarted = $state(false);
   let lastAckFlashKey = $state("");
   let anchorHintFlashKey = $state("");
 
+  const status = $derived(shellStatus);
   const uiPhase = $derived(
     operatorRemoteUiPhase({
       mintPhase,
-      shellPhase: status?.phase ?? null,
+      shellPhase: shellStatus?.phase ?? null,
     })
   );
   const uiMessage = $derived(
@@ -88,18 +89,22 @@
     }
   });
 
+  let shellUnsub: (() => void) | null = null;
+
   function detachShell(): void {
+    shellUnsub?.();
+    shellUnsub = null;
     remoteShell?.disconnect();
     remoteShell = null;
-    status = null;
+    shellStatus = null;
   }
 
   function attachShell(cap: string): void {
     detachShell();
     operatorCap = cap;
     remoteShell = createBoothOperatorShell({ operatorCap: cap });
-    remoteShell.subscribe((s) => {
-      status = s;
+    shellUnsub = remoteShell.subscribe((next) => {
+      shellStatus = next;
     });
     void remoteShell.connect();
   }
@@ -239,7 +244,7 @@
   operatorLocalMic={status?.localMic ?? false}
   operatorLocalPeerId={remoteShell?.getOperatorPeerId()}
   onLogin={() => goAuth.login()}
-  onInvite={() => retryConnect()}
+  onInvite={() => remoteShell?.mintInvite()}
   onRevokeInvite={() => remoteShell?.revokeInvite()}
   onEnd={() => remoteShell?.endBooth()}
   onKick={(peerId) => remoteShell?.kickPeer(peerId)}
