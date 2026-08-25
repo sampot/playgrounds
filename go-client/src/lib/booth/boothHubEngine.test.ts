@@ -252,7 +252,35 @@ describe("createEmbeddedBoothHubEngine", () => {
     expect(ack).toEqual({ ok: false, error: "session_ended" });
   });
 
-  it("local host reclaiming focus downgrades operator director", () => {
+  it("operator claims director while host tab would have focus", () => {
+    const engine = createEmbeddedBoothHubEngine({
+      ownerUserId: () => "user-1",
+      buildSnapshot: () => ({
+        sessionId: engine.sessionId,
+        ownerUserId: "user-1",
+        engineMode: "embedded",
+        members: [],
+        inviteGate: "none",
+        shareFileCount: 0,
+        guestCount: 0,
+        anchor: "offline",
+      }),
+      handlers,
+      localHostClaimsDirector: () => true,
+    });
+
+    engine.registerShell({ shellId: "host-local", role: "host" });
+    expect(engine.getDirector()?.shellId).toBe("host-local");
+
+    const grant = engine.claimOperatorDirector("op-remote");
+    expect(grant.role).toBe("operator");
+    expect(engine.getDirector()).toEqual({
+      shellId: "op-remote",
+      role: "operator",
+    });
+  });
+
+  it("host can explicitly reclaim director from operator", () => {
     const engine = createEmbeddedBoothHubEngine({
       ownerUserId: () => "user-1",
       buildSnapshot: () => ({
@@ -272,10 +300,58 @@ describe("createEmbeddedBoothHubEngine", () => {
     engine.claimOperatorDirector("op-remote");
     expect(engine.getDirector()?.shellId).toBe("op-remote");
 
-    engine.syncDirectorFromHostFocus(true);
+    engine.reclaimDirectorForHostShell();
     expect(engine.getDirector()).toEqual({
       shellId: "host-local",
       role: "host",
+    });
+  });
+
+  it("releases director back to host when operator disconnects", () => {
+    const engine = createEmbeddedBoothHubEngine({
+      ownerUserId: () => "user-1",
+      buildSnapshot: () => ({
+        sessionId: engine.sessionId,
+        ownerUserId: "user-1",
+        engineMode: "embedded",
+        members: [],
+        inviteGate: "none",
+        shareFileCount: 0,
+        guestCount: 0,
+        anchor: "offline",
+      }),
+      handlers,
+    });
+    engine.registerShell({ shellId: "host-local", role: "host" });
+    engine.claimOperatorDirector("op-remote");
+    engine.releaseOperatorDirector("op-remote");
+    expect(engine.getDirector()).toEqual({
+      shellId: "host-local",
+      role: "host",
+    });
+  });
+
+  it("replaces an existing operator director with a newer operator", () => {
+    const engine = createEmbeddedBoothHubEngine({
+      ownerUserId: () => "user-1",
+      buildSnapshot: () => ({
+        sessionId: engine.sessionId,
+        ownerUserId: "user-1",
+        engineMode: "embedded",
+        members: [],
+        inviteGate: "none",
+        shareFileCount: 0,
+        guestCount: 0,
+        anchor: "offline",
+      }),
+      handlers,
+    });
+    engine.registerShell({ shellId: "host-local", role: "host" });
+    engine.claimOperatorDirector("op-a");
+    engine.claimOperatorDirector("op-b");
+    expect(engine.getDirector()).toEqual({
+      shellId: "op-b",
+      role: "operator",
     });
   });
 

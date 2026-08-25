@@ -143,28 +143,46 @@
     });
   }
 
+  async function mintRemoteUrl(): Promise<string | null> {
+    const res = await fetch("/v1/booth/operator-caps", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({}),
+    });
+    const data = (await res.json().catch(() => ({}))) as {
+      remoteUrl?: string;
+      error?: string;
+    };
+    if (!res.ok || !data.remoteUrl) {
+      const msg =
+        data.error === "anchor_degraded"
+          ? "家裡包廂連線不穩，請確認包廂分頁仍開啟後再試"
+          : (data.error ?? "無法連回包廂");
+      dash.flash(msg, "err");
+      return null;
+    }
+    return data.remoteUrl;
+  }
+
   async function connectRemote() {
     busy = true;
     try {
-      const res = await fetch("/v1/booth/operator-caps", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({}),
-      });
-      const data = (await res.json().catch(() => ({}))) as {
-        remoteUrl?: string;
-        error?: string;
-      };
-      if (!res.ok || !data.remoteUrl) {
-        const msg =
-          data.error === "anchor_degraded"
-            ? "家裡包廂連線不穩，請確認包廂分頁仍開啟後再試"
-            : (data.error ?? "無法連回包廂");
-        dash.flash(msg, "err");
-        return;
-      }
-      window.open(data.remoteUrl, "_blank", "noopener,noreferrer");
+      const remoteUrl = await mintRemoteUrl();
+      if (!remoteUrl) return;
+      window.open(remoteUrl, "_blank", "noopener,noreferrer");
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function copyRemoteLink() {
+    busy = true;
+    try {
+      const remoteUrl = await mintRemoteUrl();
+      if (!remoteUrl) return;
+      const ok = await copyText(remoteUrl);
+      dash.flash(ok ? "已複製連回包廂連結" : "無法複製，請手動選取", ok ? "ok" : "warn");
     } finally {
       busy = false;
     }
@@ -247,6 +265,14 @@
         onclick={() => void connectRemote()}
       >
         連回包廂
+      </button>
+      <button
+        type="button"
+        class="pixel-btn"
+        disabled={busy || presence === "degraded"}
+        onclick={() => void copyRemoteLink()}
+      >
+        複製連回包廂
       </button>
       <button type="button" class="pixel-btn" onclick={askEndBooth}>結束常駐包廂</button>
     </div>

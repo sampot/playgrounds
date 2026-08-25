@@ -154,6 +154,7 @@ export type BoothAnchorHostHandlers = {
     inviteId: string;
     offerWire: string;
   }) => Promise<string>;
+  onOperatorDisconnected?: (shellId: string) => void;
   /** TV program stream for Operator WebRTC preview (§10.6). */
   getTvProgramStream?: () => MediaStream | null;
   onOwnerDataChannel?: (dc: RTCDataChannel) => void;
@@ -162,12 +163,15 @@ export type BoothAnchorHostHandlers = {
 export type BoothAnchorHost = {
   start(): Promise<void>;
   stop(): Promise<void>;
+  ensureConnected(): Promise<void>;
   publishSnapshot(): void;
   refreshProgram(): void;
 };
 
 const KEEPALIVE_MS = 45_000;
 const OPERATOR_HELLO_WAIT_MS = 20_000;
+const RECONNECT_BASE_MS = 1_000;
+const RECONNECT_MAX_MS = 30_000;
 
 function wsUrlWithSecret(base: string, anchorSecret: string): string {
   const url = new URL(base, platformApiOrigin());
@@ -187,10 +191,56 @@ export function createBoothAnchorHost(
 ): BoothAnchorHost {
   let ws: WebSocket | null = null;
   let keepaliveTimer: ReturnType<typeof setInterval> | null = null;
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let reconnectAttempt = 0;
+  let connecting: Promise<void> | null = null;
+  let registration: RegisterBoothAnchorResult | null = null;
   let operatorDirectorShellId: string | null = null;
   let operatorConnections = 0;
+  const operatorShellIds = new Set<string>();
   let stopped = false;
   let engineRtc: ReturnType<typeof createBoothEngineOperatorRtc> | null = null;
+
+  function clearReconnectTimer(): void {
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+  }
+
+  function resetOperatorSession(): void {
+    operatorDirectorShellId = null;
+    operatorConnections = 0;
+    operatorShellIds.clear();
+    engineRtc?.stop();
+    engineRtc = null;
+  }
+
+  function notifyOperatorDisconnected(shellId: string | undefined): void {
+    if (!shellId) return;
+    operatorShellIds.delete(shellId);
+    handlers.onOperatorDisconnected?.(shellId);
+  }
+
+  function scheduleReconnect(): void {
+    if (stopped || reconnectTimer) return;
+    const delay = Math.min(
+      RECONNECT_BASE_MS * 2 ** reconnectAttempt,
+      RECONNECT_MAX_MS
+    );
+    reconnectAttempt += 1;
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      void ensureConnected();
+    }, delay);
+  }
+
+  function handleWsClose(): void {
+    stopKeepalive();
+    ws = null;
+    resetOperatorSession();
+    if (!stopped) scheduleReconnect();
+  }
 
   function ensureEngineRtc(): ReturnType<typeof createBoothEngineOperatorRtc> | null {
     if (!handlers.getTvProgramStream || !handlers.getLocalPresence) return null;
@@ -242,9 +292,19 @@ export function createBoothAnchorHost(
   async function handleOperatorFrame(frame: BoothEnvelope): Promise<void> {
     if (frame.type === "booth.event.operator.left") {
       operatorConnections = Math.max(0, operatorConnections - 1);
+      const shellId =
+        typeof frame.shellId === "string"
+          ? frame.shellId
+          : operatorShellIds.size === 1
+            ? [...operatorShellIds][0]
+            : operatorDirectorShellId ?? undefined;
       if (operatorConnections <= 0) {
         engineRtc?.stop();
         engineRtc = null;
+      }
+      notifyOperatorDisconnected(shellId);
+      if (operatorDirectorShellId === shellId) {
+        operatorDirectorShellId = null;
       }
       return;
     }
@@ -257,6 +317,7 @@ export function createBoothAnchorHost(
       operatorConnections += 1;
       const shellId =
         typeof frame.shellId === "string" ? frame.shellId : `op-${Date.now()}`;
+      operatorShellIds.add(shellId);
       let role: "operator" | "viewer";
       let director: BoothDirectorGrant | undefined;
       if (handlers.claimOperatorDirector) {
@@ -266,11 +327,9 @@ export function createBoothAnchorHost(
         operatorDirectorShellId =
           role === "operator" ? shellId : director?.shellId ?? null;
       } else {
-        role = handlers.localHostClaimsDirector()
-          ? "viewer"
-          : ((operatorDirectorShellId = shellId), "operator");
-        director =
-          role === "operator" ? { shellId, role: "operator" } : undefined;
+        role = "operator";
+        director = { shellId, role: "operator" };
+        operatorDirectorShellId = shellId;
       }
       const snapshot = handlers.getSnapshot();
       send({
@@ -304,8 +363,7 @@ export function createBoothAnchorHost(
         typeof frame.shellId === "string" ? frame.shellId : operatorDirectorShellId;
       const canDirect = handlers.operatorCanDirect
         ? handlers.operatorCanDirect(shellId ?? "")
-        : !handlers.localHostClaimsDirector() &&
-          Boolean(shellId && operatorDirectorShellId === shellId);
+        : Boolean(shellId && operatorDirectorShellId === shellId);
       if (!canDirect) {
         send({
           type: "booth.ack",
@@ -370,42 +428,107 @@ export function createBoothAnchorHost(
     void ensureEngineRtc()?.refreshProgram();
   }
 
-  return {
-    async start() {
-      stopped = false;
-      const reg = await registerBoothAnchorWithForceRetry({
+  function isWsOpen(socket: WebSocket | null): boolean {
+    return socket?.readyState === WebSocket.OPEN;
+  }
+
+  function isWsConnecting(socket: WebSocket | null): boolean {
+    return Boolean(socket && socket.readyState === WebSocket.CONNECTING);
+  }
+
+  async function openWebSocket(): Promise<void> {
+    if (stopped) return;
+    if (isWsOpen(ws)) return;
+    if (isWsConnecting(ws)) return;
+
+    if (!registration) {
+      registration = await registerBoothAnchorWithForceRetry({
         apiKey: opts.apiKey,
         boothSessionId: opts.boothSessionId,
         deviceLabel: opts.deviceLabel,
       });
-      const socketUrl = wsUrlWithSecret(reg.wsUrl, reg.anchorSecret);
-      ws = new WebSocket(socketUrl);
-      ws.addEventListener("message", onWsMessage);
-      ws.addEventListener("close", () => stopKeepalive());
+    }
+
+    const socketUrl = wsUrlWithSecret(
+      registration.wsUrl,
+      registration.anchorSecret
+    );
+    const sock = new WebSocket(socketUrl);
+    ws = sock;
+    sock.addEventListener("message", onWsMessage);
+
+    try {
       await new Promise<void>((resolve, reject) => {
-        const sock = ws;
-        if (!sock) return reject(new Error("ws_missing"));
-        if (sock.readyState === WebSocket.OPEN) {
+        const onOpen = () => {
+          cleanup();
+          reconnectAttempt = 0;
           startKeepalive();
+          sock.send("ping");
+          sock.addEventListener("close", handleWsClose);
           resolve();
+        };
+        const onError = () => {
+          cleanup();
+          reject(new Error("ws_failed"));
+        };
+        const onCloseBeforeOpen = () => {
+          cleanup();
+          reject(new Error("ws_closed"));
+        };
+        const cleanup = () => {
+          sock.removeEventListener("open", onOpen);
+          sock.removeEventListener("error", onError);
+          sock.removeEventListener("close", onCloseBeforeOpen);
+        };
+        if (sock.readyState === WebSocket.OPEN) {
+          onOpen();
           return;
         }
-        sock.addEventListener(
-          "open",
-          () => {
-            startKeepalive();
-            sock.send("ping");
-            resolve();
-          },
-          { once: true }
-        );
-        sock.addEventListener("error", () => reject(new Error("ws_failed")), {
-          once: true,
-        });
+        sock.addEventListener("open", onOpen, { once: true });
+        sock.addEventListener("error", onError, { once: true });
+        sock.addEventListener("close", onCloseBeforeOpen, { once: true });
       });
+    } catch {
+      ws = null;
+      if (!stopped) scheduleReconnect();
+      throw new Error("ws_failed");
+    }
+  }
+
+  async function ensureConnected(): Promise<void> {
+    if (stopped) return;
+    if (isWsOpen(ws)) return;
+    if (connecting) {
+      await connecting;
+      return;
+    }
+    connecting = openWebSocket();
+    try {
+      await connecting;
+    } finally {
+      connecting = null;
+    }
+  }
+
+  return {
+    async start() {
+      stopped = false;
+      clearReconnectTimer();
+      reconnectAttempt = 0;
+      registration = await registerBoothAnchorWithForceRetry({
+        apiKey: opts.apiKey,
+        boothSessionId: opts.boothSessionId,
+        deviceLabel: opts.deviceLabel,
+      });
+      try {
+        await ensureConnected();
+      } catch {
+        /* background reconnect scheduled */
+      }
     },
     async stop() {
       stopped = true;
+      clearReconnectTimer();
       stopKeepalive();
       if (ws) {
         try {
@@ -420,11 +543,14 @@ export function createBoothAnchorHost(
       } catch {
         /* ignore */
       }
+      registration = null;
+      reconnectAttempt = 0;
       operatorDirectorShellId = null;
       operatorConnections = 0;
       engineRtc?.stop();
       engineRtc = null;
     },
+    ensureConnected,
     publishSnapshot() {
       pushSnapshotIfOperators();
     },

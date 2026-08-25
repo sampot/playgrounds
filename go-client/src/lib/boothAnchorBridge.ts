@@ -117,6 +117,7 @@ export function createBoothAnchorBridge(ctx: {
   claimHubOperatorDirector?: BoothHubEngine["claimOperatorDirector"];
   hubOperatorCanDirect?: (shellId: string) => boolean;
   syncHubDirectorFocus?: (localHostClaimsDirector: boolean) => void;
+  onOperatorDisconnected?: (shellId: string) => void;
   getBoothSessionId?: () => string;
 }): BoothAnchorBridge {
   const fallbackSessionId = crypto.randomUUID();
@@ -128,6 +129,20 @@ export function createBoothAnchorBridge(ctx: {
   let starting: Promise<void> | null = null;
   let ownerDc: RTCDataChannel | null = null;
   let ownerFileHost: ReturnType<typeof createBoothOwnerFileHost> | null = null;
+  let visibilityCleanup: (() => void) | null = null;
+
+  function bindVisibilityReconnect(): void {
+    if (typeof document === "undefined" || visibilityCleanup) return;
+    const onVisible = () => {
+      if (document.visibilityState !== "visible" || !enabled) return;
+      void host?.ensureConnected();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    visibilityCleanup = () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      visibilityCleanup = null;
+    };
+  }
 
   function ensureOwnerFileHost(): ReturnType<typeof createBoothOwnerFileHost> {
     ownerFileHost ??= createBoothOwnerFileHost({
@@ -266,10 +281,7 @@ export function createBoothAnchorBridge(ctx: {
   }
 
   function localHostClaimsDirector(): boolean {
-    if (typeof document === "undefined") return true;
-    const claims = document.hasFocus();
-    ctx.syncHubDirectorFocus?.(claims);
-    return claims;
+    return false;
   }
 
   async function handleOperatorIntent(
@@ -536,6 +548,7 @@ export function createBoothAnchorBridge(ctx: {
   }
 
   async function stopHost(): Promise<void> {
+    visibilityCleanup?.();
     ownerDc = null;
     ownerFileHost?.reset();
     ownerFileHost = null;
@@ -550,7 +563,10 @@ export function createBoothAnchorBridge(ctx: {
     if (ctx.getStatus().phase !== "open") return;
     const key = ctx.getApiKey();
     if (!key) return;
-    if (host) return;
+    if (host) {
+      await host.ensureConnected();
+      return;
+    }
     if (starting) {
       await starting;
       return;
@@ -574,6 +590,9 @@ export function createBoothAnchorBridge(ctx: {
             },
           prepareOperatorRoster: ctx.prepareOperatorRoster,
           onOperatorSession: ctx.onOperatorSession,
+          onOperatorDisconnected: (shellId) => {
+            ctx.onOperatorDisconnected?.(shellId);
+          },
         },
         {
           apiKey: key,
@@ -586,6 +605,7 @@ export function createBoothAnchorBridge(ctx: {
       );
       await nextHost.start();
       host = nextHost;
+      bindVisibilityReconnect();
     })();
     try {
       await starting;

@@ -97,7 +97,6 @@ export function createRemoteBoothHubEngine(opts: {
       const canDirect = boothShellCanDirect({
         director,
         shellId: shell.shellId,
-        localHostClaimsDirector: false,
         role: shell.role,
       });
       if (intentRequiresDirector(intent) && !canDirect) {
@@ -115,22 +114,23 @@ export function createRemoteBoothHubEngine(opts: {
     },
 
     claimOperatorDirector(nextShellId) {
-      if (director?.shellId === nextShellId) {
-        return { role: "operator" as const, director };
-      }
-      if (!director) {
-        const grant = { shellId: nextShellId, role: "operator" as const };
-        director = grant;
-        return { role: "operator" as const, director: grant };
-      }
-      return { role: "viewer" as const };
+      const lock = { shellId: nextShellId, role: "operator" as const };
+      director = lock;
+      return { role: "operator" as const, director: lock };
     },
 
-    syncDirectorFromHostFocus(claims) {
-      if (claims && role === "host") {
-        director = { shellId, role: "host" };
-        publish({ type: "booth.event.director.changed", director });
-      }
+    releaseOperatorDirector(_shellId) {
+      void _shellId;
+    },
+
+    reclaimDirectorForHostShell() {
+      if (role !== "host") return;
+      director = { shellId, role: "host" };
+      publish({ type: "booth.event.director.changed", director });
+    },
+
+    syncDirectorFromHostFocus(_claims) {
+      void _claims;
     },
 
     getMediaSurface() {

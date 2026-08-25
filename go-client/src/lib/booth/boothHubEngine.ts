@@ -111,6 +111,12 @@ export interface BoothHubEngine {
     director?: BoothDirectorLock;
   };
 
+  /** Release director when a remote operator disconnects. */
+  releaseOperatorDirector(shellId: string): void;
+
+  /** Local host Shell explicitly reclaims director (§7.4). */
+  reclaimDirectorForHostShell(): void;
+
   syncDirectorFromHostFocus(localHostClaimsDirector: boolean): void;
 
   getMediaSurface(): BoothMediaSurface;
@@ -180,15 +186,9 @@ export function createEmbeddedBoothHubEngine(opts: {
   let ended = false;
   let director: BoothDirectorLock | null = null;
   let hostShellId: string | null = null;
+  let connectedOperators = new Set<string>();
   let activePeerCap: BoothPeerCapRecord | null = null;
   const listeners = new Set<(msg: BoothEngineEvent) => void>();
-
-  const localHostClaimsDirector =
-    opts.localHostClaimsDirector ??
-    (() => {
-      if (typeof document === "undefined") return true;
-      return document.hasFocus();
-    });
 
   function publishSnapshot(): void {
     const snapshot = opts.buildSnapshot();
@@ -217,13 +217,9 @@ export function createEmbeddedBoothHubEngine(opts: {
   }
 
   function ensureHostDirector(): void {
-    if (!hostShellId) return;
-    if (localHostClaimsDirector()) {
+    if (!hostShellId || connectedOperators.size > 0) return;
+    if (!director) {
       setDirector({ shellId: hostShellId, role: "host" });
-      return;
-    }
-    if (director?.role === "host") {
-      setDirector(null);
     }
   }
 
@@ -231,7 +227,6 @@ export function createEmbeddedBoothHubEngine(opts: {
     return boothShellCanDirect({
       director,
       shellId: shell.shellId,
-      localHostClaimsDirector: localHostClaimsDirector(),
       role: shell.role,
     });
   }
@@ -422,21 +417,31 @@ export function createEmbeddedBoothHubEngine(opts: {
     },
 
     claimOperatorDirector(shellId) {
-      const picked = pickOperatorDirectorRole({
-        shellId,
-        director,
-        localHostClaimsDirector: localHostClaimsDirector(),
-      });
+      connectedOperators.add(shellId);
+      const picked = pickOperatorDirectorRole({ shellId, director });
       if (picked.director) setDirector(picked.director);
       return picked;
     },
 
-    syncDirectorFromHostFocus(claims) {
-      if (claims && hostShellId) {
-        setDirector({ shellId: hostShellId, role: "host" });
-        return;
+    releaseOperatorDirector(shellId) {
+      connectedOperators.delete(shellId);
+      if (director?.shellId === shellId && director.role === "operator") {
+        if (hostShellId && connectedOperators.size === 0) {
+          setDirector({ shellId: hostShellId, role: "host" });
+        } else {
+          setDirector(null);
+        }
       }
       ensureHostDirector();
+    },
+
+    reclaimDirectorForHostShell() {
+      if (!hostShellId) return;
+      setDirector({ shellId: hostShellId, role: "host" });
+    },
+
+    syncDirectorFromHostFocus(_claims) {
+      void _claims;
     },
 
     getMediaSurface() {

@@ -9,6 +9,7 @@ import {
 const hostFixtures = vi.hoisted(() => ({
   start: vi.fn().mockResolvedValue(undefined),
   stop: vi.fn().mockResolvedValue(undefined),
+  ensureConnected: vi.fn().mockResolvedValue(undefined),
   publishSnapshot: vi.fn(),
   refreshProgram: vi.fn(),
   capturedHandlers: null as import("./boothPlatform").BoothAnchorHostHandlers | null,
@@ -20,6 +21,7 @@ vi.mock("./boothPlatform", () => ({
     return {
       start: hostFixtures.start,
       stop: hostFixtures.stop,
+      ensureConnected: hostFixtures.ensureConnected,
       publishSnapshot: hostFixtures.publishSnapshot,
       refreshProgram: hostFixtures.refreshProgram,
     };
@@ -70,6 +72,7 @@ describe("createBoothAnchorBridge anchor lifecycle", () => {
   beforeEach(() => {
     hostFixtures.start.mockClear();
     hostFixtures.stop.mockClear();
+    hostFixtures.ensureConnected.mockClear();
     hostFixtures.capturedHandlers = null;
     storage.data = {};
     Object.defineProperty(globalThis, "localStorage", {
@@ -169,6 +172,37 @@ describe("createBoothAnchorBridge anchor lifecycle", () => {
 
     await bridge.setEnabled(false);
     expect(hostFixtures.stop).toHaveBeenCalledTimes(1);
+  });
+
+  it("re-checks anchor connection when booth reopens with host already started", async () => {
+    writeRemoteAnchorEnabled(true);
+    const bridge = createBoothAnchorBridge({
+      getStatus: () => openStatus(),
+      getOwnerUserId: () => "u1",
+      getApiKey: () => "pg_sk_test",
+      getHostPeerId: () => "host-1",
+      onGuestJoinOffer: vi.fn(),
+      onOperatorCastLive: vi.fn(),
+      onOperatorCastFile: vi.fn(),
+      onOperatorStopTv: vi.fn(),
+      onOperatorHaltLive: vi.fn(),
+      onOperatorMintInvite: vi.fn(),
+      onOperatorRevokeInvite: vi.fn(),
+      onOperatorCastState: vi.fn(),
+      onOperatorKickPeer: vi.fn(),
+      onOperatorEndBooth: vi.fn(),
+      onOperatorStartAutoPlay: vi.fn(),
+      onOperatorStartManualPlay: vi.fn(),
+      onOperatorEndPlay: vi.fn(),
+    });
+
+    await bridge.onBoothOpen();
+    expect(hostFixtures.start).toHaveBeenCalledTimes(1);
+    expect(hostFixtures.ensureConnected).not.toHaveBeenCalled();
+
+    await bridge.onBoothOpen();
+    expect(hostFixtures.start).toHaveBeenCalledTimes(1);
+    expect(hostFixtures.ensureConnected).toHaveBeenCalledTimes(1);
   });
 });
 

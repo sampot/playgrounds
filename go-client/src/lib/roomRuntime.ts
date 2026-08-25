@@ -513,13 +513,15 @@ export function createRoomRuntime(opts?: {
       const engine = hubRef.engine;
       if (!engine) return false;
       const director = engine.getDirector();
-      return (
-        !localHostPageClaimsDirector() &&
-        Boolean(director && director.shellId === shellId)
-      );
+      return Boolean(director && director.shellId === shellId);
+    },
+    onOperatorDisconnected: (shellId) => {
+      hubRef.engine?.releaseOperatorDirector(shellId);
+      anchorBridge.publishSnapshot();
     },
     syncHubDirectorFocus: (claims) => {
-      hubRef.engine?.syncDirectorFromHostFocus(claims);
+      if (claims) hubRef.engine?.reclaimDirectorForHostShell();
+      anchorBridge.publishSnapshot();
     },
     getBoothSessionId: () => hubRef.engine?.sessionId ?? "",
   });
@@ -1451,11 +1453,6 @@ export function createRoomRuntime(opts?: {
     }
   }
 
-  function localHostPageClaimsDirector(): boolean {
-    if (typeof document === "undefined") return true;
-    return document.hasFocus();
-  }
-
   function buildHubSnapshot(): import("@pg/roster/boothChannel").BoothStateSnapshot {
     const inviteGate =
       status.inviteDoor === "live"
@@ -1587,7 +1584,6 @@ export function createRoomRuntime(opts?: {
   const hubEngine = createEmbeddedBoothHubEngine({
     ownerUserId: () => goAuth.profile?.user_id ?? null,
     buildSnapshot: buildHubSnapshot,
-    localHostClaimsDirector: localHostPageClaimsDirector,
     onDirectorChanged: () => anchorBridge.publishSnapshot(),
     acceptPeerOffer: acceptPeerJoinOffer,
     handlers: {
