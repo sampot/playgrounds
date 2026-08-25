@@ -25,8 +25,14 @@ class MockWebSocket {
     this.listeners.get(type)?.delete(listener);
   }
 
-  send(_data: string) {
-    /* noop */
+  send(data: string) {
+    this.sent.push(data);
+  }
+
+  readonly sent: string[] = [];
+
+  receive(text: string) {
+    this.emit("message", { data: text } as MessageEvent);
   }
 
   close() {
@@ -63,6 +69,16 @@ const handlers = {
   onOperatorIntent: vi.fn(),
   onGuestJoinOffer: vi.fn(),
 };
+
+function parseSentFrames(sock: MockWebSocket): Record<string, unknown>[] {
+  return sock.sent.flatMap((text) => {
+    try {
+      return [JSON.parse(text) as Record<string, unknown>];
+    } catch {
+      return [];
+    }
+  });
+}
 
 async function waitForSocket(): Promise<MockWebSocket> {
   for (let i = 0; i < 20; i += 1) {
@@ -143,6 +159,143 @@ describe("createBoothAnchorHost reconnect", () => {
     second.open();
     await reconnecting;
     expect(MockWebSocket.instances).toHaveLength(2);
+
+    await host.stop();
+  });
+});
+
+describe("createBoothAnchorHost operator intents", () => {
+  const OriginalWebSocket = globalThis.WebSocket;
+
+  beforeEach(() => {
+    MockWebSocket.instances = [];
+    vi.stubGlobal("WebSocket", MockWebSocket);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          boothSessionId: "sess-1",
+          anchorSecret: "pg_ba_secret",
+          wsUrl: "https://api.test/v1/booth/ws?role=engine",
+        }),
+      })
+    );
+  });
+
+  afterEach(() => {
+    vi.stubGlobal("WebSocket", OriginalWebSocket);
+    vi.unstubAllGlobals();
+  });
+
+  it("forwards invite mint to operator intent when director is granted", async () => {
+    const onOperatorIntent = vi.fn().mockResolvedValue(undefined);
+    const host = createBoothAnchorHost(
+      {
+        ...handlers,
+        onOperatorIntent,
+        remoteOperatorEnabled: () => true,
+        claimOperatorDirector: (shellId) => ({
+          role: "operator" as const,
+          director: { shellId, role: "operator" as const },
+        }),
+        operatorCanDirect: (shellId) => shellId === "op-remote",
+      },
+      {
+        apiKey: "pg_sk_test",
+        boothSessionId: "sess-1",
+      }
+    );
+
+    const pending = host.start();
+    const sock = await waitForSocket();
+    sock.open();
+    await pending;
+
+    sock.receive(
+      JSON.stringify({
+        type: "booth.hello",
+        v: 1,
+        shellId: "op-remote",
+      })
+    );
+    await Promise.resolve();
+
+    onOperatorIntent.mockClear();
+    sock.receive(
+      JSON.stringify({
+        type: "booth.intent.invite.mint",
+        v: 1,
+        shellId: "op-remote",
+        id: "req-invite",
+      })
+    );
+    await Promise.resolve();
+
+    expect(onOperatorIntent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "booth.intent.invite.mint",
+        shellId: "op-remote",
+      })
+    );
+    const ack = parseSentFrames(sock).find(
+      (frame) => frame.type === "booth.ack" && frame.id === "req-invite"
+    );
+    expect(ack).toMatchObject({ type: "booth.ack", id: "req-invite", ok: true });
+
+    await host.stop();
+  });
+
+  it("rejects invite mint when operator lacks director", async () => {
+    const onOperatorIntent = vi.fn();
+    const host = createBoothAnchorHost(
+      {
+        ...handlers,
+        onOperatorIntent,
+        remoteOperatorEnabled: () => true,
+        claimOperatorDirector: () => ({ role: "viewer" as const }),
+        operatorCanDirect: () => false,
+      },
+      {
+        apiKey: "pg_sk_test",
+        boothSessionId: "sess-1",
+      }
+    );
+
+    const pending = host.start();
+    const sock = await waitForSocket();
+    sock.open();
+    await pending;
+
+    sock.receive(
+      JSON.stringify({
+        type: "booth.hello",
+        v: 1,
+        shellId: "op-remote",
+      })
+    );
+    await Promise.resolve();
+
+    sock.receive(
+      JSON.stringify({
+        type: "booth.intent.invite.mint",
+        v: 1,
+        shellId: "op-remote",
+        id: "req-invite",
+      })
+    );
+    await Promise.resolve();
+
+    expect(onOperatorIntent).not.toHaveBeenCalled();
+    const ack = parseSentFrames(sock).find(
+      (frame) => frame.type === "booth.ack" && frame.id === "req-invite"
+    );
+    expect(ack).toMatchObject({
+      type: "booth.ack",
+      id: "req-invite",
+      ok: false,
+      error: "not_director",
+    });
 
     await host.stop();
   });

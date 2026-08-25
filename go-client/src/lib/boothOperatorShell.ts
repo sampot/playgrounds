@@ -121,6 +121,29 @@ export function operatorCanDirect(input: {
   return Boolean(d && d.shellId === input.shellId && d.role === "operator");
 }
 
+export function operatorInviteFromAckPayload(
+  payload: Record<string, unknown> | undefined,
+  currentExpiresAt: number | null
+): Partial<OperatorShellStatus> | null {
+  if (!payload) return null;
+  if (payload.inviteGate === "expired") {
+    return { inviteDoor: "expired", shortUrl: null, inviteExpiresAt: null };
+  }
+  const shortUrl =
+    typeof payload.shortUrl === "string" ? payload.shortUrl.trim() : "";
+  if (!shortUrl) return null;
+  const inviteExpiresAt =
+    typeof payload.inviteExpiresAt === "number" &&
+    Number.isFinite(payload.inviteExpiresAt)
+      ? payload.inviteExpiresAt
+      : currentExpiresAt;
+  return {
+    shortUrl,
+    inviteDoor: "live",
+    inviteExpiresAt,
+  };
+}
+
 export function operatorLocalDisplayName(): string {
   const profile = goAuth.profile;
   const name =
@@ -583,6 +606,9 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
   }
 
   function publishSnapshot(snapshot: BoothStateSnapshot): void {
+    if ("director" in snapshot) {
+      director = snapshot.director ?? null;
+    }
     const ui = boothSnapshotToUi(snapshot);
     const canDirect = operatorCanDirect({ director, shellId });
     const programClock = resolveProgramClock(snapshot.cast);
@@ -672,9 +698,17 @@ export function createBoothOperatorShell(opts: { operatorCap: string }) {
               }
             }
           }
-          set({
+          const partial: Partial<OperatorShellStatus> = {
             lastAck: ok ? "已送出" : friendlyOperatorAckError(err),
-          });
+          };
+          if (ok) {
+            const invite = operatorInviteFromAckPayload(
+              payload,
+              status.inviteExpiresAt
+            );
+            if (invite) Object.assign(partial, invite);
+          }
+          set(partial);
         },
         onHelloOk: (hello) => {
           director = hello.director ?? null;

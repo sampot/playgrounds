@@ -102,6 +102,7 @@ import {
   createEmbeddedBoothHubEngine,
   type BoothHubEngine,
 } from "./booth/boothHubEngine";
+import { boothShellCanDirect } from "./booth/boothState";
 import {
   createBoothShellClient,
   embeddedHostShellContext,
@@ -512,8 +513,11 @@ export function createRoomRuntime(opts?: {
     hubOperatorCanDirect: (shellId) => {
       const engine = hubRef.engine;
       if (!engine) return false;
-      const director = engine.getDirector();
-      return Boolean(director && director.shellId === shellId);
+      return boothShellCanDirect({
+        director: engine.getDirector(),
+        shellId,
+        role: "operator",
+      });
     },
     onOperatorDisconnected: (shellId) => {
       hubRef.engine?.releaseOperatorDirector(shellId);
@@ -524,6 +528,7 @@ export function createRoomRuntime(opts?: {
       anchorBridge.publishSnapshot();
     },
     getBoothSessionId: () => hubRef.engine?.sessionId ?? "",
+    getDirector: () => hubRef.engine?.getDirector() ?? null,
   });
 
   function clearPlayCanvas(): void {
@@ -1727,7 +1732,9 @@ export function createRoomRuntime(opts?: {
   }
 
   operatorHooks.mintInvite = async () => {
-    await mintInviteAndAnswerInner();
+    const out = await mintInviteAndAnswerInner();
+    if (!out) throw new Error("invite_mint_failed");
+    anchorBridge.publishSnapshot();
   };
   operatorHooks.revokeInvite = async () => {
     revokeInviteDoor();

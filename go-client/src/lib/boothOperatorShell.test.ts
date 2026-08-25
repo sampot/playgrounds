@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { operatorCanDirect } from "./boothOperatorShell";
+import { operatorCanDirect, operatorInviteFromAckPayload } from "./boothOperatorShell";
 
 const clientOpts: {
   onRemoteDisabled?: () => void;
@@ -76,6 +76,35 @@ vi.mock("./boothOperatorRtc", () => ({
     };
   }),
 }));
+
+describe("operatorInviteFromAckPayload", () => {
+  it("maps live invite ack to operator shell fields", () => {
+    expect(
+      operatorInviteFromAckPayload(
+        {
+          inviteGate: "live",
+          shortUrl: "https://go.samkuo.me/i/abc",
+          inviteExpiresAt: 1_700_000_000_000,
+        },
+        null
+      )
+    ).toEqual({
+      inviteDoor: "live",
+      shortUrl: "https://go.samkuo.me/i/abc",
+      inviteExpiresAt: 1_700_000_000_000,
+    });
+  });
+
+  it("maps revoke ack to expired door", () => {
+    expect(
+      operatorInviteFromAckPayload({ inviteGate: "expired" }, 1_700_000_000_000)
+    ).toEqual({
+      inviteDoor: "expired",
+      shortUrl: null,
+      inviteExpiresAt: null,
+    });
+  });
+});
 
 describe("operatorCanDirect", () => {
   it("is true when director lock matches shell", () => {
@@ -160,6 +189,28 @@ describe("createBoothOperatorShell", () => {
       director: { shellId: shell.getShellId(), role: "operator" },
     });
     expect(shell.getStatus().phase).toBe("open");
+    expect(shell.getStatus().message).toBe("遠端導播中");
+  });
+
+  it("syncs canDirect from snapshot director", async () => {
+    const { createBoothOperatorShell } = await import("./boothOperatorShell");
+    const shell = createBoothOperatorShell({ operatorCap: "cap-test" });
+    await shell.connect();
+    openOperatorRtcChannels();
+    expect(shell.getStatus().canDirect).toBe(false);
+
+    clientOpts.onSnapshot?.({
+      sessionId: "sess-1",
+      ownerUserId: "u1",
+      engineMode: "embedded" as const,
+      members: [],
+      inviteGate: "none" as const,
+      shareFileCount: 0,
+      guestCount: 0,
+      anchor: "online" as const,
+      director: { shellId: shell.getShellId(), role: "operator" },
+    });
+    expect(shell.getStatus().canDirect).toBe(true);
     expect(shell.getStatus().message).toBe("遠端導播中");
   });
 

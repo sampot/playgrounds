@@ -287,6 +287,59 @@ describe("createBoothAnchorBridge snapshot", () => {
     expect(snap!.guestCount).toBe(1);
   });
 
+  it("returns invite ack payload after operator mint", async () => {
+    const onOperatorMintInvite = vi.fn(async () => {
+      /* host status updated by hook */
+    });
+    let door: import("./roomRuntime").RoomStatus["inviteDoor"] = "none";
+    let shortUrl: string | null = null;
+    let inviteExpiresAt: number | null = null;
+    const bridge = createBoothAnchorBridge({
+      getStatus: () =>
+        openStatus({
+          inviteDoor: door,
+          shortUrl,
+          inviteExpiresAt,
+        }),
+      getOwnerUserId: () => "u1",
+      getApiKey: () => "pg_sk_test",
+      getHostPeerId: () => "host-1",
+      onGuestJoinOffer: vi.fn(),
+      onOperatorCastLive: vi.fn(),
+      onOperatorCastFile: vi.fn(),
+      onOperatorStopTv: vi.fn(),
+      onOperatorHaltLive: vi.fn(),
+      onOperatorMintInvite: vi.fn(async () => {
+        door = "live";
+        shortUrl = "https://go.samkuo.me/i/abc123";
+        inviteExpiresAt = Date.now() + 300_000;
+        await onOperatorMintInvite();
+      }),
+      onOperatorRevokeInvite: vi.fn(),
+      onOperatorCastState: vi.fn(),
+      onOperatorKickPeer: vi.fn(),
+      onOperatorEndBooth: vi.fn(),
+      onOperatorStartAutoPlay: vi.fn(),
+      onOperatorStartManualPlay: vi.fn(),
+      onOperatorEndPlay: vi.fn(),
+    });
+
+    await bridge.setEnabled(true);
+    const payload = await hostFixtures.capturedHandlers!.onOperatorIntent({
+      type: "booth.intent.invite.mint",
+      v: 1,
+      shellId: "op-remote",
+      id: "req-1",
+    });
+
+    expect(onOperatorMintInvite).toHaveBeenCalled();
+    expect(payload).toMatchObject({
+      inviteGate: "live",
+      shortUrl: "https://go.samkuo.me/i/abc123",
+    });
+    expect(hostFixtures.publishSnapshot).toHaveBeenCalled();
+  });
+
   it("passes operator roster hooks to anchor host", async () => {
     const prepareOperatorRoster = vi.fn(() => ({}));
     const onOperatorSession = vi.fn();

@@ -119,6 +119,7 @@ export function createBoothAnchorBridge(ctx: {
   syncHubDirectorFocus?: (localHostClaimsDirector: boolean) => void;
   onOperatorDisconnected?: (shellId: string) => void;
   getBoothSessionId?: () => string;
+  getDirector?: () => BoothStateSnapshot["director"] | null;
 }): BoothAnchorBridge {
   const fallbackSessionId = crypto.randomUUID();
   let enabled = readRemoteAnchorEnabled() || isBoothDesktopShell();
@@ -277,6 +278,22 @@ export function createBoothAnchorBridge(ctx: {
       chatTail,
       guestCount: s.guestCount,
       anchor: host ? "online" : "registering",
+      director: ctx.getDirector?.() ?? undefined,
+    };
+  }
+
+  function inviteAckPayload(): Record<string, unknown> {
+    const s = ctx.getStatus();
+    const inviteGate =
+      s.inviteDoor === "live"
+        ? "live"
+        : s.inviteDoor === "expired"
+          ? "expired"
+          : "none";
+    return {
+      inviteGate,
+      shortUrl: s.shortUrl ?? undefined,
+      inviteExpiresAt: s.inviteExpiresAt ?? undefined,
     };
   }
 
@@ -297,10 +314,12 @@ export function createBoothAnchorBridge(ctx: {
       };
       if (payload?.kind === "live" && payload.peerId) {
         await ctx.onOperatorCastLive(payload.peerId, payload.label);
+        host?.publishSnapshot();
         return;
       }
       if (payload?.kind === "file" && payload.id) {
         await ctx.onOperatorCastFile(payload.id, payload.scope);
+        host?.publishSnapshot();
         return;
       }
       throw new Error("invalid_cast_offer");
@@ -354,12 +373,17 @@ export function createBoothAnchorBridge(ctx: {
     }
     if (frame.type === "booth.intent.invite.mint") {
       await ctx.onOperatorMintInvite();
-      return;
+      const ack = inviteAckPayload();
+      if (ack.inviteGate !== "live" || typeof ack.shortUrl !== "string") {
+        throw new Error("invite_mint_failed");
+      }
+      host?.publishSnapshot();
+      return ack;
     }
     if (frame.type === "booth.intent.invite.revoke") {
       await ctx.onOperatorRevokeInvite();
       host?.publishSnapshot();
-      return;
+      return { inviteGate: "expired", shortUrl: undefined, inviteExpiresAt: undefined };
     }
     if (frame.type === "booth.intent.ejectPeer") {
       const peerId = (frame.payload as { peerId?: string })?.peerId?.trim();
